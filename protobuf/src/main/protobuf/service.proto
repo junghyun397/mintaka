@@ -1,0 +1,35 @@
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+
+option java_outer_classname = "InferenceProto";
+
+package inference;
+
+service Inference {
+  rpc Session(stream Request) returns (stream Response);
+}
+
+message Request {
+  message State {
+    bytes board = 1;
+    uint32 turns = 2;
+  }
+
+  State state = 1;
+}
+
+enum Method {
+  PASS = 0;
+  HARD = 1;
+  HIT = 2;
+}
+
+message Response {
+  message Solution {
+    bytes board = 1;
+    uint32 turns = 2;
+  }
+
+  Solution solution = 1;
+  Method method = 2;
+}
