@@ -17,6 +17,8 @@ class Board(val boardField: Array[Byte], val moves: Int, val latestMove: Int, va
 
   def latestPos: Pos = Pos.fromIdx(this.latestMove)
 
+  def validateMove(pos: Pos): Option[RejectReason.Value] = this.validateMove(pos.idx)
+
   def validateMove(idx: Int): Option[RejectReason.Value] = {
     val flag = this.boardField(idx)
     if (this.isNextColorBlack && flag > Flag.FREE) Option.apply(RejectReason.FORBIDDEN)
@@ -53,7 +55,7 @@ class Board(val boardField: Array[Byte], val moves: Int, val latestMove: Int, va
 
 object Board {
 
-  val newBoard: L1Board = newBoard(Pos(Renju.BOARD_WIDTH / 2, Renju.BOARD_WIDTH / 2).idx)
+  val newBoard: L1Board = newBoard(Renju.BOARD_CENTER.idx)
 
   def newBoard(initIdx: Int): L1Board = new L1Board(
     boardField = Array.fill[Byte](Renju.BOARD_LENGTH)(Flag.FREE).updated(initIdx, Flag.BLACK),

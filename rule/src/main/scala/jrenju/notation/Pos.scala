@@ -8,9 +8,18 @@ final case class Pos(row: Int, col: Int) {
 
   def unapply(arg: Pos): (Int, Int) = (this.row, this.col)
 
+  def toCartesian: String = f"${(row + 97).toChar}${col + 1}"
+
 }
 
 object Pos {
+
+  @inline def idxToRow(idx: Int): Int = idx % Renju.BOARD_WIDTH
+  @inline def idxToCol(idx: Int): Int = idx / Renju.BOARD_WIDTH
+
+  @inline def rowColToIdx(row: Int, col: Int): Int = col * Renju.BOARD_WIDTH + row
+
+  def fromCartesian(rawRow: String, rawCol: Int): Option[Pos] = this.fromCartesian(rawRow.charAt(0), rawCol)
 
   def fromCartesian(rawRow: Char, rawCol: Int): Option[Pos] = {
     val row = rawRow.toUpper - 65
@@ -19,6 +28,6 @@ object Pos {
     else Option.apply(new Pos(row, col))
   }
 
-  def fromIdx(idx: Int): Pos = new Pos(idx % Renju.BOARD_WIDTH, idx / Renju.BOARD_WIDTH)
+  def fromIdx(idx: Int): Pos = new Pos(idxToRow(idx), idxToCol(idx))
 
 }

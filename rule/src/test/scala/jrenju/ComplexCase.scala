@@ -1,6 +1,7 @@
 package jrenju
 
-import jrenju.notation.Pos
+import jrenju.notation.Opening
+import jrenju.rule.Renju
 
 import scala.language.implicitConversions
 
@@ -24,28 +25,16 @@ import scala.language.implicitConversions
 "   A B C D E F G H I J K L M N O   "
  */
 
-final case class ComplexCase(board: Board, solution: DeepL3Board)
-
 object ComplexCase {
 
-  implicit class T2b(val s: String) {
+  implicit class T2b(val source: String) {
 
-    def t2b: L1Board = BoardTransform.fromBoardText(
-      source = "",
-      latestMove = Pos(7, 7).idx,
-      opening = Option.empty
-    ).get
+    def t2b: L1Board = source.t2b(Renju.BOARD_CENTER.idx)
+
+    def t2b(latestMove: Int): L1Board = source.t2b(latestMove, Option.empty)
+
+    def t2b(latestMove: Int, opening: Option[Opening]): L1Board = BoardTransform.fromBoardText(source, latestMove, opening).get
 
   }
-
-  val OPEN_THREE: ComplexCase = ???
-  val CLOSED_THREE: ComplexCase = ???
-
-  val OPEN_FOUR: ComplexCase = ???
-  val CLOSED_FOUR: ComplexCase = ???
-
-  val DOUBLE_3_FORBIDDEN: ComplexCase = ???
-  val DOUBLE_4_FORBIDDEN: ComplexCase = ???
-  val OVER_6_FORBIDDEN: ComplexCase = ???
 
 }

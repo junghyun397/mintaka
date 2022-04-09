@@ -2,14 +2,16 @@ package jrenju.notation
 
 object Flag {
 
-  @inline val BLACK: Byte = 1
-  @inline val WHITE: Byte = 0
+  val BLACK: Byte = 1
+  val WHITE: Byte = 0
 
-  @inline val FREE: Byte = 2
+  val FREE: Byte = 2
 
-  @inline val FORBIDDEN_33: Byte = 3
-  @inline val FORBIDDEN_44: Byte = 4
-  @inline val FORBIDDEN_6: Byte = 5
+  val FORBIDDEN_33: Byte = 3
+  val FORBIDDEN_44: Byte = 4
+  val FORBIDDEN_6: Byte = 5
+
+  val WALL: Byte = 127
 
   object Text {
 
@@ -42,5 +44,7 @@ object Flag {
     case Flag.Text.FORBIDDEN_6 => Option.apply(Flag.FORBIDDEN_6)
     case _ => Option.empty
   }
-  
+
+  @inline def onlyStone(flag: Byte): Byte = if (flag > Flag.FREE) Flag.FREE else flag
+
 }
