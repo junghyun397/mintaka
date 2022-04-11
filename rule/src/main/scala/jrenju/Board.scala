@@ -3,7 +3,13 @@ package jrenju
 import jrenju.notation._
 import jrenju.rule.Renju
 
-class Board(val boardField: Array[Byte], val moves: Int, val latestMove: Int, val opening: Option[Opening]) {
+class Board(
+  val boardField: Array[Byte],
+  val pointsField: Array[PointsPair],
+  val moves: Int,
+  val latestMove: Int,
+  val opening: Option[Opening]
+) {
 
   @inline private val colorRaw: Byte = (this.moves % 2).toByte
 
@@ -32,6 +38,7 @@ class Board(val boardField: Array[Byte], val moves: Int, val latestMove: Int, va
     val thenBoard = boardField.updated(idx, nextColorRaw)
     new L1Board(
       boardField = thenBoard,
+      pointsField = this.pointsField.clone(),
       moves = this.moves + 1,
       latestMove = idx,
       opening = if (this.moves + 1 == 3) Opening.detect(thenBoard, idx) else this.opening
@@ -44,6 +51,7 @@ class Board(val boardField: Array[Byte], val moves: Int, val latestMove: Int, va
     boardField = this.boardField
       .updated(move1, this.colorRaw)
       .updated(move2, this.colorRaw),
+    this.pointsField.clone(),
     moves = this.moves + 2,
     latestMove = move2,
     opening = this.opening,
@@ -58,7 +66,8 @@ object Board {
   val newBoard: L1Board = newBoard(Renju.BOARD_CENTER.idx)
 
   def newBoard(initIdx: Int): L1Board = new L1Board(
-    boardField = Array.fill[Byte](Renju.BOARD_LENGTH)(Flag.FREE).updated(initIdx, Flag.BLACK),
+    boardField = Array.fill(Renju.BOARD_LENGTH)(Flag.FREE).updated(initIdx, Flag.BLACK),
+    pointsField = Array.fill(Renju.BOARD_LENGTH)(new PointsPair()),
     moves = 1,
     latestMove = initIdx,
     opening = Option.empty,

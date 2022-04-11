@@ -1,12 +1,13 @@
 package jrenju
 
-import jrenju.ComplexCase.T2b
+import jrenju.BoardIO.BoardToText
+import jrenju.ComplexCase.T2
 import jrenju.notation.Pos
 import org.scalatest._
 import org.scalatest.flatspec._
 import org.scalatest.matchers._
 
-class BoardTransformTest extends AnyFlatSpec with should.Matchers {
+class BoardIOTest extends AnyFlatSpec with should.Matchers {
 
   "Board IO" should "injection function" in {
     val board = (
@@ -30,13 +31,7 @@ class BoardTransformTest extends AnyFlatSpec with should.Matchers {
       )
       .t2b(Pos.fromCartesian("I", 2).get.idx)
 
-    println(BoardTransform.buildBoardText(board.boardField))
-
-    BoardTransform.buildBoardText(board.boardField) should be (BoardTransform.buildBoardText(BoardTransform.fromBoardText(
-      BoardTransform.buildBoardText(board.boardField),
-      0,
-      Option.empty
-    ).get.boardField))
+    board.boardText should be (BoardIO.fromBoardText(board.boardText, 0, Option.empty).get.boardText)
   }
 
 }

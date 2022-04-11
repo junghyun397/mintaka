@@ -1,81 +1,351 @@
 package jrenju
 
-import jrenju.L1Strip.{resolveStripField, retrieveStripFieldSolution}
+import jrenju.L1Strip.retrieveStripFieldSolution
 import jrenju.notation.Flag
 import utils.math.FNV1a
 
 import scala.collection.mutable
-
-object Direction {
-
-  val X: Byte = 0
-  val Y: Byte = 1
-  val DEG45: Byte = 2
-  val DEG315: Byte = 3
-
-}
-
-final class AttackPoints(
-  var open2: Int = 0, var open3: Int = 0, var closed4: Int = 0, var open4: Int = 0, var five: Int = 0,
-)
+import scala.math.Numeric.IntIsIntegral.{minus, plus}
 
 sealed class Strip(val direction: Byte, val startIdx: Int)
 
 final class L1Strip(direction: Byte, startIdx: Int, stripField: Array[Byte]) extends Strip(direction, startIdx) {
 
   def calculateL2Strip(): L2Strip = {
-    val assembly = retrieveStripFieldSolution(this.stripField) // 4112 ms
-//    val assembly = resolveStripField(this.stripField) // 5352 ms
+    val assembly = retrieveStripFieldSolution(this.stripField) // 5570 ms
+//    val assembly = calculatePoints(this.stripField) // 8953 ms
     new L2Strip(this.direction, this.startIdx, assembly._1, assembly._2, assembly._3)
   }
 
 }
 
+//noinspection DuplicatedCode
 object L1Strip {
 
-  @inline private def isOver6(field: Array[Byte], idx: Int, color: Byte) = false
+  @inline private def isNotOver6(field: Array[Byte], mask: Int): Boolean = this.isNotOver6(field, mask, -1, -1)
 
-  @inline private def isOpenFour(field: Array[Byte], idx: Int, color: Byte) = false
+  @inline private def isNotOver6(field: Array[Byte], mask1: Int, mask2: Int): Boolean = this.isNotOver6(field, mask1, mask2, -1)
 
-  @inline private def isOpenThree(field: Array[Byte], idx: Int, color: Byte) = false
+  @inline private def isNotOver6(field: Array[Byte], mask1: Int, mask2: Int, mask3: Int): Boolean = {
+    var bridged = 0
 
-  @inline private def isClosedFour(field: Array[Byte], idx: Int, color: Byte) = false
+    var pointer = 0
+    while (pointer < field.length) {
+      if (field(pointer) == Flag.BLACK || pointer == mask1 || pointer == mask2 || pointer == mask3)
+        bridged += 1
+      else
+        bridged = 0
 
-  // KMP Algorithm, O(1)
-  private def resolveStripField(field: Array[Byte]): (Array[(AttackPoints, AttackPoints)], Array[Byte], Byte) = {
-    val attackStrip = Array.fill(field.length)(new AttackPoints(), new AttackPoints())
+      if (bridged > 5) return false
+      pointer += 1
+    }
+
+    true
+  }
+
+  @inline private def pattern2Mutate(
+    field: Array[Byte], pointsStrip: Array[PointsProvidePair], forbidMask: Array[Byte],
+    pointer: Int, isSolid: Boolean,
+    p6Flag: Byte, p5Flag: Byte, p4Flag: Byte, p3Flag: Byte, p2Flag: Byte, p1Flag: Byte, flag: Byte,
+    op: (Int, Int) => Int,
+  ): Unit = {
+    // check five
+    // OOOO+
+    if (
+      !isSolid && p4Flag != Flag.FREE && p4Flag != Flag.WALL
+        && p4Flag == p3Flag && p3Flag == p2Flag && p2Flag == p1Flag
+    )
+      if (p1Flag == Flag.WHITE) pointsStrip(pointer).white.five = 1
+      else if (this.isNotOver6(field, pointer)) pointsStrip(pointer).black.five = 1
+      else forbidMask(pointer) = Flag.FORBIDDEN_6
+
+    // OOO+O
+    if (
+      !isSolid && p4Flag != Flag.FREE
+        && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE && flag == p2Flag
+    )
+      if (flag == Flag.WHITE) pointsStrip(op(pointer, 1)).white.five = 1
+      else if (this.isNotOver6(field, op(pointer, 1))) pointsStrip(op(pointer, 1)).black.five = 1
+      else forbidMask(pointer) = Flag.FORBIDDEN_6
+
+    // check open-4
+    // -OOO+-
+    if (
+      !isSolid && p4Flag != Flag.FREE
+        && p5Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
+    )
+      if (p2Flag == Flag.WHITE) pointsStrip(op(pointer, 1)).white.open4 = 1
+      else if (this.isNotOver6(field, op(pointer, 1), pointer) && this.isNotOver6(field, op(pointer, 1), op(pointer, 5)))
+        pointsStrip(op(pointer, 1)).black.open4 = 1
+
+    // -OO+O-
+    if (
+      !isSolid && p4Flag != Flag.FREE
+        && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p3Flag == p1Flag
+    )
+      if (p2Flag == Flag.WHITE) pointsStrip(op(pointer, 2)).white.open4 = 1
+      else if (this.isNotOver6(field, op(pointer, 2), pointer) && this.isNotOver6(field, op(pointer, 2), op(pointer, 5)))
+        pointsStrip(op(pointer, 2)).black.open4 = 1
+
+    // check closed-4
+    // -OOO-+
+    if (
+      !isSolid && p4Flag != Flag.FREE
+        && p5Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
+    )
+      if (p2Flag == Flag.WHITE) pointsStrip(pointer).white.closed4 = 1
+      else if (this.isNotOver6(field, pointer, op(pointer, 1))) pointsStrip(pointer).black.closed4 = 1
+
+    // OO++O
+    if (
+      isSolid && p4Flag != Flag.FREE
+        && p4Flag == p3Flag && p3Flag == flag && p2Flag == Flag.FREE && p1Flag == Flag.FREE
+    )
+      if (flag == Flag.WHITE) {
+        pointsStrip(op(pointer, 1)).white.closed4 = 1
+        pointsStrip(op(pointer, 2)).white.closed4 = 1
+      } else if (this.isNotOver6(field, op(pointer, 1), op(pointer, 2))) {
+        pointsStrip(op(pointer, 1)).black.closed4 = 1
+        pointsStrip(op(pointer, 2)).black.closed4 = 1
+      }
+
+    // -OO-O+
+    if (
+      !isSolid && p4Flag != Flag.FREE
+        && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p3Flag == p1Flag
+    )
+      if (p1Flag == Flag.WHITE) pointsStrip(pointer).white.closed4 = 1
+      else if (this.isNotOver6(field, pointer, op(pointer, 2))) pointsStrip(pointer).black.closed4 = 1
+
+    // XOOO++
+    if (
+      !isSolid && p4Flag != Flag.FREE
+        && p5Flag != Flag.FREE && p5Flag != p4Flag
+        && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
+    )
+      if (p2Flag == Flag.WHITE) {
+        pointsStrip(pointer).white.closed4 = 1
+        pointsStrip(op(pointer, 1)).white.closed4 = 1
+      } else if (this.isNotOver6(field, pointer, op(pointer, 1))) {
+        pointsStrip(pointer).black.closed4 = 1
+        pointsStrip(op(pointer, 1)).black.closed4 = 1
+      }
+
+    // XOO+O+
+    if (
+      !isSolid && p4Flag != Flag.FREE
+        && p5Flag != Flag.FREE && p5Flag != p4Flag
+        && p4Flag == p3Flag && p2Flag == Flag.FREE && p1Flag == p3Flag
+    )
+      if (p1Flag == Flag.WHITE) {
+        pointsStrip(pointer).white.closed4 = 1
+        pointsStrip(op(pointer, 2)).white.closed4 = 1
+      } else if (this.isNotOver6(field, pointer, op(pointer, 2))) {
+        pointsStrip(pointer).black.closed4 = 1
+        pointsStrip(op(pointer, 2)).black.closed4 = 1
+      }
+
+    // check open-3
+    // !-OO++-
+    if (
+      !isSolid && p4Flag != Flag.FREE
+        && p6Flag != p4Flag
+        && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p1Flag == Flag.FREE
+    )
+      if (p4Flag == Flag.WHITE) {
+        pointsStrip(op(pointer, 1)).white.open3 = 1
+        pointsStrip(op(pointer, 2)).white.open3 = 1
+      } else {
+        pointsStrip(op(pointer, 2)).black.open3 = 1
+        if (this.isNotOver6(field, pointer, op(pointer, 1), op(pointer, 2)))
+          pointsStrip(op(pointer, 1)).black.open3 = 1
+      }
+
+    // -+OO+-X
+    if (
+      isSolid && p4Flag != Flag.FREE
+        && flag != p4Flag
+        && p6Flag == Flag.FREE && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p1Flag == Flag.FREE
+    )
+      if (p4Flag == Flag.WHITE) {
+        pointsStrip(op(pointer, 2)).white.open3 = 1
+        pointsStrip(op(pointer, 5)).white.open3 = 1
+      } else if (pointsStrip(op(pointer, 5)).black.closed4 != 1) {
+        pointsStrip(op(pointer, 2)).black.open3 = 1
+        pointsStrip(op(pointer, 5)).black.open3 = 1
+      }
+
+    // !-O-O+-
+    if (
+      !isSolid && p4Flag != Flag.FREE
+        && p6Flag != p4Flag
+        && p5Flag == Flag.FREE && p4Flag == p2Flag && p3Flag == Flag.FREE && p1Flag == Flag.FREE
+    )
+      if (p4Flag == Flag.WHITE) {
+        pointsStrip(op(pointer, 1)).white.open3 = 1
+      } else if (this.isNotOver6(field, pointer, op(pointer, 1), op(pointer, 3))) {
+        pointsStrip(op(pointer, 1)).black.open3 = 1
+      }
+
+    // -+O+O-X
+    if (
+      isSolid && p4Flag != Flag.FREE
+        && flag != p4Flag
+        && p6Flag == Flag.FREE && p5Flag == Flag.FREE && p4Flag == p2Flag && p3Flag == Flag.FREE && p1Flag == Flag.FREE
+    )
+      if (p4Flag == Flag.WHITE) {
+        pointsStrip(op(pointer, 3)).white.open3 = 1
+        pointsStrip(op(pointer, 5)).white.open3 = 1
+      } else if (this.isNotOver6(field, op(pointer, 3), op(pointer, 5), op(pointer, 6))) {
+        pointsStrip(op(pointer, 3)).black.open3 = 1
+        pointsStrip(op(pointer, 5)).black.open3 = 1
+      }
+  }
+
+  private def calculatePoints(field: Array[Byte]): (Array[PointsProvidePair], Array[Byte], Byte) = {
+    val pointsStrip = Array.fill(field.length)(new PointsProvidePair())
+    val forbidMask = Array.fill(field.length)(Flag.FREE)
 
     var winner = Flag.FREE
-    var fiveCounter = 0
 
-    var priorFlag = Flag.WALL
+    // registers
+    var p6Flag = Flag.WALL
+    var p5Flag = Flag.WALL
+    var p4Flag = Flag.WALL
+    var p3Flag = Flag.WALL
+    var p2Flag = Flag.WALL
+    var p1Flag = Flag.WALL
     var flag = Flag.WALL
+
     var isSolid = false
 
+    // >>>>>
+    // p6Flag | p5Flag | p4Flag | p3Flag | p2Flag | p1Flag | Flag <- pointer
     var pointer = 0
     while (pointer < field.length) {
       flag = field(pointer)
       isSolid = flag != Flag.FREE
 
-      if (isSolid && flag == priorFlag && fiveCounter == 3) {
+      // check win
+      if (
+        isSolid
+          && p4Flag == p3Flag && p3Flag == p2Flag && p2Flag == p1Flag && p1Flag == flag
+          && (flag == Flag.WHITE || this.isNotOver6(field, pointer))
+      )
         winner = flag
-      } else if (isSolid && flag == priorFlag) {
-        fiveCounter += 1
-      } else fiveCounter = 0
 
-      priorFlag = flag
+      // check five
+      // OO+OO
+      if (
+        isSolid
+          && p2Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p1Flag && p1Flag == flag
+      )
+        if (flag == Flag.WHITE) pointsStrip(pointer - 2).white.five = 1
+        else if (this.isNotOver6(field, pointer - 2)) pointsStrip(pointer - 2).black.five = 1
+        else forbidMask(pointer - 2) = Flag.FORBIDDEN_6
+
+      // check closed-4
+      // O+O+O
+      if (
+        isSolid
+          && p4Flag == p2Flag && p2Flag == flag && p3Flag == Flag.FREE && p1Flag == Flag.FREE
+      )
+        if (flag == Flag.WHITE) {
+          pointsStrip(pointer - 1).white.closed4 = (pointsStrip(pointer - 1).white.closed4 + 1).toByte
+          pointsStrip(pointer - 3).white.closed4 = (pointsStrip(pointer - 3).white.closed4 + 1).toByte
+        } else {
+          pointsStrip(pointer - 1).black.closed4 = (pointsStrip(pointer - 1).black.closed4 + 1).toByte
+          pointsStrip(pointer - 1).black.closed4 = (pointsStrip(pointer - 1).black.closed4 + 1).toByte
+        }
+
+      // check open-3
+      // -O++O-
+      if (
+        !isSolid && p1Flag != Flag.FREE
+          && p5Flag == Flag.FREE && p4Flag == p1Flag && p3Flag == Flag.FREE && p2Flag == Flag.FREE
+      )
+        if (p1Flag == Flag.WHITE) {
+          pointsStrip(pointer - 2).white.open3 = 1
+          pointsStrip(pointer - 3).white.open3 = 1
+        } else if (
+          this.isNotOver6(field, pointer, pointer - 2, pointer - 3)
+            && this.isNotOver6(field, pointer - 2, pointer - 3, pointer - 5)
+        ) {
+          pointsStrip(pointer - 2).black.open3 = 1
+          pointsStrip(pointer - 3).black.open3 = 1
+        }
+
+      // --O+O--
+      if (
+        !isSolid && p4Flag != Flag.FREE
+          && p6Flag == Flag.FREE && p5Flag == Flag.FREE && p4Flag == p2Flag && p3Flag == Flag.FREE && p1Flag == Flag.FREE
+      )
+        if (p2Flag == Flag.WHITE)
+          pointsStrip(pointer - 3).white.open3 = 1
+        else if (!(
+          !this.isNotOver6(field, pointer, pointer - 1, pointer - 3)
+            && !this.isNotOver6(field, pointer - 3, pointer - 5, pointer - 6)
+          ))
+          pointsStrip(pointer - 3).black.open3 = 1
+
+      this.pattern2Mutate(
+        field, pointsStrip, forbidMask,
+        pointer, isSolid,
+        p6Flag, p5Flag, p4Flag, p3Flag, p2Flag, p1Flag, flag,
+        minus,
+      )
+
+      p6Flag = p5Flag
+      p5Flag = p4Flag
+      p4Flag = p3Flag
+      p3Flag = p2Flag
+      p2Flag = p1Flag
+      p1Flag = flag
+
       pointer += 1
     }
 
-    (Array.fill(field.length)(new AttackPoints(), new AttackPoints()), field, winner)
+    p6Flag = Flag.WALL
+    p5Flag = Flag.WALL
+    p3Flag = Flag.WALL
+    p4Flag = Flag.WALL
+    p2Flag = Flag.WALL
+    p1Flag = Flag.WALL
+
+    isSolid = false
+
+    // <<<<<
+    // pointer -> Flag | p1Flag | p2Flag | p3Flag | p4Flag | p5Flag | p6Flag
+    pointer = pointsStrip.length - 1
+    while (pointer >= 0) {
+      flag = field(pointer)
+      isSolid = flag != Flag.FREE
+
+      this.pattern2Mutate(
+        field, pointsStrip, forbidMask,
+        pointer, isSolid,
+        p6Flag, p5Flag, p4Flag, p3Flag, p2Flag, p1Flag, flag,
+        plus,
+      )
+
+      p6Flag = p5Flag
+      p5Flag = p4Flag
+      p4Flag = p3Flag
+      p3Flag = p2Flag
+      p2Flag = p1Flag
+      p1Flag = flag
+      pointer -= 1
+    }
+
+    (pointsStrip, forbidMask, winner)
   }
 
-  private val stripMemo = new mutable.HashMap[BigInt, (Array[(AttackPoints, AttackPoints)], Array[Byte], Byte)]()
+  private val stripMemo = new mutable.HashMap[BigInt, (Array[PointsProvidePair], Array[Byte], Byte)]()
 
-  private def retrieveStripFieldSolution(field: Array[Byte]): (Array[(AttackPoints, AttackPoints)], Array[Byte], Byte) =
-    this.stripMemo.getOrElseUpdate(FNV1a.hash32a(field), this.resolveStripField(field))
+  private def retrieveStripFieldSolution(field: Array[Byte]): (Array[PointsProvidePair], Array[Byte], Byte) =
+    this.stripMemo.getOrElseUpdate(FNV1a.hash32a(field), this.calculatePoints(field))
 
 }
 
-final class L2Strip(direction: Byte, startIdx: Int, val attackStrip: Array[(AttackPoints, AttackPoints)], val forbiddenMask: Array[Byte], val winner: Byte)
+final class L2Strip(direction: Byte, startIdx: Int, val pointsStrip: Array[PointsProvidePair], val forbidMask: Array[Byte], val winner: Byte)
   extends Strip(direction, startIdx)
