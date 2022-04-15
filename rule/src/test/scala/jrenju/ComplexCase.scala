@@ -1,28 +1,29 @@
 package jrenju
 
-import jrenju.notation.{Direction, Flag, Opening, Pos}
-import jrenju.rule.Renju
+import jrenju.notation.{Direction, Flag, Opening, Pos, Renju}
 
 import scala.language.implicitConversions
 
 /*
-"   A B C D E F G H I J K L M N O   \n" +
-"15 . . . . . . . . . . . . . . X 15\n" +
-"14 . . . . . . . . . . . . . . . 14\n" +
-"13 . . . . . . . . . . . . . . . 13\n" +
-"12 . . . . . . . . . . . . . . . 12\n" +
-"11 . . . . . . . . . . . . . . . 11\n" +
-"10 . . . . . . . . . . . . . . . 10\n" +
-" 9 . . . . . . . . . . . . . . .  9\n" +
-" 8 . . . . . . . O . . . . . . .  8\n" +
-" 7 . . . . . . . . . . . . . . .  7\n" +
-" 6 . . . . . . . . . . . . . . .  6\n" +
-" 5 . . . . . . . . . . . . . . .  5\n" +
-" 4 . . . . . . . . . . . . . . .  4\n" +
-" 3 . . . . . . . . . . . . . . .  3\n" +
-" 2 . . . . . . . . . . . . . . .  2\n" +
-" 1 . . . . . . . . . . . . . . .  1\n" +
-"   A B C D E F G H I J K L M N O   "
+"""
+   A B C D E F G H I J K L M N O
+15 . . . . . . . . . . . . . . . 15
+14 . . . . . . . . . . . . . . . 14
+13 . . . . . . . . . . . . . . . 13
+12 . . . . . . . . . . . . . . . 12
+11 . . . . . . . . . . . . . . . 11
+10 . . . . . . . . . . . . . . . 10
+ 9 . . . . . . . . . . . . . . . 9
+ 8 . . . . . . . O . . . . . . . 8
+ 7 . . . . . . . . . . . . . . . 7
+ 6 . . . . . . . . . . . . . . . 6
+ 5 . . . . . . . . . . . . . . . 5
+ 4 . . . . . . . . . . . . . . . 4
+ 3 . . . . . . . . . . . . . . . 3
+ 2 . . . . . . . . . . . . . . . 2
+ 1 . . . . . . . . . . . . . . . 1
+   A B C D E F G H I J K L M N O
+"""
  */
 
 object ComplexCase {
@@ -31,7 +32,7 @@ object ComplexCase {
 
     def t2b: L1Board = source.t2b(Renju.BOARD_CENTER.idx)
 
-    def t2b(x: String, y: Int): L1Board = source.t2b(Pos.fromCartesian(x, y).get.idx)
+    def t2b(x: String, y: Int): L1Board = source.t2b(Pos.fromCartesian(y, x).get.idx)
 
     def t2b(latestMove: Int): L1Board = source.t2b(latestMove, Option.empty)
 
@@ -48,24 +49,24 @@ object ComplexCase {
 
   }
 
-  val complexForbidden: L1Board = (
-    "   A B C D E F G H I J K L M N O   \n" +
-    "15 . . . . . . . . . . . . . . X 15\n" +
-    "14 . . . . . . . . . . . . . . . 14\n" +
-    "13 . . . . . . . . . . . . . . . 13\n" +
-    "12 . . . . . X . . . . . . . . . 12\n" +
-    "11 . . . . . O X . X . . . . . . 11\n" +
-    "10 . . . . . . O . O . X . . . . 10\n" +
-    " 9 . . . . X . X O . . . . . . . 9 \n" +
-    " 8 . . . . . O X O X . . . . . . 8 \n" +
-    " 7 . . . . . O . . O . . . . . . 7 \n" +
-    " 6 . . . . . . . . . . . . . . . 6 \n" +
-    " 5 . . . . . . . . . . . . . . . 5 \n" +
-    " 4 . . . . . . . . . . . . . . . 4 \n" +
-    " 3 . . . . . . . . . . . . . . . 3 \n" +
-    " 2 . . . . . . . . . . . . . . . 2 \n" +
-    " 1 . . . . . . . . . . . . . . . 1 \n" +
-    "   A B C D E F G H I J K L M N O   "
-    ).t2b("K", 10)
+  val complexForbidden: L1Board = ("""
+       A B C D E F G H I J K L M N O
+    15 . . . . . . . . . . . . . . X 15
+    14 . . . . . . . . . . . . . . . 14
+    13 . . . . . . . . . . . . . . . 13
+    12 . . . . . X . . . . . . . . . 12
+    11 . . . . . O X . X . . . . . . 11
+    10 . . . . . . O . O . X . . . . 10
+     9 . . . . X . X O . . . . . . . 9
+     8 . . . . . O X O X . . . . . . 8
+     7 . . . . . O . . O . . . . . . 7
+     6 . . . . . . . . . . . . . . . 6
+     5 . . . . . . . . . . . . . . . 5
+     4 . . . . . . . . . . . . . . . 4
+     3 . . . . . . . . . . . . . . . 3
+     2 . . . . . . . . . . . . . . . 2
+     1 . . . . . . . . . . . . . . . 1
+       A B C D E F G H I J K L M N O
+    """).t2b("K", 10)
 
 }

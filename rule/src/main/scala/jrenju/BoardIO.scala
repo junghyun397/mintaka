@@ -1,8 +1,7 @@
 package jrenju
 
-import jrenju.notation.{Flag, Opening}
-import jrenju.rule.Renju
-import utils.lang.{ByteTransform, StringArrayTransform}
+import jrenju.notation.{Flag, Opening, Renju}
+import utils.lang.{StringArrayTransform, IntTransform}
 
 //noinspection DuplicatedCode
 object BoardIO {
@@ -26,7 +25,7 @@ object BoardIO {
 
   def fromFieldArray(source: Array[Byte], latestMove: Int, opening: Option[Opening]): Option[L1Board] =
     if (source.length != Renju.BOARD_LENGTH) Option.empty
-    else Option.apply(new L1Board(
+    else Option(new L1Board(
       boardField = source,
       pointsField = Array.fill(Renju.BOARD_LENGTH)(new PointsPair()),
       moves = source.count {
@@ -50,11 +49,11 @@ object BoardIO {
       extract(this.source)
         .grouped(Renju.BOARD_WIDTH)
         .zipWithIndex
-        .map(rowIdx => f"${rowIdx._2 + 1}%2d ${
-          rowIdx._1
+        .map(colIdx => f"${colIdx._2 + 1}%2d ${
+          colIdx._1
             .map(value => f"${transform(value)} ")
             .mkString
-        }${rowIdx._2 + 1}%-2d\n")
+        }${colIdx._2 + 1}%-2d\n")
         .toArray
         .reverse
         .flatten
@@ -66,16 +65,16 @@ object BoardIO {
     def debugText: String =
       f"${this.boardText}\n" +
         Array(
-          f"\nblack-open-3 /\n${this.attributeText(_.pointsField)(_.black.open3.sum.dotIfZero)}\n",
+          f"\nblack-open-3 /\n${this.attributeText(_.pointsField)(_.black.open3.count(_ == true).dotIfZero)}\n",
           f"\nblack-closed-4 /\n${this.attributeText(_.pointsField)(_.black.closed4.sum.dotIfZero)}\n",
-          f"\nblack-open-4 /\n${this.attributeText(_.pointsField)(_.black.open4.sum.dotIfZero)}\n",
-          f"\nblack-5\n${this.attributeText(_.pointsField)(_.black.five.sum.dotIfZero)}\n"
+          f"\nblack-open-4 /\n${this.attributeText(_.pointsField)(_.black.open4.count(_ == true).dotIfZero)}\n",
+          f"\nblack-5\n${this.attributeText(_.pointsField)(_.black.five.count(_ == true).dotIfZero)}\n"
         ).mergeHorizontal +
         Array(
-          f"\nwhite-open-3 /\n${this.attributeText(_.pointsField)(_.white.open3.sum.dotIfZero)}\n",
+          f"\nwhite-open-3 /\n${this.attributeText(_.pointsField)(_.white.open3.count(_ == true).dotIfZero)}\n",
           f"\nwhite-closed-4 /\n${this.attributeText(_.pointsField)(_.white.closed4.sum.dotIfZero)}\n",
-          f"\nwhite-open-4 /\n${this.attributeText(_.pointsField)(_.white.open4.sum.dotIfZero)}\n",
-          f"\nwhite-5\n${this.attributeText(_.pointsField)(_.white.five.sum.dotIfZero)}\n"
+          f"\nwhite-open-4 /\n${this.attributeText(_.pointsField)(_.white.open4.count(_ == true).dotIfZero)}\n",
+          f"\nwhite-5\n${this.attributeText(_.pointsField)(_.white.five.count(_ == true).dotIfZero)}\n"
         ).mergeHorizontal
 
   }

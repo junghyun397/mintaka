@@ -1,7 +1,6 @@
 package jrenju
 
-import jrenju.notation._
-import jrenju.rule.Renju
+import jrenju.notation.{Color, Renju, _}
 
 class Board(
   val boardField: Array[Byte],
@@ -17,18 +16,18 @@ class Board(
 
   @inline private val isNextColorBlack: Boolean = this.nextColorRaw == Flag.BLACK
 
-  def color: Color.Value = Color.apply(this.colorRaw)
+  def color: Color.Value = Color(this.colorRaw)
 
-  def nextColor: Color.Value = Color.apply(this.nextColorRaw)
+  def nextColor: Color.Value = Color(this.nextColorRaw)
 
-  def latestPos: Pos = Pos.fromIdx(this.latestMove)
+  def latestPos: Option[Pos] = Option(Pos.fromIdx(this.latestMove))
 
   def validateMove(pos: Pos): Option[RejectReason.Value] = this.validateMove(pos.idx)
 
   def validateMove(idx: Int): Option[RejectReason.Value] = {
     val flag = this.boardField(idx)
-    if (this.isNextColorBlack && flag > Flag.FREE) Option.apply(RejectReason.FORBIDDEN)
-    else if (flag != Flag.FREE) Option.apply(RejectReason.EXIST)
+    if (this.isNextColorBlack && flag > Flag.FREE) Option(RejectReason.FORBIDDEN)
+    else if (flag != Flag.FREE) Option(RejectReason.EXIST)
     else Option.empty
   }
 
@@ -45,9 +44,9 @@ class Board(
     )
   }
 
-  def injectMove(move1: Pos)(move2: Pos): L1Board = this.injectMove(move1.idx)(move2.idx)
+  def injectMove(move1: Pos, move2: Pos): L1Board = this.injectMove(move1.idx, move2.idx)
 
-  def injectMove(move1: Int)(move2: Int): L1Board = new L1Board(
+  def injectMove(move1: Int, move2: Int): L1Board = new L1Board(
     boardField = this.boardField
       .updated(move1, this.colorRaw)
       .updated(move2, this.colorRaw),

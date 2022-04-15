@@ -11,7 +11,7 @@ object Flag {
   val FORBIDDEN_44: Byte = 4
   val FORBIDDEN_6: Byte = 5
 
-  val WALL: Byte = 127
+  val WALL: Byte = 9
 
   object Text {
 
@@ -36,12 +36,12 @@ object Flag {
   }
 
   def charToFlag(char: Char): Option[Byte] = char match {
-    case Flag.Text.FREE => Option.apply(Flag.FREE)
-    case Flag.Text.BLACK => Option.apply(Flag.BLACK)
-    case Flag.Text.WHITE => Option.apply(Flag.WHITE)
-    case Flag.Text.FORBIDDEN_33 => Option.apply(Flag.FORBIDDEN_33)
-    case Flag.Text.FORBIDDEN_44 => Option.apply(Flag.FORBIDDEN_44)
-    case Flag.Text.FORBIDDEN_6 => Option.apply(Flag.FORBIDDEN_6)
+    case Flag.Text.FREE => Option(Flag.FREE)
+    case Flag.Text.BLACK => Option(Flag.BLACK)
+    case Flag.Text.WHITE => Option(Flag.WHITE)
+    case Flag.Text.FORBIDDEN_33 => Option(Flag.FORBIDDEN_33)
+    case Flag.Text.FORBIDDEN_44 => Option(Flag.FORBIDDEN_44)
+    case Flag.Text.FORBIDDEN_6 => Option(Flag.FORBIDDEN_6)
     case _ => Option.empty
   }
 

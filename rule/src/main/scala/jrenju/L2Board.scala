@@ -16,27 +16,18 @@ final class L2Board(
 
     pointsField.zipWithIndex foreach { particleIdx =>
       val points = particleIdx._1.black
-      if (points.open3.sum > 1) {
-        points.open3 = Points.empty
+
+      if (points.fiveInRow > 0)
+        this.boardField(particleIdx._2) = Flag.FREE
+      else if (this.boardField(particleIdx._2) == Flag.FORBIDDEN_6)
+        this.boardField(particleIdx._2) = Flag.FORBIDDEN_6
+      else if (points.four > 1)
+        this.boardField(particleIdx._2) = Flag.FORBIDDEN_44
+      else if (points.three > 1) {
         this.boardField(particleIdx._2) = Flag.FORBIDDEN_33
         di3ForbidFlag = true
       }
-      if (points.closed4.sum + points.open4.sum > 1) {
-        points.closed4 = Points.empty
-        points.open4 = Points.empty
-        this.boardField(particleIdx._2) == Flag.FORBIDDEN_44
-      }
-      if (points.five.sum > 0) {
-        points.open3 = Points.empty
-        points.closed4 = Points.empty
-        points.open4 = Points.empty
-        this.boardField(particleIdx._2) = Flag.FREE
-      }
-      if (this.boardField(particleIdx._2) == Flag.FORBIDDEN_6) {
-        points.open3 = Points.empty
-        points.closed4 = Points.empty
-        points.open4 = Points.empty
-      }
+
     }
 
     new L3Board(this.boardField, pointsField, this.moves, this.latestMove, this.opening, this.winner, di3ForbidFlag)

@@ -8,6 +8,6 @@ trait EvaluatedBoard {
 
   def isEnd: Boolean = winner != Flag.FREE
 
-  def winnerColor: Option[Color.Value] = if (this.isEnd) Option.apply(Color.apply(winner)) else Option.empty
+  def winnerColor: Option[Color.Value] = if (this.isEnd) Option(Color(winner)) else Option.empty
 
 }

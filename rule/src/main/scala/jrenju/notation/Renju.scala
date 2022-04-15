@@ -1,6 +1,4 @@
-package jrenju.rule
-
-import jrenju.notation.Pos
+package jrenju.notation
 
 object Renju {
 

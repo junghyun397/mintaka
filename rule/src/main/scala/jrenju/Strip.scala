@@ -55,18 +55,18 @@ object L1Strip {
       !isSolid && p4Flag != Flag.FREE && p4Flag != Flag.WALL
         && p4Flag == p3Flag && p3Flag == p2Flag && p2Flag == p1Flag
     )
-      if (p1Flag == Flag.WHITE) pointsStrip(pointer).white.five = 1
-      else if (this.isNotOver6(field, pointer)) pointsStrip(pointer).black.five = 1
+      if (p1Flag == Flag.WHITE) pointsStrip(pointer).white.five = true
+      else if (this.isNotOver6(field, pointer)) pointsStrip(pointer).black.five = true
       else forbidMask(pointer) = Flag.FORBIDDEN_6
 
     // OOO+O
     if (
-      !isSolid && p4Flag != Flag.FREE
+      isSolid && p4Flag != Flag.FREE
         && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE && flag == p2Flag
     )
-      if (flag == Flag.WHITE) pointsStrip(op(pointer, 1)).white.five = 1
-      else if (this.isNotOver6(field, op(pointer, 1))) pointsStrip(op(pointer, 1)).black.five = 1
-      else forbidMask(pointer) = Flag.FORBIDDEN_6
+      if (flag == Flag.WHITE) pointsStrip(op(pointer, 1)).white.five = true
+      else if (this.isNotOver6(field, op(pointer, 1))) pointsStrip(op(pointer, 1)).black.five = true
+      else forbidMask(op(pointer, 1)) = Flag.FORBIDDEN_6
 
     // check open-4
     // -OOO+-
@@ -74,18 +74,23 @@ object L1Strip {
       !isSolid && p4Flag != Flag.FREE
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
     )
-      if (p2Flag == Flag.WHITE) pointsStrip(op(pointer, 1)).white.open4 = 1
-      else if (this.isNotOver6(field, op(pointer, 1), pointer) && this.isNotOver6(field, op(pointer, 1), op(pointer, 5)))
-        pointsStrip(op(pointer, 1)).black.open4 = 1
+      if (p2Flag == Flag.WHITE) pointsStrip(op(pointer, 1)).white.open4 = true
+      else if (this.isNotOver6(field, op(pointer, 1), op(pointer, 5))) {
+        pointsStrip(op(pointer, 1)).black.closed4 = 1
+        if (this.isNotOver6(field, pointer, op(pointer, 1))) {
+          pointsStrip(op(pointer, 1)).black.closed4 = 0
+          pointsStrip(op(pointer, 1)).black.open4 = true
+        }
+      }
 
     // -OO+O-
     if (
       !isSolid && p4Flag != Flag.FREE
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p3Flag == p1Flag
     )
-      if (p2Flag == Flag.WHITE) pointsStrip(op(pointer, 2)).white.open4 = 1
+      if (p2Flag == Flag.WHITE) pointsStrip(op(pointer, 2)).white.open4 = true
       else if (this.isNotOver6(field, op(pointer, 2), pointer) && this.isNotOver6(field, op(pointer, 2), op(pointer, 5)))
-        pointsStrip(op(pointer, 2)).black.open4 = 1
+        pointsStrip(op(pointer, 2)).black.open4 = true
 
     // check closed-4
     // -OOO-+
@@ -93,8 +98,8 @@ object L1Strip {
       !isSolid && p4Flag != Flag.FREE
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
     )
-      if (p2Flag == Flag.WHITE) pointsStrip(pointer).white.closed4 = 1
-      else if (this.isNotOver6(field, pointer, op(pointer, 1))) pointsStrip(pointer).black.closed4 = 1
+      if (p2Flag == Flag.WHITE) pointsStrip(pointer).white.closed4 += 1
+      else if (this.isNotOver6(field, pointer, op(pointer, 1))) pointsStrip(pointer).black.closed4 += 1
 
     // OO++O
     if (
@@ -102,20 +107,25 @@ object L1Strip {
         && p4Flag == p3Flag && p3Flag == flag && p2Flag == Flag.FREE && p1Flag == Flag.FREE
     )
       if (flag == Flag.WHITE) {
-        pointsStrip(op(pointer, 1)).white.closed4 = 1
-        pointsStrip(op(pointer, 2)).white.closed4 = 1
+        pointsStrip(op(pointer, 1)).white.closed4 += 1
+        pointsStrip(op(pointer, 2)).white.closed4 += 1
       } else if (this.isNotOver6(field, op(pointer, 1), op(pointer, 2))) {
-        pointsStrip(op(pointer, 1)).black.closed4 = 1
-        pointsStrip(op(pointer, 2)).black.closed4 = 1
+        pointsStrip(op(pointer, 1)).black.closed4 += 1
+        pointsStrip(op(pointer, 2)).black.closed4 += 1
       }
 
-    // -OO-O+
+    // +OO-O+
     if (
       !isSolid && p4Flag != Flag.FREE
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p3Flag == p1Flag
     )
-      if (p1Flag == Flag.WHITE) pointsStrip(pointer).white.closed4 = 1
-      else if (this.isNotOver6(field, pointer, op(pointer, 2))) pointsStrip(pointer).black.closed4 = 1
+      if (p1Flag == Flag.WHITE) pointsStrip(pointer).white.closed4 += 1
+      else {
+        if (this.isNotOver6(field, pointer, op(pointer, 2)))
+          pointsStrip(pointer).black.closed4 += 1
+        if (this.isNotOver6(field, op(pointer, 2), op(pointer, 5)))
+          pointsStrip(op(pointer, 5)).black.closed4 += 1
+      }
 
     // XOOO++
     if (
@@ -124,12 +134,23 @@ object L1Strip {
         && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
     )
       if (p2Flag == Flag.WHITE) {
-        pointsStrip(pointer).white.closed4 = 1
-        pointsStrip(op(pointer, 1)).white.closed4 = 1
+        pointsStrip(pointer).white.closed4 += 1
+        pointsStrip(op(pointer, 1)).white.closed4 += 1
       } else if (this.isNotOver6(field, pointer, op(pointer, 1))) {
-        pointsStrip(pointer).black.closed4 = 1
-        pointsStrip(op(pointer, 1)).black.closed4 = 1
+        pointsStrip(pointer).black.closed4 += 1
+        pointsStrip(op(pointer, 1)).black.closed4 += 1
       }
+
+    // X+OOO-
+    if (
+      !isSolid && p3Flag != Flag.FREE
+        && p5Flag != Flag.FREE && p5Flag != p3Flag
+        && p4Flag == Flag.FREE && p3Flag == p2Flag && p2Flag == p1Flag
+    )
+      if (p2Flag == Flag.WHITE)
+        pointsStrip(op(pointer, 4)).white.closed4 += 1
+      else if (this.isNotOver6(field, pointer, op(pointer, 4)))
+        pointsStrip(op(pointer, 4)).black.closed4 += 1
 
     // XOO+O+
     if (
@@ -138,11 +159,25 @@ object L1Strip {
         && p4Flag == p3Flag && p2Flag == Flag.FREE && p1Flag == p3Flag
     )
       if (p1Flag == Flag.WHITE) {
-        pointsStrip(pointer).white.closed4 = 1
-        pointsStrip(op(pointer, 2)).white.closed4 = 1
+        pointsStrip(pointer).white.closed4 += 1
+        pointsStrip(op(pointer, 2)).white.closed4 += 1
       } else if (this.isNotOver6(field, pointer, op(pointer, 2))) {
-        pointsStrip(pointer).black.closed4 = 1
-        pointsStrip(op(pointer, 2)).black.closed4 = 1
+        pointsStrip(pointer).black.closed4 += 1
+        pointsStrip(op(pointer, 2)).black.closed4 += 1
+      }
+
+    // XO+OO+
+    if (
+      !isSolid && p4Flag != Flag.FREE
+        && p5Flag != Flag.FREE && p5Flag != p4Flag
+        && p4Flag == p2Flag && p3Flag == Flag.FREE && p2Flag == p1Flag
+    )
+      if (p1Flag == Flag.WHITE) {
+        pointsStrip(pointer).white.closed4 += 1
+        pointsStrip(op(pointer, 3)).white.closed4 += 1
+      } else if (this.isNotOver6(field, pointer, op(pointer, 3))) {
+        pointsStrip(pointer).black.closed4 += 1
+        pointsStrip(op(pointer, 3)).black.closed4 += 1
       }
 
     // check open-3
@@ -153,26 +188,27 @@ object L1Strip {
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p1Flag == Flag.FREE
     )
       if (p4Flag == Flag.WHITE) {
-        pointsStrip(op(pointer, 1)).white.open3 = 1
-        pointsStrip(op(pointer, 2)).white.open3 = 1
-      } else {
-        pointsStrip(op(pointer, 2)).black.open3 = 1
-        if (this.isNotOver6(field, pointer, op(pointer, 1), op(pointer, 2)))
-          pointsStrip(op(pointer, 1)).black.open3 = 1
+        pointsStrip(op(pointer, 1)).white.open3 = true
+        pointsStrip(op(pointer, 2)).white.open3 = true
+      } else if (this.isNotOver6(field, pointer, op(pointer, 1), op(pointer, 2))) {
+        pointsStrip(op(pointer, 1)).black.open3 = true
+        pointsStrip(op(pointer, 2)).black.open3 = true
+      } else if (p6Flag != Flag.WHITE && this.isNotOver6(field, op(pointer, 5), op(pointer, 6))) {
+        pointsStrip(op(pointer, 2)).black.open3 = true
       }
 
-    // -+OO+-X
+    // X-+OO+-
     if (
-      isSolid && p4Flag != Flag.FREE
-        && flag != p4Flag
-        && p6Flag == Flag.FREE && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p1Flag == Flag.FREE
+      !isSolid && p3Flag != Flag.FREE
+        && p6Flag != Flag.FREE && p6Flag != p3Flag
+        && p5Flag == Flag.FREE && p4Flag == Flag.FREE && p3Flag == p2Flag && p1Flag == Flag.FREE
     )
-      if (p4Flag == Flag.WHITE) {
-        pointsStrip(op(pointer, 2)).white.open3 = 1
-        pointsStrip(op(pointer, 5)).white.open3 = 1
-      } else if (pointsStrip(op(pointer, 5)).black.closed4 != 1) {
-        pointsStrip(op(pointer, 2)).black.open3 = 1
-        pointsStrip(op(pointer, 5)).black.open3 = 1
+      if (p3Flag == Flag.WHITE) {
+        pointsStrip(op(pointer, 1)).white.open3 = true
+        pointsStrip(op(pointer, 4)).white.open3 = true
+      } else if (this.isNotOver6(field, pointer, op(pointer, 1))) {
+        pointsStrip(op(pointer, 1)).black.open3 = true
+        pointsStrip(op(pointer, 4)).black.open3 = true
       }
 
     // !-O-O+-
@@ -182,23 +218,24 @@ object L1Strip {
         && p5Flag == Flag.FREE && p4Flag == p2Flag && p3Flag == Flag.FREE && p1Flag == Flag.FREE
     )
       if (p4Flag == Flag.WHITE) {
-        pointsStrip(op(pointer, 1)).white.open3 = 1
+        pointsStrip(op(pointer, 1)).white.open3 = true
       } else if (this.isNotOver6(field, pointer, op(pointer, 1), op(pointer, 3))) {
-        pointsStrip(op(pointer, 1)).black.open3 = 1
+        pointsStrip(op(pointer, 1)).black.open3 = true
       }
 
-    // -+O+O-X
+    // X-O+O+-
+
     if (
-      isSolid && p4Flag != Flag.FREE
-        && flag != p4Flag
-        && p6Flag == Flag.FREE && p5Flag == Flag.FREE && p4Flag == p2Flag && p3Flag == Flag.FREE && p1Flag == Flag.FREE
+      !isSolid && p4Flag != Flag.FREE
+        && p6Flag != p4Flag
+        && p1Flag == Flag.FREE && p2Flag == p4Flag && p3Flag == Flag.FREE && p5Flag == Flag.FREE
     )
       if (p4Flag == Flag.WHITE) {
-        pointsStrip(op(pointer, 3)).white.open3 = 1
-        pointsStrip(op(pointer, 5)).white.open3 = 1
-      } else if (this.isNotOver6(field, op(pointer, 3), op(pointer, 5), op(pointer, 6))) {
-        pointsStrip(op(pointer, 3)).black.open3 = 1
-        pointsStrip(op(pointer, 5)).black.open3 = 1
+        pointsStrip(op(pointer, 1)).white.open3 = true
+        pointsStrip(op(pointer, 3)).white.open3 = true
+      } else if (this.isNotOver6(field, pointer, op(pointer, 1), op(pointer, 3))) {
+        pointsStrip(op(pointer, 1)).black.open3 = true
+        pointsStrip(op(pointer, 3)).black.open3 = true
       }
   }
 
@@ -240,8 +277,8 @@ object L1Strip {
         isSolid
           && p2Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p1Flag && p1Flag == flag
       )
-        if (flag == Flag.WHITE) pointsStrip(pointer - 2).white.five = 1
-        else if (this.isNotOver6(field, pointer - 2)) pointsStrip(pointer - 2).black.five = 1
+        if (flag == Flag.WHITE) pointsStrip(pointer - 2).white.five = true
+        else if (this.isNotOver6(field, pointer - 2)) pointsStrip(pointer - 2).black.five = true
         else forbidMask(pointer - 2) = Flag.FORBIDDEN_6
 
       // check closed-4
@@ -251,11 +288,11 @@ object L1Strip {
           && p4Flag == p2Flag && p2Flag == flag && p3Flag == Flag.FREE && p1Flag == Flag.FREE
       )
         if (flag == Flag.WHITE) {
-          pointsStrip(pointer - 1).white.closed4 = (pointsStrip(pointer - 1).white.closed4 + 1).toByte
-          pointsStrip(pointer - 3).white.closed4 = (pointsStrip(pointer - 3).white.closed4 + 1).toByte
+          pointsStrip(pointer - 1).white.closed4 += 1
+          pointsStrip(pointer - 3).white.closed4 += 1
         } else {
-          pointsStrip(pointer - 1).black.closed4 = (pointsStrip(pointer - 1).black.closed4 + 1).toByte
-          pointsStrip(pointer - 1).black.closed4 = (pointsStrip(pointer - 1).black.closed4 + 1).toByte
+          pointsStrip(pointer - 1).black.closed4 += 1
+          pointsStrip(pointer - 3).black.closed4 += 1
         }
 
       // check open-3
@@ -265,14 +302,14 @@ object L1Strip {
           && p5Flag == Flag.FREE && p4Flag == p1Flag && p3Flag == Flag.FREE && p2Flag == Flag.FREE
       )
         if (p1Flag == Flag.WHITE) {
-          pointsStrip(pointer - 2).white.open3 = 1
-          pointsStrip(pointer - 3).white.open3 = 1
+          pointsStrip(pointer - 2).white.open3 = true
+          pointsStrip(pointer - 3).white.open3 = true
         } else if (
           this.isNotOver6(field, pointer, pointer - 2, pointer - 3)
             && this.isNotOver6(field, pointer - 2, pointer - 3, pointer - 5)
         ) {
-          pointsStrip(pointer - 2).black.open3 = 1
-          pointsStrip(pointer - 3).black.open3 = 1
+          pointsStrip(pointer - 2).black.open3 = true
+          pointsStrip(pointer - 3).black.open3 = true
         }
 
       // --O+O--
@@ -281,12 +318,12 @@ object L1Strip {
           && p6Flag == Flag.FREE && p5Flag == Flag.FREE && p4Flag == p2Flag && p3Flag == Flag.FREE && p1Flag == Flag.FREE
       )
         if (p2Flag == Flag.WHITE)
-          pointsStrip(pointer - 3).white.open3 = 1
+          pointsStrip(pointer - 3).white.open3 = true
         else if (!(
           !this.isNotOver6(field, pointer, pointer - 1, pointer - 3)
             && !this.isNotOver6(field, pointer - 3, pointer - 5, pointer - 6)
           ))
-          pointsStrip(pointer - 3).black.open3 = 1
+          pointsStrip(pointer - 3).black.open3 = true
 
       this.pattern2Mutate(
         field, pointsStrip, forbidMask,
@@ -335,6 +372,17 @@ object L1Strip {
       p2Flag = p1Flag
       p1Flag = flag
       pointer -= 1
+    }
+
+    pointer = 0
+    while (pointer < field.length) {
+      if (pointsStrip(pointer).black.four > 1) {
+        pointsStrip(pointer).black.closed4 = 0
+        pointsStrip(pointer).black.open4 = false
+        forbidMask(pointer) = Flag.FORBIDDEN_44
+      }
+
+      pointer += 1
     }
 
     (pointsStrip, forbidMask, winner)

@@ -28,7 +28,7 @@ class L1BoardTest extends AnyFlatSpec with should.Matchers {
         " 1 . . . . . . . . . . . . . . . 1 \n" +
         "   A B C D E F G H I J K L M N O   "
       )
-      .t2b(Pos.fromCartesian("I", 2).get.idx)
+      .t2b(Pos.fromCartesian(2, "I").get.idx)
 
     for (_ <- 0 until 100000) {
       board.calculateGlobalL2Board()
@@ -55,7 +55,7 @@ class L1BoardTest extends AnyFlatSpec with should.Matchers {
         " 1 . . . . . . . . . . . . . . . 1 \n" +
         "   A B C D E F G H I J K L M N O   "
       )
-      .t2b(Pos.fromCartesian("I", 2).get.idx)
+      .t2b(Pos.fromCartesian(2, "I").get.idx)
       .calculateGlobalL2Board()
       .calculateL3Board()
 
@@ -82,7 +82,7 @@ class L1BoardTest extends AnyFlatSpec with should.Matchers {
         " 1 . . . . . . . . . . . . . . . 1 \n" +
         "   A B C D E F G H I J K L M N O   "
     )
-      .t2b(Pos.fromCartesian("I", 2).get.idx)
+      .t2b(Pos.fromCartesian(2, "I").get.idx)
 
     val strips = board.composeL2Strips()
 
