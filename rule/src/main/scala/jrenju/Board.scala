@@ -26,9 +26,12 @@ class Board(
 
   def validateMove(idx: Int): Option[RejectReason.Value] = {
     val flag = this.boardField(idx)
-    if (this.isNextColorBlack && flag > Flag.FREE) Option(RejectReason.FORBIDDEN)
-    else if (flag != Flag.FREE) Option(RejectReason.EXIST)
-    else Option.empty
+    if (this.isNextColorBlack && Flag.isForbid(flag))
+      Option(RejectReason.FORBIDDEN)
+    else if (Flag.isExist(flag))
+      Option(RejectReason.EXIST)
+    else
+      Option.empty
   }
 
   def makeMove(pos: Pos): L1Board = this.makeMove(pos.idx)
@@ -37,7 +40,7 @@ class Board(
     val thenBoard = boardField.updated(idx, nextColorRaw)
     new L1Board(
       boardField = thenBoard,
-      pointsField = this.pointsField.clone(),
+      pointsField = this.pointsField.updated(idx, PointsPair.empty),
       moves = this.moves + 1,
       latestMove = idx,
       opening = if (this.moves + 1 == 3) Opening.detect(thenBoard, idx) else this.opening
@@ -50,13 +53,19 @@ class Board(
     boardField = this.boardField
       .updated(move1, this.colorRaw)
       .updated(move2, this.colorRaw),
-    this.pointsField.clone(),
+    this.pointsField
+      .updated(move1, PointsPair.empty)
+      .updated(move2, PointsPair.empty),
     moves = this.moves + 2,
     latestMove = move2,
     opening = this.opening,
   )
 
   override def hashCode(): Int = boardField.hashCode()
+
+  def rotated(rotation: Rotation.Value): Board = ???
+
+  def transposed(): Board = ???
 
 }
 
@@ -66,7 +75,7 @@ object Board {
 
   def newBoard(initIdx: Int): L1Board = new L1Board(
     boardField = Array.fill(Renju.BOARD_LENGTH)(Flag.FREE).updated(initIdx, Flag.BLACK),
-    pointsField = Array.fill(Renju.BOARD_LENGTH)(new PointsPair()),
+    pointsField = Array.fill(Renju.BOARD_LENGTH)(PointsPair.empty),
     moves = 1,
     latestMove = initIdx,
     opening = Option.empty,

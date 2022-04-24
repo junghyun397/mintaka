@@ -2,36 +2,26 @@ package jrenju
 
 import jrenju.L1Strip.retrieveStripFieldSolution
 import jrenju.notation.Flag
-import utils.math.FNV1a
+import jrenju.solve.Zobrist
 
 import scala.collection.mutable
 import scala.math.Numeric.IntIsIntegral.{minus, plus}
 
 sealed class Strip(val direction: Byte, val startIdx: Int)
 
-final class L1Strip(direction: Byte, startIdx: Int, stripField: Array[Byte]) extends Strip(direction, startIdx) {
-
-  def calculateL2Strip(): L2Strip = {
-    val assembly = retrieveStripFieldSolution(this.stripField) // 5570 ms
-//    val assembly = calculatePoints(this.stripField) // 8953 ms
-    new L2Strip(this.direction, this.startIdx, assembly._1, assembly._2, assembly._3)
-  }
-
-}
-
 //noinspection DuplicatedCode
-object L1Strip {
+final class L1Strip(direction: Byte, startIdx: Int, val stripField: Array[Byte]) extends Strip(direction, startIdx) {
 
-  @inline private def isNotOver6(field: Array[Byte], mask: Int): Boolean = this.isNotOver6(field, mask, -1, -1)
+  @inline private def isNotOver6(mask: Int): Boolean = this.isNotOver6(mask, -1, -1)
 
-  @inline private def isNotOver6(field: Array[Byte], mask1: Int, mask2: Int): Boolean = this.isNotOver6(field, mask1, mask2, -1)
+  @inline private def isNotOver6(mask1: Int, mask2: Int): Boolean = this.isNotOver6(mask1, mask2, -1)
 
-  @inline private def isNotOver6(field: Array[Byte], mask1: Int, mask2: Int, mask3: Int): Boolean = {
+  @inline private def isNotOver6(mask1: Int, mask2: Int, mask3: Int): Boolean = {
     var bridged = 0
 
     var pointer = 0
-    while (pointer < field.length) {
-      if (field(pointer) == Flag.BLACK || pointer == mask1 || pointer == mask2 || pointer == mask3)
+    while (pointer < this.stripField.length) {
+      if (this.stripField(pointer) == Flag.BLACK || pointer == mask1 || pointer == mask2 || pointer == mask3)
         bridged += 1
       else
         bridged = 0
@@ -44,7 +34,7 @@ object L1Strip {
   }
 
   @inline private def pattern2Mutate(
-    field: Array[Byte], pointsStrip: Array[PointsProvidePair], forbidMask: Array[Byte],
+    pointsStrip: Array[PointsProvidePair], forbidMask: Array[Byte],
     pointer: Int, isSolid: Boolean,
     p6Flag: Byte, p5Flag: Byte, p4Flag: Byte, p3Flag: Byte, p2Flag: Byte, p1Flag: Byte, flag: Byte,
     op: (Int, Int) => Int,
@@ -55,18 +45,24 @@ object L1Strip {
       !isSolid && p4Flag != Flag.FREE && p4Flag != Flag.WALL
         && p4Flag == p3Flag && p3Flag == p2Flag && p2Flag == p1Flag
     )
-      if (p1Flag == Flag.WHITE) pointsStrip(pointer).white.five = true
-      else if (this.isNotOver6(field, pointer)) pointsStrip(pointer).black.five = true
-      else forbidMask(pointer) = Flag.FORBIDDEN_6
+      if (p1Flag == Flag.WHITE)
+        pointsStrip(pointer).white.five = true
+      else if (this.isNotOver6(pointer))
+        pointsStrip(pointer).black.five = true
+      else if (p5Flag != Flag.BLACK)
+        forbidMask(pointer) = Flag.FORBIDDEN_6
 
     // OOO+O
     if (
       isSolid && p4Flag != Flag.FREE
         && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE && flag == p2Flag
     )
-      if (flag == Flag.WHITE) pointsStrip(op(pointer, 1)).white.five = true
-      else if (this.isNotOver6(field, op(pointer, 1))) pointsStrip(op(pointer, 1)).black.five = true
-      else forbidMask(op(pointer, 1)) = Flag.FORBIDDEN_6
+      if (flag == Flag.WHITE)
+        pointsStrip(op(pointer, 1)).white.five = true
+      else if (this.isNotOver6(op(pointer, 1)))
+        pointsStrip(op(pointer, 1)).black.five = true
+      else
+        forbidMask(op(pointer, 1)) = Flag.FORBIDDEN_6
 
     // check open-4
     // -OOO+-
@@ -74,23 +70,29 @@ object L1Strip {
       !isSolid && p4Flag != Flag.FREE
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
     )
-      if (p2Flag == Flag.WHITE) pointsStrip(op(pointer, 1)).white.open4 = true
-      else if (this.isNotOver6(field, op(pointer, 1), op(pointer, 5))) {
-        pointsStrip(op(pointer, 1)).black.closed4 = 1
-        if (this.isNotOver6(field, pointer, op(pointer, 1))) {
-          pointsStrip(op(pointer, 1)).black.closed4 = 0
+      if (p2Flag == Flag.WHITE)
+        pointsStrip(op(pointer, 1)).white.open4 = true
+      else if (this.isNotOver6(op(pointer, 1), op(pointer, 5)))
+        if (this.isNotOver6(pointer, op(pointer, 1)))
           pointsStrip(op(pointer, 1)).black.open4 = true
-        }
-      }
+        else
+          pointsStrip(op(pointer, 1)).black.closed4 = 1
 
     // -OO+O-
     if (
       !isSolid && p4Flag != Flag.FREE
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p3Flag == p1Flag
     )
-      if (p2Flag == Flag.WHITE) pointsStrip(op(pointer, 2)).white.open4 = true
-      else if (this.isNotOver6(field, op(pointer, 2), pointer) && this.isNotOver6(field, op(pointer, 2), op(pointer, 5)))
-        pointsStrip(op(pointer, 2)).black.open4 = true
+      if (p1Flag == Flag.WHITE)
+        pointsStrip(op(pointer, 2)).white.open4 = true
+      else {
+        val condL = this.isNotOver6(op(pointer, 2), pointer)
+        val condR = this.isNotOver6(op(pointer, 2), op(pointer, 5))
+        if (condL && condR)
+          pointsStrip(op(pointer, 2)).black.open4 = true
+        else if (condL || condR)
+          pointsStrip(op(pointer, 2)).black.closed4 = 1
+      }
 
     // check closed-4
     // -OOO-+
@@ -98,8 +100,10 @@ object L1Strip {
       !isSolid && p4Flag != Flag.FREE
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
     )
-      if (p2Flag == Flag.WHITE) pointsStrip(pointer).white.closed4 += 1
-      else if (this.isNotOver6(field, pointer, op(pointer, 1))) pointsStrip(pointer).black.closed4 += 1
+      if (p2Flag == Flag.WHITE)
+        pointsStrip(pointer).white.closed4 += 1
+      else if (this.isNotOver6(pointer, op(pointer, 1)))
+        pointsStrip(pointer).black.closed4 += 1
 
     // OO++O
     if (
@@ -109,7 +113,7 @@ object L1Strip {
       if (flag == Flag.WHITE) {
         pointsStrip(op(pointer, 1)).white.closed4 += 1
         pointsStrip(op(pointer, 2)).white.closed4 += 1
-      } else if (this.isNotOver6(field, op(pointer, 1), op(pointer, 2))) {
+      } else if (this.isNotOver6(op(pointer, 1), op(pointer, 2))) {
         pointsStrip(op(pointer, 1)).black.closed4 += 1
         pointsStrip(op(pointer, 2)).black.closed4 += 1
       }
@@ -121,9 +125,9 @@ object L1Strip {
     )
       if (p1Flag == Flag.WHITE) pointsStrip(pointer).white.closed4 += 1
       else {
-        if (this.isNotOver6(field, pointer, op(pointer, 2)))
+        if (this.isNotOver6(pointer, op(pointer, 2)))
           pointsStrip(pointer).black.closed4 += 1
-        if (this.isNotOver6(field, op(pointer, 2), op(pointer, 5)))
+        if (this.isNotOver6(op(pointer, 2), op(pointer, 5)))
           pointsStrip(op(pointer, 5)).black.closed4 += 1
       }
 
@@ -136,7 +140,7 @@ object L1Strip {
       if (p2Flag == Flag.WHITE) {
         pointsStrip(pointer).white.closed4 += 1
         pointsStrip(op(pointer, 1)).white.closed4 += 1
-      } else if (this.isNotOver6(field, pointer, op(pointer, 1))) {
+      } else if (this.isNotOver6(pointer, op(pointer, 1))) {
         pointsStrip(pointer).black.closed4 += 1
         pointsStrip(op(pointer, 1)).black.closed4 += 1
       }
@@ -149,7 +153,7 @@ object L1Strip {
     )
       if (p2Flag == Flag.WHITE)
         pointsStrip(op(pointer, 4)).white.closed4 += 1
-      else if (this.isNotOver6(field, pointer, op(pointer, 4)))
+      else if (this.isNotOver6(pointer, op(pointer, 4)))
         pointsStrip(op(pointer, 4)).black.closed4 += 1
 
     // XOO+O+
@@ -161,7 +165,7 @@ object L1Strip {
       if (p1Flag == Flag.WHITE) {
         pointsStrip(pointer).white.closed4 += 1
         pointsStrip(op(pointer, 2)).white.closed4 += 1
-      } else if (this.isNotOver6(field, pointer, op(pointer, 2))) {
+      } else if (this.isNotOver6(pointer, op(pointer, 2))) {
         pointsStrip(pointer).black.closed4 += 1
         pointsStrip(op(pointer, 2)).black.closed4 += 1
       }
@@ -175,7 +179,7 @@ object L1Strip {
       if (p1Flag == Flag.WHITE) {
         pointsStrip(pointer).white.closed4 += 1
         pointsStrip(op(pointer, 3)).white.closed4 += 1
-      } else if (this.isNotOver6(field, pointer, op(pointer, 3))) {
+      } else if (this.isNotOver6(pointer, op(pointer, 3))) {
         pointsStrip(pointer).black.closed4 += 1
         pointsStrip(op(pointer, 3)).black.closed4 += 1
       }
@@ -190,10 +194,10 @@ object L1Strip {
       if (p4Flag == Flag.WHITE) {
         pointsStrip(op(pointer, 1)).white.open3 = true
         pointsStrip(op(pointer, 2)).white.open3 = true
-      } else if (this.isNotOver6(field, pointer, op(pointer, 1), op(pointer, 2))) {
+      } else if (this.isNotOver6(pointer, op(pointer, 1), op(pointer, 2))) {
         pointsStrip(op(pointer, 1)).black.open3 = true
         pointsStrip(op(pointer, 2)).black.open3 = true
-      } else if (p6Flag != Flag.WHITE && this.isNotOver6(field, op(pointer, 5), op(pointer, 6))) {
+      } else if (p6Flag != Flag.WHITE && this.isNotOver6(op(pointer, 5), op(pointer, 6))) {
         pointsStrip(op(pointer, 2)).black.open3 = true
       }
 
@@ -206,7 +210,7 @@ object L1Strip {
       if (p3Flag == Flag.WHITE) {
         pointsStrip(op(pointer, 1)).white.open3 = true
         pointsStrip(op(pointer, 4)).white.open3 = true
-      } else if (this.isNotOver6(field, pointer, op(pointer, 1))) {
+      } else if (this.isNotOver6(pointer, op(pointer, 1))) {
         pointsStrip(op(pointer, 1)).black.open3 = true
         pointsStrip(op(pointer, 4)).black.open3 = true
       }
@@ -219,7 +223,7 @@ object L1Strip {
     )
       if (p4Flag == Flag.WHITE) {
         pointsStrip(op(pointer, 1)).white.open3 = true
-      } else if (this.isNotOver6(field, pointer, op(pointer, 1), op(pointer, 3))) {
+      } else if (this.isNotOver6(pointer, op(pointer, 1), op(pointer, 3))) {
         pointsStrip(op(pointer, 1)).black.open3 = true
       }
 
@@ -233,15 +237,15 @@ object L1Strip {
       if (p4Flag == Flag.WHITE) {
         pointsStrip(op(pointer, 1)).white.open3 = true
         pointsStrip(op(pointer, 3)).white.open3 = true
-      } else if (this.isNotOver6(field, pointer, op(pointer, 1), op(pointer, 3))) {
+      } else if (this.isNotOver6(pointer, op(pointer, 1), op(pointer, 3))) {
         pointsStrip(op(pointer, 1)).black.open3 = true
         pointsStrip(op(pointer, 3)).black.open3 = true
       }
   }
 
-  private def calculatePoints(field: Array[Byte]): (Array[PointsProvidePair], Array[Byte], Byte) = {
-    val pointsStrip = Array.fill(field.length)(new PointsProvidePair())
-    val forbidMask = Array.fill(field.length)(Flag.FREE)
+  private def calculatePoints(): (Array[PointsProvidePair], Array[Byte], Byte) = {
+    val pointsStrip = Array.fill(this.stripField.length)(new PointsProvidePair())
+    val forbidMask = Array.fill(this.stripField.length)(Flag.FREE)
 
     var winner = Flag.FREE
 
@@ -259,15 +263,15 @@ object L1Strip {
     // >>>>>
     // p6Flag | p5Flag | p4Flag | p3Flag | p2Flag | p1Flag | Flag <- pointer
     var pointer = 0
-    while (pointer < field.length) {
-      flag = field(pointer)
+    while (pointer < this.stripField.length) {
+      flag = this.stripField(pointer)
       isSolid = flag != Flag.FREE
 
       // check win
       if (
         isSolid
           && p4Flag == p3Flag && p3Flag == p2Flag && p2Flag == p1Flag && p1Flag == flag
-          && (flag == Flag.WHITE || this.isNotOver6(field, pointer))
+          && (flag == Flag.WHITE || this.isNotOver6(pointer))
       )
         winner = flag
 
@@ -278,7 +282,7 @@ object L1Strip {
           && p2Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p1Flag && p1Flag == flag
       )
         if (flag == Flag.WHITE) pointsStrip(pointer - 2).white.five = true
-        else if (this.isNotOver6(field, pointer - 2)) pointsStrip(pointer - 2).black.five = true
+        else if (this.isNotOver6(pointer - 2)) pointsStrip(pointer - 2).black.five = true
         else forbidMask(pointer - 2) = Flag.FORBIDDEN_6
 
       // check closed-4
@@ -290,7 +294,7 @@ object L1Strip {
         if (flag == Flag.WHITE) {
           pointsStrip(pointer - 1).white.closed4 += 1
           pointsStrip(pointer - 3).white.closed4 += 1
-        } else {
+        } else if (this.isNotOver6(pointer - 1, pointer - 3)) {
           pointsStrip(pointer - 1).black.closed4 += 1
           pointsStrip(pointer - 3).black.closed4 += 1
         }
@@ -305,8 +309,8 @@ object L1Strip {
           pointsStrip(pointer - 2).white.open3 = true
           pointsStrip(pointer - 3).white.open3 = true
         } else if (
-          this.isNotOver6(field, pointer, pointer - 2, pointer - 3)
-            && this.isNotOver6(field, pointer - 2, pointer - 3, pointer - 5)
+          this.isNotOver6(pointer, pointer - 2, pointer - 3)
+            && this.isNotOver6(pointer - 2, pointer - 3, pointer - 5)
         ) {
           pointsStrip(pointer - 2).black.open3 = true
           pointsStrip(pointer - 3).black.open3 = true
@@ -320,13 +324,13 @@ object L1Strip {
         if (p2Flag == Flag.WHITE)
           pointsStrip(pointer - 3).white.open3 = true
         else if (!(
-          !this.isNotOver6(field, pointer, pointer - 1, pointer - 3)
-            && !this.isNotOver6(field, pointer - 3, pointer - 5, pointer - 6)
+          !this.isNotOver6(pointer, pointer - 1, pointer - 3)
+            && !this.isNotOver6(pointer - 3, pointer - 5, pointer - 6)
           ))
           pointsStrip(pointer - 3).black.open3 = true
 
       this.pattern2Mutate(
-        field, pointsStrip, forbidMask,
+        pointsStrip, forbidMask,
         pointer, isSolid,
         p6Flag, p5Flag, p4Flag, p3Flag, p2Flag, p1Flag, flag,
         minus,
@@ -355,11 +359,11 @@ object L1Strip {
     // pointer -> Flag | p1Flag | p2Flag | p3Flag | p4Flag | p5Flag | p6Flag
     pointer = pointsStrip.length - 1
     while (pointer >= 0) {
-      flag = field(pointer)
+      flag = this.stripField(pointer)
       isSolid = flag != Flag.FREE
 
       this.pattern2Mutate(
-        field, pointsStrip, forbidMask,
+        pointsStrip, forbidMask,
         pointer, isSolid,
         p6Flag, p5Flag, p4Flag, p3Flag, p2Flag, p1Flag, flag,
         plus,
@@ -375,7 +379,7 @@ object L1Strip {
     }
 
     pointer = 0
-    while (pointer < field.length) {
+    while (pointer < this.stripField.length) {
       if (pointsStrip(pointer).black.four > 1) {
         pointsStrip(pointer).black.closed4 = 0
         pointsStrip(pointer).black.open4 = false
@@ -388,10 +392,20 @@ object L1Strip {
     (pointsStrip, forbidMask, winner)
   }
 
-  private val stripMemo = new mutable.HashMap[BigInt, (Array[PointsProvidePair], Array[Byte], Byte)]()
+  def calculateL2Strip(): L2Strip = {
+    val assembly = retrieveStripFieldSolution(this) // VCF * 10000 for 39,418 ms
+//    val assembly = calculatePoints() // VCF * 10000 for 27,525 ms
+    new L2Strip(this.direction, this.startIdx, assembly._1, assembly._2, assembly._3)
+  }
 
-  private def retrieveStripFieldSolution(field: Array[Byte]): (Array[PointsProvidePair], Array[Byte], Byte) =
-    this.stripMemo.getOrElseUpdate(FNV1a.hash32a(field), this.calculatePoints(field))
+}
+
+object L1Strip {
+
+  private val stripMemo = new mutable.HashMap[Long, (Array[PointsProvidePair], Array[Byte], Byte)]()
+
+  private def retrieveStripFieldSolution(strip: L1Strip): (Array[PointsProvidePair], Array[Byte], Byte) =
+    this.stripMemo.getOrElseUpdate(Zobrist.stripHash(strip.stripField), strip.calculatePoints())
 
 }
 

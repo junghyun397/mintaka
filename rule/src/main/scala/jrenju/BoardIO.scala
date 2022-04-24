@@ -6,8 +6,9 @@ import utils.lang.{StringArrayTransform, IntTransform}
 //noinspection DuplicatedCode
 object BoardIO {
 
+  // regex: [0-9][\s(]([^\s][\s()]){15}[0-9]
   def fromBoardText(source: String, latestMove: Int, opening: Option[Opening]): Option[L1Board] = this.fromFieldArray(
-    ("[0-9]\\s([^\\s]\\s){" + Renju.BOARD_WIDTH + "}[0-9]").r.findAllIn(source)
+    ("[0-9][\\s(]([^\\s()]\\s){" + Renju.BOARD_WIDTH + "}[0-9]").r.findAllIn(source)
       .toArray
       .flatMap(_
         .drop(1)
@@ -65,16 +66,16 @@ object BoardIO {
     def debugText: String =
       f"${this.boardText}\n" +
         Array(
-          f"\nblack-open-3 /\n${this.attributeText(_.pointsField)(_.black.open3.count(_ == true).dotIfZero)}\n",
-          f"\nblack-closed-4 /\n${this.attributeText(_.pointsField)(_.black.closed4.sum.dotIfZero)}\n",
+          f"\nblack-open-3 /\n${this.attributeText(_.pointsField)(_.black.three.dotIfZero)}\n",
+          f"\nblack-closed-4 /\n${this.attributeText(_.pointsField)(_.black.closedFour.dotIfZero)}\n",
           f"\nblack-open-4 /\n${this.attributeText(_.pointsField)(_.black.open4.count(_ == true).dotIfZero)}\n",
-          f"\nblack-5\n${this.attributeText(_.pointsField)(_.black.five.count(_ == true).dotIfZero)}\n"
+          f"\nblack-5\n${this.attributeText(_.pointsField)(_.black.fiveInRow.dotIfZero)}\n"
         ).mergeHorizontal +
         Array(
-          f"\nwhite-open-3 /\n${this.attributeText(_.pointsField)(_.white.open3.count(_ == true).dotIfZero)}\n",
-          f"\nwhite-closed-4 /\n${this.attributeText(_.pointsField)(_.white.closed4.sum.dotIfZero)}\n",
+          f"\nwhite-open-3 /\n${this.attributeText(_.pointsField)(_.white.three.dotIfZero)}\n",
+          f"\nwhite-closed-4 /\n${this.attributeText(_.pointsField)(_.white.closedFour.dotIfZero)}\n",
           f"\nwhite-open-4 /\n${this.attributeText(_.pointsField)(_.white.open4.count(_ == true).dotIfZero)}\n",
-          f"\nwhite-5\n${this.attributeText(_.pointsField)(_.white.five.count(_ == true).dotIfZero)}\n"
+          f"\nwhite-5\n${this.attributeText(_.pointsField)(_.white.fiveInRow.dotIfZero)}\n"
         ).mergeHorizontal
 
   }

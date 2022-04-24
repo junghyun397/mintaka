@@ -1,9 +1,9 @@
 package jrenju
 
-import jrenju.notation.{Direction, Flag, Opening, Pos}
+import jrenju.notation.{Direction, Flag, Opening, Pos, Renju}
 
 import scala.collection.mutable
-import scala.language.implicitConversions
+import scala.language.{implicitConversions, postfixOps}
 
 class L3Board(
   boardField: Array[Byte],
@@ -15,114 +15,182 @@ class L3Board(
   private val hasDi3Forbid: Boolean,
 ) extends Board(boardField, pointsField, moves, latestMove, opening) with EvaluatedBoard {
 
-  @inline private def getOffsetIdxForward(direction: Int, initRow: Int, initCol: Int, offset: Int): Int = direction match {
+  implicit def int2bool(value: Int): Boolean = if (value == 0) false else true
+
+  @inline private def getOffsetIdx(direction: Byte, initRow: Int, initCol: Int, offset: Int): Int = direction match {
     case Direction.X => Pos.rowColToIdx(initRow, initCol + offset)
     case Direction.Y => Pos.rowColToIdx(initRow + offset, initCol)
     case Direction.DEG45 => Pos.rowColToIdx(initRow + offset, initCol + offset)
     case Direction.DEG315 => Pos.rowColToIdx(initRow + offset, initCol - offset)
   }
 
-  @inline private def getOffsetIdxBackward(direction: Int, initRow: Int, initCol: Int, offset: Int): Int = direction match {
-    case Direction.X => Pos.rowColToIdx(initRow, initCol - offset)
-    case Direction.Y => Pos.rowColToIdx(initRow - offset, initCol)
-    case Direction.DEG45 => Pos.rowColToIdx(initRow - offset, initCol - offset)
-    case Direction.DEG315 => Pos.rowColToIdx(initRow - offset, initCol + offset)
-  }
+  @inline private def getBoardFieldBounded(idx: Int): Byte =
+    if (idx < 0) Flag.WALL
+    else this.boardField(idx)
 
-  private def recoverCompanions(direction: Int, idx: Int): Array[Int] = {
+  @inline private def getPointsBounded(idx: Int, op: PointsPair => Boolean): Boolean =
+    if (idx < 0) false
+    else op(this.pointsField(idx))
+
+  def recoverOpen3Companions(direction: Byte, idx: Int, op: PointsPair => Points, color: Byte): Array[Int] = {
     val row = Pos.idxToRow(idx)
     val col = Pos.idxToCol(idx)
 
-    val buffer = mutable.ListBuffer[Int]()
+    val builder = new mutable.ArrayBuilder.ofInt
 
-    val p2Pointer = this.getOffsetIdxBackward(direction, row, col, 2)
-    val p1Pointer = this.getOffsetIdxBackward(direction, row, col, 1)
-    val a1Pointer = this.getOffsetIdxForward(direction, row, col, 1)
-    val a2Pointer = this.getOffsetIdxForward(direction, row, col, 2)
+    val p2Pointer = this.getOffsetIdx(direction, row, col, -2)
+    val p2Value = this.getBoardFieldBounded(p2Pointer)
+    val p1Pointer = this.getOffsetIdx(direction, row, col, -1)
+    val p1Value = this.getBoardFieldBounded(p1Pointer)
+    val a1Pointer = this.getOffsetIdx(direction, row, col, 1)
+    val a1Value = this.getBoardFieldBounded(a1Pointer)
+    val a2Pointer = this.getOffsetIdx(direction, row, col, 2)
+    val a2Value = this.getBoardFieldBounded(a2Pointer)
 
     // +0OO+
-    if (this.boardField(a1Pointer) == Flag.BLACK && this.boardField(a2Pointer) == Flag.BLACK) {
-      if (this.pointsField(p1Pointer).black.open3(direction))
-        buffer.append(p1Pointer)
-      val end = this.getOffsetIdxForward(direction, row, col, 3)
-      if (this.pointsField(end).black.open3(direction))
-        buffer.append(end)
+    if (a1Value == color && a2Value == color) {
+      if (op(this.pointsField(p1Pointer)).open3(direction))
+        builder += p1Pointer
+      val end = this.getOffsetIdx(direction, row, col, 3)
+      if (op(this.pointsField(end)).open3(direction))
+        builder += end
     }
 
     // +OO0+
-    else if (this.boardField(p1Pointer) == Flag.BLACK && this.boardField(p2Pointer) == Flag.BLACK) {
-      if (this.pointsField(a1Pointer).black.open3(direction))
-        buffer.append(a1Pointer)
-      val start = this.getOffsetIdxBackward(direction, row, col, 3)
-      if (this.pointsField(start).black.open3(direction))
-        buffer.append(start)
+    else if (p1Value == color && p2Value == color) {
+      if (op(this.pointsField(a1Pointer)).open3(direction))
+        builder += a1Pointer
+      val start = this.getOffsetIdx(direction, row, col, -3)
+      if (op(this.pointsField(start)).open3(direction))
+        builder += start
     }
 
     // O0+O
-    else if (this.boardField(p1Pointer) == Flag.BLACK && this.boardField(a2Pointer) == Flag.BLACK)
-      buffer.append(a1Pointer)
+    else if (p1Value == color && a2Value == color)
+      builder += a1Pointer
     // O+0O
-    else if (this.boardField(p2Pointer) == Flag.BLACK && this.boardField(a1Pointer) == Flag.BLACK)
-      buffer.append(p1Pointer)
+    else if (p2Value == color && a1Value == color)
+      builder += p1Pointer
 
     // -0O+O
-    else if (this.boardField(p1Pointer) == Flag.FREE && this.boardField(a1Pointer) == Flag.BLACK && this.boardField(p2Pointer) >= Flag.FREE)
-      buffer.append(a2Pointer)
+    else if (
+      Flag.onlyStone(p1Value) == Flag.FREE
+        && a1Value == color
+        && Flag.onlyStone(p2Value) == Flag.FREE
+    )
+      builder += a2Pointer
     // O+O0-
-    else if (this.boardField(p1Pointer) == Flag.BLACK && this.boardField(p2Pointer) >= Flag.FREE && this.boardField(a1Pointer) == Flag.FREE)
-      buffer.append(p2Pointer)
+    else if (
+      p1Value == color
+        && Flag.onlyStone(p2Value) == Flag.FREE
+        && Flag.onlyStone(a1Value) == Flag.FREE
+    )
+      builder += p2Pointer
 
     // +O0O+
-    else if (this.boardField(p1Pointer) == Flag.BLACK && this.boardField(a1Pointer) == Flag.BLACK) {
-      if (this.pointsField(a2Pointer).black.open3(direction))
-        buffer.append(a2Pointer)
-      if (this.pointsField(p2Pointer).black.open3(direction))
-        buffer.append(p2Pointer)
+    else if (p1Value == color && a1Value == color) {
+      if (op(this.pointsField(a2Pointer)).open3(direction))
+        builder += a2Pointer
+      if (op(this.pointsField(p2Pointer)).open3(direction))
+        builder += p2Pointer
     }
 
-    buffer.toArray
+    // OO+0
+    else if (Flag.onlyStone(p1Value) == Flag.FREE && p2Value == color)
+      builder += p1Pointer
+    // 0+OO
+    else if (Flag.onlyStone(a1Value) == Flag.FREE && a2Value == color)
+      builder += a1Pointer
+
+    builder.result()
   }
 
-  implicit def int2bool(value: Int): Boolean = if (value == 0) false else true
+  def recoverClosed4Companion(direction: Byte, idx: Int, op: PointsPair => Points): Int = {
+    val row = Pos.idxToRow(idx)
+    val col = Pos.idxToCol(idx)
 
-  private def isNotPseudoThree(direction: Int, idx: Int): Boolean = this.recoverCompanions(direction, idx)
-    .count { companionIdx: Int =>
-      this.boardField(companionIdx) match {
-        case Flag.FORBIDDEN_6 | Flag.FORBIDDEN_44 => false
-        case _ =>
-          val points = this.pointsField(companionIdx).black
-          if (points.four > 0) false
-          else if (points.three > 2)
-            this.isPseudoForbid(companionIdx, direction)
-          else true
+    for (offset <- -4 to 4) {
+      if (offset != 0) {
+        val pointer = this.getOffsetIdx(direction, row, col, offset)
+        if (this.getPointsBounded(pointer, op(_).closed4(direction)))
+          return pointer
       }
     }
 
-  private def isPseudoForbid(idx: Int): Boolean = this.pointsField(idx).black.open3
-    .zipWithIndex.count { open3Direction =>
-      open3Direction._1 && this.isNotPseudoThree(open3Direction._2, idx)
-    } < 2
+    -1
+  }
 
-  private def isPseudoForbid(idx: Int, excludeDirection: Int): Boolean = this.pointsField(idx).black.open3
-    .zipWithIndex.count { open3Direction =>
-      open3Direction._2 != excludeDirection && open3Direction._1 && this.isNotPseudoThree(open3Direction._2, idx)
-    } < 2
+  private def isNotPseudoThree(direction: Byte, idx: Int): Boolean = {
+    for (companionIdx <- this.recoverOpen3Companions(direction, idx, _.black, Flag.BLACK)) {
+      val flag = this.boardField(companionIdx)
+      if (flag != Flag.FORBIDDEN_6 && flag != Flag.FORBIDDEN_44) {
+        val points = this.pointsField(companionIdx).black
+        if (points.four == 0 && points.fiveInRow == 0) {
+          if (points.three > 2) {
+            if (this.isPseudoForbid(companionIdx, direction))
+              return true
+          } else
+            return true
+        }
+      }
+    }
+
+    false
+  }
+
+  private def isPseudoForbid(idx: Int): Boolean = {
+    var count = 0
+    val open3 = this.pointsField(idx).black.open3
+    for (direction <- 0 until 4)
+      if (open3(direction) && this.isNotPseudoThree(direction.toByte, idx))
+        count += 1
+
+    count < 2
+  }
+
+  private def isPseudoForbid(idx: Int, excludeDirection: Int): Boolean = {
+    var count = 0
+    val open3 = this.pointsField(idx).black.open3
+    for (direction <- 0 until 4)
+      if (direction != excludeDirection && open3(direction) && this.isNotPseudoThree(direction.toByte, idx))
+        count += 1
+
+    count < 2
+  }
+
+  def collectTrapPoints(): (Array[Int], Array[Int]) = {
+    val threeSideTraps = new mutable.ArrayBuilder.ofInt
+    val fourSideTraps = new mutable.ArrayBuilder.ofInt
+
+    for (idx <- 0 until Renju.BOARD_LENGTH) {
+      if (Flag.isForbid(this.boardField(idx))) {
+        val points = this.pointsField(idx).white
+
+        for (direction <- 0 until 4) {
+          if (points.open3(direction))
+            threeSideTraps.addAll(this.recoverOpen3Companions(direction.toByte, idx, _.white, Flag.WHITE))
+
+          if (points.closed4(direction) != 0) {
+            val answer = this.recoverClosed4Companion(direction.toByte, idx, _.white)
+            if (answer != -1)
+              fourSideTraps += answer
+          }
+        }
+      }
+    }
+
+    (threeSideTraps.result(), fourSideTraps.result())
+  }
 
   def calculateDeepL3Board(): L3Board =
     if (this.hasDi3Forbid) {
-      this.boardField.zipWithIndex
-        .filter(flagIdx => flagIdx._1 == Flag.FORBIDDEN_33 && this.isPseudoForbid(flagIdx._2))
-        .foreach(flagIdx => this.boardField(flagIdx._2) = Flag.FREE)
+      for (idx <- 0 until Renju.BOARD_LENGTH) {
+        val flag = this.boardField(idx)
+        if (flag == Flag.FORBIDDEN_33 && this.isPseudoForbid(idx))
+          this.boardField(idx) = Flag.FREE
+      }
 
-      new DeepL3Board(
-        this.boardField,
-        this.moves,
-        this.latestMove,
-        this.opening,
-        this.pointsField,
-        this.winner,
-        this.hasDi3Forbid,
-      )
+      new DeepL3Board(this.boardField, this.moves, this.latestMove, this.opening, this.pointsField, this.winner, this.hasDi3Forbid)
     } else this
 
 }

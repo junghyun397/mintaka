@@ -17,9 +17,11 @@ object Pos {
 
   @inline def rowColToIdx(row: Int, col: Int): Int = row * Renju.BOARD_WIDTH + col
 
-  def fromCartesian(rawRow: Int, rawCol: String): Option[Pos] = this.fromCartesian(rawRow, rawCol.charAt(0))
+  def fromCartesian(raw: String): Option[Pos] = raw.drop(1).toIntOption.flatMap(this.fromCartesian(raw.head, _))
 
-  def fromCartesian(rawRow: Int, rawCol: Char): Option[Pos] = {
+  def fromCartesian(rawCol: String, rawRow: Int): Option[Pos] = this.fromCartesian(rawCol.charAt(0), rawRow)
+
+  def fromCartesian(rawCol: Char, rawRow: Int): Option[Pos] = {
     val col = rawCol.toUpper - 65
     val row = rawRow - 1
     if (col < 0 || col >= Renju.BOARD_WIDTH || row < 0 || row >= Renju.BOARD_WIDTH) Option.empty

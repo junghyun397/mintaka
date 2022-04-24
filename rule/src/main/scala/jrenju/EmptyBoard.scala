@@ -4,7 +4,7 @@ import jrenju.notation.{Color, Flag, Pos, Renju}
 
 object EmptyBoard extends Board(
   boardField = Array.fill(Renju.BOARD_LENGTH)(Flag.FREE),
-  pointsField = Array.fill(Renju.BOARD_LENGTH)(new PointsPair()),
+  pointsField = Array.fill(Renju.BOARD_LENGTH)(PointsPair.empty),
   moves = 0,
   latestMove = 0,
   opening = Option.empty

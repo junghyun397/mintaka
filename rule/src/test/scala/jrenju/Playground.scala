@@ -1,10 +1,16 @@
 package jrenju
 
-import org.scalatest._
+import jrenju.notation.Renju
 import org.scalatest.flatspec._
 import org.scalatest.matchers._
 
 class Playground extends AnyFlatSpec with should.Matchers {
+
+  "language test clone" should "works" in {
+    val a = Seq(0, 1, 2, 3)
+
+    println(a.dropRight(1))
+  }
 
   "language test div" should "works" in { // 20662 ms
     println((-1 + 1) % 2)

@@ -1,6 +1,5 @@
 package jrenju.notation
 
-import org.scalatest._
 import org.scalatest.flatspec._
 import org.scalatest.matchers._
 

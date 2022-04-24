@@ -1,7 +1,8 @@
 package jrenju
 
 import jrenju.BoardIO.BoardToText
-import jrenju.ComplexCase.T2
+import jrenju.TestHelper.T2
+import jrenju.notation.Pos
 import org.scalatest.flatspec._
 import org.scalatest.matchers._
 
@@ -16,6 +17,49 @@ class L3BoardTest extends AnyFlatSpec with should.Matchers {
     println(board.debugText)
 
     board.boardText should be (answer.t2b.boardText)
+  }
+
+  "edge cases" should "analyze correctly" in {
+    deepForbid(
+      """
+        |   A B C D E F G H I J K L M N O
+        |15 . . . . . . . . . . . . . . . 15
+        |14 . . . . . . . . . . . . . . . 14
+        |13 . . . . . . . . . . . . . . . 13
+        |12 . . . . . . . . . . . . . . . 12
+        |11 . . . . . . . . . . . . . . . 11
+        |10 . . . . . . . . . . . . . . . 10
+        | 9 . . . . . . . . . . . . . . . 9
+        | 8 . . . . . X . O . . . . . . . 8
+        | 7 . . . . X . O X X . . . . . . 7
+        | 6 . . . . . X X O . . . . . . . 6
+        | 5 . . . . . O O X O . . . . . . 5
+        | 4 . . . . . . O . O O . . . . . 4
+        | 3 . . . . . . . . . . X . . . . 3
+        | 2 . . . . . . . . . . . . . . . 2
+        | 1 . . . . . . . . . . . . . . . 1
+        |   A B C D E F G H I J K L M N O
+      """.stripMargin,
+      """
+        |   A B C D E F G H I J K L M N O
+        |15 . . . . . . . . . . . . . . . 15
+        |14 . . . . . . . . . . . . . . . 14
+        |13 . . . . . . . . . . . . . . . 13
+        |12 . . . . . . . . . . . . . . . 12
+        |11 . . . . . . . . . . . . . . . 11
+        |10 . . . . . . . . . . . . . . . 10
+        | 9 . . . . . . . . . . . . . . . 9
+        | 8 . . . . . X . O . . . . . . . 8
+        | 7 . . . . X . O X X . . . . . . 7
+        | 6 . . . . . X X O . . . . . . . 6
+        | 5 . . . . . O O X O . . . . . . 5
+        | 4 . . . . . . O . O O . . . . . 4
+        | 3 . . . . . . . . . . X . . . . 3
+        | 2 . . . . . . . . 3 . . . . . . 2
+        | 1 . . . . . . . . . . . . . . . 1
+        |   A B C D E F G H I J K L M N O
+      """.stripMargin,
+    )
   }
 
   "valid forbidden moves" should "analyze correctly" in {
@@ -306,6 +350,217 @@ class L3BoardTest extends AnyFlatSpec with should.Matchers {
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
       """.stripMargin,
+    )
+
+    deepForbid(
+      """
+        |   A B C D E F G H I J K L M N O
+        |15 . . . . . . . . . . . . . . . 15
+        |14 . . . . . . . . . . . . . . . 14
+        |13 . . . . . . . . . . . . . . . 13
+        |12 . . . . . . . X . . . . . . . 12
+        |11 . . . . . . . O . . . . . . . 11
+        |10 . . . . . X . O . . . . . . . 10
+        | 9 . . . . . O X O X . . . . . . 9
+        | 8 . . . . . O . O . X . . . . . 8
+        | 7 . . X O O O O X O . . . . . . 7
+        | 6 . . . . . O . X . X . . . . . 6
+        | 5 . . . . O X X . . . . . . . . 5
+        | 4 . . . X . . . . . . . . . . . 4
+        | 3 . . . . . . . . . . . . . . . 3
+        | 2 . . . . . . . . . . . . . . . 2
+        | 1 . . . . . . . . . . . . . . . 1
+        |   A B C D E F G H I J K L M N O
+      """.stripMargin,
+      """
+        |   A B C D E F G H I J K L M N O
+        |15 . . . . . . . . . . . . . . . 15
+        |14 . . . . . . . . . . . . . . . 14
+        |13 . . . . . . . . . . . . . . . 13
+        |12 . . . . . . . X . . . . . . . 12
+        |11 . . . . . . . O . . . . . . . 11
+        |10 . . . . . X . O . . . . . . . 10
+        | 9 . . . . . O X O X . . . . . . 9
+        | 8 . . . . 3 O . O . X . . . . . 8
+        | 7 . . X O O O O X O . . . . . . 7
+        | 6 . . . . 3 O . X . X . . . . . 6
+        | 5 . . . . O X X . . . . . . . . 5
+        | 4 . . . X . . . . . . . . . . . 4
+        | 3 . . . . . . . . . . . . . . . 3
+        | 2 . . . . . . . . . . . . . . . 2
+        | 1 . . . . . . . . . . . . . . . 1
+        |   A B C D E F G H I J K L M N O
+      """.stripMargin,
+    )
+
+  }
+
+  "uncommon forbidden moves" should "analyze correctly" in {
+    deepForbid(
+      """
+        |   A B C D E F G H I J K L M N O
+        |15 . . . . . . . . . . . . . . X 15
+        |14 . . . . . . . . . . . . . . . 14
+        |13 . . . . . . . . . . . . . . . 13
+        |12 . . . . . . . . . . . . . . . 12
+        |11 . . . . O . O . . . . . . . . 11
+        |10 . . . . . . . . . O . . . . . 10
+        | 9 . . . . . . . . . . . . . . . 9
+        | 8 . . . . . . O O . . . . . . . 8
+        | 7 . . . . O . . . O O . . . . . 7
+        | 6 . . . . O . O . O . . . . . . 6
+        | 5 . . . . . . . . . O O O . . . 5
+        | 4 . . . . . . . . O . . . . . . 4
+        | 3 . . . . . . . . . . . . . . . 3
+        | 2 . . . . . . . . . . . . . . . 2
+        | 1 . . . . . . . . . . . . . . . 1
+        |   A B C D E F G H I J K L M N O
+      """.stripMargin,
+      """
+        |   A B C D E F G H I J K L M N O
+        |15 . . . . . . . . . . . . . . X 15
+        |14 . . . . . . . . . . . . . . . 14
+        |13 . . . . . . . . . . . . . . . 13
+        |12 . . . . . . . . . . . . . . . 12
+        |11 . . . . O . O . . . . . . . . 11
+        |10 . . . . . . . . . O . . . . . 10
+        | 9 . . . . . . 4 . . . . . . . . 9
+        | 8 . . . . 3 . O O 3 . . . . . . 8
+        | 7 . . . . O . 3 . O O . 3 . . . 7
+        | 6 . . . . O . O . O . 3 . . . . 6
+        | 5 . . . . . . . 3 4 O O O . . . 5
+        | 4 . . . . . . . . O . . . . . . 4
+        | 3 . . . . . . . . . . . . . . . 3
+        | 2 . . . . . . . . . . . . . . . 2
+        | 1 . . . . . . . . . . . . . . . 1
+        |   A B C D E F G H I J K L M N O
+      """.stripMargin,
+    )
+  }
+
+  "recursive forbidden moves" should "analyze correctly" in {
+    deepForbid(
+      """
+        |   A B C D E F G H I J K L M N O
+        |15 . . . . . . . . . . . . . . . 15
+        |14 . . . . . . . . . . . . . . . 14
+        |13 . . . . . . . . . . . . . . . 13
+        |12 . . . . . . . . . . . . . . . 12
+        |11 . . . . . . . . . . . . . . . 11
+        |10 . . . . . . X X . . . . . . . 10
+        | 9 . . . . . . O O . . . . . . . 9
+        | 8 . . . . X O O O O X . . . . . 8
+        | 7 . . . . X O O O O X . . . . . 7
+        | 6 . . . . . . O O . . . . . . . 6
+        | 5 . . . . . . X X . . . . . . . 5
+        | 4 . . . . . . . . . . . . . . . 4
+        | 3 . . . . . . . . . . . . . . . 3
+        | 2 . . . . . . . . . . . . . . . 2
+        | 1 . . . . . . . . . . . . . . . 1
+        |   A B C D E F G H I J K L M N O
+      """.stripMargin,
+      """
+        |   A B C D E F G H I J K L M N O
+        |15 . . . . . . . . . . . . . . . 15
+        |14 . . . . . . . . . . . . . . . 14
+        |13 . . . . . . . . . . . . . . . 13
+        |12 . . . . . . . . . . . . . . . 12
+        |11 . . . . . . . . . . . . . . . 11
+        |10 . . . . . . X X . . . . . . . 10
+        | 9 . . . . . 3 O O 3 . . . . . . 9
+        | 8 . . . . X O O O O X . . . . . 8
+        | 7 . . . . X O O O O X . . . . . 7
+        | 6 . . . . . 3 O O 3 . . . . . . 6
+        | 5 . . . . . . X X . . . . . . . 5
+        | 4 . . . . . . . . . . . . . . . 4
+        | 3 . . . . . . . . . . . . . . . 3
+        | 2 . . . . . . . . . . . . . . . 2
+        | 1 . . . . . . . . . . . . . . . 1
+        |   A B C D E F G H I J K L M N O
+      """.stripMargin,
+    )
+  }
+
+  def trap(problem: String, answer: String): Unit = {
+    val board = problem.t2b
+      .calculateGlobalL2Board()
+      .calculateL3Board()
+      .calculateDeepL3Board()
+
+    val (threeSide, fourSide) = board.collectTrapPoints()
+
+    threeSide.map(idx => Pos.fromIdx(idx).toCartesian).mkString("Three(", ", ", ") ") +
+      fourSide.map(idx => Pos.fromIdx(idx).toCartesian).mkString("Four(", ", ", ")") should be (answer)
+  }
+
+  "traps" should "analyse correctly" in {
+    trap(
+      """
+        |   A B C D E F G H I J K L M N O
+        |15 . . . . . . . . . . . . . . . 15
+        |14 . . . . . . . . . . . . . . . 14
+        |13 . . . . . . . . . . . . . . . 13
+        |12 . . . . . . . . . . . . . . . 12
+        |11 . . . . . . . . . . . . . . . 11
+        |10 . . . . . . . . . . . . . . . 10
+        | 9 . . . . . . . . . . . . . . . 9
+        | 8 . . . . . . . O . . . . . . . 8
+        | 7 . . . . . . . O . . . . . . . 7
+        | 6 . . . . . . . . O O . . . . . 6
+        | 5 . . . . . . X . . . . . . . . 5
+        | 4 . . . . . X . . . . . . . . . 4
+        | 3 . . . . . . . . . . . . . . . 3
+        | 2 . . . . . . . . . . . . . . . 2
+        | 1 . . . . . . . . . . . . . . . 1
+        |   A B C D E F G H I J K L M N O
+      """.stripMargin,
+      "Three(i7, e3) Four()"
+    )
+
+    trap(
+      """
+        |   A B C D E F G H I J K L M N O
+        |15 . . . . . . . . . . . . . . . 15
+        |14 . . . . . . . . . . . . . . . 14
+        |13 . . . . . . . . . . . . . . . 13
+        |12 . . . . . . . . . . . . . . . 12
+        |11 . . . . . . . . . . . . . . . 11
+        |10 . . . . . . . . . . . . . . . 10
+        | 9 . . . . . . . . . . . . . . . 9
+        | 8 . . . . . . . O . O . . . . . 8
+        | 7 . . . . . . . O X . . . . . . 7
+        | 6 . . . . . . . . O O . . . . . 6
+        | 5 . . . . . . X . . . . . . . . 5
+        | 4 . . . . . X . . . . . . . . . 4
+        | 3 . . . . . . . . . . . . . . . 3
+        | 2 . . . . . . . . . . . . . . . 2
+        | 1 . . . . . . . . . . . . . . . 1
+        |   A B C D E F G H I J K L M N O
+      """.stripMargin,
+      "Three() Four(e3)"
+    )
+
+    trap(
+      """
+        |   A B C D E F G H I J K L M N O
+        |15 . . . . . . . . . . . . . . . 15
+        |14 . . . . . . . . . . . . . . . 14
+        |13 . . . . . . . . . . . . . . . 13
+        |12 . . . . . . . . . . . . . . . 12
+        |11 . . . . . . . . . . . . . . . 11
+        |10 . . . . . . . . . . . . . . . 10
+        | 9 . . . . . . . . . O . . . . . 9
+        | 8 . . . . . . . O . O . . . . . 8
+        | 7 . . . . . . . . . . . . . . . 7
+        | 6 . . . . O X X . X . . . . . . 6
+        | 5 . . . . . . . . . . O . . . . 5
+        | 4 . . . . . . . . . . . . . . . 4
+        | 3 . . . . . . . . . . . . . . . 3
+        | 2 . . . . . . . . . . . . . . . 2
+        | 1 . . . . . . . . . . . . . . . 1
+        |   A B C D E F G H I J K L M N O
+      """.stripMargin,
+      "Three() Four(h6)"
     )
   }
 

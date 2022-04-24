@@ -1,13 +1,13 @@
 package jrenju
 
-import jrenju.ComplexCase.T2
+import jrenju.TestHelper.T2
 import jrenju.notation.Flag
 import org.scalatest.flatspec._
 import org.scalatest.matchers._
 
 class StripTest extends AnyFlatSpec with should .Matchers {
 
-  private def open3(problem: String, answer: String): Unit = {
+  def open3(problem: String, answer: String): Unit = {
     problem.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.open3) "1" else ".").mkString should be (answer)
     problem.reverse.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.open3) "1" else ".").mkString should be (answer.reverse)
   }
@@ -63,7 +63,7 @@ class StripTest extends AnyFlatSpec with should .Matchers {
 
   }
 
-  private def closed4(problem: String, answer: String): Unit = {
+  def closed4(problem: String, answer: String): Unit = {
     problem.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.closed4 == 0) "." else v.black.closed4.toString).mkString should be (answer)
     problem.reverse.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.closed4 == 0) "." else v.black.closed4.toString).mkString should be (answer.reverse)
   }
@@ -76,6 +76,8 @@ class StripTest extends AnyFlatSpec with should .Matchers {
     closed4("...XOOO...", ".......11.")
 
     closed4("...X.OOO...", "....1....1.")
+
+    closed4("...X.OOO.X...", "....1...1....")
 
     closed4("...X.OOO..X...", "....1....1....")
 
@@ -95,6 +97,8 @@ class StripTest extends AnyFlatSpec with should .Matchers {
 
     closed4("...XOO.O.X...", "......1.1....")
 
+    closed4("...X.OO.OX...", "....1..1.....")
+
     // O.OO
 
     closed4("...XO.OO...", ".....1..1..")
@@ -103,15 +107,22 @@ class StripTest extends AnyFlatSpec with should .Matchers {
 
     closed4("...XO.OO..O...", ".....1...1....")
 
+    closed4("...XOO.O.X...", "......1.1....")
+
     // OO..O
 
     closed4("...OO..O...", ".....11....")
 
     closed4("....OO..OO...", ".............")
 
+    // complex
+
+    closed4("...O.OO.O.O...", "..1.1.........")
+
+    closed4("...XO.OO.O...", "........1.1..")
   }
 
-  private def open4(problem: String, answer: String): Unit = {
+  def open4(problem: String, answer: String): Unit = {
     problem.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.open4) "1" else ".").mkString should be (answer)
     problem.reverse.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.open4) "1" else ".").mkString should be (answer.reverse)
   }
@@ -138,7 +149,7 @@ class StripTest extends AnyFlatSpec with should .Matchers {
     open4("...OO.O.O...", "............")
   }
 
-  private def five(problem: String, answer: String): Unit = {
+  def five(problem: String, answer: String): Unit = {
     problem.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.five) "1" else ".").mkString should be (answer)
     problem.reverse.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.five) "1" else ".").mkString should be (answer.reverse)
   }
@@ -159,27 +170,26 @@ class StripTest extends AnyFlatSpec with should .Matchers {
     five("...OOOO..OOOO...", "..1....11....1..")
   }
 
-  "5-in-a-row" should "detect correctly" in {
-    val case1 = ".OOXO..XOOOO.O".t2s
-    case1.calculateL2Strip().winner should be (Flag.FREE)
-
-    val case2 = "..OXXOX.XXXX.X".t2s
-    case2.calculateL2Strip().winner should be (Flag.FREE)
-
-    val case3 = "OOOOO".t2s
-    case3.calculateL2Strip().winner should be (Flag.BLACK)
-
-    val case4 = "XXXXX".t2s
-    case4.calculateL2Strip().winner should be (Flag.WHITE)
-
-    val case5 = "..XO.OOX.OOOOOX..".t2s
-    case5.calculateL2Strip().winner should be (Flag.BLACK)
-
-    val case6 = "..XXXXO.XOXXXXXO".t2s
-    case6.calculateL2Strip().winner should be (Flag.WHITE)
+  def win(problem: String, answer: Byte): Unit = {
+    problem.t2s.calculateL2Strip().winner should be (answer)
+    problem.reverse.t2s.calculateL2Strip().winner should be (answer)
   }
 
-  private def over6forbid(problem: String, answer: String): Unit = {
+  "5-in-a-row" should "detect correctly" in {
+    win(".OOXO..XOOOO.O", Flag.FREE)
+
+    win("..OXXOX.XXXX.X", Flag.FREE)
+
+    win("OOOOO", Flag.BLACK)
+
+    win("XXXXX", Flag.WHITE)
+
+    win("..XO.OOX.OOOOOX..", Flag.BLACK)
+
+    win("..XXXXO.XOXXXXXO", Flag.WHITE)
+  }
+
+  def over6forbid(problem: String, answer: String): Unit = {
     problem.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_6) "6" else ".").mkString should be (answer)
     problem.reverse.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_6) "6" else ".").mkString should be (answer.reverse)
   }
@@ -190,9 +200,11 @@ class StripTest extends AnyFlatSpec with should .Matchers {
     over6forbid("...O.OOOO...", "....6.......")
 
     over6forbid("...O.OOO.OOO...", "........6......")
+
+    over6forbid("...XOOOO.O...", "........6....")
   }
 
-  private def double4forbid(problem: String, answer: String): Unit = {
+  def double4forbid(problem: String, answer: String): Unit = {
     problem.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_44) "4" else ".").mkString should be (answer)
     problem.reverse.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_44) "4" else ".").mkString should be (answer.reverse)
   }

@@ -1,49 +1,72 @@
 package jrenju
 
-import jrenju.Points.{emptyBool, emptyNum}
+import jrenju.Points.{emptyAttributeBool, emptyAttributeNum}
 
-import scala.collection.mutable
 import scala.language.{implicitConversions, postfixOps}
 
 final class PointsPair(
   val black: Points = new Points(),
   val white: Points = new Points(),
-)
-  extends mutable.Cloneable[PointsPair] {
+) {
 
-  override def clone(): PointsPair = new PointsPair(this.black.clone(), this.white.clone())
+  @inline def isDifference(direction: Byte, that: PointsProvidePair): Boolean =
+    this.black.isDifference(direction, that.black) || this.white.isDifference(direction, that.white)
+
+  @inline def merged(direction: Byte, that: PointsProvidePair): PointsPair =
+    new PointsPair(
+      this.black.merged(direction, that.black),
+      this.white.merged(direction, that.white),
+    )
+
+}
+
+object PointsPair {
+
+  val empty = new PointsPair()
 
 }
 
 final class Points(
-  var open3: Array[Boolean] = emptyBool,
-  var closed4: Array[Int] = emptyNum,
-  var open4: Array[Boolean] = emptyBool,
-  var five: Array[Boolean] = emptyBool,
-) extends mutable.Cloneable[Points] {
+  val open3: Array[Boolean] = emptyAttributeBool,
+  val closed4: Array[Int] = emptyAttributeNum,
+  val open4: Array[Boolean] = emptyAttributeBool,
+  val five: Array[Boolean] = emptyAttributeBool,
+) {
 
-  @inline def three: Int = this.open3.count(_ == true)
+  implicit def bool2int(cond: Boolean): Int = if (cond) 1 else 0
 
-  @inline def four: Int = this.open4.count(_ == true) + this.closed4.sum
+  val three: Int = this.open3.count(_ == true)
 
-  @inline def fiveInRow: Int = this.five.count(_ == true)
+  def threeAt: Byte = this.open3.indexWhere(_ == true).toByte
 
-  def merge(direction: Byte, that: PointsProvider): Unit = {
-    this.open3(direction) = that.open3
-    this.closed4(direction) = that.closed4
-    this.open4(direction) = that.open4
-    this.five(direction) = that.five
-  }
+  val closedFour: Int = this.closed4.sum
 
-  override def clone(): Points = new Points(open3.clone(), closed4.clone(), open4.clone(), five.clone())
+  def closedFourAt: Byte = this.closed4.indexWhere(_ > 0).toByte
+
+  val four: Int = this.open4.count(_ == true) + this.closedFour
+
+  def fiveInRow: Int = this.five.count(_ == true)
+
+  @inline def isDifference(direction: Byte, that: PointsProvider): Boolean =
+    this.open3(direction) != that.open3 ||
+      this.closed4(direction) != that.closed4 || this.open4(direction) != that.open4 ||
+      this.five(direction) != that.five
+
+  @inline def merged(direction: Byte, that: PointsProvider): Points =
+    new Points(
+      this.open3.updated(direction, that.open3),
+      this.closed4.updated(direction, that.closed4),
+      this.open4.updated(direction, that.open4),
+      this.five.updated(direction, that.five)
+    )
 
 }
 
 object Points {
 
-  def emptyNum: Array[Int] = Array.fill(4)(0)
+  def emptyAttributeNum: Array[Int] = Array.fill(4)(0)
 
-  def emptyBool: Array[Boolean] = Array.fill(4)(false)
+  def emptyAttributeBool: Array[Boolean] = Array.fill(4)(false)
 
 }
 

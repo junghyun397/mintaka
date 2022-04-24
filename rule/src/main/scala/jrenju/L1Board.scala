@@ -2,7 +2,9 @@
 
 package jrenju
 
-import jrenju.notation.{Direction, Flag, Opening, Pos, Renju}
+import jrenju.notation._
+
+import scala.collection.mutable
 
 final class L1Board(
   boardField: Array[Byte],
@@ -12,97 +14,112 @@ final class L1Board(
   opening: Option[Opening]
 ) extends Board(boardField, pointsField, moves, latestMove, opening) {
 
+  def collectStonesX(row: Int): Array[Byte] = {
+    val stones = Array.ofDim[Byte](Renju.BOARD_WIDTH)
+    for (idx <- 0 until Renju.BOARD_WIDTH)
+      stones(idx) = Flag.onlyStone(this.boardField(Pos.rowColToIdx(row, idx)))
+    stones
+  }
+
+  def collectStonesY(col: Int): Array[Byte] = {
+    val stones = Array.ofDim[Byte](Renju.BOARD_WIDTH)
+    for (idx <- 0 until Renju.BOARD_WIDTH)
+      stones(idx) = Flag.onlyStone(this.boardField(Pos.rowColToIdx(idx, col)))
+    stones
+  }
+
+  def collectStonesDEG45(size: Int, row: Int, col: Int): Array[Byte] = {
+    val stones = Array.ofDim[Byte](size)
+    for (idx <- 0 until size)
+      stones(idx) = Flag.onlyStone(this.boardField(Pos.rowColToIdx(row + idx, col + idx)))
+    stones
+  }
+
+  def collectStonesDEG315(size: Int, row: Int, col: Int): Array[Byte] = {
+    val stones = Array.ofDim[Byte](size)
+    for (idx <- 0 until size)
+      stones(idx) = Flag.onlyStone(this.boardField(Pos.rowColToIdx(row + idx, col - idx)))
+    stones
+  }
+
   def composeL2Strips(): Array[L2Strip] = this.composeL2Strips(this.latestMove)
 
-  private def composeL2Strips(pivot: Int): Array[L2Strip] = {
+  def composeL2Strips(pivot: Int): Array[L2Strip] = {
     val col = Pos.idxToCol(pivot)
     val row = Pos.idxToRow(pivot)
 
     val rCol = Renju.BOARD_MAX_IDX - col
 
-    Array(
-      new L1Strip(
-        Direction.X,
-        Pos.rowColToIdx(row, 0),
-        (for (idx <- 0 until Renju.BOARD_WIDTH)
-          yield Flag.onlyStone(this.boardField(Pos.rowColToIdx(row, idx)))).toArray
-      )
-        .calculateL2Strip(),
-      new L1Strip(
-        Direction.Y,
-        Pos.rowColToIdx(0, col),
-        (for (idx <- 0 until Renju.BOARD_WIDTH)
-          yield Flag.onlyStone(this.boardField(Pos.rowColToIdx(idx, col)))).toArray
-      )
-        .calculateL2Strip(),
-      // 45 DEGREE STRIP
-      if (col - row < 0) { // TOP
-        val y = row - col
-        val size = Renju.BOARD_WIDTH - y
-        if (size > 4) new L1Strip(
+    val builder = new mutable.ArrayBuilder.ofRef[L2Strip]()
+
+    builder += new L1Strip(Direction.X, Pos.rowColToIdx(row, 0), this.collectStonesX(row))
+      .calculateL2Strip()
+
+    builder += new L1Strip(Direction.Y, Pos.rowColToIdx(0, col), this.collectStonesY(col))
+      .calculateL2Strip()
+
+    if (col - row < 0) { // TOP
+      val y = row - col
+      val size = Renju.BOARD_WIDTH - y
+      if (size > 4)
+        builder += new L1Strip(
           Direction.DEG45,
           Pos.rowColToIdx(y, 0),
-          (for (idx <- 0 until size)
-            yield Flag.onlyStone(this.boardField(Pos.rowColToIdx(y + idx, idx)))).toArray
+          this.collectStonesDEG45(size, y, 0)
         )
           .calculateL2Strip()
-        else null
-      } else { // BOTTOM
-        val x = col - row
-        val size = Renju.BOARD_WIDTH - x
-        if (size > 4) new L1Strip(
+    } else { // BOTTOM
+      val x = col - row
+      val size = Renju.BOARD_WIDTH - x
+      if (size > 4)
+        builder += new L1Strip(
           Direction.DEG45,
           Pos.rowColToIdx(0, x),
-          (for (idx <- 0 until size)
-            yield Flag.onlyStone(this.boardField(Pos.rowColToIdx(idx, x + idx)))).toArray
+          this.collectStonesDEG45(size, 0, x)
         )
           .calculateL2Strip()
-        else null
-      },
-      // 315 DEGREE STRIP
-      if (rCol - row < 0) { // TOP
-        val y = row - rCol
-        val size = Renju.BOARD_WIDTH - y
-        if (size > 4) new L1Strip(
+    }
+
+    if (rCol - row < 0) { // TOP
+      val y = row - rCol
+      val size = Renju.BOARD_WIDTH - y
+      if (size > 4)
+        builder += new L1Strip(
           Direction.DEG315,
           Pos.rowColToIdx(y, Renju.BOARD_MAX_IDX),
-          (for (idx <- 0 until size)
-            yield Flag.onlyStone(this.boardField(Pos.rowColToIdx(y + idx, Renju.BOARD_MAX_IDX - idx)))).toArray
+          this.collectStonesDEG315(size, y, Renju.BOARD_MAX_IDX)
         )
           .calculateL2Strip()
-        else null
-      } else { // BOTTOM
-        val x = rCol - row
-        val size = Renju.BOARD_WIDTH - x
-        if (size > 4) new L1Strip(
+    } else { // BOTTOM
+      val x = rCol - row
+      val size = Renju.BOARD_WIDTH - x
+      if (size > 4)
+        builder += new L1Strip(
           Direction.DEG315,
-          Pos.rowColToIdx(0, Renju.BOARD_MAX_IDX - rCol),
-          (for (idx <- 0 until size)
-            yield Flag.onlyStone(this.boardField(Pos.rowColToIdx(idx, col + row - idx)))).toArray
+          Pos.rowColToIdx(0, col + row),
+          this.collectStonesDEG315(size, 0, col + row)
         )
           .calculateL2Strip()
-        else null
-      }
-    )
-      .filterNot(_ == null)
+    }
+
+    builder.result()
   }
 
   def composeGlobalL2Strips(): Array[L2Strip] = {
-    val strips = Array.fill[L2Strip](Renju.BOARD_WIDTH * 6 - 18)(null)
+    val strips = Array.ofDim[L2Strip](Renju.BOARD_WIDTH * 6 - 18)
 
     for (idx <- 0 until Renju.BOARD_WIDTH) {
       strips(idx * 2) = new L1Strip(
         Direction.X,
         Pos.rowColToIdx(idx, 0),
-        (for (col <- 0 until Renju.BOARD_WIDTH)
-          yield Flag.onlyStone(this.boardField(Pos.rowColToIdx(idx, col)))).toArray
+        this.collectStonesX(idx)
       )
         .calculateL2Strip()
+
       strips(idx * 2 + 1) = new L1Strip(
         Direction.Y,
         Pos.rowColToIdx(0, idx),
-        (for (row <- 0 until Renju.BOARD_WIDTH)
-          yield Flag.onlyStone(this.boardField(Pos.rowColToIdx(row, idx)))).toArray
+        this.collectStonesY(idx)
       )
         .calculateL2Strip()
     }
@@ -112,8 +129,7 @@ final class L1Board(
       strips(offset45Bottom + idx) = new L1Strip(
         Direction.DEG45,
         Pos.rowColToIdx(0, idx),
-        (for (dIdx <- 0 until Renju.BOARD_WIDTH - idx)
-          yield Flag.onlyStone(this.boardField(Pos.rowColToIdx(dIdx, idx + dIdx)))).toArray
+        this.collectStonesDEG45(Renju.BOARD_WIDTH - idx, 0, idx)
       )
         .calculateL2Strip()
     }
@@ -123,8 +139,7 @@ final class L1Board(
       strips(offset45Top + idx) = new L1Strip(
         Direction.DEG45,
         Pos.rowColToIdx(idx + 1, 0),
-        (for (dIdx <- 0 until Renju.BOARD_WIDTH - idx - 1)
-          yield Flag.onlyStone(this.boardField(Pos.rowColToIdx(idx + 1 + dIdx, dIdx)))).toArray
+        this.collectStonesDEG45(Renju.BOARD_MAX_IDX - idx, idx + 1, 0)
       )
         .calculateL2Strip()
     }
@@ -134,8 +149,7 @@ final class L1Board(
       strips(offset315Bottom + idx) = new L1Strip(
         Direction.DEG315,
         Pos.rowColToIdx(0, Renju.BOARD_WIDTH - idx - 1),
-        (for (dIdx <- 0 until Renju.BOARD_WIDTH - idx)
-          yield Flag.onlyStone(this.boardField(Pos.rowColToIdx(dIdx, Renju.BOARD_WIDTH - idx - 1 - dIdx)))).toArray
+        this.collectStonesDEG315(Renju.BOARD_WIDTH - idx, 0, Renju.BOARD_MAX_IDX - idx)
       )
         .calculateL2Strip()
     }
@@ -145,8 +159,7 @@ final class L1Board(
       strips(offset315Top + idx) = new L1Strip(
         Direction.DEG315,
         Pos.rowColToIdx(idx + 1, Renju.BOARD_WIDTH - 1),
-        (for (dIdx <- 0 until Renju.BOARD_WIDTH - idx - 1)
-          yield Flag.onlyStone(this.boardField(Pos.rowColToIdx(idx + 1 + dIdx, Renju.BOARD_WIDTH - 1 - dIdx)))).toArray
+        this.collectStonesDEG315(Renju.BOARD_MAX_IDX - idx, idx + 1, Renju.BOARD_MAX_IDX)
       )
         .calculateL2Strip()
     }
@@ -154,16 +167,24 @@ final class L1Board(
     strips
   }
 
-  @inline private def mergeParticle(direction: Byte, idx: Int, points: PointsProvidePair, forbidMask: Byte): Unit = {
-    this.pointsField(idx).black.merge(direction, points.black)
-    this.pointsField(idx).white.merge(direction, points.white)
+  private def mergeParticle(direction: Byte, idx: Int, points: PointsProvidePair, forbidMask: Byte): Unit = {
+    if (this.pointsField(idx).isDifference(direction, points))
+      this.pointsField(idx) = this.pointsField(idx).merged(direction, points)
 
-    if (forbidMask > Flag.FREE)
+    if (forbidMask != Flag.FREE)
       this.boardField(idx) = forbidMask
   }
 
   private def mergeL2Strips(strips: Array[L2Strip]): L2Board = {
     var winner = Flag.FREE
+
+    for (idx <- 0 until Renju.BOARD_LENGTH) {
+      if (
+        this.boardField(idx) == Flag.FORBIDDEN_33
+          || (this.boardField(idx) == Flag.FORBIDDEN_44 && 1 > this.pointsField(idx).black.closedFour)
+      )
+        this.boardField(idx) = Flag.FREE
+    }
 
     for (strip <- strips) {
       if (strip.winner != Flag.FREE) winner = strip.winner
@@ -196,7 +217,7 @@ final class L1Board(
       }
     }
 
-    new L2Board(this.boardField, pointsField, this.moves, latestMove, this.opening, winner)
+    new L2Board(this.boardField, pointsField, this.moves, this.latestMove, this.opening, winner)
   }
 
   def calculateL2Board(): L2Board =

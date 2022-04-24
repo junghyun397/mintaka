@@ -1,9 +1,8 @@
 package jrenju
 
 import jrenju.BoardIO.BoardToText
-import jrenju.ComplexCase.T2
+import jrenju.TestHelper.T2
 import jrenju.notation.Pos
-import org.scalatest._
 import org.scalatest.flatspec._
 import org.scalatest.matchers._
 
@@ -29,7 +28,7 @@ class BoardIOTest extends AnyFlatSpec with should.Matchers {
         " 1 . . . . . . . . . . . . . . . 1 \n" +
         "   A B C D E F G H I J K L M N O   "
       )
-      .t2b(Pos.fromCartesian(2, "I").get.idx)
+      .t2b(Pos.fromCartesian("I", 2).get.idx)
 
     board.boardText should be (BoardIO.fromBoardText(board.boardText, 0, Option.empty).get.boardText)
   }

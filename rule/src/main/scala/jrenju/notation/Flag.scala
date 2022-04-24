@@ -45,6 +45,12 @@ object Flag {
     case _ => Option.empty
   }
 
-  @inline def onlyStone(flag: Byte): Byte = if (flag > Flag.FREE) Flag.FREE else flag
+  @inline def onlyStone(flag: Byte): Byte = if (this.isForbid(flag)) Flag.FREE else flag
+
+  @inline def isEmpty(flag: Byte): Boolean = flag != Flag.BLACK && flag != Flag.WHITE
+
+  @inline def isExist(flag: Byte): Boolean = flag == Flag.BLACK || flag == Flag.WHITE
+
+  @inline def isForbid(flag: Byte): Boolean = flag == Flag.FORBIDDEN_33 || flag == Flag.FORBIDDEN_44 || flag == Flag.FORBIDDEN_6
 
 }

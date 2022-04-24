@@ -1,6 +1,6 @@
 package jrenju
 
-import jrenju.notation.{Flag, Opening}
+import jrenju.notation.{Flag, Opening, Renju}
 
 final class L2Board(
   boardField: Array[Byte],
@@ -14,20 +14,19 @@ final class L2Board(
   def calculateL3Board(): L3Board = {
     var di3ForbidFlag = false
 
-    pointsField.zipWithIndex foreach { particleIdx =>
-      val points = particleIdx._1.black
+    for (idx <- 0 until Renju.BOARD_LENGTH) {
+      val points = this.pointsField(idx).black
 
       if (points.fiveInRow > 0)
-        this.boardField(particleIdx._2) = Flag.FREE
-      else if (this.boardField(particleIdx._2) == Flag.FORBIDDEN_6)
-        this.boardField(particleIdx._2) = Flag.FORBIDDEN_6
+        this.boardField(idx) = Flag.FREE
+      else if (this.boardField(idx) == Flag.FORBIDDEN_6)
+        this.boardField(idx) = Flag.FORBIDDEN_6
       else if (points.four > 1)
-        this.boardField(particleIdx._2) = Flag.FORBIDDEN_44
+        this.boardField(idx) = Flag.FORBIDDEN_44
       else if (points.three > 1) {
-        this.boardField(particleIdx._2) = Flag.FORBIDDEN_33
+        this.boardField(idx) = Flag.FORBIDDEN_33
         di3ForbidFlag = true
       }
-
     }
 
     new L3Board(this.boardField, pointsField, this.moves, this.latestMove, this.opening, this.winner, di3ForbidFlag)
