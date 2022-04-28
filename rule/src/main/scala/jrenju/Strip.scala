@@ -2,21 +2,21 @@ package jrenju
 
 import jrenju.L1Strip.retrieveStripFieldSolution
 import jrenju.notation.Flag
-import jrenju.solve.Zobrist
+import jrenju.solve.ZobristHash
 
 import scala.collection.mutable
 import scala.math.Numeric.IntIsIntegral.{minus, plus}
 
-sealed class Strip(val direction: Byte, val startIdx: Int)
+sealed class Strip(val direction: Int, val startIdx: Int)
 
 //noinspection DuplicatedCode
-final class L1Strip(direction: Byte, startIdx: Int, val stripField: Array[Byte]) extends Strip(direction, startIdx) {
+final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) extends Strip(direction, startIdx) {
 
   @inline private def isNotOver6(mask: Int): Boolean = this.isNotOver6(mask, -1, -1)
 
   @inline private def isNotOver6(mask1: Int, mask2: Int): Boolean = this.isNotOver6(mask1, mask2, -1)
 
-  @inline private def isNotOver6(mask1: Int, mask2: Int, mask3: Int): Boolean = {
+  private def isNotOver6(mask1: Int, mask2: Int, mask3: Int): Boolean = {
     var bridged = 0
 
     var pointer = 0
@@ -33,7 +33,7 @@ final class L1Strip(direction: Byte, startIdx: Int, val stripField: Array[Byte])
     true
   }
 
-  @inline private def pattern2Mutate(
+  private def pattern2Mutate(
     pointsStrip: Array[PointsProvidePair], forbidMask: Array[Byte],
     pointer: Int, isSolid: Boolean,
     p6Flag: Byte, p5Flag: Byte, p4Flag: Byte, p3Flag: Byte, p2Flag: Byte, p1Flag: Byte, flag: Byte,
@@ -405,9 +405,9 @@ object L1Strip {
   private val stripMemo = new mutable.HashMap[Long, (Array[PointsProvidePair], Array[Byte], Byte)]()
 
   private def retrieveStripFieldSolution(strip: L1Strip): (Array[PointsProvidePair], Array[Byte], Byte) =
-    this.stripMemo.getOrElseUpdate(Zobrist.stripHash(strip.stripField), strip.calculatePoints())
+    this.stripMemo.getOrElseUpdate(ZobristHash.stripHash(strip.stripField), strip.calculatePoints())
 
 }
 
-final class L2Strip(direction: Byte, startIdx: Int, val pointsStrip: Array[PointsProvidePair], val forbidMask: Array[Byte], val winner: Byte)
+final class L2Strip(direction: Int, startIdx: Int, val pointsStrip: Array[PointsProvidePair], val forbidMask: Array[Byte], val winner: Byte)
   extends Strip(direction, startIdx)

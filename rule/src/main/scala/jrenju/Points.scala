@@ -9,20 +9,30 @@ final class PointsPair(
   val white: Points = new Points(),
 ) {
 
-  @inline def isDifference(direction: Byte, that: PointsProvidePair): Boolean =
+  @inline def isDifference(direction: Int, that: PointsProvidePair): Boolean =
     this.black.isDifference(direction, that.black) || this.white.isDifference(direction, that.white)
 
-  @inline def merged(direction: Byte, that: PointsProvidePair): PointsPair =
+  @inline def merged(direction: Int, that: PointsProvidePair): PointsPair =
     new PointsPair(
       this.black.merged(direction, that.black),
       this.white.merged(direction, that.white),
     )
 
+  @inline def merge(direction: Int, that: PointsProvidePair): Unit = {
+    this.black.merge(direction, that.black)
+    this.white.merge(direction, that.white)
+  }
+
+  @inline def clear(): Unit = {
+    this.black.clear()
+    this.white.clear()
+  }
+
 }
 
 object PointsPair {
 
-  val empty = new PointsPair()
+  def empty = new PointsPair()
 
 }
 
@@ -33,26 +43,26 @@ final class Points(
   val five: Array[Boolean] = emptyAttributeBool,
 ) {
 
-  implicit def bool2int(cond: Boolean): Int = if (cond) 1 else 0
+  @inline implicit def bool2int(cond: Boolean): Int = if (cond) 1 else 0
 
-  val three: Int = this.open3.count(_ == true)
+  var three: Int = calculateThree()
+  @inline private def calculateThree(): Int = this.bool2int(this.open3(0)) + this.open3(1) + this.open3(2) + this.open3(3)
 
-  def threeAt: Byte = this.open3.indexWhere(_ == true).toByte
+  var closedFour: Int = calculateClosedFour()
+  @inline private def calculateClosedFour(): Int = this.closed4(0) + this.closed4(1) + this.closed4(2) + this.closed4(3)
 
-  val closedFour: Int = this.closed4.sum
+  var four: Int = calculateFour()
+  @inline private def calculateFour(): Int = this.bool2int(this.open4(0)) + this.open4(1) + this.open4(2) + this.open4(3) + this.closedFour
 
-  def closedFourAt: Byte = this.closed4.indexWhere(_ > 0).toByte
+  var fiveInRow: Int = calculateFiveInRow()
+  @inline private def calculateFiveInRow(): Int = this.bool2int(this.five(0)) + this.five(1) + this.five(2) + this.five(3)
 
-  val four: Int = this.open4.count(_ == true) + this.closedFour
-
-  def fiveInRow: Int = this.five.count(_ == true)
-
-  @inline def isDifference(direction: Byte, that: PointsProvider): Boolean =
+  @inline def isDifference(direction: Int, that: PointsProvider): Boolean =
     this.open3(direction) != that.open3 ||
       this.closed4(direction) != that.closed4 || this.open4(direction) != that.open4 ||
       this.five(direction) != that.five
 
-  @inline def merged(direction: Byte, that: PointsProvider): Points =
+  @inline def merged(direction: Int, that: PointsProvider): Points =
     new Points(
       this.open3.updated(direction, that.open3),
       this.closed4.updated(direction, that.closed4),
@@ -60,13 +70,53 @@ final class Points(
       this.five.updated(direction, that.five)
     )
 
+  @inline def merge(direction: Int, that: PointsProvider): Unit = {
+    this.open3(direction) = that.open3
+    this.three = this.calculateThree()
+
+    this.closed4(direction) = that.closed4
+    this.closedFour = this.calculateClosedFour()
+
+    this.open4(direction) = that.open4
+    this.four = this.calculateFour()
+
+    this.five(direction) = that.five
+    this.fiveInRow = this.calculateFiveInRow()
+  }
+
+  @inline def clear(): Unit = {
+    this.open3(0) = false
+    this.open3(1) = false
+    this.open3(2) = false
+    this.open3(3) = false
+    this.three = 0
+
+    this.closed4(0) = 0
+    this.closed4(1) = 0
+    this.closed4(2) = 0
+    this.closed4(3) = 0
+    this.closedFour = 0
+
+    this.open4(0) = false
+    this.open4(1) = false
+    this.open4(2) = false
+    this.open4(3) = false
+    this.four = 0
+
+    this.five(0) = false
+    this.five(1) = false
+    this.five(2) = false
+    this.five(3) = false
+    this.fiveInRow = 0
+  }
+
 }
 
 object Points {
 
-  def emptyAttributeNum: Array[Int] = Array.fill(4)(0)
+  @inline def emptyAttributeNum: Array[Int] = Array.fill(4)(0)
 
-  def emptyAttributeBool: Array[Boolean] = Array.fill(4)(false)
+  @inline def emptyAttributeBool: Array[Boolean] = Array.fill(4)(false)
 
 }
 
@@ -82,7 +132,7 @@ final class PointsProvider(
   var five: Boolean = false,
 ) {
 
-  implicit def bool2int(value: Boolean): Int = if (value) 1 else 0
+  @inline implicit def bool2int(value: Boolean): Int = if (value) 1 else 0
 
   @inline def four: Int = this.open4 + this.closed4
 

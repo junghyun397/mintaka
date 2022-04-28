@@ -1,20 +1,29 @@
 package jrenju
 
-import jrenju.notation.{Color, Renju, _}
+import jrenju.Board.boardOps
+import jrenju.notation.{Color, Flag, Pos, RejectReason, Renju, Rotation}
+import jrenju.solve.ZobristHash
+import jrenju.solve.ZobristHash.IncrementHash
+
+import scala.language.implicitConversions
 
 class Board(
   val boardField: Array[Byte],
   val pointsField: Array[PointsPair],
-  val moves: Int,
-  val latestMove: Int,
-  val opening: Option[Opening]
+
+  var moves: Int,
+  var latestMove: Int,
+
+  var winner: Option[Byte],
+
+  var zobristKey: Long,
 ) {
 
-  @inline private val colorRaw: Byte = (this.moves % 2).toByte
+  @inline private def colorRaw: Byte = (this.moves % 2).toByte
 
-  @inline private val nextColorRaw: Byte = ((this.moves + 1) % 2).toByte
+  @inline private def nextColorRaw: Byte = ((this.moves + 1) % 2).toByte
 
-  @inline private val isNextColorBlack: Boolean = this.nextColorRaw == Flag.BLACK
+  @inline private def isNextColorBlack: Boolean = this.nextColorRaw == Flag.BLACK
 
   def color: Color.Value = Color(this.colorRaw)
 
@@ -34,51 +43,77 @@ class Board(
       Option.empty
   }
 
-  def makeMove(pos: Pos): L1Board = this.makeMove(pos.idx)
+  def makeMove(pos: Pos): Board = this.makeMove(pos.idx)
 
-  def makeMove(idx: Int): L1Board = {
-    val thenBoard = boardField.updated(idx, nextColorRaw)
-    new L1Board(
+  def makeMove(idx: Int): Board = {
+    val thenBoard = boardField.updated(idx, this.nextColorRaw)
+    val thenPoints = this.pointsField.updated(idx, PointsPair.empty)
+    new Board(
       boardField = thenBoard,
-      pointsField = this.pointsField.updated(idx, PointsPair.empty),
+      pointsField = thenPoints,
       moves = this.moves + 1,
       latestMove = idx,
-      opening = if (this.moves + 1 == 3) Opening.detect(thenBoard, idx) else this.opening
+      winner = Option.empty,
+      zobristKey = this.zobristKey.incrementHash(idx, this.nextColorRaw)
     )
+      .calculatePoints(idx)
+      .calculateForbids()
   }
 
-  def injectMove(move1: Pos, move2: Pos): L1Board = this.injectMove(move1.idx, move2.idx)
+  def injectMove(idx: Int): Board = {
+    this.boardField(idx) = this.nextColorRaw
 
-  def injectMove(move1: Int, move2: Int): L1Board = new L1Board(
-    boardField = this.boardField
-      .updated(move1, this.colorRaw)
-      .updated(move2, this.colorRaw),
-    this.pointsField
-      .updated(move1, PointsPair.empty)
-      .updated(move2, PointsPair.empty),
-    moves = this.moves + 2,
-    latestMove = move2,
-    opening = this.opening,
-  )
+    this.moves += 1
+    this.zobristKey = this.zobristKey.incrementHash(idx, this.colorRaw)
 
-  override def hashCode(): Int = boardField.hashCode()
+    this.calculateInjectedPoints(idx)
+  }
 
-  def rotated(rotation: Rotation.Value): Board = ???
+  def removeMove(idx: Int): Board = {
+    this.boardField(idx) = Flag.FREE
+    this.pointsField(idx).clear()
 
-  def transposed(): Board = ???
+    this.moves -= 1
+    this.zobristKey = ZobristHash.boardHash(this.boardField)
+
+    this.calculateInjectedPoints(idx)
+  }
+
+  def rotatedKey(rotation: Rotation.Value): Long = rotation match {
+    case Rotation.CLOCKWISE => 0
+    case Rotation.COUNTER_CLOCKWISE => 0
+    case Rotation.OVERTURN => 0
+    case _ => this.zobristKey
+  }
+
+  def rotated(rotation: Rotation.Value): Board = rotation match {
+    case Rotation.CLOCKWISE => this
+    case Rotation.COUNTER_CLOCKWISE => this
+    case Rotation.OVERTURN => this
+    case _ => this
+  }
+
+  def transposedKey(): Long = this.zobristKey
+
+  def transposed(): Board = this
 
 }
 
 object Board {
 
-  val newBoard: L1Board = newBoard(Renju.BOARD_CENTER.idx)
+  @inline implicit def boardOps(board: Board): BoardOps = new BoardOps(board)
 
-  def newBoard(initIdx: Int): L1Board = new L1Board(
+  @inline implicit def forbidOps(board: Board): ForbidOps = new ForbidOps(board)
+
+  val newBoard: Board = newBoard(Renju.BOARD_CENTER.idx)
+
+  def newBoard(initIdx: Int): Board = new Board(
     boardField = Array.fill(Renju.BOARD_LENGTH)(Flag.FREE).updated(initIdx, Flag.BLACK),
     pointsField = Array.fill(Renju.BOARD_LENGTH)(PointsPair.empty),
     moves = 1,
+    winner = Option.empty,
     latestMove = initIdx,
-    opening = Option.empty,
+    zobristKey = ZobristHash.empty
   )
 
 }

@@ -6,13 +6,12 @@ import jrenju.notation.Pos
 import org.scalatest.flatspec._
 import org.scalatest.matchers._
 
-class L3BoardTest extends AnyFlatSpec with should.Matchers {
+class ForbidOpsTest extends AnyFlatSpec with should.Matchers {
 
   def deepForbid(problem: String, answer: String): Unit = {
     val board = problem.t2b
-      .calculateGlobalL2Board()
-      .calculateL3Board()
-      .calculateDeepL3Board()
+      .calculateGlobalPoints()
+      .calculateForbids()
 
     println(board.debugText)
 
@@ -483,9 +482,8 @@ class L3BoardTest extends AnyFlatSpec with should.Matchers {
 
   def trap(problem: String, answer: String): Unit = {
     val board = problem.t2b
-      .calculateGlobalL2Board()
-      .calculateL3Board()
-      .calculateDeepL3Board()
+      .calculateGlobalPoints()
+      .calculateForbids()
 
     val (threeSide, fourSide) = board.collectTrapPoints()
 

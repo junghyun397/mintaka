@@ -30,7 +30,7 @@ class BoardIOTest extends AnyFlatSpec with should.Matchers {
       )
       .t2b(Pos.fromCartesian("I", 2).get.idx)
 
-    board.boardText should be (BoardIO.fromBoardText(board.boardText, 0, Option.empty).get.boardText)
+    board.boardText should be (BoardIO.fromBoardText(board.boardText, 0).get.boardText)
   }
 
 }

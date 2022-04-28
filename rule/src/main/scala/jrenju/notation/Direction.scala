@@ -2,9 +2,9 @@ package jrenju.notation
 
 object Direction {
 
-  val X: Byte = 0
-  val Y: Byte = 1
-  val DEG45: Byte = 2
-  val DEG315: Byte = 3
+  val X: Int = 0
+  val Y: Int = 1
+  val DEG45: Int = 2
+  val DEG315: Int = 3
 
 }

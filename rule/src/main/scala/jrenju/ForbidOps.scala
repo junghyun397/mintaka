@@ -1,23 +1,16 @@
 package jrenju
 
-import jrenju.notation.{Direction, Flag, Opening, Pos, Renju}
+import jrenju.notation.{Direction, Flag, Pos, Renju}
 
 import scala.collection.mutable
-import scala.language.{implicitConversions, postfixOps}
+import scala.language.implicitConversions
 
-class L3Board(
-  boardField: Array[Byte],
-  pointsField: Array[PointsPair],
-  moves: Int,
-  latestMove: Int,
-  opening: Option[Opening],
-  override val winner: Byte,
-  private val hasDi3Forbid: Boolean,
-) extends Board(boardField, pointsField, moves, latestMove, opening) with EvaluatedBoard {
+//noinspection DuplicatedCode
+final class ForbidOps(private val b: Board) extends AnyVal {
 
-  implicit def int2bool(value: Int): Boolean = if (value == 0) false else true
+  @inline implicit private def int2bool(value: Int): Boolean = if (value == 0) false else true
 
-  @inline private def getOffsetIdx(direction: Byte, initRow: Int, initCol: Int, offset: Int): Int = direction match {
+  @inline private def getOffsetIdx(direction: Int, initRow: Int, initCol: Int, offset: Int): Int = direction match {
     case Direction.X => Pos.rowColToIdx(initRow, initCol + offset)
     case Direction.Y => Pos.rowColToIdx(initRow + offset, initCol)
     case Direction.DEG45 => Pos.rowColToIdx(initRow + offset, initCol + offset)
@@ -26,17 +19,15 @@ class L3Board(
 
   @inline private def getBoardFieldBounded(idx: Int): Byte =
     if (idx < 0) Flag.WALL
-    else this.boardField(idx)
+    else b.boardField(idx)
 
   @inline private def getPointsBounded(idx: Int, op: PointsPair => Boolean): Boolean =
     if (idx < 0) false
-    else op(this.pointsField(idx))
+    else op(b.pointsField(idx))
 
-  def recoverOpen3Companions(direction: Byte, idx: Int, op: PointsPair => Points, color: Byte): Array[Int] = {
+  def recoverOpen3Companions(direction: Int, idx: Int, op: PointsPair => Points, color: Byte): Array[Int] = {
     val row = Pos.idxToRow(idx)
     val col = Pos.idxToCol(idx)
-
-    val builder = new mutable.ArrayBuilder.ofInt
 
     val p2Pointer = this.getOffsetIdx(direction, row, col, -2)
     val p2Value = this.getBoardFieldBounded(p2Pointer)
@@ -49,28 +40,36 @@ class L3Board(
 
     // +0OO+
     if (a1Value == color && a2Value == color) {
-      if (op(this.pointsField(p1Pointer)).open3(direction))
+      val builder = new mutable.ArrayBuilder.ofInt
+
+      if (op(b.pointsField(p1Pointer)).open3(direction))
         builder += p1Pointer
       val end = this.getOffsetIdx(direction, row, col, 3)
-      if (op(this.pointsField(end)).open3(direction))
+      if (op(b.pointsField(end)).open3(direction))
         builder += end
+
+      builder.result()
     }
 
     // +OO0+
     else if (p1Value == color && p2Value == color) {
-      if (op(this.pointsField(a1Pointer)).open3(direction))
+      val builder = new mutable.ArrayBuilder.ofInt
+
+      if (op(b.pointsField(a1Pointer)).open3(direction))
         builder += a1Pointer
       val start = this.getOffsetIdx(direction, row, col, -3)
-      if (op(this.pointsField(start)).open3(direction))
+      if (op(b.pointsField(start)).open3(direction))
         builder += start
+
+      builder.result()
     }
 
     // O0+O
     else if (p1Value == color && a2Value == color)
-      builder += a1Pointer
+      Array(a1Pointer)
     // O+0O
     else if (p2Value == color && a1Value == color)
-      builder += p1Pointer
+      Array(p1Pointer)
 
     // -0O+O
     else if (
@@ -78,34 +77,41 @@ class L3Board(
         && a1Value == color
         && Flag.onlyStone(p2Value) == Flag.FREE
     )
-      builder += a2Pointer
+      Array(a2Pointer)
+
     // O+O0-
     else if (
       p1Value == color
         && Flag.onlyStone(p2Value) == Flag.FREE
         && Flag.onlyStone(a1Value) == Flag.FREE
     )
-      builder += p2Pointer
+      Array(p2Pointer)
 
     // +O0O+
     else if (p1Value == color && a1Value == color) {
-      if (op(this.pointsField(a2Pointer)).open3(direction))
+      val builder = new mutable.ArrayBuilder.ofInt
+
+      if (op(b.pointsField(a2Pointer)).open3(direction))
         builder += a2Pointer
-      if (op(this.pointsField(p2Pointer)).open3(direction))
+      if (op(b.pointsField(p2Pointer)).open3(direction))
         builder += p2Pointer
+
+      builder.result()
     }
 
     // OO+0
     else if (Flag.onlyStone(p1Value) == Flag.FREE && p2Value == color)
-      builder += p1Pointer
+      Array(p1Pointer)
+
     // 0+OO
     else if (Flag.onlyStone(a1Value) == Flag.FREE && a2Value == color)
-      builder += a1Pointer
+      Array(a1Pointer)
 
-    builder.result()
+    else
+      Array.empty
   }
 
-  def recoverClosed4Companion(direction: Byte, idx: Int, op: PointsPair => Points): Int = {
+  def recoverClosed4Companion(direction: Int, idx: Int, op: PointsPair => Points): Int = {
     val row = Pos.idxToRow(idx)
     val col = Pos.idxToCol(idx)
 
@@ -117,17 +123,19 @@ class L3Board(
       }
     }
 
-    -1
+    throw new Exception()
   }
 
-  private def isNotPseudoThree(direction: Byte, idx: Int): Boolean = {
-    for (companionIdx <- this.recoverOpen3Companions(direction, idx, _.black, Flag.BLACK)) {
-      val flag = this.boardField(companionIdx)
+  private def isNotPseudoThree(direction: Int, idx: Int): Boolean = {
+    val companions = this.recoverOpen3Companions(direction, idx, _.black, Flag.BLACK)
+    for (idx <- companions.indices) {
+      val companion = companions(idx)
+      val flag = b.boardField(companion)
       if (flag != Flag.FORBIDDEN_6 && flag != Flag.FORBIDDEN_44) {
-        val points = this.pointsField(companionIdx).black
+        val points = b.pointsField(companion).black
         if (points.four == 0 && points.fiveInRow == 0) {
           if (points.three > 2) {
-            if (this.isPseudoForbid(companionIdx, direction))
+            if (this.isPseudoForbid(companion, direction))
               return true
           } else
             return true
@@ -140,9 +148,9 @@ class L3Board(
 
   private def isPseudoForbid(idx: Int): Boolean = {
     var count = 0
-    val open3 = this.pointsField(idx).black.open3
+    val open3 = b.pointsField(idx).black.open3
     for (direction <- 0 until 4)
-      if (open3(direction) && this.isNotPseudoThree(direction.toByte, idx))
+      if (open3(direction) && this.isNotPseudoThree(direction, idx))
         count += 1
 
     count < 2
@@ -150,9 +158,9 @@ class L3Board(
 
   private def isPseudoForbid(idx: Int, excludeDirection: Int): Boolean = {
     var count = 0
-    val open3 = this.pointsField(idx).black.open3
+    val open3 = b.pointsField(idx).black.open3
     for (direction <- 0 until 4)
-      if (direction != excludeDirection && open3(direction) && this.isNotPseudoThree(direction.toByte, idx))
+      if (direction != excludeDirection && open3(direction) && this.isNotPseudoThree(direction, idx))
         count += 1
 
     count < 2
@@ -163,18 +171,15 @@ class L3Board(
     val fourSideTraps = new mutable.ArrayBuilder.ofInt
 
     for (idx <- 0 until Renju.BOARD_LENGTH) {
-      if (Flag.isForbid(this.boardField(idx))) {
-        val points = this.pointsField(idx).white
+      if (Flag.isForbid(b.boardField(idx))) {
+        val points = b.pointsField(idx).white
 
         for (direction <- 0 until 4) {
           if (points.open3(direction))
-            threeSideTraps.addAll(this.recoverOpen3Companions(direction.toByte, idx, _.white, Flag.WHITE))
+            threeSideTraps.addAll(this.recoverOpen3Companions(direction, idx, _.white, Flag.WHITE))
 
-          if (points.closed4(direction) != 0) {
-            val answer = this.recoverClosed4Companion(direction.toByte, idx, _.white)
-            if (answer != -1)
-              fourSideTraps += answer
-          }
+          if (points.closed4(direction) != 0)
+            fourSideTraps += this.recoverClosed4Companion(direction, idx, _.white)
         }
       }
     }
@@ -182,25 +187,32 @@ class L3Board(
     (threeSideTraps.result(), fourSideTraps.result())
   }
 
-  def calculateDeepL3Board(): L3Board =
-    if (this.hasDi3Forbid) {
+  def calculateForbids(calculateDeepForbid: Boolean = true): Board = {
+    var di3ForbidFlag = false
+
+    for (idx <- 0 until Renju.BOARD_LENGTH) {
+      val points = b.pointsField(idx).black
+
+      if (points.fiveInRow > 0)
+        b.boardField(idx) = Flag.FREE
+      else if (b.boardField(idx) == Flag.FORBIDDEN_6)
+        b.boardField(idx) = Flag.FORBIDDEN_6
+      else if (points.four > 1)
+        b.boardField(idx) = Flag.FORBIDDEN_44
+      else if (points.three > 1) {
+        b.boardField(idx) = Flag.FORBIDDEN_33
+        di3ForbidFlag = true
+      }
+    }
+
+    if (calculateDeepForbid || di3ForbidFlag)
       for (idx <- 0 until Renju.BOARD_LENGTH) {
-        val flag = this.boardField(idx)
+        val flag = b.boardField(idx)
         if (flag == Flag.FORBIDDEN_33 && this.isPseudoForbid(idx))
-          this.boardField(idx) = Flag.FREE
+          b.boardField(idx) = Flag.FREE
       }
 
-      new DeepL3Board(this.boardField, this.moves, this.latestMove, this.opening, this.pointsField, this.winner, this.hasDi3Forbid)
-    } else this
+    b
+  }
 
 }
-
-final class DeepL3Board(
-  boardField: Array[Byte],
-  moves: Int,
-  latestMove: Int,
-  opening: Option[Opening],
-  pointsField: Array[PointsPair],
-  winner: Byte,
-  hasDi3Forbid: Boolean,
-) extends L3Board(boardField, pointsField, moves, latestMove, opening, winner, hasDi3Forbid)

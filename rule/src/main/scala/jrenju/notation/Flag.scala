@@ -15,14 +15,14 @@ object Flag {
 
   object Text {
 
-    val BLACK: Char = 79 // O
-    val WHITE: Char = 88 // X
+    val BLACK: Char = 'O'
+    val WHITE: Char = 'X'
 
-    val FREE: Char = 46 // .
+    val FREE: Char = '.'
 
-    val FORBIDDEN_33: Char = 51 // 3
-    val FORBIDDEN_44: Char = 52 // 4
-    val FORBIDDEN_6: Char = 54 // 6
+    val FORBIDDEN_33: Char = '3'
+    val FORBIDDEN_44: Char = '4'
+    val FORBIDDEN_6: Char = '6'
 
   }
 

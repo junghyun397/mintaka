@@ -10,9 +10,8 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
 
   def vcf(problem: String, answer: Boolean): Unit = {
     val board = problem.t2b
-      .calculateGlobalL2Board()
-      .calculateL3Board()
-      .calculateDeepL3Board()
+      .calculateGlobalPoints()
+      .calculateForbids()
 
     val solution = board.findVCFSequence()
       .toSolution
@@ -45,7 +44,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 2 . . . . . . . . . . . . . . . 2
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
-    """.stripMargin,
+      """.stripMargin,
       answer = true
     )
 
@@ -69,7 +68,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 2 . . . . . . . . . . . . . . . 2
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
-    """.stripMargin,
+      """.stripMargin,
       answer = true
     )
 
@@ -93,7 +92,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 2 . . . . . . . . . . . . . . . 2
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
-    """.stripMargin,
+      """.stripMargin,
       answer = true
     )
 
@@ -117,7 +116,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 2 . . . . . . . . . . . . . . . 2
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
-    """.stripMargin,
+      """.stripMargin,
       answer = true
     )
 
@@ -141,7 +140,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 2 . . . . . . . . . . . . . . . 2
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
-    """.stripMargin,
+      """.stripMargin,
       answer = true
     )
 
@@ -165,7 +164,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 2 . . . . . . . . . . . . . . . 2
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
-    """.stripMargin,
+      """.stripMargin,
       answer = true
     )
 
@@ -189,7 +188,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 2 . . . . . . . . . . . . . . . 2
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
-    """.stripMargin,
+      """.stripMargin,
       answer = true
     )
 
@@ -213,7 +212,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 2 . . . . . . . . . . . . . . . 2
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
-    """.stripMargin,
+      """.stripMargin,
       answer = true
     )
   }

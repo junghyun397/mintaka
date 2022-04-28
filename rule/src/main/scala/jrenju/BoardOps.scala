@@ -1,50 +1,44 @@
-//noinspection DuplicatedCode
-
 package jrenju
 
-import jrenju.notation._
+import jrenju.notation.{Direction, Flag, Pos, Renju}
 
 import scala.collection.mutable
+import scala.language.implicitConversions
 
-final class L1Board(
-  boardField: Array[Byte],
-  pointsField: Array[PointsPair],
-  moves: Int,
-  latestMove: Int,
-  opening: Option[Opening]
-) extends Board(boardField, pointsField, moves, latestMove, opening) {
+//noinspection DuplicatedCode
+final class BoardOps(private val b: Board) extends AnyVal {
 
-  def collectStonesX(row: Int): Array[Byte] = {
+  @inline implicit private def int2bool(value: Int): Boolean = if (value == 0) false else true
+
+  private def collectStonesX(row: Int): Array[Byte] = {
     val stones = Array.ofDim[Byte](Renju.BOARD_WIDTH)
     for (idx <- 0 until Renju.BOARD_WIDTH)
-      stones(idx) = Flag.onlyStone(this.boardField(Pos.rowColToIdx(row, idx)))
+      stones(idx) = Flag.onlyStone(b.boardField(Pos.rowColToIdx(row, idx)))
     stones
   }
 
-  def collectStonesY(col: Int): Array[Byte] = {
+  private def collectStonesY(col: Int): Array[Byte] = {
     val stones = Array.ofDim[Byte](Renju.BOARD_WIDTH)
     for (idx <- 0 until Renju.BOARD_WIDTH)
-      stones(idx) = Flag.onlyStone(this.boardField(Pos.rowColToIdx(idx, col)))
+      stones(idx) = Flag.onlyStone(b.boardField(Pos.rowColToIdx(idx, col)))
     stones
   }
 
-  def collectStonesDEG45(size: Int, row: Int, col: Int): Array[Byte] = {
+  private def collectStonesDEG45(size: Int, row: Int, col: Int): Array[Byte] = {
     val stones = Array.ofDim[Byte](size)
     for (idx <- 0 until size)
-      stones(idx) = Flag.onlyStone(this.boardField(Pos.rowColToIdx(row + idx, col + idx)))
+      stones(idx) = Flag.onlyStone(b.boardField(Pos.rowColToIdx(row + idx, col + idx)))
     stones
   }
 
-  def collectStonesDEG315(size: Int, row: Int, col: Int): Array[Byte] = {
+  private def collectStonesDEG315(size: Int, row: Int, col: Int): Array[Byte] = {
     val stones = Array.ofDim[Byte](size)
     for (idx <- 0 until size)
-      stones(idx) = Flag.onlyStone(this.boardField(Pos.rowColToIdx(row + idx, col - idx)))
+      stones(idx) = Flag.onlyStone(b.boardField(Pos.rowColToIdx(row + idx, col - idx)))
     stones
   }
 
-  def composeL2Strips(): Array[L2Strip] = this.composeL2Strips(this.latestMove)
-
-  def composeL2Strips(pivot: Int): Array[L2Strip] = {
+  private def composeStrips(pivot: Int): Array[L2Strip] = {
     val col = Pos.idxToCol(pivot)
     val row = Pos.idxToRow(pivot)
 
@@ -105,7 +99,7 @@ final class L1Board(
     builder.result()
   }
 
-  def composeGlobalL2Strips(): Array[L2Strip] = {
+  private def composeGlobalStrips(): Array[L2Strip] = {
     val strips = Array.ofDim[L2Strip](Renju.BOARD_WIDTH * 6 - 18)
 
     for (idx <- 0 until Renju.BOARD_WIDTH) {
@@ -167,49 +161,57 @@ final class L1Board(
     strips
   }
 
-  private def mergeParticle(direction: Byte, idx: Int, points: PointsProvidePair, forbidMask: Byte): Unit = {
-    if (this.pointsField(idx).isDifference(direction, points))
-      this.pointsField(idx) = this.pointsField(idx).merged(direction, points)
+  private def applyParticle(direction: Int, idx: Int, points: PointsProvidePair, forbidMask: Byte): Unit = {
+    if (b.pointsField(idx).isDifference(direction, points))
+      b.pointsField(idx) = b.pointsField(idx).merged(direction, points)
 
     if (forbidMask != Flag.FREE)
-      this.boardField(idx) = forbidMask
+      b.boardField(idx) = forbidMask
   }
 
-  private def mergeL2Strips(strips: Array[L2Strip]): L2Board = {
-    var winner = Flag.FREE
+  private def mergeParticle(direction: Int, idx: Int, points: PointsProvidePair, forbidMask: Byte): Unit = {
+    if (b.pointsField(idx).isDifference(direction, points))
+      b.pointsField(idx).merge(direction, points)
+
+    if (forbidMask != Flag.FREE)
+      b.boardField(idx) = forbidMask
+  }
+
+  private def integrateStrips(strips: Array[L2Strip], op: (Int, Int, PointsProvidePair, Byte) => Unit): Unit = {
+    var winner = Option.empty[Byte]
 
     for (idx <- 0 until Renju.BOARD_LENGTH) {
       if (
-        this.boardField(idx) == Flag.FORBIDDEN_33
-          || (this.boardField(idx) == Flag.FORBIDDEN_44 && 1 > this.pointsField(idx).black.closedFour)
+        b.boardField(idx) == Flag.FORBIDDEN_33
+          || (b.boardField(idx) == Flag.FORBIDDEN_44 && 1 > b.pointsField(idx).black.closedFour)
       )
-        this.boardField(idx) = Flag.FREE
+        b.boardField(idx) = Flag.FREE
     }
 
     for (strip <- strips) {
-      if (strip.winner != Flag.FREE) winner = strip.winner
+      if (strip.winner != Flag.FREE) winner = Option(strip.winner)
 
       strip.direction match {
         case Direction.X => for (idx <- strip.pointsStrip.indices)
-          this.mergeParticle(
+          op(
             Direction.X,
             strip.startIdx + idx,
             strip.pointsStrip(idx), strip.forbidMask(idx),
           )
         case Direction.Y => for (idx <- strip.pointsStrip.indices)
-          this.mergeParticle(
+          op(
             Direction.Y,
             Pos.rowColToIdx(idx, Pos.idxToCol(strip.startIdx)),
             strip.pointsStrip(idx), strip.forbidMask(idx),
           )
         case Direction.DEG45 => for (idx <- strip.pointsStrip.indices)
-          this.mergeParticle(
+          op(
             Direction.DEG45,
             Pos.rowColToIdx(Pos.idxToRow(strip.startIdx) + idx, Pos.idxToCol(strip.startIdx) + idx),
             strip.pointsStrip(idx), strip.forbidMask(idx),
           )
         case Direction.DEG315 => for (idx <- strip.pointsStrip.indices)
-          this.mergeParticle(
+          op(
             Direction.DEG315,
             Pos.rowColToIdx(Pos.idxToRow(strip.startIdx) + idx, Pos.idxToCol(strip.startIdx) - idx),
             strip.pointsStrip(idx), strip.forbidMask(idx),
@@ -217,13 +219,22 @@ final class L1Board(
       }
     }
 
-    new L2Board(this.boardField, pointsField, this.moves, this.latestMove, this.opening, winner)
+    b.winner = winner
   }
 
-  def calculateL2Board(): L2Board =
-    this.mergeL2Strips(this.composeL2Strips())
+  @inline def calculatePoints(change: Int): Board = {
+    this.integrateStrips(this.composeStrips(change), this.applyParticle)
+    b
+  }
 
-  def calculateGlobalL2Board(): L2Board =
-    this.mergeL2Strips(this.composeGlobalL2Strips())
+  @inline def calculateInjectedPoints(change: Int): Board = {
+    this.integrateStrips(this.composeStrips(change), this.mergeParticle)
+    b
+  }
+
+  @inline def calculateGlobalPoints(): Board = {
+    this.integrateStrips(this.composeGlobalStrips(), this.applyParticle)
+    b
+  }
 
 }

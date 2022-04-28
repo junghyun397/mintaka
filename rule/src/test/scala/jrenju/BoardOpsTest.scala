@@ -5,10 +5,10 @@ import jrenju.notation.Flag
 import org.scalatest.flatspec._
 import org.scalatest.matchers._
 
-class L1BoardTest extends AnyFlatSpec with should.Matchers {
+class BoardOpsTest extends AnyFlatSpec with should.Matchers {
 
-  def win(problem: String, answer: Byte): Unit = {
-    problem.t2b.calculateGlobalL2Board().winner should be (answer)
+  def win(problem: String, answer: Option[Byte]): Unit = {
+    problem.t2b.calculateGlobalPoints().winner should be (answer)
   }
 
   "five-in-a-row board" should "has isEnd flag" in {
@@ -29,7 +29,7 @@ class L1BoardTest extends AnyFlatSpec with should.Matchers {
       " 3 . . . . . . . . . . . . . . . 3 \n" +
       " 2 . . . . . . . . . . . . . . . 2 \n" +
       " 1 . . . . . . . . . . . . . . . 1 \n" +
-      "   A B C D E F G H I J K L M N O   " , Flag.BLACK)
+      "   A B C D E F G H I J K L M N O   " , Option(Flag.BLACK))
 
     win(
       "   A B C D E F G H I J K L M N O   \n" +
@@ -48,7 +48,7 @@ class L1BoardTest extends AnyFlatSpec with should.Matchers {
       " 3 . . . . . . . . . . . . . . . 3 \n" +
       " 2 . . . . . . . . . . . . . . . 2 \n" +
       " 1 . . . . . . . . . . . . . . . 1 \n" +
-      "   A B C D E F G H I J K L M N O   ", Flag.BLACK)
+      "   A B C D E F G H I J K L M N O   ", Option(Flag.BLACK))
 
     win(
       "   A B C D E F G H I J K L M N O   \n" +
@@ -67,7 +67,7 @@ class L1BoardTest extends AnyFlatSpec with should.Matchers {
       " 3 . . . . . . . . . . . . . . . 3 \n" +
       " 2 . . . . . . . . . . . . . . . 2 \n" +
       " 1 . . . . . . . . . . . . . . . 1 \n" +
-      "   A B C D E F G H I J K L M N O   ", Flag.BLACK)
+      "   A B C D E F G H I J K L M N O   ", Option(Flag.BLACK))
 
     win(
         "   A B C D E F G H I J K L M N O   \n" +
@@ -86,7 +86,7 @@ class L1BoardTest extends AnyFlatSpec with should.Matchers {
         " 3 . . . . . . . . . . . . . . . 3 \n" +
         " 2 . . . . . . . . . . . . . . . 2 \n" +
         " 1 . . . . . . . . . . . . . . . 1 \n" +
-        "   A B C D E F G H I J K L M N O   ", Flag.BLACK)
+        "   A B C D E F G H I J K L M N O   ", Option(Flag.BLACK))
 
     win(
         "   A B C D E F G H I J K L M N O   \n" +
@@ -105,7 +105,7 @@ class L1BoardTest extends AnyFlatSpec with should.Matchers {
         " 3 . . . . . . . . . . . . O . . 3 \n" +
         " 2 . . . . . . . . . . . O . . . 2 \n" +
         " 1 . . . . . . . . . . O . . . . 1 \n" +
-        "   A B C D E F G H I J K L M N O   ", Flag.BLACK)
+        "   A B C D E F G H I J K L M N O   ", Option(Flag.BLACK))
 
     win(
       "   A B C D E F G H I J K L M N O   \n" +
@@ -124,7 +124,7 @@ class L1BoardTest extends AnyFlatSpec with should.Matchers {
       " 3 . . . . . . . . . . . . . . . 3 \n" +
       " 2 . . . . . . . . . . . . . . . 2 \n" +
       " 1 . . . . . . . . . . . . . . . 1 \n" +
-      "   A B C D E F G H I J K L M N O   ", Flag.BLACK)
+      "   A B C D E F G H I J K L M N O   ", Option(Flag.BLACK))
 
     win(
         "   A B C D E F G H I J K L M N O   \n" +
@@ -143,7 +143,7 @@ class L1BoardTest extends AnyFlatSpec with should.Matchers {
         " 3 . . O . . . . . . . . . . . . 3 \n" +
         " 2 . . . O . . . . . . . . . . . 2 \n" +
         " 1 . . . . O . . . . . . . . . . 1 \n" +
-        "   A B C D E F G H I J K L M N O   ", Flag.BLACK)
+        "   A B C D E F G H I J K L M N O   ", Option(Flag.BLACK))
 
     win(
         "   A B C D E F G H I J K L M N O   \n" +
@@ -162,7 +162,7 @@ class L1BoardTest extends AnyFlatSpec with should.Matchers {
         " 3 . . . . . . . . . . . . . . . 3 \n" +
         " 2 . . . . . . . . . . . . . . . 2 \n" +
         " 1 . . . . . . . . . . . . . . . 1 \n" +
-        "   A B C D E F G H I J K L M N O   ", Flag.BLACK)
+        "   A B C D E F G H I J K L M N O   ", Option(Flag.BLACK))
 
   }
 

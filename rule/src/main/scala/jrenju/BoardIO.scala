@@ -1,13 +1,14 @@
 package jrenju
 
-import jrenju.notation.{Flag, Opening, Renju}
-import utils.lang.{StringArrayTransform, IntTransform}
+import jrenju.notation.{Flag, Renju}
+import jrenju.solve.ZobristHash
+import utils.lang.{IntTransform, StringArrayTransform}
 
 //noinspection DuplicatedCode
 object BoardIO {
 
   // regex: [0-9][\s(]([^\s][\s()]){15}[0-9]
-  def fromBoardText(source: String, latestMove: Int, opening: Option[Opening]): Option[L1Board] = this.fromFieldArray(
+  def fromBoardText(source: String, latestMove: Int): Option[Board] = this.fromFieldArray(
     ("[0-9][\\s(]([^\\s()]\\s){" + Renju.BOARD_WIDTH + "}[0-9]").r.findAllIn(source)
       .toArray
       .flatMap(_
@@ -21,22 +22,26 @@ object BoardIO {
       )
       .reverse,
     latestMove,
-    opening,
   )
 
-  def fromFieldArray(source: Array[Byte], latestMove: Int, opening: Option[Opening]): Option[L1Board] =
+  def fromFieldArray(source: Array[Byte], latestMove: Int): Option[Board] =
     if (source.length != Renju.BOARD_LENGTH) Option.empty
-    else Option(new L1Board(
-      boardField = source,
-      pointsField = Array.fill(Renju.BOARD_LENGTH)(new PointsPair()),
-      moves = source.count {
-        case Flag.BLACK => true
-        case Flag.WHITE => true
-        case _ => false
-      },
-      latestMove = latestMove,
-      opening = opening,
-    ))
+    else Option(
+      new Board(
+        boardField = source,
+        pointsField = Array.fill(Renju.BOARD_LENGTH)(new PointsPair()),
+        moves = source.count {
+          case Flag.BLACK => true
+          case Flag.WHITE => true
+          case _ => false
+        },
+        latestMove = latestMove,
+        winner = Option.empty,
+        zobristKey = ZobristHash.boardHash(source)
+      )
+      .calculateGlobalPoints()
+      .calculateForbids()
+    )
 
   implicit class BoardToText(source: Board) {
 

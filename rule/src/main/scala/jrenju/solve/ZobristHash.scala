@@ -2,9 +2,10 @@ package jrenju.solve
 
 import jrenju.notation.{Flag, Renju}
 
+import scala.collection.mutable
 import scala.util.Random
 
-object Zobrist {
+object ZobristHash {
 
   private val TABLE_SEED = 10204
 
@@ -20,7 +21,7 @@ object Zobrist {
 
   val empty: Long = new Random(TABLE_SEED << 1).nextLong()
 
-  def hash(field: Array[Byte]): Long = {
+  def boardHash(field: Array[Byte]): Long = {
     var result = this.empty
 
     var flag = Flag.WALL
@@ -58,10 +59,12 @@ object Zobrist {
 
   implicit class IncrementHash(source: Long) {
 
-    def incrementHash(move: Int, isBlack: Boolean): Long =
-      if (isBlack) source ^ table(move)
+    def incrementHash(move: Int, flag: Byte): Long =
+      if (flag == Flag.BLACK) source ^ table(move)
       else source ^ table(Renju.BOARD_LENGTH + move)
 
   }
+
+  type Memo = mutable.HashMap[Long, Int]
 
 }

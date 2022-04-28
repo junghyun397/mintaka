@@ -1,6 +1,6 @@
 package jrenju
 
-import jrenju.notation.{Direction, Flag, Opening, Pos, Renju}
+import jrenju.notation.{Direction, Flag, Pos, Renju}
 
 import scala.language.implicitConversions
 
@@ -36,13 +36,11 @@ object TestHelper {
 
     def t2i: Int = source.t2p.idx
 
-    def t2b: L1Board = source.t2b(Renju.BOARD_CENTER.idx)
+    def t2b: Board = source.t2b(Renju.BOARD_CENTER.idx)
 
-    def t2b(x: String, y: Int): L1Board = source.t2b(Pos.fromCartesian(x, y).get.idx)
+    def t2b(latestMove: String): Board = source.t2b(Pos.fromCartesian(latestMove).get.idx)
 
-    def t2b(latestMove: Int): L1Board = source.t2b(latestMove, Option.empty)
-
-    def t2b(latestMove: Int, opening: Option[Opening]): L1Board = BoardIO.fromBoardText(source, latestMove, opening).get
+    def t2b(latestMove: Int): Board = BoardIO.fromBoardText(source, latestMove).get
 
     def t2s: L1Strip = new L1Strip(
       Direction.X,
