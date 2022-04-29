@@ -1,6 +1,7 @@
 package jrenju
 
 import jrenju.Points.{emptyAttributeBool, emptyAttributeNum}
+import utils.lang.Transform.BoolTransform
 
 import scala.language.{implicitConversions, postfixOps}
 
@@ -43,19 +44,17 @@ final class Points(
   val five: Array[Boolean] = emptyAttributeBool,
 ) {
 
-  @inline implicit def bool2int(cond: Boolean): Int = if (cond) 1 else 0
-
   var three: Int = calculateThree()
-  @inline private def calculateThree(): Int = this.bool2int(this.open3(0)) + this.open3(1) + this.open3(2) + this.open3(3)
+  @inline private def calculateThree(): Int = this.open3(0).toInt + this.open3(1).toInt + this.open3(2).toInt + this.open3(3)
 
   var closedFour: Int = calculateClosedFour()
   @inline private def calculateClosedFour(): Int = this.closed4(0) + this.closed4(1) + this.closed4(2) + this.closed4(3)
 
   var four: Int = calculateFour()
-  @inline private def calculateFour(): Int = this.bool2int(this.open4(0)) + this.open4(1) + this.open4(2) + this.open4(3) + this.closedFour
+  @inline private def calculateFour(): Int = this.open4(0).toInt + this.open4(1).toInt + this.open4(2).toInt + this.open4(3).toInt + this.closedFour
 
   var fiveInRow: Int = calculateFiveInRow()
-  @inline private def calculateFiveInRow(): Int = this.bool2int(this.five(0)) + this.five(1) + this.five(2) + this.five(3)
+  @inline private def calculateFiveInRow(): Int = this.five(0).toInt + this.five(1).toInt + this.five(2).toInt + this.five(3).toInt
 
   @inline def isDifference(direction: Int, that: PointsProvider): Boolean =
     this.open3(direction) != that.open3 ||

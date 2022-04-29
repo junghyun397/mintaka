@@ -17,7 +17,7 @@ class Board(
   var winner: Option[Byte],
 
   var zobristKey: Long,
-) {
+) extends Cloneable {
 
   @inline private def colorRaw: Byte = (this.moves % 2).toByte
 
@@ -96,6 +96,15 @@ class Board(
   def transposedKey(): Long = this.zobristKey
 
   def transposed(): Board = this
+
+  override def clone(): Board = new Board(
+    boardField = this.boardField.clone(),
+    pointsField = this.pointsField.clone(),
+    moves = this.moves,
+    latestMove = this.latestMove,
+    winner = this.winner,
+    zobristKey = this.zobristKey
+  )
 
 }
 

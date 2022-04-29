@@ -1,14 +1,13 @@
 package jrenju
 
 import jrenju.notation.{Direction, Flag, Pos, Renju}
+import utils.lang.Transform.IntTransform
 
 import scala.collection.mutable
 import scala.language.implicitConversions
 
 //noinspection DuplicatedCode
 final class ForbidOps(private val b: Board) extends AnyVal {
-
-  @inline implicit private def int2bool(value: Int): Boolean = if (value == 0) false else true
 
   @inline private def getOffsetIdx(direction: Int, initRow: Int, initCol: Int, offset: Int): Int = direction match {
     case Direction.X => Pos.rowColToIdx(initRow, initCol + offset)
@@ -118,7 +117,7 @@ final class ForbidOps(private val b: Board) extends AnyVal {
     for (offset <- -4 to 4) {
       if (offset != 0) {
         val pointer = this.getOffsetIdx(direction, row, col, offset)
-        if (this.getPointsBounded(pointer, op(_).closed4(direction)))
+        if (this.getPointsBounded(pointer, op(_).closed4(direction).toBoolean))
           return pointer
       }
     }
@@ -126,7 +125,7 @@ final class ForbidOps(private val b: Board) extends AnyVal {
     throw new Exception()
   }
 
-  private def isNotPseudoThree(direction: Int, idx: Int): Boolean = {
+  private def isNotPseudoThree(direction: Int, idx: Int, from: Int): Boolean = {
     val companions = this.recoverOpen3Companions(direction, idx, _.black, Flag.BLACK)
     for (idx <- companions.indices) {
       val companion = companions(idx)
@@ -135,7 +134,7 @@ final class ForbidOps(private val b: Board) extends AnyVal {
         val points = b.pointsField(companion).black
         if (points.four == 0 && points.fiveInRow == 0) {
           if (points.three > 2) {
-            if (this.isPseudoForbid(companion, direction))
+            if (this.isPseudoForbid(companion, direction, from))
               return true
           } else
             return true
@@ -150,17 +149,19 @@ final class ForbidOps(private val b: Board) extends AnyVal {
     var count = 0
     val open3 = b.pointsField(idx).black.open3
     for (direction <- 0 until 4)
-      if (open3(direction) && this.isNotPseudoThree(direction, idx))
+      if (open3(direction) && this.isNotPseudoThree(direction, idx, idx))
         count += 1
 
     count < 2
   }
 
-  private def isPseudoForbid(idx: Int, excludeDirection: Int): Boolean = {
+  private def isPseudoForbid(idx: Int, excludeDirection: Int, from: Int): Boolean = {
+    if (idx == from) return true
+
     var count = 0
     val open3 = b.pointsField(idx).black.open3
     for (direction <- 0 until 4)
-      if (direction != excludeDirection && open3(direction) && this.isNotPseudoThree(direction, idx))
+      if (direction != excludeDirection && open3(direction) && this.isNotPseudoThree(direction, idx, from))
         count += 1
 
     count < 2
@@ -206,11 +207,9 @@ final class ForbidOps(private val b: Board) extends AnyVal {
     }
 
     if (calculateDeepForbid || di3ForbidFlag)
-      for (idx <- 0 until Renju.BOARD_LENGTH) {
-        val flag = b.boardField(idx)
-        if (flag == Flag.FORBIDDEN_33 && this.isPseudoForbid(idx))
+      for (idx <- 0 until Renju.BOARD_LENGTH)
+        if (b.boardField(idx) == Flag.FORBIDDEN_33 && this.isPseudoForbid(idx))
           b.boardField(idx) = Flag.FREE
-      }
 
     b
   }

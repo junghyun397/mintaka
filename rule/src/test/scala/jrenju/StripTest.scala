@@ -13,53 +13,53 @@ class StripTest extends AnyFlatSpec with should .Matchers {
   }
 
   "open-3 points" should "detect correctly" in {
-    // OO
+    // XX
 
-    open3("...OO...", ".11..11.")
+    open3("...XX...", ".11..11.")
 
-    open3("...OO..X...", ".11..1.....")
+    open3("...XX..O...", ".11..1.....")
 
-    open3("...OO.X...", ".11.......")
+    open3("...XX.O...", ".11.......")
 
-    open3("...O...OO...", "......1..11.")
+    open3("...X...XX...", "......1..11.")
 
-    open3("...O...OO.X...", "..............")
+    open3("...X...XX.O...", "..............")
 
-    open3("...O...OO..X...", "......1..1.....")
+    open3("...X...XX..O...", "......1..1.....")
 
-    open3("...X..OO..X...", ".....1..1.....")
+    open3("...O..XX..O...", ".....1..1.....")
 
-    open3("...O...OO...O...", "......1..1......")
+    open3("...X...XX...X...", "......1..1......")
 
-    open3("...O...OO..OO..X...", "...................")
+    open3("...X...XX..XX..O...", "...................")
 
-    // O.O
+    // X.X
 
-    open3("...O.O...", "..1.1.1..")
+    open3("...X.X...", "..1.1.1..")
 
-    open3(".O.O...", "..1.1..")
+    open3(".X.X...", "..1.1..")
 
-    open3("...O.O..X...", "..1.1.1.....")
+    open3("...X.X..O...", "..1.1.1.....")
 
-    open3("...O.O.X...", "..1.1......")
+    open3("...X.X.O...", "..1.1......")
 
-    open3("....O..O.O.X...", "...............")
+    open3("....X..X.X.O...", "...............")
 
-    open3("...O...O.O.X...", "......1.1......")
+    open3("...X...X.X.O...", "......1.1......")
 
-    open3("...O..O.O..O...", "...............")
+    open3("...X..X.X..X...", "...............")
 
-    // O..O
+    // X..X
 
-    open3("...O..O...", "....11....")
+    open3("...X..X...", "....11....")
 
-    open3("...O..O.O.X...", "..............")
+    open3("...X..X.X.O...", "..............")
 
-    open3("...O..O.O..X...", ".......1.1.....")
+    open3("...X..X.X..O...", ".......1.1.....")
 
-    open3("...O..O..O...", "....11.11....")
+    open3("...X..X..X...", "....11.11....")
 
-    open3("...O..O.O...", ".......1.1..")
+    open3("...X..X.X...", ".......1.1..")
 
   }
 
@@ -69,57 +69,57 @@ class StripTest extends AnyFlatSpec with should .Matchers {
   }
 
   "closed-4 points" should "detect correctly" in {
-    // OOO
+    // XXX
 
-    closed4("...OOO...", ".1.....1.")
+    closed4("...XXX...", ".1.....1.")
 
-    closed4("...XOOO...", ".......11.")
+    closed4("...OXXX...", ".......11.")
 
-    closed4("...X.OOO...", "....1....1.")
+    closed4("...O.XXX...", "....1....1.")
 
-    closed4("...X.OOO.X...", "....1...1....")
+    closed4("...O.XXX.O...", "....1...1....")
 
-    closed4("...X.OOO..X...", "....1....1....")
+    closed4("...O.XXX..O...", "....1....1....")
 
-    closed4("...OOO..OOO...", ".1....11....1.")
+    closed4("...XXX..XXX...", ".1....11....1.")
 
-    closed4("...O.OOO..O...", "..............")
+    closed4("...X.XXX..X...", "..............")
 
-    // OO.O
+    // XX.X
 
-    closed4("...OO.O...", "..1....1..")
+    closed4("...XX.X...", "..1....1..")
 
-    closed4("...XOO.O...", "......1.1..")
+    closed4("...OXX.X...", "......1.1..")
 
-    closed4("...X.OO.O...", "....1....1..")
+    closed4("...O.XX.X...", "....1....1..")
 
-    closed4("...X.OO.OX...", "....1..1.....")
+    closed4("...O.XX.XO...", "....1..1.....")
 
-    closed4("...XOO.O.X...", "......1.1....")
+    closed4("...OXX.X.O...", "......1.1....")
 
-    closed4("...X.OO.OX...", "....1..1.....")
+    closed4("...O.XX.XO...", "....1..1.....")
 
-    // O.OO
+    // X.XX
 
-    closed4("...XO.OO...", ".....1..1..")
+    closed4("...OX.XX...", ".....1..1..")
 
-    closed4("...X.O.OOX...", "....1.1......")
+    closed4("...O.X.XXO...", "....1.1......")
 
-    closed4("...XO.OO..O...", ".....1...1....")
+    closed4("...OX.XX..X...", ".....1...1....")
 
-    closed4("...XOO.O.X...", "......1.1....")
+    closed4("...OXX.X.O...", "......1.1....")
 
-    // OO..O
+    // XX..X
 
-    closed4("...OO..O...", ".....11....")
+    closed4("...XX..X...", ".....11....")
 
-    closed4("....OO..OO...", ".............")
+    closed4("....XX..XX...", ".............")
 
     // complex
 
-    closed4("...O.OO.O.O...", "..1.1.........")
+    closed4("...X.XX.X.X...", "..1.1.........")
 
-    closed4("...XO.OO.O...", "........1.1..")
+    closed4("...OX.XX.X...", "........1.1..")
   }
 
   def open4(problem: String, answer: String): Unit = {
@@ -128,25 +128,25 @@ class StripTest extends AnyFlatSpec with should .Matchers {
   }
 
   "open-4 points" should "detect correctly" in {
-    // OOO
+    // XXX
 
-    open4("...OOO...", "..1...1..")
+    open4("...XXX...", "..1...1..")
 
-    open4("...OOO..O...", "..1.........")
+    open4("...XXX..X...", "..1.........")
 
-    open4("...OOO...OOO...", "..1...1.1...1..")
+    open4("...XXX...XXX...", "..1...1.1...1..")
 
-    open4("...X.OOO...", "........1..")
+    open4("...O.XXX...", "........1..")
 
-    open4("...X.OOO.X...", ".............")
+    open4("...O.XXX.O...", ".............")
 
-    // OO.O
+    // XX.X
 
-    open4("...OO.O...", ".....1....")
+    open4("...XX.X...", ".....1....")
 
-    open4("...XOO.O...", "...........")
+    open4("...OXX.X...", "...........")
 
-    open4("...OO.O.O...", "............")
+    open4("...XX.X.X...", "............")
   }
 
   def five(problem: String, answer: String): Unit = {
@@ -155,19 +155,19 @@ class StripTest extends AnyFlatSpec with should .Matchers {
   }
 
   "move-to-win points" should "detect correctly" in {
-    five("...OOOO...", "..1....1..")
+    five("...XXXX...", "..1....1..")
 
-    five("...XOOOO...", "........1..")
+    five("...OXXXX...", "........1..")
 
-    five("...OO.OO...", ".....1.....")
+    five("...XX.XX...", ".....1.....")
 
-    five("...OOO.O...", "......1....")
+    five("...XXX.X...", "......1....")
 
-    five("...OOOO.OO...", "..1..........")
+    five("...XXXX.XX...", "..1..........")
 
-    five("...OOO.OO...", "............")
+    five("...XXX.XX...", "............")
 
-    five("...OOOO..OOOO...", "..1....11....1..")
+    five("...XXXX..XXXX...", "..1....11....1..")
   }
 
   def win(problem: String, answer: Byte): Unit = {
@@ -176,17 +176,17 @@ class StripTest extends AnyFlatSpec with should .Matchers {
   }
 
   "5-in-a-row" should "detect correctly" in {
-    win(".OOXO..XOOOO.O", Flag.FREE)
+    win(".XXOX..OXXXX.X", Flag.FREE)
 
-    win("..OXXOX.XXXX.X", Flag.FREE)
+    win("..XOOXO.OOOO.O", Flag.FREE)
 
-    win("OOOOO", Flag.BLACK)
+    win("XXXXX", Flag.BLACK)
 
-    win("XXXXX", Flag.WHITE)
+    win("OOOOO", Flag.WHITE)
 
-    win("..XO.OOX.OOOOOX..", Flag.BLACK)
+    win("..OX.XXO.XXXXXO..", Flag.BLACK)
 
-    win("..XXXXO.XOXXXXXO", Flag.WHITE)
+    win("..OOOOX.OXOOOOOX", Flag.WHITE)
   }
 
   def over6forbid(problem: String, answer: String): Unit = {
@@ -195,13 +195,13 @@ class StripTest extends AnyFlatSpec with should .Matchers {
   }
 
   "over-6 forbidden points" should "detect correctly" in {
-    over6forbid("...OOO.OO...", "......6.....")
+    over6forbid("...XXX.XX...", "......6.....")
 
-    over6forbid("...O.OOOO...", "....6.......")
+    over6forbid("...X.XXXX...", "....6.......")
 
-    over6forbid("...O.OOO.OOO...", "........6......")
+    over6forbid("...X.XXX.XXX...", "........6......")
 
-    over6forbid("...XOOOO.O...", "........6....")
+    over6forbid("...OXXXX.X...", "........6....")
   }
 
   def double4forbid(problem: String, answer: String): Unit = {
@@ -210,19 +210,19 @@ class StripTest extends AnyFlatSpec with should .Matchers {
   }
 
   "double-4 forbidden points" should "detect correctly" in {
-    double4forbid("...O..OO.O...", ".....4.......")
+    double4forbid("...X..XX.X...", ".....4.......")
 
-    double4forbid("...OOO...OOO...", ".......4.......")
+    double4forbid("...XXX...XXX...", ".......4.......")
 
-    double4forbid("...OO..O.OO...", "......4.......")
+    double4forbid("...XX..X.XX...", "......4.......")
 
-    double4forbid("...OOO..O.OO...", "...............")
+    double4forbid("...XXX..X.XX...", "...............")
 
-    double4forbid("...O.O.O.O...", "......4......")
+    double4forbid("...X.X.X.X...", "......4......")
 
-    double4forbid("...O.O.O.O.O...", "......4.4......")
+    double4forbid("...X.X.X.X.X...", "......4.4......")
 
-    double4forbid("...O.O.O.O.O.O.O.O...", "......4.4.4.4.4......")
+    double4forbid("...X.X.X.X.X.X.X.X...", "......4.4.4.4.4......")
   }
 
 }

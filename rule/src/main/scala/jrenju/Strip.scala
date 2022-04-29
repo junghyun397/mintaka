@@ -4,7 +4,7 @@ import jrenju.L1Strip.retrieveStripFieldSolution
 import jrenju.notation.Flag
 import jrenju.solve.ZobristHash
 
-import scala.collection.mutable
+import java.util.concurrent.ConcurrentHashMap
 import scala.math.Numeric.IntIsIntegral.{minus, plus}
 
 sealed class Strip(val direction: Int, val startIdx: Int)
@@ -402,10 +402,18 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
 
 object L1Strip {
 
-  private val stripMemo = new mutable.HashMap[Long, (Array[PointsProvidePair], Array[Byte], Byte)]()
+//  private val stripMemo = new mutable.HashMap[Long, (Array[PointsProvidePair], Array[Byte], Byte)]()
+  private val stripMemo = new ConcurrentHashMap[Long, (Array[PointsProvidePair], Array[Byte], Byte)]()
 
-  private def retrieveStripFieldSolution(strip: L1Strip): (Array[PointsProvidePair], Array[Byte], Byte) =
-    this.stripMemo.getOrElseUpdate(ZobristHash.stripHash(strip.stripField), strip.calculatePoints())
+  private def retrieveStripFieldSolution(strip: L1Strip): (Array[PointsProvidePair], Array[Byte], Byte) = {
+    val hash = ZobristHash.stripHash(strip.stripField)
+    val cache = this.stripMemo.get(hash)
+    if (cache == null) {
+      val l2 = strip.calculatePoints()
+      this.stripMemo.put(hash, l2)
+      l2
+    } else cache
+  }
 
 }
 

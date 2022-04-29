@@ -5,7 +5,7 @@ import jrenju.notation.{Flag, Renju}
 
 object VCFSolver {
 
-  def hasVCFBlack(board: Board, memo: ZobristHash.Memo): Boolean = {
+  def isVCFBlack(board: Board, memo: ZobristHash.Memo): Boolean = {
     for (idx <- 0 until Renju.BOARD_LENGTH) {
       val points = board.pointsField(idx).black
 
@@ -21,7 +21,7 @@ object VCFSolver {
             .injectMove(companion)
             .calculateForbids(false)
 
-          val hasVCF = this.hasVCFBlack(board, memo)
+          val hasVCF = this.isVCFBlack(board, memo)
 
           board
             .removeMove(companion)
@@ -36,7 +36,7 @@ object VCFSolver {
     false
   }
 
-  def hasVCFWhite(board: Board, memo: ZobristHash.Memo): Boolean = {
+  def isVCFWhite(board: Board, memo: ZobristHash.Memo): Boolean = {
     for (idx <- 0 until Renju.BOARD_LENGTH) {
       val points = board.pointsField(idx).white
       if (points.closed4.sum == 1) {
@@ -53,7 +53,7 @@ object VCFSolver {
             .injectMove(companion)
             .calculateForbids(false)
 
-          val hasVCF = this.hasVCFWhite(board, memo)
+          val hasVCF = this.isVCFWhite(board, memo)
 
           board
             .removeMove(companion)

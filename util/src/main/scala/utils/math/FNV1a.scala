@@ -10,8 +10,6 @@ object FNV1a {
   private val MOD64 = BigInt("2").pow(64)
   private val MASK = 0xff
 
-  @inline private final def calc(prime: BigInt, mod: BigInt)(hash: BigInt, b: Byte): BigInt = ((hash * prime) % mod) ^ (b & MASK)
-
   @inline private final def calcA(prime: BigInt, mod: BigInt)(hash: BigInt, b: Byte): BigInt = ((hash ^ (b & MASK)) * prime) % mod
 
   @inline final def hash32a(data: Array[Byte]): BigInt = data.foldLeft(INIT32)(calcA(PRIME32, MOD32))

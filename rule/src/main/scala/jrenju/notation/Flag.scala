@@ -15,8 +15,8 @@ object Flag {
 
   object Text {
 
-    val BLACK: Char = 'O'
-    val WHITE: Char = 'X'
+    val BLACK: Char = 'X'
+    val WHITE: Char = 'O'
 
     val FREE: Char = '.'
 

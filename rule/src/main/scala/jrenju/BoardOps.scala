@@ -8,8 +8,6 @@ import scala.language.implicitConversions
 //noinspection DuplicatedCode
 final class BoardOps(private val b: Board) extends AnyVal {
 
-  @inline implicit private def int2bool(value: Int): Boolean = if (value == 0) false else true
-
   private def collectStonesX(row: Int): Array[Byte] = {
     val stones = Array.ofDim[Byte](Renju.BOARD_WIDTH)
     for (idx <- 0 until Renju.BOARD_WIDTH)

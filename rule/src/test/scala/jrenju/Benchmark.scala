@@ -7,8 +7,8 @@ import org.scalatest.matchers.should
 
 class Benchmark extends AnyFlatSpec with should.Matchers {
 
-  "Complex VCF benchmark" should "run rapidly" in {
-    val case1 = """
+  "complex VCF benchmark" should "run rapidly" in {
+    val black43Fork = """
       |   A B C D E F G H I J K L M N O
       |15 . . . . . . . . . . . . . . . 15
       |14 . . . . . . . . . . . . . . . 14
@@ -16,13 +16,13 @@ class Benchmark extends AnyFlatSpec with should.Matchers {
       |12 . . . . . . . . . . . . . . . 12
       |11 . . . . . . . . . . . . . . . 11
       |10 . . . . . . . . . . . . . . . 10
-      | 9 . . . . X . . . X . . . . . . 9
-      | 8 . . . . . . . O X X . . . . . 8
-      | 7 . . . . X O . O . . . . . . . 7
-      | 6 . . . . . O . . X O . . . . . 6
+      | 9 . . . . O . . . O . . . . . . 9
+      | 8 . . . . . . . X O O . . . . . 8
+      | 7 . . . . O X . X . . . . . . . 7
+      | 6 . . . . . X . . O X . . . . . 6
       | 5 . . . . . . . . . . . . . . . 5
-      | 4 . . . . . . . O . . . O . . . 4
-      | 3 . . . . . . X . . . . . . . . 3
+      | 4 . . . . . . . X . . . X . . . 4
+      | 3 . . . . . . O . . . . . . . . 3
       | 2 . . . . . . . . . . . . . . . 2
       | 1 . . . . . . . . . . . . . . . 1
       |   A B C D E F G H I J K L M N O
@@ -30,19 +30,19 @@ class Benchmark extends AnyFlatSpec with should.Matchers {
       .calculateGlobalPoints()
       .calculateForbids()
 
-    val case2 = """
+    val whiteTrap = """
       |   A B C D E F G H I J K L M N O
       |15 . . . . . . . . . . . . . . . 15
-      |14 . . . . . . . X . . . X . . . 14
-      |13 . . . . . . . O . . O . . . . 13
-      |12 . . . . . . . . X . . . . . . 12
-      |11 . . . X . O X O . . . . . . . 11
-      |10 . . . O . . . . O . . . . . . 10
+      |14 . . . . . . . O . . . O . . . 14
+      |13 . . . . . . . X . . X . . . . 13
+      |12 . . . . . . . . O . . . . . . 12
+      |11 . . . O . X O X . . . . . . . 11
+      |10 . . . X . . . . X . . . . . . 10
       | 9 . . . . . . . . . . . . . . . 9
-      | 8 . . . . O . X O X . O . . . . 8
-      | 7 . . . . . . X X O . . . . . . 7
-      | 6 . . . . . . . . . . X . . . . 6
-      | 5 . . . . . O . . . . O . X . . 5
+      | 8 . . . . X . O X O . X . . . . 8
+      | 7 . . . . . . O O X . . . . . . 7
+      | 6 . . . . . . . . . . O . . . . 6
+      | 5 . . . . . X . . . . X . O . . 5
       | 4 . . . . . . . . . . . . . . . 4
       | 3 . . . . . . . . . . . . . . . 3
       | 2 . . . . . . . . . . . . . . . 2
@@ -53,8 +53,8 @@ class Benchmark extends AnyFlatSpec with should.Matchers {
       .calculateForbids()
 
     for (_ <- 1 to 1000) {
-      case1.findVCFSequence()
-      case2.findVCFSequence()
+      black43Fork.findVCFSequence()
+      whiteTrap.findVCFSequence()
     }
   }
 

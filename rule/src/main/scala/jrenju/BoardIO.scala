@@ -2,7 +2,9 @@ package jrenju
 
 import jrenju.notation.{Flag, Renju}
 import jrenju.solve.ZobristHash
-import utils.lang.{IntTransform, StringArrayTransform}
+import utils.lang.Transform.StringArrayTransform
+
+import scala.language.implicitConversions
 
 //noinspection DuplicatedCode
 object BoardIO {
@@ -68,19 +70,21 @@ object BoardIO {
 
     def boardText: String = this.attributeText(_.boardField)(Flag.flagToChar)
 
+    implicit def dotIfZero(i: Int): String = if (i == 0) "." else i.toString
+
     def debugText: String =
       f"${this.boardText}\n" +
         Array(
-          f"\nblack-open-3 /\n${this.attributeText(_.pointsField)(_.black.three.dotIfZero)}\n",
-          f"\nblack-closed-4 /\n${this.attributeText(_.pointsField)(_.black.closedFour.dotIfZero)}\n",
-          f"\nblack-open-4 /\n${this.attributeText(_.pointsField)(_.black.open4.count(_ == true).dotIfZero)}\n",
-          f"\nblack-5\n${this.attributeText(_.pointsField)(_.black.fiveInRow.dotIfZero)}\n"
+          f"\nblack-open-3 /\n${this.attributeText(_.pointsField)(_.black.three)}\n",
+          f"\nblack-closed-4 /\n${this.attributeText(_.pointsField)(_.black.closedFour)}\n",
+          f"\nblack-open-4 /\n${this.attributeText(_.pointsField)(_.black.open4.count(_ == true))}\n",
+          f"\nblack-5\n${this.attributeText(_.pointsField)(_.black.fiveInRow)}\n"
         ).mergeHorizontal +
         Array(
-          f"\nwhite-open-3 /\n${this.attributeText(_.pointsField)(_.white.three.dotIfZero)}\n",
-          f"\nwhite-closed-4 /\n${this.attributeText(_.pointsField)(_.white.closedFour.dotIfZero)}\n",
-          f"\nwhite-open-4 /\n${this.attributeText(_.pointsField)(_.white.open4.count(_ == true).dotIfZero)}\n",
-          f"\nwhite-5\n${this.attributeText(_.pointsField)(_.white.fiveInRow.dotIfZero)}\n"
+          f"\nwhite-open-3 /\n${this.attributeText(_.pointsField)(_.white.three)}\n",
+          f"\nwhite-closed-4 /\n${this.attributeText(_.pointsField)(_.white.closedFour)}\n",
+          f"\nwhite-open-4 /\n${this.attributeText(_.pointsField)(_.white.open4.count(_ == true))}\n",
+          f"\nwhite-5\n${this.attributeText(_.pointsField)(_.white.fiveInRow)}\n"
         ).mergeHorizontal
 
   }
