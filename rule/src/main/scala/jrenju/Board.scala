@@ -11,19 +11,19 @@ class Board(
   val boardField: Array[Byte],
   val pointsField: Array[PointsPair],
 
-  var moves: Int,
-  var latestMove: Int,
+  val moves: Int,
+  val latestMove: Int,
 
   var winner: Option[Byte],
 
   var zobristKey: Long,
 ) extends Cloneable {
 
-  @inline private def colorRaw: Byte = (this.moves % 2).toByte
+  @inline def colorRaw: Byte = (this.moves % 2).toByte
 
-  @inline private def nextColorRaw: Byte = ((this.moves + 1) % 2).toByte
+  @inline def nextColorRaw: Byte = ((this.moves + 1) % 2).toByte
 
-  @inline private def isNextColorBlack: Boolean = this.nextColorRaw == Flag.BLACK
+  @inline def isNextColorBlack: Boolean = this.nextColorRaw == Flag.BLACK
 
   def color: Color.Value = Color(this.colorRaw)
 
@@ -45,38 +45,25 @@ class Board(
 
   def makeMove(pos: Pos): Board = this.makeMove(pos.idx)
 
-  def makeMove(idx: Int): Board = {
-    val thenBoard = boardField.updated(idx, this.nextColorRaw)
+  def makeMove(idx: Int): Board = this.makeMove(idx, calculateForbid = true)
+
+  def makeMove(idx: Int, calculateForbid: Boolean): Board = {
+    val thenField = boardField.updated(idx, this.nextColorRaw)
     val thenPoints = this.pointsField.updated(idx, PointsPair.empty)
-    new Board(
-      boardField = thenBoard,
+
+    val board = new Board(
+      boardField = thenField,
       pointsField = thenPoints,
       moves = this.moves + 1,
       latestMove = idx,
       winner = Option.empty,
       zobristKey = this.zobristKey.incrementHash(idx, this.nextColorRaw)
     )
-      .calculatePoints(idx)
-      .calculateForbids()
-  }
 
-  def injectMove(idx: Int): Board = {
-    this.boardField(idx) = this.nextColorRaw
+    board.integrateStrips(board.composeStrips(idx))
+    if (calculateForbid) board.calculateForbids()
 
-    this.moves += 1
-    this.zobristKey = this.zobristKey.incrementHash(idx, this.colorRaw)
-
-    this.calculateInjectedPoints(idx)
-  }
-
-  def removeMove(idx: Int): Board = {
-    this.boardField(idx) = Flag.FREE
-    this.pointsField(idx).clear()
-
-    this.moves -= 1
-    this.zobristKey = ZobristHash.boardHash(this.boardField)
-
-    this.calculateInjectedPoints(idx)
+    board
   }
 
   def rotatedKey(rotation: Rotation.Value): Long = rotation match {
@@ -112,9 +99,9 @@ object Board {
 
   @inline implicit def boardOps(board: Board): BoardOps = new BoardOps(board)
 
-  @inline implicit def forbidOps(board: Board): ForbidOps = new ForbidOps(board)
+  @inline implicit def structOps(board: Board): StructOps = new StructOps(board)
 
-  val newBoard: Board = newBoard(Renju.BOARD_CENTER.idx)
+  val newBoard: Board = newBoard(Renju.BOARD_CENTER_POS.idx)
 
   def newBoard(initIdx: Int): Board = new Board(
     boardField = Array.fill(Renju.BOARD_LENGTH)(Flag.FREE).updated(initIdx, Flag.BLACK),

@@ -3,6 +3,7 @@ package jrenju
 import jrenju.L1Strip.retrieveStripFieldSolution
 import jrenju.notation.Flag
 import jrenju.solve.ZobristHash
+import utils.lang.ConcurrentMapOps.concurrentMapOps
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.math.Numeric.IntIsIntegral.{minus, plus}
@@ -11,6 +12,8 @@ sealed class Strip(val direction: Int, val startIdx: Int)
 
 //noinspection DuplicatedCode
 final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) extends Strip(direction, startIdx) {
+
+  var zobristHash: Long = ZobristHash.stripHash(this.stripField)
 
   @inline private def isNotOver6(mask: Int): Boolean = this.isNotOver6(mask, -1, -1)
 
@@ -44,32 +47,34 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
     if (
       !isSolid && p4Flag != Flag.FREE && p4Flag != Flag.WALL
         && p4Flag == p3Flag && p3Flag == p2Flag && p2Flag == p1Flag
-    )
+    ) {
       if (p1Flag == Flag.WHITE)
         pointsStrip(pointer).white.five = true
       else if (this.isNotOver6(pointer))
         pointsStrip(pointer).black.five = true
       else if (p5Flag != Flag.BLACK)
         forbidMask(pointer) = Flag.FORBIDDEN_6
+    }
 
     // OOO+O
     if (
       isSolid && p4Flag != Flag.FREE
         && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE && flag == p2Flag
-    )
+    ) {
       if (flag == Flag.WHITE)
         pointsStrip(op(pointer, 1)).white.five = true
       else if (this.isNotOver6(op(pointer, 1)))
         pointsStrip(op(pointer, 1)).black.five = true
       else
         forbidMask(op(pointer, 1)) = Flag.FORBIDDEN_6
+    }
 
     // check open-4
     // -OOO+-
     if (
       !isSolid && p4Flag != Flag.FREE
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
-    )
+    ) {
       if (p2Flag == Flag.WHITE)
         pointsStrip(op(pointer, 1)).white.open4 = true
       else if (this.isNotOver6(op(pointer, 1), op(pointer, 5)))
@@ -77,12 +82,13 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
           pointsStrip(op(pointer, 1)).black.open4 = true
         else
           pointsStrip(op(pointer, 1)).black.closed4 = 1
+    }
 
     // -OO+O-
-    if (
+    else if (
       !isSolid && p4Flag != Flag.FREE
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p3Flag == p1Flag
-    )
+    ) {
       if (p1Flag == Flag.WHITE)
         pointsStrip(op(pointer, 2)).white.open4 = true
       else {
@@ -93,36 +99,40 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
         else if (condL || condR)
           pointsStrip(op(pointer, 2)).black.closed4 = 1
       }
+    }
 
     // check closed-4
     // -OOO-+
     if (
       !isSolid && p4Flag != Flag.FREE
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
-    )
+    ) {
       if (p2Flag == Flag.WHITE)
         pointsStrip(pointer).white.closed4 += 1
       else if (this.isNotOver6(pointer, op(pointer, 1)))
         pointsStrip(pointer).black.closed4 += 1
+    }
 
-    // OO++O
-    if (
+    // ?OO++O
+    else if (
       isSolid && p4Flag != Flag.FREE
         && p4Flag == p3Flag && p3Flag == flag && p2Flag == Flag.FREE && p1Flag == Flag.FREE
-    )
+    ) {
       if (flag == Flag.WHITE) {
-        pointsStrip(op(pointer, 1)).white.closed4 += 1
+        if (p5Flag != p4Flag)
+          pointsStrip(op(pointer, 1)).white.closed4 += 1
         pointsStrip(op(pointer, 2)).white.closed4 += 1
       } else if (this.isNotOver6(op(pointer, 1), op(pointer, 2))) {
         pointsStrip(op(pointer, 1)).black.closed4 += 1
         pointsStrip(op(pointer, 2)).black.closed4 += 1
       }
+    }
 
     // +OO-O+
-    if (
+    else if (
       !isSolid && p4Flag != Flag.FREE
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p3Flag == p1Flag
-    )
+    ) {
       if (p1Flag == Flag.WHITE) pointsStrip(pointer).white.closed4 += 1
       else {
         if (this.isNotOver6(pointer, op(pointer, 2)))
@@ -130,13 +140,14 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
         if (this.isNotOver6(op(pointer, 2), op(pointer, 5)))
           pointsStrip(op(pointer, 5)).black.closed4 += 1
       }
+    }
 
     // XOOO++
-    if (
+    else if (
       !isSolid && p4Flag != Flag.FREE
         && p5Flag != Flag.FREE && p5Flag != p4Flag
         && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
-    )
+    ) {
       if (p2Flag == Flag.WHITE) {
         pointsStrip(pointer).white.closed4 += 1
         pointsStrip(op(pointer, 1)).white.closed4 += 1
@@ -144,24 +155,26 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
         pointsStrip(pointer).black.closed4 += 1
         pointsStrip(op(pointer, 1)).black.closed4 += 1
       }
+    }
 
     // X+OOO-
-    if (
+    else if (
       !isSolid && p3Flag != Flag.FREE
         && p5Flag != Flag.FREE && p5Flag != p3Flag
         && p4Flag == Flag.FREE && p3Flag == p2Flag && p2Flag == p1Flag
-    )
+    ) {
       if (p2Flag == Flag.WHITE)
         pointsStrip(op(pointer, 4)).white.closed4 += 1
       else if (this.isNotOver6(pointer, op(pointer, 4)))
         pointsStrip(op(pointer, 4)).black.closed4 += 1
+    }
 
     // XOO+O+
-    if (
+    else if (
       !isSolid && p4Flag != Flag.FREE
         && p5Flag != Flag.FREE && p5Flag != p4Flag
         && p4Flag == p3Flag && p2Flag == Flag.FREE && p1Flag == p3Flag
-    )
+    ) {
       if (p1Flag == Flag.WHITE) {
         pointsStrip(pointer).white.closed4 += 1
         pointsStrip(op(pointer, 2)).white.closed4 += 1
@@ -169,13 +182,14 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
         pointsStrip(pointer).black.closed4 += 1
         pointsStrip(op(pointer, 2)).black.closed4 += 1
       }
+    }
 
     // XO+OO+
-    if (
+    else if (
       !isSolid && p4Flag != Flag.FREE
         && p5Flag != Flag.FREE && p5Flag != p4Flag
         && p4Flag == p2Flag && p3Flag == Flag.FREE && p2Flag == p1Flag
-    )
+    ) {
       if (p1Flag == Flag.WHITE) {
         pointsStrip(pointer).white.closed4 += 1
         pointsStrip(op(pointer, 3)).white.closed4 += 1
@@ -183,6 +197,7 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
         pointsStrip(pointer).black.closed4 += 1
         pointsStrip(op(pointer, 3)).black.closed4 += 1
       }
+    }
 
     // check open-3
     // !-OO++-
@@ -190,7 +205,7 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
       !isSolid && p4Flag != Flag.FREE
         && p6Flag != p4Flag
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p1Flag == Flag.FREE
-    )
+    ) {
       if (p4Flag == Flag.WHITE) {
         pointsStrip(op(pointer, 1)).white.open3 = true
         pointsStrip(op(pointer, 2)).white.open3 = true
@@ -200,40 +215,43 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
       } else if (p6Flag != Flag.WHITE && this.isNotOver6(op(pointer, 5), op(pointer, 6))) {
         pointsStrip(op(pointer, 2)).black.open3 = true
       }
+    }
 
     // X-+OO+-
     if (
       !isSolid && p3Flag != Flag.FREE
         && p6Flag != Flag.FREE && p6Flag != p3Flag
         && p5Flag == Flag.FREE && p4Flag == Flag.FREE && p3Flag == p2Flag && p1Flag == Flag.FREE
-    )
+    ) {
       if (p3Flag == Flag.WHITE) {
         pointsStrip(op(pointer, 1)).white.open3 = true
         pointsStrip(op(pointer, 4)).white.open3 = true
       } else if (this.isNotOver6(pointer, op(pointer, 1))) {
-        pointsStrip(op(pointer, 1)).black.open3 = true
+        if (this.isNotOver6(pointer, op(pointer, 1), op(pointer, 4)))
+          pointsStrip(op(pointer, 1)).black.open3 = true
         pointsStrip(op(pointer, 4)).black.open3 = true
       }
+    }
 
     // !-O-O+-
     if (
       !isSolid && p4Flag != Flag.FREE
         && p6Flag != p4Flag
         && p5Flag == Flag.FREE && p4Flag == p2Flag && p3Flag == Flag.FREE && p1Flag == Flag.FREE
-    )
+    ) {
       if (p4Flag == Flag.WHITE) {
         pointsStrip(op(pointer, 1)).white.open3 = true
       } else if (this.isNotOver6(pointer, op(pointer, 1), op(pointer, 3))) {
         pointsStrip(op(pointer, 1)).black.open3 = true
       }
+    }
 
     // X-O+O+-
-
     if (
       !isSolid && p4Flag != Flag.FREE
         && p6Flag != p4Flag
         && p1Flag == Flag.FREE && p2Flag == p4Flag && p3Flag == Flag.FREE && p5Flag == Flag.FREE
-    )
+    ) {
       if (p4Flag == Flag.WHITE) {
         pointsStrip(op(pointer, 1)).white.open3 = true
         pointsStrip(op(pointer, 3)).white.open3 = true
@@ -241,6 +259,7 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
         pointsStrip(op(pointer, 1)).black.open3 = true
         pointsStrip(op(pointer, 3)).black.open3 = true
       }
+    }
   }
 
   private def calculatePoints(): (Array[PointsProvidePair], Array[Byte], Byte) = {
@@ -292,8 +311,13 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
           && p4Flag == p2Flag && p2Flag == flag && p3Flag == Flag.FREE && p1Flag == Flag.FREE
       )
         if (flag == Flag.WHITE) {
-          pointsStrip(pointer - 1).white.closed4 += 1
-          pointsStrip(pointer - 3).white.closed4 += 1
+          if (
+            p5Flag != Flag.WHITE
+              && (pointer == this.stripField.length - 1 || this.stripField(pointer + 1) != Flag.WHITE)
+          ) {
+            pointsStrip(pointer - 1).white.closed4 += 1
+            pointsStrip(pointer - 3).white.closed4 += 1
+          }
         } else if (this.isNotOver6(pointer - 1, pointer - 3)) {
           pointsStrip(pointer - 1).black.closed4 += 1
           pointsStrip(pointer - 3).black.closed4 += 1
@@ -380,11 +404,8 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
 
     pointer = 0
     while (pointer < this.stripField.length) {
-      if (pointsStrip(pointer).black.four > 1) {
-        pointsStrip(pointer).black.closed4 = 0
-        pointsStrip(pointer).black.open4 = false
+      if (pointsStrip(pointer).black.four > 1)
         forbidMask(pointer) = Flag.FORBIDDEN_44
-      }
 
       pointer += 1
     }
@@ -393,8 +414,8 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
   }
 
   def calculateL2Strip(): L2Strip = {
-    val assembly = retrieveStripFieldSolution(this) // VCF * 10000 for 39,418 ms
-//    val assembly = calculatePoints() // VCF * 10000 for 27,525 ms
+    val assembly = retrieveStripFieldSolution(this) // VCF * 10000 for 29,418 ms
+//    val assembly = calculatePoints() // VCF * 10000 for 58,525 ms
     new L2Strip(this.direction, this.startIdx, assembly._1, assembly._2, assembly._3)
   }
 
@@ -402,18 +423,10 @@ final class L1Strip(direction: Int, startIdx: Int, val stripField: Array[Byte]) 
 
 object L1Strip {
 
-//  private val stripMemo = new mutable.HashMap[Long, (Array[PointsProvidePair], Array[Byte], Byte)]()
   private val stripMemo = new ConcurrentHashMap[Long, (Array[PointsProvidePair], Array[Byte], Byte)]()
 
-  private def retrieveStripFieldSolution(strip: L1Strip): (Array[PointsProvidePair], Array[Byte], Byte) = {
-    val hash = ZobristHash.stripHash(strip.stripField)
-    val cache = this.stripMemo.get(hash)
-    if (cache == null) {
-      val l2 = strip.calculatePoints()
-      this.stripMemo.put(hash, l2)
-      l2
-    } else cache
-  }
+  private def retrieveStripFieldSolution(strip: L1Strip): (Array[PointsProvidePair], Array[Byte], Byte) =
+    this.stripMemo.getOrElseUpdate(strip.zobristHash, () => strip.calculatePoints())
 
 }
 

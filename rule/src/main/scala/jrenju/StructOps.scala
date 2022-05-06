@@ -7,7 +7,7 @@ import scala.collection.mutable
 import scala.language.implicitConversions
 
 //noinspection DuplicatedCode
-final class ForbidOps(private val b: Board) extends AnyVal {
+final class StructOps(private val b: Board) extends AnyVal {
 
   @inline private def getOffsetIdx(direction: Int, initRow: Int, initCol: Int, offset: Int): Int = direction match {
     case Direction.X => Pos.rowColToIdx(initRow, initCol + offset)
@@ -17,14 +17,14 @@ final class ForbidOps(private val b: Board) extends AnyVal {
   }
 
   @inline private def getBoardFieldBounded(idx: Int): Byte =
-    if (idx < 0) Flag.WALL
+    if (idx < 0 || idx >= Renju.BOARD_LENGTH) Flag.WALL
     else b.boardField(idx)
 
   @inline private def getPointsBounded(idx: Int, op: PointsPair => Boolean): Boolean =
-    if (idx < 0) false
+    if (idx < 0 || idx >= Renju.BOARD_LENGTH) false
     else op(b.pointsField(idx))
 
-  def recoverOpen3Companions(direction: Int, idx: Int, op: PointsPair => Points, color: Byte): Array[Int] = {
+  def collectOpen3Companions(direction: Int, idx: Int, op: PointsPair => Points, color: Byte): Array[Int] = {
     val row = Pos.idxToRow(idx)
     val col = Pos.idxToCol(idx)
 
@@ -110,11 +110,11 @@ final class ForbidOps(private val b: Board) extends AnyVal {
       Array.empty
   }
 
-  def recoverClosed4Companion(direction: Int, idx: Int, op: PointsPair => Points): Int = {
+  def collectClosed4Companion(direction: Int, idx: Int, op: PointsPair => Points): Int = {
     val row = Pos.idxToRow(idx)
     val col = Pos.idxToCol(idx)
 
-    for (offset <- -4 to 4) {
+    for (offset <- -5 to 5) {
       if (offset != 0) {
         val pointer = this.getOffsetIdx(direction, row, col, offset)
         if (this.getPointsBounded(pointer, op(_).closed4(direction).toBoolean))
@@ -126,7 +126,7 @@ final class ForbidOps(private val b: Board) extends AnyVal {
   }
 
   private def isNotPseudoThree(direction: Int, idx: Int, from: Int): Boolean = {
-    val companions = this.recoverOpen3Companions(direction, idx, _.black, Flag.BLACK)
+    val companions = this.collectOpen3Companions(direction, idx, _.black, Flag.BLACK)
     for (idx <- companions.indices) {
       val companion = companions(idx)
       val flag = b.boardField(companion)
@@ -156,7 +156,7 @@ final class ForbidOps(private val b: Board) extends AnyVal {
   }
 
   private def isPseudoForbid(idx: Int, excludeDirection: Int, from: Int): Boolean = {
-    if (idx == from) return true
+    if (idx == from) return false
 
     var count = 0
     val open3 = b.pointsField(idx).black.open3
@@ -177,10 +177,10 @@ final class ForbidOps(private val b: Board) extends AnyVal {
 
         for (direction <- 0 until 4) {
           if (points.open3(direction))
-            threeSideTraps.addAll(this.recoverOpen3Companions(direction, idx, _.white, Flag.WHITE))
+            threeSideTraps.addAll(this.collectOpen3Companions(direction, idx, _.white, Flag.WHITE))
 
           if (points.closed4(direction) != 0)
-            fourSideTraps += this.recoverClosed4Companion(direction, idx, _.white)
+            fourSideTraps += this.collectClosed4Companion(direction, idx, _.white)
         }
       }
     }
@@ -188,7 +188,7 @@ final class ForbidOps(private val b: Board) extends AnyVal {
     (threeSideTraps.result(), fourSideTraps.result())
   }
 
-  def calculateForbids(calculateDeepForbid: Boolean = true): Board = {
+  def calculateForbids(): Unit = {
     var di3ForbidFlag = false
 
     for (idx <- 0 until Renju.BOARD_LENGTH) {
@@ -206,12 +206,10 @@ final class ForbidOps(private val b: Board) extends AnyVal {
       }
     }
 
-    if (calculateDeepForbid || di3ForbidFlag)
+    if (di3ForbidFlag)
       for (idx <- 0 until Renju.BOARD_LENGTH)
         if (b.boardField(idx) == Flag.FORBIDDEN_33 && this.isPseudoForbid(idx))
           b.boardField(idx) = Flag.FREE
-
-    b
   }
 
 }

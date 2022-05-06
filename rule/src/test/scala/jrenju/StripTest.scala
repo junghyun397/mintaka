@@ -7,167 +7,217 @@ import org.scalatest.matchers._
 
 class StripTest extends AnyFlatSpec with should .Matchers {
 
-  def open3(problem: String, answer: String): Unit = {
-    problem.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.open3) "1" else ".").mkString should be (answer)
-    problem.reverse.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.open3) "1" else ".").mkString should be (answer.reverse)
+  def open3(problem: String, answer: String, op: PointsProvidePair => PointsProvider): Unit = {
+    problem.t2s.calculateL2Strip().pointsStrip.map(v => if (op(v).open3) "1" else ".").mkString should be (answer)
+    problem.reverse.t2s.calculateL2Strip().pointsStrip.map(v => if (op(v).open3) "1" else ".").mkString should be (answer.reverse)
   }
 
   "open-3 points" should "detect correctly" in {
     // XX
 
-    open3("...XX...", ".11..11.")
+    open3("...XX...", ".11..11.", _.black)
 
-    open3("...XX..O...", ".11..1.....")
+    open3("...XX..X...", ".11........", _.black)
 
-    open3("...XX.O...", ".11.......")
+    open3("...O..XX..X...", ".....1........", _.black)
 
-    open3("...X...XX...", "......1..11.")
+    open3("...XX..O...", ".11..1.....", _.black)
 
-    open3("...X...XX.O...", "..............")
+    open3("...XX.O...", ".11.......", _.black)
 
-    open3("...X...XX..O...", "......1..1.....")
+    open3("...X...XX...", "......1..11.", _.black)
 
-    open3("...O..XX..O...", ".....1..1.....")
+    open3("...X...XX.O...", "..............", _.black)
 
-    open3("...X...XX...X...", "......1..1......")
+    open3("...X...XX..O...", "......1..1.....", _.black)
 
-    open3("...X...XX..XX..O...", "...................")
+    open3("...O..XX..O...", ".....1..1.....", _.black)
+
+    open3("...X...XX...X...", "......1..1......", _.black)
+
+    open3("...X...XX..XX..O...", "...................", _.black)
 
     // X.X
 
-    open3("...X.X...", "..1.1.1..")
+    open3("...X.X...", "..1.1.1..", _.black)
 
-    open3(".X.X...", "..1.1..")
+    open3("...O.X.X..O...", "......1.1.....", _.black)
 
-    open3("...X.X..O...", "..1.1.1.....")
+    open3(".X.X...", "..1.1..", _.black)
 
-    open3("...X.X.O...", "..1.1......")
+    open3("...X.X..O...", "..1.1.1.....", _.black)
 
-    open3("....X..X.X.O...", "...............")
+    open3("...X.X.O...", "..1.1......", _.black)
 
-    open3("...X...X.X.O...", "......1.1......")
+    open3("....X..X.X.O...", "...............", _.black)
 
-    open3("...X..X.X..X...", "...............")
+    open3("...X...X.X.O...", "......1.1......", _.black)
+
+    open3("...X..X.X..X...", "...............", _.black)
 
     // X..X
 
-    open3("...X..X...", "....11....")
+    open3("...X..X...", "....11....", _.black)
 
-    open3("...X..X.X.O...", "..............")
+    open3("...X..X.X.O...", "..............", _.black)
 
-    open3("...X..X.X..O...", ".......1.1.....")
+    open3("...X..X.X..O...", ".......1.1.....", _.black)
 
-    open3("...X..X..X...", "....11.11....")
+    open3("...X..X..X...", "....11.11....", _.black)
 
-    open3("...X..X.X...", ".......1.1..")
+    open3("...X..X.X...", ".......1.1..", _.black)
 
   }
 
-  def closed4(problem: String, answer: String): Unit = {
-    problem.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.closed4 == 0) "." else v.black.closed4.toString).mkString should be (answer)
-    problem.reverse.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.closed4 == 0) "." else v.black.closed4.toString).mkString should be (answer.reverse)
+  def block3(problem: String, answer: String, op: PointsProvidePair => PointsProvider): Unit = {
+    problem.t2s.calculateL2Strip().pointsStrip.map(v => if (op(v).block3) "1" else ".").mkString should be (answer)
+    problem.reverse.t2s.calculateL2Strip().pointsStrip.map(v => if (op(v).block3) "1" else ".").mkString should be (answer.reverse)
+  }
+
+//  "block-3 points" should "detect correctly" in {
+//
+//    block3("...XXX...", "..1...1..", _.black)
+//
+//    block3("...O.XXX...", "....1...11.", _.black)
+//
+//    block3("...O.XXX..O...", "....1...11....", _.black)
+//
+//    block3("...XXX..X...", ".11...1.....", _.black)
+//
+//
+//    block3("...XX.X...", "..1..1.1..", _.black)
+//
+//  }
+
+  def closed4(problem: String, answer: String, op: PointsProvidePair => PointsProvider): Unit = {
+    problem.t2s.calculateL2Strip().pointsStrip.map(v => if (op(v).closed4 == 0) "." else op(v).closed4.toString).mkString should be (answer)
+    problem.reverse.t2s.calculateL2Strip().pointsStrip.map(v => if (op(v).closed4 == 0) "." else op(v).closed4.toString).mkString should be (answer.reverse)
   }
 
   "closed-4 points" should "detect correctly" in {
     // XXX
 
-    closed4("...XXX...", ".1.....1.")
+    closed4("...XXX...", ".1.....1.", _.black)
 
-    closed4("...OXXX...", ".......11.")
+    closed4("...OOO...", ".1.....1.", _.white)
 
-    closed4("...O.XXX...", "....1....1.")
+    closed4("...OXXX...", ".......11.", _.black)
 
-    closed4("...O.XXX.O...", "....1...1....")
+    closed4("...XOOO...", ".......11.", _.white)
 
-    closed4("...O.XXX..O...", "....1....1....")
+    closed4("...O.XXX...", "....1....1.", _.black)
 
-    closed4("...XXX..XXX...", ".1....11....1.")
+    closed4("...O.XXX.O...", "....1...1....", _.black)
 
-    closed4("...X.XXX..X...", "..............")
+    closed4("...O.XXX..O...", "....1....1....", _.black)
+
+    closed4("...XXX..XXX...", ".1....11....1.", _.black)
+
+    closed4("...X.XXX..X...", "..............", _.black)
+
+    closed4("...O.OOO..O...", "........11....", _.white)
+
+    closed4("...O.OO..OO.O...", "..1....22....1..", _.white)
 
     // XX.X
 
-    closed4("...XX.X...", "..1....1..")
+    closed4("...XX.X...", "..1....1..", _.black)
 
-    closed4("...OXX.X...", "......1.1..")
+    closed4("...OXX.X...", "......1.1..", _.black)
 
-    closed4("...O.XX.X...", "....1....1..")
+    closed4("...O.XX.X...", "....1....1..", _.black)
 
-    closed4("...O.XX.XO...", "....1..1.....")
+    closed4("...O.XX.XO...", "....1..1.....", _.black)
 
-    closed4("...OXX.X.O...", "......1.1....")
+    closed4("...OXX.X.O...", "......1.1....", _.black)
 
-    closed4("...O.XX.XO...", "....1..1.....")
+    closed4("...O.XX.XO...", "....1..1.....", _.black)
 
     // X.XX
 
-    closed4("...OX.XX...", ".....1..1..")
+    closed4("...OX.XX...", ".....1..1..", _.black)
 
-    closed4("...O.X.XXO...", "....1.1......")
+    closed4("...O.X.XXO...", "....1.1......", _.black)
 
-    closed4("...OX.XX..X...", ".....1...1....")
+    closed4("...OX.XX..X...", ".....1..21....", _.black)
 
-    closed4("...OXX.X.O...", "......1.1....")
+    closed4("...OXX.X.O...", "......1.1....", _.black)
 
     // XX..X
 
-    closed4("...XX..X...", ".....11....")
+    closed4("...XX..X...", ".....11....", _.black)
 
-    closed4("....XX..XX...", ".............")
+    closed4("....XX..XX...", ".............", _.black)
+
+    closed4("...XX..X..X", ".....11....", _.black)
+
+    closed4("...XX..X", ".....11.", _.black)
 
     // complex
 
-    closed4("...X.XX.X.X...", "..1.1.........")
+    closed4("...X.XX.X.X...", "..1.1.........", _.black)
 
-    closed4("...OX.XX.X...", "........1.1..")
+    closed4("...OX.XX.X...", "........1.1..", _.black)
+
+    closed4("...O.XXX..O...", "....1....1....", _.black)
+
+    closed4("...XO.O.OOX...", ".....1.1......", _.white)
   }
 
-  def open4(problem: String, answer: String): Unit = {
-    problem.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.open4) "1" else ".").mkString should be (answer)
-    problem.reverse.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.open4) "1" else ".").mkString should be (answer.reverse)
+  def open4(problem: String, answer: String, op: PointsProvidePair => PointsProvider): Unit = {
+    problem.t2s.calculateL2Strip().pointsStrip.map(v => if (op(v).open4) "1" else ".").mkString should be (answer)
+    problem.reverse.t2s.calculateL2Strip().pointsStrip.map(v => if (op(v).open4) "1" else ".").mkString should be (answer.reverse)
   }
 
   "open-4 points" should "detect correctly" in {
     // XXX
 
-    open4("...XXX...", "..1...1..")
+    open4("...XXX...", "..1...1..", _.black)
 
-    open4("...XXX..X...", "..1.........")
+    open4("...XXX..X...", "..1.........", _.black)
 
-    open4("...XXX...XXX...", "..1...1.1...1..")
+    open4("...OOO..O...", "..1...1.....", _.white)
 
-    open4("...O.XXX...", "........1..")
+    open4("...XXX...XXX...", "..1...1.1...1..", _.black)
 
-    open4("...O.XXX.O...", ".............")
+    open4("...O.XXX...", "........1..", _.black)
+
+    open4("...O.XXX.O...", ".............", _.black)
+
+    open4("...O.XXX..O...", "........1.....", _.black)
 
     // XX.X
 
-    open4("...XX.X...", ".....1....")
+    open4("...XX.X...", ".....1....", _.black)
 
-    open4("...OXX.X...", "...........")
+    open4("...OXX.X...", "...........", _.black)
 
-    open4("...XX.X.X...", "............")
+    open4("...XX.X.X...", "............", _.black)
+
+    open4("...OO.O.O...", ".....1......", _.white)
   }
 
-  def five(problem: String, answer: String): Unit = {
-    problem.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.five) "1" else ".").mkString should be (answer)
-    problem.reverse.t2s.calculateL2Strip().pointsStrip.map(v => if (v.black.five) "1" else ".").mkString should be (answer.reverse)
+  def five(problem: String, answer: String, op: PointsProvidePair => PointsProvider): Unit = {
+    problem.t2s.calculateL2Strip().pointsStrip.map(v => if (op(v).five) "1" else ".").mkString should be (answer)
+    problem.reverse.t2s.calculateL2Strip().pointsStrip.map(v => if (op(v).five) "1" else ".").mkString should be (answer.reverse)
   }
 
   "move-to-win points" should "detect correctly" in {
-    five("...XXXX...", "..1....1..")
+    five("...XXXX...", "..1....1..", _.black)
 
-    five("...OXXXX...", "........1..")
+    five("...OXXXX...", "........1..", _.black)
 
-    five("...XX.XX...", ".....1.....")
+    five("...XX.XX...", ".....1.....", _.black)
 
-    five("...XXX.X...", "......1....")
+    five("...XXX.X...", "......1....", _.black)
 
-    five("...XXXX.XX...", "..1..........")
+    five("...XXXX.XX...", "..1..........", _.black)
 
-    five("...XXX.XX...", "............")
+    five("...XXX.XX...", "............", _.black)
 
-    five("...XXXX..XXXX...", "..1....11....1..")
+    five("...OOO.OO...", "......1.....", _.white)
+
+    five("...XXXX..XXXX...", "..1....11....1..", _.black)
   }
 
   def win(problem: String, answer: Byte): Unit = {
@@ -189,6 +239,31 @@ class StripTest extends AnyFlatSpec with should .Matchers {
     win("..OOOOX.OXOOOOOX", Flag.WHITE)
   }
 
+  def double4forbid(problem: String, answer: String): Unit = {
+    problem.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_44) "4" else ".").mkString should be (answer)
+    problem.reverse.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_44) "4" else ".").mkString should be (answer.reverse)
+  }
+
+  "double-4 forbidden points" should "detect correctly" in {
+    double4forbid("...X.XX..X...", ".......4.....")
+
+    double4forbid("...X..XX.X...", ".....4.......")
+
+    double4forbid("...XXX...XXX...", ".......4.......")
+
+    double4forbid("...XX..X.XX...", "......4.......")
+
+    double4forbid("...XXX..X.XX...", "...............")
+
+    double4forbid("...X.X.X.XX...", "..............")
+
+    double4forbid("...X.X.X.X...", "......4......")
+
+    double4forbid("...X.X.X.X.X...", "......4.4......")
+
+    double4forbid("...X.X.X.X.X.X.X.X...", "......4.4.4.4.4......")
+  }
+
   def over6forbid(problem: String, answer: String): Unit = {
     problem.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_6) "6" else ".").mkString should be (answer)
     problem.reverse.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_6) "6" else ".").mkString should be (answer.reverse)
@@ -202,27 +277,6 @@ class StripTest extends AnyFlatSpec with should .Matchers {
     over6forbid("...X.XXX.XXX...", "........6......")
 
     over6forbid("...OXXXX.X...", "........6....")
-  }
-
-  def double4forbid(problem: String, answer: String): Unit = {
-    problem.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_44) "4" else ".").mkString should be (answer)
-    problem.reverse.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_44) "4" else ".").mkString should be (answer.reverse)
-  }
-
-  "double-4 forbidden points" should "detect correctly" in {
-    double4forbid("...X..XX.X...", ".....4.......")
-
-    double4forbid("...XXX...XXX...", ".......4.......")
-
-    double4forbid("...XX..X.XX...", "......4.......")
-
-    double4forbid("...XXX..X.XX...", "...............")
-
-    double4forbid("...X.X.X.X...", "......4......")
-
-    double4forbid("...X.X.X.X.X...", "......4.4......")
-
-    double4forbid("...X.X.X.X.X.X.X.X...", "......4.4.4.4.4......")
   }
 
 }

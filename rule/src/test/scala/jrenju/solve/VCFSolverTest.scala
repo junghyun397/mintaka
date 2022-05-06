@@ -10,16 +10,14 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
 
   def vcf(problem: String, answer: Boolean): Unit = {
     val board = problem.t2b
-      .calculateGlobalPoints()
-      .calculateForbids()
 
-    val solution = board.findVCFSequence()
-      .toSolution
+    val seq = board.findVCFSequence()
 
     println(problem)
-    println(solution)
+    println(seq.length)
+    println(seq.toSolution)
 
-    solution.toString.nonEmpty should be (answer)
+    seq.toString.nonEmpty should be (answer)
   }
 
   "VCF Points" should "analyze correctly" in {
@@ -138,6 +136,31 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 3 . . . . . . O . . . . . . . . 3
         | 2 . . . . . . . . . . . . . . . 2
         | 1 . . . . . . . . . . . . . . . 1
+        |   A B C D E F G H I J K L M N O
+      """.stripMargin,
+      answer = true
+    )
+
+    // BLACK 4-3 FORK
+    // "h8,g8,c14,b15,e15,f14,g15,a15,a11,a12,c11,a10,b7,a9,a1,a13,b3,a14,a4,b4,d5,e6,f4,d8,i4,d10,k6,i6,l4,i7,n4,i9,o5,o4,m7,o6,m8,n9,n10,o3,n2,o2,m1,n1,j1,k1,h1,l1,o14,k2,o12,b2,n15,m15,k15,l15,k14,j15,f12,b1,g10,d1,o9,f1"
+    vcf(
+      """
+        |   A B C D E F G H I J K L M N O
+        |15 O O . . X . X . . O X O O X . 15
+        |14 O . X . . O . . . . X . . . X 14
+        |13 O . . . . . . . . . . . . . . 13
+        |12 O . . . . X . . . . . . . . X 12
+        |11 X . X . . . . . . . . . . . . 11
+        |10 O . . O . . X . . . . . . X . 10
+        | 9 O . . . . . . . O . . . . O X 9
+        | 8 . . . O . . O X . . . . X . . 8
+        | 7 . X . . . . . . O . . . X . . 7
+        | 6 . . . . O . . . O . X . . . O 6
+        | 5 . . . X . . . . . . . . . . X 5
+        | 4 X O . . . X . . X . . X . X O 4
+        | 3 . X . . . . . . . . . . . . O 3
+        | 2 . O . . . . . . . . O . . X O 2
+        | 1 X O . O . O . X . X O O X O . 1
         |   A B C D E F G H I J K L M N O
       """.stripMargin,
       answer = true

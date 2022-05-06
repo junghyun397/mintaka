@@ -36,7 +36,7 @@ object TestHelper {
 
     def t2i: Int = source.t2p.idx
 
-    def t2b: Board = source.t2b(Renju.BOARD_CENTER.idx)
+    def t2b: Board = source.t2b(Renju.BOARD_CENTER_POS.idx)
 
     def t2b(latestMove: String): Board = source.t2b(Pos.fromCartesian(latestMove).get.idx)
 

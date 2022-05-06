@@ -19,16 +19,6 @@ final class PointsPair(
       this.white.merged(direction, that.white),
     )
 
-  @inline def merge(direction: Int, that: PointsProvidePair): Unit = {
-    this.black.merge(direction, that.black)
-    this.white.merge(direction, that.white)
-  }
-
-  @inline def clear(): Unit = {
-    this.black.clear()
-    this.white.clear()
-  }
-
 }
 
 object PointsPair {
@@ -39,22 +29,19 @@ object PointsPair {
 
 final class Points(
   val open3: Array[Boolean] = emptyAttributeBool,
+  val block3: Array[Boolean] = emptyAttributeBool,
   val closed4: Array[Int] = emptyAttributeNum,
   val open4: Array[Boolean] = emptyAttributeBool,
   val five: Array[Boolean] = emptyAttributeBool,
 ) {
 
-  var three: Int = calculateThree()
-  @inline private def calculateThree(): Int = this.open3(0).toInt + this.open3(1).toInt + this.open3(2).toInt + this.open3(3)
+  val three: Int = this.open3(0).toInt + this.open3(1).toInt + this.open3(2).toInt + this.open3(3).toInt
 
-  var closedFour: Int = calculateClosedFour()
-  @inline private def calculateClosedFour(): Int = this.closed4(0) + this.closed4(1) + this.closed4(2) + this.closed4(3)
+  val closedFour: Int = this.closed4(0) + this.closed4(1) + this.closed4(2) + this.closed4(3)
 
-  var four: Int = calculateFour()
-  @inline private def calculateFour(): Int = this.open4(0).toInt + this.open4(1).toInt + this.open4(2).toInt + this.open4(3).toInt + this.closedFour
+  val four: Int = this.open4(0).toInt + this.open4(1).toInt + this.open4(2).toInt + this.open4(3).toInt + this.closedFour
 
-  var fiveInRow: Int = calculateFiveInRow()
-  @inline private def calculateFiveInRow(): Int = this.five(0).toInt + this.five(1).toInt + this.five(2).toInt + this.five(3).toInt
+  val fiveInRow: Int = this.five(0).toInt + this.five(1).toInt + this.five(2).toInt + this.five(3).toInt
 
   @inline def isDifference(direction: Int, that: PointsProvider): Boolean =
     this.open3(direction) != that.open3 ||
@@ -64,50 +51,11 @@ final class Points(
   @inline def merged(direction: Int, that: PointsProvider): Points =
     new Points(
       this.open3.updated(direction, that.open3),
+      this.block3.updated(direction, that.block3),
       this.closed4.updated(direction, that.closed4),
       this.open4.updated(direction, that.open4),
       this.five.updated(direction, that.five)
     )
-
-  @inline def merge(direction: Int, that: PointsProvider): Unit = {
-    this.open3(direction) = that.open3
-    this.three = this.calculateThree()
-
-    this.closed4(direction) = that.closed4
-    this.closedFour = this.calculateClosedFour()
-
-    this.open4(direction) = that.open4
-    this.four = this.calculateFour()
-
-    this.five(direction) = that.five
-    this.fiveInRow = this.calculateFiveInRow()
-  }
-
-  @inline def clear(): Unit = {
-    this.open3(0) = false
-    this.open3(1) = false
-    this.open3(2) = false
-    this.open3(3) = false
-    this.three = 0
-
-    this.closed4(0) = 0
-    this.closed4(1) = 0
-    this.closed4(2) = 0
-    this.closed4(3) = 0
-    this.closedFour = 0
-
-    this.open4(0) = false
-    this.open4(1) = false
-    this.open4(2) = false
-    this.open4(3) = false
-    this.four = 0
-
-    this.five(0) = false
-    this.five(1) = false
-    this.five(2) = false
-    this.five(3) = false
-    this.fiveInRow = 0
-  }
 
 }
 
@@ -126,13 +74,12 @@ final class PointsProvidePair(
 
 final class PointsProvider(
   var open3: Boolean = false,
+  var block3: Boolean = false,
   var closed4: Int = 0,
   var open4: Boolean = false,
   var five: Boolean = false,
 ) {
 
-  @inline implicit def bool2int(value: Boolean): Int = if (value) 1 else 0
-
-  @inline def four: Int = this.open4 + this.closed4
+  @inline def four: Int = this.open4.toInt + this.closed4.toInt
 
 }

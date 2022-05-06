@@ -36,11 +36,11 @@ final class BoardOps(private val b: Board) extends AnyVal {
     stones
   }
 
-  private def composeStrips(pivot: Int): Array[L2Strip] = {
+  def composeStrips(pivot: Int): Array[L2Strip] = {
     val col = Pos.idxToCol(pivot)
     val row = Pos.idxToRow(pivot)
 
-    val rCol = Renju.BOARD_MAX_IDX - col
+    val rCol = Renju.BOARD_WIDTH_MAX_IDX - col
 
     val builder = new mutable.ArrayBuilder.ofRef[L2Strip]()
 
@@ -78,8 +78,8 @@ final class BoardOps(private val b: Board) extends AnyVal {
       if (size > 4)
         builder += new L1Strip(
           Direction.DEG315,
-          Pos.rowColToIdx(y, Renju.BOARD_MAX_IDX),
-          this.collectStonesDEG315(size, y, Renju.BOARD_MAX_IDX)
+          Pos.rowColToIdx(y, Renju.BOARD_WIDTH_MAX_IDX),
+          this.collectStonesDEG315(size, y, Renju.BOARD_WIDTH_MAX_IDX)
         )
           .calculateL2Strip()
     } else { // BOTTOM
@@ -97,7 +97,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
     builder.result()
   }
 
-  private def composeGlobalStrips(): Array[L2Strip] = {
+  def composeGlobalStrips(): Array[L2Strip] = {
     val strips = Array.ofDim[L2Strip](Renju.BOARD_WIDTH * 6 - 18)
 
     for (idx <- 0 until Renju.BOARD_WIDTH) {
@@ -131,7 +131,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
       strips(offset45Top + idx) = new L1Strip(
         Direction.DEG45,
         Pos.rowColToIdx(idx + 1, 0),
-        this.collectStonesDEG45(Renju.BOARD_MAX_IDX - idx, idx + 1, 0)
+        this.collectStonesDEG45(Renju.BOARD_WIDTH_MAX_IDX - idx, idx + 1, 0)
       )
         .calculateL2Strip()
     }
@@ -141,7 +141,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
       strips(offset315Bottom + idx) = new L1Strip(
         Direction.DEG315,
         Pos.rowColToIdx(0, Renju.BOARD_WIDTH - idx - 1),
-        this.collectStonesDEG315(Renju.BOARD_WIDTH - idx, 0, Renju.BOARD_MAX_IDX - idx)
+        this.collectStonesDEG315(Renju.BOARD_WIDTH - idx, 0, Renju.BOARD_WIDTH_MAX_IDX - idx)
       )
         .calculateL2Strip()
     }
@@ -151,7 +151,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
       strips(offset315Top + idx) = new L1Strip(
         Direction.DEG315,
         Pos.rowColToIdx(idx + 1, Renju.BOARD_WIDTH - 1),
-        this.collectStonesDEG315(Renju.BOARD_MAX_IDX - idx, idx + 1, Renju.BOARD_MAX_IDX)
+        this.collectStonesDEG315(Renju.BOARD_WIDTH_MAX_IDX - idx, idx + 1, Renju.BOARD_WIDTH_MAX_IDX)
       )
         .calculateL2Strip()
     }
@@ -167,15 +167,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
       b.boardField(idx) = forbidMask
   }
 
-  private def mergeParticle(direction: Int, idx: Int, points: PointsProvidePair, forbidMask: Byte): Unit = {
-    if (b.pointsField(idx).isDifference(direction, points))
-      b.pointsField(idx).merge(direction, points)
-
-    if (forbidMask != Flag.FREE)
-      b.boardField(idx) = forbidMask
-  }
-
-  private def integrateStrips(strips: Array[L2Strip], op: (Int, Int, PointsProvidePair, Byte) => Unit): Unit = {
+  def integrateStrips(strips: Array[L2Strip]): Unit = {
     var winner = Option.empty[Byte]
 
     for (idx <- 0 until Renju.BOARD_LENGTH) {
@@ -191,25 +183,25 @@ final class BoardOps(private val b: Board) extends AnyVal {
 
       strip.direction match {
         case Direction.X => for (idx <- strip.pointsStrip.indices)
-          op(
+          this.applyParticle(
             Direction.X,
             strip.startIdx + idx,
             strip.pointsStrip(idx), strip.forbidMask(idx),
           )
         case Direction.Y => for (idx <- strip.pointsStrip.indices)
-          op(
+          this.applyParticle(
             Direction.Y,
             Pos.rowColToIdx(idx, Pos.idxToCol(strip.startIdx)),
             strip.pointsStrip(idx), strip.forbidMask(idx),
           )
         case Direction.DEG45 => for (idx <- strip.pointsStrip.indices)
-          op(
+          this.applyParticle(
             Direction.DEG45,
             Pos.rowColToIdx(Pos.idxToRow(strip.startIdx) + idx, Pos.idxToCol(strip.startIdx) + idx),
             strip.pointsStrip(idx), strip.forbidMask(idx),
           )
         case Direction.DEG315 => for (idx <- strip.pointsStrip.indices)
-          op(
+          this.applyParticle(
             Direction.DEG315,
             Pos.rowColToIdx(Pos.idxToRow(strip.startIdx) + idx, Pos.idxToCol(strip.startIdx) - idx),
             strip.pointsStrip(idx), strip.forbidMask(idx),
@@ -218,21 +210,6 @@ final class BoardOps(private val b: Board) extends AnyVal {
     }
 
     b.winner = winner
-  }
-
-  @inline def calculatePoints(change: Int): Board = {
-    this.integrateStrips(this.composeStrips(change), this.applyParticle)
-    b
-  }
-
-  @inline def calculateInjectedPoints(change: Int): Board = {
-    this.integrateStrips(this.composeStrips(change), this.mergeParticle)
-    b
-  }
-
-  @inline def calculateGlobalPoints(): Board = {
-    this.integrateStrips(this.composeGlobalStrips(), this.applyParticle)
-    b
   }
 
 }

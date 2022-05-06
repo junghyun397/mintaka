@@ -1,6 +1,7 @@
 package jrenju
 
 import jrenju.TestHelper.T2
+import jrenju.solve.LRUMemo
 import jrenju.solve.VCFSolver.VCFFinder
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
@@ -8,6 +9,7 @@ import org.scalatest.matchers.should
 class Benchmark extends AnyFlatSpec with should.Matchers {
 
   "complex VCF benchmark" should "run rapidly" in {
+    val memoBlack = new LRUMemo()
     val black43Fork = """
       |   A B C D E F G H I J K L M N O
       |15 . . . . . . . . . . . . . . . 15
@@ -27,9 +29,8 @@ class Benchmark extends AnyFlatSpec with should.Matchers {
       | 1 . . . . . . . . . . . . . . . 1
       |   A B C D E F G H I J K L M N O
     """.t2b
-      .calculateGlobalPoints()
-      .calculateForbids()
 
+    val memoWhite = new LRUMemo()
     val whiteTrap = """
       |   A B C D E F G H I J K L M N O
       |15 . . . . . . . . . . . . . . . 15
@@ -49,12 +50,10 @@ class Benchmark extends AnyFlatSpec with should.Matchers {
       | 1 . . . . . . . . . . . . . . . 1
       |   A B C D E F G H I J K L M N O
     """.t2b
-      .calculateGlobalPoints()
-      .calculateForbids()
 
     for (_ <- 1 to 1000) {
-      black43Fork.findVCFSequence()
-      whiteTrap.findVCFSequence()
+      black43Fork.findVCFSequence(memoBlack)
+      whiteTrap.findVCFSequence(memoWhite)
     }
   }
 

@@ -8,10 +8,10 @@ import org.scalatest.matchers._
 class BoardOpsTest extends AnyFlatSpec with should.Matchers {
 
   def win(problem: String, answer: Option[Byte]): Unit = {
-    problem.t2b.calculateGlobalPoints().winner should be (answer)
+    problem.t2b.winner should be (answer)
   }
 
-  "five-in-a-row board" should "has isEnd flag" in {
+  "five-in-a-row board" should "has winner" in {
     win(
       """
         |   A B C D E F G H I J K L M N O
@@ -31,7 +31,7 @@ class BoardOpsTest extends AnyFlatSpec with should.Matchers {
         | 2 . . . . . . . . . . . . . . . 2
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
-  """.stripMargin,
+      """.stripMargin,
       Option(Flag.BLACK)
     )
   }
