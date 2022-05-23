@@ -5,35 +5,80 @@ import jrenju.notation.Flag
 import jrenju.solve.ZobristHash.IncrementHash
 import utils.lang.LRUCache
 
+import java.util.Collections.synchronizedMap
+
 class LRUMemo(
-  private val black: java.util.Map[Long, Float] = LRUCache[Long, Float](100_000),
-  private val white: java.util.Map[Long, Float] = LRUCache[Long, Float](100_000),
+  private val blackMemo: java.util.Map[Long, Float] = new java.util.concurrent.ConcurrentHashMap(),
+  private val whiteMemo: java.util.Map[Long, Float] = new java.util.concurrent.ConcurrentHashMap(),
+
+  private val blackCache: java.util.Map[Long, Float] = synchronizedMap(new LRUCache[Long, Float](1_000)),
+  private val whiteCache: java.util.Map[Long, Float] = synchronizedMap(new LRUCache[Long, Float](1_000)),
 ) extends Cloneable {
 
-  def probe(board: Board): Option[Float] =
-    if (board.colorRaw == Flag.BLACK)
-      Option(this.black.get(board.zobristKey))
+  def probe(key: Long, color: Byte): Option[Float] =
+    if (color == Flag.BLACK)
+      this.probeBlack(key)
     else
-      Option(this.white.get(board.zobristKey))
+      this.probeWhite(key)
 
-  def probe(board: Board, move: Int, flag: Byte): Option[Float] =
-    if (flag == Flag.BLACK)
-      Option(this.black.get(board.zobristKey.incrementHash(move, flag)))
+  def probe(board: Board): Option[Float] =
+    if (board.isNextColorBlack)
+      this.probeBlack(board.zobristKey)
     else
-      Option(this.white.get(board.zobristKey.incrementHash(move, flag)))
+      this.probeWhite(board.zobristKey)
+
+  def probe(board: Board, move: Int): Option[Float] = {
+    val key = board.zobristKey.incrementHash(move, board.nextColorFlag)
+    if (board.isNextColorBlack)
+      this.probeBlack(key)
+    else
+      this.probeWhite(key)
+  }
+
+  private def probeBlack(key: Long): Option[Float] =
+    Option(this.blackCache.get(key))
+      .orElse(Option(this.blackMemo.get(key)))
+
+  private def probeWhite(key: Long): Option[Float] =
+    Option(this.whiteCache.get(key))
+      .orElse(Option(this.whiteMemo.get(key)))
+
+  def write(key: Long, color: Byte, eval: Float): Unit =
+    if (color == Flag.BLACK)
+      this.writeBlack(key, eval)
+    else
+      this.writeWhite(key, eval)
 
   def write(board: Board, eval: Float): Unit =
-    if (board.colorRaw == Flag.BLACK)
-      this.black.put(board.zobristKey, eval)
+    if (board.isNextColorBlack)
+      this.writeBlack(board.zobristKey, eval)
     else
-      this.white.put(board.zobristKey, eval)
+      this.writeWhite(board.zobristKey, eval)
 
-  def write(board: Board, move: Int, flag: Byte, eval: Float): Unit =
-    if (flag == Flag.BLACK)
-      this.black.put(board.zobristKey.incrementHash(move, flag), eval)
+  def write(board: Board, move: Int, eval: Float): Unit = {
+    val key = board.zobristKey.incrementHash(move, board.nextColorFlag)
+    if (board.isNextColorBlack)
+      this.writeBlack(key, eval)
     else
-      this.white.put(board.zobristKey.incrementHash(move, flag), eval)
+      this.writeWhite(key, eval)
+  }
 
-  override def clone(): LRUMemo = new LRUMemo(this.black, this.white)
+  private def writeBlack(key: Long, eval: Float): Unit = {
+    this.blackCache.put(key, eval)
+    this.blackMemo.put(key, eval)
+  }
+
+  private def writeWhite(key: Long, eval: Float): Unit = {
+    this.whiteCache.put(key, eval)
+    this.whiteMemo.put(key, eval)
+  }
+
+  override def clone(): LRUMemo = new LRUMemo(this.blackCache, this.whiteCache)
+
+}
+
+object LRUMemo {
+
+  def empty: LRUMemo = new LRUMemo()
 
 }

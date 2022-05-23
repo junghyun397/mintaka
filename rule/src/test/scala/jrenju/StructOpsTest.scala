@@ -478,13 +478,12 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
     )
   }
 
-  def trap(problem: String, answer: String): Unit = {
+  def trap(problem: String, answer: Set[String]): Unit = {
     val board = problem.t2b
 
     val (threeSide, fourSide) = board.collectTrapPoints()
 
-    threeSide.map(idx => Pos.fromIdx(idx).toCartesian).mkString("Three(", ", ", ") ") +
-      fourSide.map(idx => Pos.fromIdx(idx).toCartesian).mkString("Four(", ", ", ")") should be (answer)
+    (threeSide ++ fourSide).map(Pos.fromIdx).map(_.toCartesian).toSet == answer should be (true)
   }
 
   "traps" should "analyse correctly" in {
@@ -508,7 +507,7 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
       """.stripMargin,
-      "Three(i7, e3) Four()"
+      Set("i7", "e3")
     )
 
     trap(
@@ -531,7 +530,7 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
       """.stripMargin,
-      "Three() Four(e3)"
+      Set("e3")
     )
 
     trap(
@@ -554,7 +553,7 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
       """.stripMargin,
-      "Three() Four(h6)"
+      Set("h6")
     )
   }
 

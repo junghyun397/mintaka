@@ -8,6 +8,7 @@ import org.scalatest.matchers.should
 
 class Benchmark extends AnyFlatSpec with should.Matchers {
 
+  // 1155 ms
   "complex VCF benchmark" should "run rapidly" in {
     val memoBlack = new LRUMemo()
     val black43Fork = """

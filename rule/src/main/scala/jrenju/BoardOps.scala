@@ -170,10 +170,10 @@ final class BoardOps(private val b: Board) extends AnyVal {
   def integrateStrips(strips: Array[L2Strip]): Unit = {
     var winner = Option.empty[Byte]
 
-    for (idx <- 0 until Renju.BOARD_LENGTH) {
+    for (idx <- 0 until Renju.BOARD_SIZE) {
       if (
         b.boardField(idx) == Flag.FORBIDDEN_33
-          || (b.boardField(idx) == Flag.FORBIDDEN_44 && 1 > b.pointsField(idx).black.closedFour)
+          || b.boardField(idx) == Flag.FORBIDDEN_44
       )
         b.boardField(idx) = Flag.FREE
     }

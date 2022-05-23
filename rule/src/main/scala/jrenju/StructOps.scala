@@ -17,14 +17,14 @@ final class StructOps(private val b: Board) extends AnyVal {
   }
 
   @inline private def getBoardFieldBounded(idx: Int): Byte =
-    if (idx < 0 || idx >= Renju.BOARD_LENGTH) Flag.WALL
+    if (idx < 0 || idx >= Renju.BOARD_SIZE) Flag.WALL
     else b.boardField(idx)
 
   @inline private def getPointsBounded(idx: Int, op: PointsPair => Boolean): Boolean =
-    if (idx < 0 || idx >= Renju.BOARD_LENGTH) false
+    if (idx < 0 || idx >= Renju.BOARD_SIZE) false
     else op(b.pointsField(idx))
 
-  def collectOpen3Companions(direction: Int, idx: Int, op: PointsPair => Points, color: Byte): Array[Int] = {
+  def collectOpen3Counters(direction: Int, idx: Int, op: PointsPair => Points, flag: Byte): Array[Int] = {
     val row = Pos.idxToRow(idx)
     val col = Pos.idxToCol(idx)
 
@@ -38,7 +38,7 @@ final class StructOps(private val b: Board) extends AnyVal {
     val a2Value = this.getBoardFieldBounded(a2Pointer)
 
     // +0OO+
-    if (a1Value == color && a2Value == color) {
+    if (a1Value == flag && a2Value == flag) {
       val builder = new mutable.ArrayBuilder.ofInt
 
       if (op(b.pointsField(p1Pointer)).open3(direction))
@@ -51,7 +51,7 @@ final class StructOps(private val b: Board) extends AnyVal {
     }
 
     // +OO0+
-    else if (p1Value == color && p2Value == color) {
+    else if (p1Value == flag && p2Value == flag) {
       val builder = new mutable.ArrayBuilder.ofInt
 
       if (op(b.pointsField(a1Pointer)).open3(direction))
@@ -64,30 +64,30 @@ final class StructOps(private val b: Board) extends AnyVal {
     }
 
     // O0+O
-    else if (p1Value == color && a2Value == color)
+    else if (p1Value == flag && a2Value == flag)
       Array(a1Pointer)
     // O+0O
-    else if (p2Value == color && a1Value == color)
+    else if (p2Value == flag && a1Value == flag)
       Array(p1Pointer)
 
     // -0O+O
     else if (
       Flag.onlyStone(p1Value) == Flag.FREE
-        && a1Value == color
+        && a1Value == flag
         && Flag.onlyStone(p2Value) == Flag.FREE
     )
       Array(a2Pointer)
 
     // O+O0-
     else if (
-      p1Value == color
+      p1Value == flag
         && Flag.onlyStone(p2Value) == Flag.FREE
         && Flag.onlyStone(a1Value) == Flag.FREE
     )
       Array(p2Pointer)
 
     // +O0O+
-    else if (p1Value == color && a1Value == color) {
+    else if (p1Value == flag && a1Value == flag) {
       val builder = new mutable.ArrayBuilder.ofInt
 
       if (op(b.pointsField(a2Pointer)).open3(direction))
@@ -99,18 +99,18 @@ final class StructOps(private val b: Board) extends AnyVal {
     }
 
     // OO+0
-    else if (Flag.onlyStone(p1Value) == Flag.FREE && p2Value == color)
+    else if (Flag.onlyStone(p1Value) == Flag.FREE && p2Value == flag)
       Array(p1Pointer)
 
     // 0+OO
-    else if (Flag.onlyStone(a1Value) == Flag.FREE && a2Value == color)
+    else if (Flag.onlyStone(a1Value) == Flag.FREE && a2Value == flag)
       Array(a1Pointer)
 
     else
       Array.empty
   }
 
-  def collectClosed4Companion(direction: Int, idx: Int, op: PointsPair => Points): Int = {
+  def collectClosed4Counter(direction: Int, idx: Int, op: PointsPair => Points): Int = {
     val row = Pos.idxToRow(idx)
     val col = Pos.idxToCol(idx)
 
@@ -122,19 +122,19 @@ final class StructOps(private val b: Board) extends AnyVal {
       }
     }
 
-    throw new Exception()
+    -1
   }
 
   private def isNotPseudoThree(direction: Int, idx: Int, from: Int): Boolean = {
-    val companions = this.collectOpen3Companions(direction, idx, _.black, Flag.BLACK)
-    for (idx <- companions.indices) {
-      val companion = companions(idx)
-      val flag = b.boardField(companion)
+    val counters = this.collectOpen3Counters(direction, idx, _.black, Flag.BLACK)
+    for (idx <- counters.indices) {
+      val counter = counters(idx)
+      val flag = b.boardField(counter)
       if (flag != Flag.FORBIDDEN_6 && flag != Flag.FORBIDDEN_44) {
-        val points = b.pointsField(companion).black
+        val points = b.pointsField(counter).black
         if (points.four == 0 && points.fiveInRow == 0) {
           if (points.three > 2) {
-            if (this.isPseudoForbid(companion, direction, from))
+            if (this.isPseudoForbid(direction, counter, from))
               return true
           } else
             return true
@@ -155,7 +155,7 @@ final class StructOps(private val b: Board) extends AnyVal {
     count < 2
   }
 
-  private def isPseudoForbid(idx: Int, excludeDirection: Int, from: Int): Boolean = {
+  private def isPseudoForbid(excludeDirection: Int, idx: Int, from: Int): Boolean = {
     if (idx == from) return false
 
     var count = 0
@@ -171,16 +171,19 @@ final class StructOps(private val b: Board) extends AnyVal {
     val threeSideTraps = new mutable.ArrayBuilder.ofInt
     val fourSideTraps = new mutable.ArrayBuilder.ofInt
 
-    for (idx <- 0 until Renju.BOARD_LENGTH) {
+    for (idx <- 0 until Renju.BOARD_SIZE) {
       if (Flag.isForbid(b.boardField(idx))) {
         val points = b.pointsField(idx).white
 
         for (direction <- 0 until 4) {
           if (points.open3(direction))
-            threeSideTraps.addAll(this.collectOpen3Companions(direction, idx, _.white, Flag.WHITE))
+            threeSideTraps.addAll(this.collectOpen3Counters(direction, idx, _.white, Flag.WHITE))
 
-          if (points.closed4(direction) != 0)
-            fourSideTraps += this.collectClosed4Companion(direction, idx, _.white)
+          if (points.closed4(direction).toBoolean) {
+            val counter = this.collectClosed4Counter(direction, idx, _.white)
+            if (counter != -1)
+              fourSideTraps += counter
+          }
         }
       }
     }
@@ -191,7 +194,7 @@ final class StructOps(private val b: Board) extends AnyVal {
   def calculateForbids(): Unit = {
     var di3ForbidFlag = false
 
-    for (idx <- 0 until Renju.BOARD_LENGTH) {
+    for (idx <- 0 until Renju.BOARD_SIZE) {
       val points = b.pointsField(idx).black
 
       if (points.fiveInRow > 0)
@@ -207,7 +210,7 @@ final class StructOps(private val b: Board) extends AnyVal {
     }
 
     if (di3ForbidFlag)
-      for (idx <- 0 until Renju.BOARD_LENGTH)
+      for (idx <- 0 until Renju.BOARD_SIZE)
         if (b.boardField(idx) == Flag.FORBIDDEN_33 && this.isPseudoForbid(idx))
           b.boardField(idx) = Flag.FREE
   }

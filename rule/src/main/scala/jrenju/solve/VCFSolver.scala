@@ -6,37 +6,44 @@ import jrenju.notation.{Flag, Renju}
 //noinspection DuplicatedCode
 object VCFSolver {
 
-  def findVCFSequenceBlack(board: Board, parents: Seq[Int], coerce: Boolean, memo: LRUMemo, maxDepth: Int): Seq[Int] = {
-    if (parents.size > maxDepth) return Seq.empty
+  private def findVCFSequenceBlack(memo: LRUMemo, maxDepth: Int, board: Board, parents: Seq[Int], coerce: Boolean): Seq[Int] = {
+    if (parents.size > maxDepth || memo.probe(board).fold(false)(_ == 0)) return Seq.empty
 
-    for (idx <- 0 until Renju.BOARD_LENGTH) {
-      val points = board.pointsField(idx).black
-
+    for (idx <- 0 until Renju.BOARD_SIZE) {
+      val point = board.pointsField(idx).black
       if (
-        memo.probe(board, idx, Flag.BLACK).fold(true)(_ != 0)
-          && points.closedFour == 1
+        point.four == 1
           && !Flag.isForbid(board.boardField(idx))
           && (!coerce || board.pointsField(idx).white.fiveInRow == 1)
+          && memo.probe(board, idx).fold(true)(_ != 0)
       ) {
-        if (
-          points.three == 1
-            && board.pointsField(board.collectClosed4Companion(points.closed4.indexOf(1), idx, _.black)).white.four == 0
-        ) {
-          memo.write(board, idx, Flag.BLACK, Float.MaxValue)
+        if (point.openFour == 1) {
+          memo.write(board, idx, Float.MaxValue)
           return parents.appended(idx)
         }
 
-        val companion = board.collectClosed4Companion(points.closed4.indexOf(1), idx, _.black)
+        val l1board = board.makeMove(idx, calculateForbid = false)
 
-        val l1board = board
-          .makeMove(idx, calculateForbid = false)
+        val counter = l1board.pointsField.indexWhere(_.black.fiveInRow == 1)
+        val counterPoint = l1board.pointsField(counter).white
+
         val l2board = l1board
-          .makeMove(companion)
+          .makeMove(counter)
 
-        val companionPoint = l1board.pointsField(companion).white
-        val white4 = companionPoint.four
-        if (white4 < 2 && companionPoint.closedFour - white4 == 0) {
-          val solution = this.findVCFSequenceBlack(l2board, parents.appended(idx).appended(companion), white4 == 1, memo, maxDepth)
+        if (counterPoint.closedFour < 2 && counterPoint.openFour == 0) {
+          if (
+            (point.three == 1 && counterPoint.closedFour == 0)
+              || (l2board.pointsField.exists(_.black.openFour == 1) && counterPoint.closedFour == 0)
+          ) {
+            memo.write(board, idx, Float.MaxValue)
+            return parents.appended(idx)
+          }
+
+          val solution = this.findVCFSequenceBlack(
+            memo, maxDepth,
+            l2board, parents.appended(idx).appended(counter),
+            counterPoint.closedFour == 1
+          )
 
           if (solution.nonEmpty) {
             memo.write(l1board, Float.MaxValue)
@@ -46,47 +53,49 @@ object VCFSolver {
         }
       }
 
-      memo.write(board, idx, Flag.BLACK, 0)
+      memo.write(board, idx, 0)
     }
 
     Seq.empty
   }
 
-  def findVCFSequenceWhite(board: Board, parents: Seq[Int], coerce: Boolean, memo: LRUMemo, maxDepth: Int): Seq[Int] = {
+  private def findVCFSequenceWhite(memo: LRUMemo, maxDepth: Int, board: Board, parents: Seq[Int], coerce: Boolean): Seq[Int] = {
     if (parents.size > maxDepth) return Seq.empty
 
-    for (idx <- 0 until Renju.BOARD_LENGTH) {
+    for (idx <- 0 until Renju.BOARD_SIZE) {
       val points = board.pointsField(idx).white
-
       if (
-        memo.probe(board, idx, Flag.WHITE).fold(true)(_ != 0)
-          && points.closedFour == 1
+        points.four == 1
           && (!coerce || board.pointsField(idx).black.fiveInRow == 1)
+          && memo.probe(board, idx).fold(true)(_ != 0)
       ) {
-        if (
-          points.three > 1 || points.four > 1
-            && board.pointsField(board.collectClosed4Companion(points.closed4.indexOf(1), idx, _.white)).black.four == 0
-        ) {
-          memo.write(board, idx, Flag.WHITE, Float.MaxValue)
+        if (points.openFour == 1) {
+          memo.write(board, idx, Float.MaxValue)
           return parents.appended(idx)
         }
 
-        val companion = board.collectClosed4Companion(points.closed4.indexOf(1), idx, _.white)
+        val l1board = board.makeMove(idx, calculateForbid = false)
 
-        if (Flag.isForbid(board.boardField(companion))) {
-          memo.write(board, idx, Flag.WHITE, Float.MaxValue)
-          return parents.appended(idx)
-        }
+        val counter = l1board.pointsField.indexWhere(_.white.fiveInRow > 0)
+        val counterPoint = l1board.pointsField(counter).black
 
-        val l1board = board
-          .makeMove(idx, calculateForbid = false)
         val l2board = l1board
-          .makeMove(companion)
+          .makeMove(counter)
 
-        val companionPoint = l1board.pointsField(companion).black
-        val black4 = companionPoint.four
-        if (black4 < 2 && companionPoint.closedFour - black4 == 0) {
-          val solution = this.findVCFSequenceWhite(l2board, parents.appended(idx).appended(companion), black4 == 1, memo, maxDepth)
+        if (counterPoint.openFour == 0 || Flag.isForbid(board.boardField(counter))) {
+          if (
+            (points.three > 1 || points.four > 1 && counterPoint.four == 0)
+              || Flag.isForbid(board.boardField(counter))
+              || (l2board.pointsField.exists(_.white.openFour == 1) && counterPoint.closedFour == 0)
+          ) {
+            memo.write(board, idx, Float.MaxValue)
+            return parents.appended(idx)
+          }
+
+          val solution = this.findVCFSequenceWhite(
+            memo, maxDepth,
+            l2board, parents.appended(idx).appended(counter), counterPoint.closedFour == 1
+          )
 
           if (solution.nonEmpty) {
             memo.write(l1board, Float.MaxValue)
@@ -96,20 +105,22 @@ object VCFSolver {
         }
       }
 
-      memo.write(board, idx, Flag.WHITE, 0)
+      memo.write(board, idx, 0)
     }
 
     Seq.empty
   }
-
 
   implicit class VCFFinder(val board: Board) {
 
-    def findVCFSequence(memo: LRUMemo = new LRUMemo(), maxDepth: Int = Int.MaxValue): Seq[Int] =
-      if (this.board.moves % 2 == 0)
-        findVCFSequenceBlack(this.board, Seq.empty, coerce = false, memo, maxDepth)
+    def isVCFRoot(memo: LRUMemo, maxDepth: Int): Boolean =
+      this.findVCFSequence(memo, maxDepth).nonEmpty
+
+    def findVCFSequence(memo: LRUMemo = LRUMemo.empty, maxDepth: Int = Int.MaxValue): Seq[Int] =
+      if (this.board.isNextColorBlack)
+        findVCFSequenceBlack(memo, maxDepth, this.board, Seq.empty, coerce = false)
       else
-        findVCFSequenceWhite(this.board, Seq.empty, coerce = false, memo, maxDepth)
+        findVCFSequenceWhite(memo, maxDepth, this.board, Seq.empty, coerce = false)
 
   }
 

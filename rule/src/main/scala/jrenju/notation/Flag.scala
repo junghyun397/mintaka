@@ -45,6 +45,10 @@ object Flag {
     case _ => Option.empty
   }
 
+  @inline def colorFlag(moves: Int): Byte = (moves % 2).toByte
+
+  @inline def nextColorFlag(moves: Int): Byte = ((moves + 1) % 2).toByte
+
   @inline def onlyStone(flag: Byte): Byte = if (this.isForbid(flag)) Flag.FREE else flag
 
   @inline def isEmpty(flag: Byte): Boolean = flag != Flag.BLACK && flag != Flag.WHITE
@@ -52,5 +56,7 @@ object Flag {
   @inline def isExist(flag: Byte): Boolean = flag == Flag.BLACK || flag == Flag.WHITE
 
   @inline def isForbid(flag: Byte): Boolean = flag == Flag.FORBIDDEN_33 || flag == Flag.FORBIDDEN_44 || flag == Flag.FORBIDDEN_6
+
+  @inline def isForbid(flag: Byte, color: Byte): Boolean = color == Flag.BLACK && this.isForbid(flag)
 
 }

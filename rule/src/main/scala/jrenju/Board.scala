@@ -19,15 +19,15 @@ class Board(
   var zobristKey: Long,
 ) extends Cloneable {
 
-  @inline def colorRaw: Byte = (this.moves % 2).toByte
+  def colorFlag: Byte = Flag.colorFlag(this.moves)
 
-  @inline def nextColorRaw: Byte = ((this.moves + 1) % 2).toByte
+  def nextColorFlag: Byte = Flag.nextColorFlag(this.moves)
 
-  @inline def isNextColorBlack: Boolean = this.nextColorRaw == Flag.BLACK
+  def isNextColorBlack: Boolean = this.nextColorFlag == Flag.BLACK
 
-  def color: Color.Value = Color(this.colorRaw)
+  def color: Color.Value = Color(this.colorFlag)
 
-  def nextColor: Color.Value = Color(this.nextColorRaw)
+  def nextColor: Color.Value = Color(this.nextColorFlag)
 
   def latestPos: Option[Pos] = Option(Pos.fromIdx(this.latestMove))
 
@@ -48,7 +48,7 @@ class Board(
   def makeMove(idx: Int): Board = this.makeMove(idx, calculateForbid = true)
 
   def makeMove(idx: Int, calculateForbid: Boolean): Board = {
-    val thenField = boardField.updated(idx, this.nextColorRaw)
+    val thenField = boardField.updated(idx, this.nextColorFlag)
     val thenPoints = this.pointsField.updated(idx, PointsPair.empty)
 
     val board = new Board(
@@ -57,7 +57,7 @@ class Board(
       moves = this.moves + 1,
       latestMove = idx,
       winner = Option.empty,
-      zobristKey = this.zobristKey.incrementHash(idx, this.nextColorRaw)
+      zobristKey = this.zobristKey.incrementHash(idx, this.nextColorFlag)
     )
 
     board.integrateStrips(board.composeStrips(idx))
@@ -104,8 +104,8 @@ object Board {
   val newBoard: Board = newBoard(Renju.BOARD_CENTER_POS.idx)
 
   def newBoard(initIdx: Int): Board = new Board(
-    boardField = Array.fill(Renju.BOARD_LENGTH)(Flag.FREE).updated(initIdx, Flag.BLACK),
-    pointsField = Array.fill(Renju.BOARD_LENGTH)(PointsPair.empty),
+    boardField = Array.fill(Renju.BOARD_SIZE)(Flag.FREE).updated(initIdx, Flag.BLACK),
+    pointsField = Array.fill(Renju.BOARD_SIZE)(PointsPair.empty),
     moves = 1,
     winner = Option.empty,
     latestMove = initIdx,

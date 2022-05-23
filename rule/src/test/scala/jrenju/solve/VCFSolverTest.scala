@@ -1,26 +1,32 @@
 package jrenju.solve
 
+import jrenju.BoardIO.BoardToText
 import jrenju.TestHelper.T2
-import jrenju.protocol.SolutionNode.SequenceToNode
+import jrenju.notation.Pos
+import jrenju.solve.SolutionMapper.SequenceToNode
 import jrenju.solve.VCFSolver.VCFFinder
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
+import utils.lang.Transform.joinHorizontal
 
 class VCFSolverTest extends AnyFlatSpec with should.Matchers {
 
-  def vcf(problem: String, answer: Boolean): Unit = {
+  def vcf(problem: String, answer: Int): Unit = {
     val board = problem.t2b
 
     val seq = board.findVCFSequence()
 
-    println(problem)
-    println(seq.length)
-    println(seq.toSolution)
+    val markedBoard = seq.foldLeft(board.clone()) { (board, idx) =>
+      board.makeMove(idx)
+    }
 
-    seq.toString.nonEmpty should be (answer)
+    println(joinHorizontal(board.boardText, markedBoard.boardText))
+    println(f"${seq.length}, ${Pos.fromIdx(seq.last).toCartesian}, ${seq.toSolution}")
+
+    seq.size should be (answer)
   }
 
-  "VCF Points" should "analyze correctly" in {
+  "VCF Sequences" should "analyze correctly" in {
     // BLACK 4-3 FORK
     vcf(
       """
@@ -42,7 +48,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
       """.stripMargin,
-      answer = true
+      7
     )
 
     // BLACK 4-3 FORK
@@ -66,7 +72,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
       """.stripMargin,
-      answer = true
+      27
     )
 
     // BLACK 4-3 FORK
@@ -90,7 +96,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
       """.stripMargin,
-      answer = true
+      19
     )
 
     // BLACK 4-3 FORK
@@ -114,7 +120,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
       """.stripMargin,
-      answer = true
+      19
     )
 
     // BLACK 4-3 FORK
@@ -138,11 +144,10 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
       """.stripMargin,
-      answer = true
+      25
     )
 
     // BLACK 4-3 FORK
-    // "h8,g8,c14,b15,e15,f14,g15,a15,a11,a12,c11,a10,b7,a9,a1,a13,b3,a14,a4,b4,d5,e6,f4,d8,i4,d10,k6,i6,l4,i7,n4,i9,o5,o4,m7,o6,m8,n9,n10,o3,n2,o2,m1,n1,j1,k1,h1,l1,o14,k2,o12,b2,n15,m15,k15,l15,k14,j15,f12,b1,g10,d1,o9,f1"
     vcf(
       """
         |   A B C D E F G H I J K L M N O
@@ -163,7 +168,31 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 1 X O . O . O . X . X O O X O . 1
         |   A B C D E F G H I J K L M N O
       """.stripMargin,
-      answer = true
+      157
+    )
+
+    // BLACK 4-3 FORK
+    vcf(
+      """
+        |   A B C D E F G H I J K L M N O
+        |15 O . . . X . . . . . . . X . X 15
+        |14 X . . . . O . . . O . . O . X 14
+        |13 . . . . . . . O . . . . . O . 13
+        |12 O . . . . . . . . . . X . . X 12
+        |11 X . . . . . . . . . . . O . . 11
+        |10 O . O . . . . . . . . . . . . 10
+        | 9 O O X O . . . . X . . . O . . 9
+        | 8 O . O O . . . X . O . . . . . 8
+        | 7 . X . . . . . . . O . . X . . 7
+        | 6 . . . . . . . . O . . . . . X 6
+        | 5 X . . . . . . . . . . . X . X 5
+        | 4 . . . . . . . . . . . . . X O 4
+        | 3 X . . . . . . . . . . . . X . 3
+        | 2 . . . . . . . X . . . . . . O 2
+        | 1 X O O O . X . . X . X . . . . 1
+        |   A B C D E F G H I J K L M N O
+      """.stripMargin,
+      173
     )
 
     // WHITE TRAP
@@ -187,7 +216,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
       """.stripMargin,
-      answer = true
+      31
     )
 
     // WHITE TRAP
@@ -211,7 +240,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
       """.stripMargin,
-      answer = true
+      19
     )
 
     // WHITE TRAP
@@ -235,7 +264,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
         | 1 . . . . . . . . . . . . . . . 1
         |   A B C D E F G H I J K L M N O
       """.stripMargin,
-      answer = true
+      25
     )
   }
 

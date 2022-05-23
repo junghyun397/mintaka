@@ -4,8 +4,8 @@ import jrenju.notation.{Color, Flag, Pos, Renju}
 import jrenju.solve.ZobristHash
 
 object EmptyBoard extends Board(
-  boardField = Array.fill(Renju.BOARD_LENGTH)(Flag.FREE),
-  pointsField = Array.fill(Renju.BOARD_LENGTH)(PointsPair.empty),
+  boardField = Array.fill(Renju.BOARD_SIZE)(Flag.FREE),
+  pointsField = Array.fill(Renju.BOARD_SIZE)(PointsPair.empty),
   moves = 0,
   latestMove = 0,
   winner = Option.empty,

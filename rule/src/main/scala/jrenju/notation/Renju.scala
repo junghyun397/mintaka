@@ -6,7 +6,7 @@ object Renju {
 
   val BOARD_WIDTH_MAX_IDX: Int = BOARD_WIDTH - 1
 
-  val BOARD_LENGTH: Int = BOARD_WIDTH * BOARD_WIDTH
+  val BOARD_SIZE: Int = BOARD_WIDTH * BOARD_WIDTH
 
   val BOARD_CENTER_POS: Pos = Pos(this.BOARD_WIDTH / 2, this.BOARD_WIDTH / 2)
 

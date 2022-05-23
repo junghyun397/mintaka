@@ -6,7 +6,7 @@ val scala3Version = "3.1.1"
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
 ThisBuild / libraryDependencies ++= Seq(
-  "org.scalatest" %% "scalatest" % "3.2.11" % Test
+  "org.scalatest" %% "scalatest" % "3.2.12" % Test
 )
 
 lazy val utils = (project in file("util"))
@@ -37,13 +37,13 @@ lazy val core = (project in file("core"))
 
     libraryDependencies ++= Seq(
       "org.typelevel" %% "cats-core" % "2.7.0",
-      "org.typelevel" %% "cats-effect" % "3.3.8",
+      "org.typelevel" %% "cats-effect" % "3.3.11",
 
-      "co.fs2" %% "fs2-core" % "3.2.5",
-      "co.fs2" %% "fs2-reactive-streams" % "3.2.5",
+      "co.fs2" %% "fs2-core" % "3.2.7",
+      "co.fs2" %% "fs2-reactive-streams" % "3.2.7",
 
-      "org.typelevel" %% "log4cats-core" % "2.2.0",
-      "org.typelevel" %% "log4cats-slf4j" % "2.2.0",
+      "org.typelevel" %% "log4cats-core" % "2.3.0",
+      "org.typelevel" %% "log4cats-slf4j" % "2.3.0",
     )
   )
   .dependsOn(utils, jrenju)

@@ -10,7 +10,7 @@ import scala.language.implicitConversions
 object BoardIO {
 
   // regex: [a-z][0-9][0-9]?[0-9]?
-  def fromPosSequence(source: String): Option[Seq[Pos]] = {
+  def buildPosSequence(source: String): Option[Seq[Pos]] = {
     val seq = "[a-z][0-9][0-9]?[0-9]?".r
       .findAllIn(source)
       .map(Pos.fromCartesian)
@@ -20,12 +20,12 @@ object BoardIO {
     else Option(seq.map(_.get))
   }
 
-  def fromSequence(source: String): Option[Board] = this.fromPosSequence(source)
+  def fromSequence(source: String): Option[Board] = this.buildPosSequence(source)
     .map(_.map(_.idx))
     .flatMap(this.fromSequence)
 
   def fromSequence(source: Seq[Int]): Option[Board] = {
-    val field = Array.fill(Renju.BOARD_LENGTH)(Flag.FREE)
+    val field = Array.fill(Renju.BOARD_SIZE)(Flag.FREE)
 
     source.zipWithIndex foreach { idxOrder =>
       field(idxOrder._1) =
@@ -35,7 +35,7 @@ object BoardIO {
 
     val board = new Board(
       boardField = field,
-      pointsField = Array.fill(Renju.BOARD_LENGTH)(new PointsPair()),
+      pointsField = Array.fill(Renju.BOARD_SIZE)(new PointsPair()),
       moves = source.length,
       latestMove = source.last,
       winner = Option.empty,
@@ -66,11 +66,11 @@ object BoardIO {
   )
 
   def fromFieldArray(source: Array[Byte], latestMove: Int): Option[Board] =
-    if (source.length != Renju.BOARD_LENGTH) Option.empty
+    if (source.length != Renju.BOARD_SIZE) Option.empty
     else {
       val board = new Board(
         boardField = source,
-        pointsField = Array.fill(Renju.BOARD_LENGTH)(new PointsPair()),
+        pointsField = Array.fill(Renju.BOARD_SIZE)(new PointsPair()),
         moves = source.count {
           case Flag.BLACK | Flag.WHITE => true
           case _ => false

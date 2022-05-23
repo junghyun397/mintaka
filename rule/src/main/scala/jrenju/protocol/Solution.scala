@@ -12,25 +12,6 @@ final class SolutionNode(idx: Int, val child: Map[Int, Solution]) extends Soluti
 
 }
 
-object SolutionNode {
-
-  implicit class SequenceToNode(sequence: Seq[Int]) {
-
-    def toSolution: Solution = {
-      val leaf = new SolutionLeaf(this.sequence.last)
-
-      this.sequence
-        .dropRight(1)
-        .grouped(2)
-        .foldRight[Solution](leaf) { (movePair, child) =>
-          new SolutionNode(movePair.head, Map(movePair.last -> child))
-        }
-    }
-
-  }
-
-}
-
 final class SolutionLeaf(idx: Int) extends Solution(idx) {
 
   override def toString: String = f"{solution: ${Pos.fromIdx(idx).toCartesian}}"

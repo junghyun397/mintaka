@@ -1,6 +1,7 @@
 package jrenju
 
 import jrenju.Points.{emptyAttributeBool, emptyAttributeNum}
+import jrenju.notation.Flag
 import utils.lang.Transform.BoolTransform
 
 import scala.language.{implicitConversions, postfixOps}
@@ -18,6 +19,12 @@ final class PointsPair(
       this.black.merged(direction, that.black),
       this.white.merged(direction, that.white),
     )
+
+  def apply(flag: Byte): Points =
+    if (flag == Flag.BLACK)
+      this.black
+    else
+      this.white
 
 }
 
@@ -39,14 +46,16 @@ final class Points(
 
   val closedFour: Int = this.closed4(0) + this.closed4(1) + this.closed4(2) + this.closed4(3)
 
-  val four: Int = this.open4(0).toInt + this.open4(1).toInt + this.open4(2).toInt + this.open4(3).toInt + this.closedFour
+  val openFour: Int = this.open4(0).toInt + this.open4(1).toInt + this.open4(2).toInt + this.open4(3).toInt
+
+  val four: Int = this.openFour + this.closedFour
 
   val fiveInRow: Int = this.five(0).toInt + this.five(1).toInt + this.five(2).toInt + this.five(3).toInt
 
   @inline def isDifference(direction: Int, that: PointsProvider): Boolean =
-    this.open3(direction) != that.open3 ||
-      this.closed4(direction) != that.closed4 || this.open4(direction) != that.open4 ||
-      this.five(direction) != that.five
+    this.open3(direction) ^ that.open3 ||
+      this.closed4(direction) != that.closed4 || this.open4(direction) ^ that.open4 ||
+      this.five(direction) ^ that.five
 
   @inline def merged(direction: Int, that: PointsProvider): Points =
     new Points(

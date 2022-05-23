@@ -11,7 +11,7 @@ object ZobristHash {
 
   private val table: Array[Long] = {
     val random = new Random(TABLE_SEED)
-    Array.fill[Long](Renju.BOARD_LENGTH * 2)(random.nextLong())
+    Array.fill[Long](Renju.BOARD_SIZE * 2)(random.nextLong())
   }
 
   private val stripTable: Array[Long] = {
@@ -25,13 +25,13 @@ object ZobristHash {
     var result = this.empty
 
     var flag = Flag.WALL
-    for (move <- 0 until Renju.BOARD_LENGTH) {
+    for (move <- 0 until Renju.BOARD_SIZE) {
       flag = field(move)
       if (Flag.isExist(flag)) {
         if (flag == Flag.BLACK)
           result ^= this.table(move)
         else
-          result ^= this.table(Renju.BOARD_LENGTH + move)
+          result ^= this.table(Renju.BOARD_SIZE + move)
       }
     }
 
@@ -61,7 +61,7 @@ object ZobristHash {
 
     def incrementHash(move: Int, flag: Byte): Long =
       if (flag == Flag.BLACK) source ^ table(move)
-      else source ^ table(Renju.BOARD_LENGTH + move)
+      else source ^ table(Renju.BOARD_SIZE + move)
 
   }
 

@@ -75,7 +75,6 @@ class StripTest extends AnyFlatSpec with should .Matchers {
   }
 
 //  "block-3 points" should "detect correctly" in {
-//
 //    block3("...XXX...", "..1...1..", _.black)
 //
 //    block3("...O.XXX...", "....1...11.", _.black)
@@ -84,9 +83,7 @@ class StripTest extends AnyFlatSpec with should .Matchers {
 //
 //    block3("...XXX..X...", ".11...1.....", _.black)
 //
-//
 //    block3("...XX.X...", "..1..1.1..", _.black)
-//
 //  }
 
   def closed4(problem: String, answer: String, op: PointsProvidePair => PointsProvider): Unit = {
@@ -99,11 +96,7 @@ class StripTest extends AnyFlatSpec with should .Matchers {
 
     closed4("...XXX...", ".1.....1.", _.black)
 
-    closed4("...OOO...", ".1.....1.", _.white)
-
     closed4("...OXXX...", ".......11.", _.black)
-
-    closed4("...XOOO...", ".......11.", _.white)
 
     closed4("...O.XXX...", "....1....1.", _.black)
 
@@ -114,10 +107,6 @@ class StripTest extends AnyFlatSpec with should .Matchers {
     closed4("...XXX..XXX...", ".1....11....1.", _.black)
 
     closed4("...X.XXX..X...", "..............", _.black)
-
-    closed4("...O.OOO..O...", "........11....", _.white)
-
-    closed4("...O.OO..OO.O...", "..1....22....1..", _.white)
 
     // XX.X
 
@@ -161,7 +150,45 @@ class StripTest extends AnyFlatSpec with should .Matchers {
 
     closed4("...O.XXX..O...", "....1....1....", _.black)
 
+    closed4("...XX.X.X...", "..1..1......", _.black)
+  }
+
+  "white closed-4 points" should "detect correctly" in {
+    // WHITE DOUBLE 4 FORK
+
+    closed4("...O.OO..OO.O...", "..1....22....1..", _.white)
+
+    closed4("...OOO...OOO...", ".1.....2.....1.", _.white)
+
+    closed4("...OO..O.OO...", ".....12....1..", _.white)
+
+    closed4("...O.O.O.O...", "....1.2.1....", _.white)
+
+    closed4("...O.O.O.O.O...", "....1.2.2.1....", _.white)
+
+    closed4("...OOO..OO.OX...", ".1....12..1.....", _.white)
+
+    // CLOSED 4
+
+    closed4("OO.OO.", ".....1", _.white)
+
+    closed4("XO.OO.O..", "..1..1.1.", _.white)
+
+    closed4("...XOOO..OOOX...", ".......11.......", _.white)
+
+    closed4("...X.OOO..OOOX...", "....1...11.......", _.white)
+
     closed4("...XO.O.OOX...", ".....1.1......", _.white)
+
+    closed4("...XOOO..OOO.X...", ".......11...1....", _.white)
+
+    closed4("..XOOO..OX...", "......11.....", _.white)
+
+    closed4("...OOO...", ".1.....1.", _.white)
+
+    closed4("...O.OOO..O...", "..1.....11....", _.white)
+
+    closed4("...XOOO...", ".......11.", _.white)
   }
 
   def open4(problem: String, answer: String, op: PointsProvidePair => PointsProvider): Unit = {
