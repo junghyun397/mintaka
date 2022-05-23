@@ -57,7 +57,7 @@ lazy val protobuf = (project in file("protobuf"))
 lazy val app = (project in file("app"))
   .settings(
     name := "app",
-    description := "m,n,k-game online self-play learning server",
+    description := "online self-learning renju solver",
 
     scalaVersion := scala3Version,
 
@@ -76,6 +76,6 @@ lazy val app = (project in file("app"))
 
 lazy val root = (project in file("."))
   .settings(
-    name := "B3nzene",
+    name := "Kvine",
   )
   .aggregate(utils, jrenju, core, protobuf, app)
