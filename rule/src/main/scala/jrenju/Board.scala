@@ -33,11 +33,18 @@ class Board(
 
   def getParticlePair(idx: Int): ParticlePair = {
     val flag = this.boardField(idx)
+
     val color =
       if (Flag.isEmpty(flag)) Color.EMPTY
       else Color(flag)
 
-    new ParticlePair(color, new ParticleOps(this.structFieldBlack(idx)), new ParticleOps(this.structFieldWhite(idx)))
+    val forbidKind =
+      if (Flag.isForbid(flag))
+        Option(flag)
+      else
+        Option.empty
+
+    new ParticlePair(color, forbidKind, new ParticleOps(this.structFieldBlack(idx)), new ParticleOps(this.structFieldWhite(idx)))
   }
 
   def validateMove(pos: Pos): Option[RejectReason.Value] = this.validateMove(pos.idx)

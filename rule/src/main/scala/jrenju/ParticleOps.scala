@@ -4,13 +4,21 @@ import jrenju.notation.{Color, Flag}
 
 import scala.language.implicitConversions
 
-final class ParticlePair(val color: Color.Value, val black: ParticleOps, val white: ParticleOps) {
+final class ParticlePair(val color: Color.Value, val forbidKind: Option[Byte], val black: ParticleOps, val white: ParticleOps) {
+
+  def apply(color: Color.Value): ParticleOps =
+    color match {
+      case Color.BLACK => this.black
+      case Color.WHITE => this.white
+      case _ => throw new IllegalStateException()
+    }
 
   def apply(flag: Int): ParticleOps =
-    if (flag == Flag.BLACK)
-      this.black
-    else
-      this.white
+    flag match {
+      case Flag.BLACK => this.black
+      case Flag.WHITE => this.white
+      case _ => throw new IllegalStateException()
+    }
 
 }
 
