@@ -8,15 +8,15 @@ import scala.language.implicitConversions
 
 class Board(
   val boardField: Array[Byte],
-  val pointFieldBlack: Array[Int],
-  val pointFieldWhite: Array[Int],
+  val structFieldBlack: Array[Int],
+  val structFieldWhite: Array[Int],
 
   val moves: Int,
   val latestMove: Int,
 
   var winner: Option[Byte],
 
-  var zobristKey: Long,
+  val zobristKey: Long,
 ) extends Cloneable {
 
   def colorFlag: Byte = Flag.colorFlag(this.moves)
@@ -31,8 +31,14 @@ class Board(
 
   def latestPos: Option[Pos] = Option(Pos.fromIdx(this.latestMove))
 
-  def getPoints(idx: Int): (PointOps, PointOps) =
-    (new PointOps(this.pointFieldBlack(idx)), new PointOps(this.pointFieldWhite(idx)))
+  def getParticlePair(idx: Int): ParticlePair = {
+    val flag = this.boardField(idx)
+    val color =
+      if (Flag.isEmpty(flag)) Color.EMPTY
+      else Color(flag)
+
+    new ParticlePair(color, new ParticleOps(this.structFieldBlack(idx)), new ParticleOps(this.structFieldWhite(idx)))
+  }
 
   def validateMove(pos: Pos): Option[RejectReason.Value] = this.validateMove(pos.idx)
 
@@ -53,8 +59,8 @@ class Board(
   def makeMove(idx: Int, calculateForbid: Boolean): Board = {
     val board = new Board(
       boardField = this.boardField.updated(idx, this.nextColorFlag),
-      pointFieldBlack = this.pointFieldBlack.updated(idx, 0),
-      pointFieldWhite = this.pointFieldWhite.updated(idx, 0),
+      structFieldBlack = this.structFieldBlack.updated(idx, 0),
+      structFieldWhite = this.structFieldWhite.updated(idx, 0),
       moves = this.moves + 1,
       latestMove = idx,
       winner = Option.empty,
@@ -87,8 +93,8 @@ class Board(
 
   override def clone(): Board = new Board(
     boardField = this.boardField.clone(),
-    pointFieldBlack = this.pointFieldBlack.clone(),
-    pointFieldWhite = this.pointFieldWhite.clone(),
+    structFieldBlack = this.structFieldBlack.clone(),
+    structFieldWhite = this.structFieldWhite.clone(),
     moves = this.moves,
     latestMove = this.latestMove,
     winner = this.winner,
@@ -107,8 +113,8 @@ object Board {
 
   def newBoard(initIdx: Int): Board = new Board(
     boardField = Array.fill(Renju.BOARD_SIZE)(Flag.FREE).updated(initIdx, Flag.BLACK),
-    pointFieldBlack = Array.fill(Renju.BOARD_SIZE)(0),
-    pointFieldWhite = Array.fill(Renju.BOARD_SIZE)(0),
+    structFieldBlack = Array.fill(Renju.BOARD_SIZE)(0),
+    structFieldWhite = Array.fill(Renju.BOARD_SIZE)(0),
     moves = 1,
     winner = Option.empty,
     latestMove = initIdx,

@@ -1,6 +1,6 @@
 package jrenju
 
-import jrenju.PointOps.pointsOps
+import jrenju.ParticleOps.particleOps
 import jrenju.notation.{Direction, Flag, Pos, Renju}
 
 import scala.collection.mutable
@@ -20,7 +20,7 @@ final class StructOps(private val b: Board) extends AnyVal {
     if (idx < 0 || idx >= Renju.BOARD_SIZE) Flag.WALL
     else b.boardField(idx)
 
-  @inline private def getPointsBounded(idx: Int, process: Int => Boolean): Boolean =
+  @inline private def processParticleBounded(idx: Int, process: Int => Boolean): Boolean =
     if (idx < 0 || idx >= Renju.BOARD_SIZE) false
     else process(idx)
 
@@ -117,7 +117,7 @@ final class StructOps(private val b: Board) extends AnyVal {
     for (offset <- -5 to 5) {
       if (offset != 0) {
         val pointer = this.getOffsetIdx(direction, row, col, offset)
-        if (this.getPointsBounded(pointer, extract(_).closedFourAt(direction)))
+        if (this.processParticleBounded(pointer, extract(_).closedFourAt(direction)))
           return pointer
       }
     }
@@ -126,14 +126,14 @@ final class StructOps(private val b: Board) extends AnyVal {
   }
 
   private def isNotPseudoThree(direction: Int, idx: Int, from: Int): Boolean = {
-    val counters = this.collectOpen3Counters(direction, idx, b.pointFieldBlack, Flag.BLACK)
+    val counters = this.collectOpen3Counters(direction, idx, b.structFieldBlack, Flag.BLACK)
     for (idx <- counters.indices) {
       val counter = counters(idx)
       val flag = b.boardField(counter)
       if (flag != Flag.FORBIDDEN_6 && flag != Flag.FORBIDDEN_44) {
-        val points = b.pointFieldBlack(counter)
-        if (points.fourTotal == 0 && points.fiveTotal == 0) {
-          if (points.threeTotal > 2) {
+        val particle = b.structFieldBlack(counter)
+        if (particle.fourTotal == 0 && particle.fiveTotal == 0) {
+          if (particle.threeTotal > 2) {
             if (this.isPseudoForbid(direction, counter, from))
               return true
           } else
@@ -147,9 +147,9 @@ final class StructOps(private val b: Board) extends AnyVal {
 
   private def isPseudoForbid(idx: Int): Boolean = {
     var count = 0
-    val points = b.pointFieldBlack(idx)
+    val particle = b.structFieldBlack(idx)
     for (direction <- 0 until 4)
-      if (points.threeAt(direction) && this.isNotPseudoThree(direction, idx, idx))
+      if (particle.threeAt(direction) && this.isNotPseudoThree(direction, idx, idx))
         count += 1
 
     count < 2
@@ -159,9 +159,9 @@ final class StructOps(private val b: Board) extends AnyVal {
     if (idx == from) return false
 
     var count = 0
-    val points = b.pointFieldBlack(idx)
+    val particle = b.structFieldBlack(idx)
     for (direction <- 0 until 4)
-      if (direction != excludeDirection && points.threeAt(direction) && this.isNotPseudoThree(direction, idx, from))
+      if (direction != excludeDirection && particle.threeAt(direction) && this.isNotPseudoThree(direction, idx, from))
         count += 1
 
     count < 2
@@ -173,14 +173,14 @@ final class StructOps(private val b: Board) extends AnyVal {
 
     for (idx <- 0 until Renju.BOARD_SIZE) {
       if (Flag.isForbid(b.boardField(idx))) {
-        val points = b.pointFieldWhite(idx)
+        val particle = b.structFieldWhite(idx)
 
         for (direction <- 0 until 4) {
-          if (points.threeAt(direction))
-            threeSideTraps.addAll(this.collectOpen3Counters(direction, idx, b.pointFieldWhite, Flag.WHITE))
+          if (particle.threeAt(direction))
+            threeSideTraps.addAll(this.collectOpen3Counters(direction, idx, b.structFieldWhite, Flag.WHITE))
 
-          if (points.closedFourAt(direction)) {
-            val counter = this.collectClosed4Counter(direction, idx, b.pointFieldWhite)
+          if (particle.closedFourAt(direction)) {
+            val counter = this.collectClosed4Counter(direction, idx, b.structFieldWhite)
             if (counter != -1)
               fourSideTraps += counter
           }
@@ -195,15 +195,15 @@ final class StructOps(private val b: Board) extends AnyVal {
     var di3ForbidFlag = false
 
     for (idx <- 0 until Renju.BOARD_SIZE) {
-      val points = b.pointFieldBlack(idx)
+      val particle = b.structFieldBlack(idx)
 
-      if (points.fiveTotal > 0)
+      if (particle.fiveTotal > 0)
         b.boardField(idx) = Flag.FREE
       else if (b.boardField(idx) == Flag.FORBIDDEN_6)
         b.boardField(idx) = Flag.FORBIDDEN_6
-      else if (points.fourTotal > 1)
+      else if (particle.fourTotal > 1)
         b.boardField(idx) = Flag.FORBIDDEN_44
-      else if (points.threeTotal > 1) {
+      else if (particle.threeTotal > 1) {
         b.boardField(idx) = Flag.FORBIDDEN_33
         di3ForbidFlag = true
       }

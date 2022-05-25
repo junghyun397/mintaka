@@ -1,6 +1,6 @@
 package jrenju
 
-import jrenju.PointOps.pointsOps
+import jrenju.ParticleOps.particleOps
 import jrenju.notation.{Direction, Flag, Pos, Renju}
 
 import scala.collection.mutable
@@ -170,9 +170,9 @@ final class BoardOps(private val b: Board) extends AnyVal {
     strips
   }
 
-  private def applyParticle(direction: Int, idx: Int, pointsBlack: Int, pointsWhite: Int, forbidMask: Byte): Unit = {
-    b.pointFieldBlack(idx) = b.pointFieldBlack(idx).merged(direction, pointsBlack)
-    b.pointFieldWhite(idx) = b.pointFieldWhite(idx).merged(direction, pointsWhite)
+  private def applyParticle(direction: Int, idx: Int, particleBlack: Int, particleWhite: Int, forbidMask: Byte): Unit = {
+    b.structFieldBlack(idx) = b.structFieldBlack(idx).merged(direction, particleBlack)
+    b.structFieldWhite(idx) = b.structFieldWhite(idx).merged(direction, particleWhite)
 
     if (forbidMask != Flag.FREE)
       b.boardField(idx) = forbidMask
@@ -197,25 +197,25 @@ final class BoardOps(private val b: Board) extends AnyVal {
           this.applyParticle(
             Direction.X,
             strip.startIdx + idx,
-            strip.pointStripBlack(idx), strip.pointStripWhite(idx), strip.forbidMask(idx)
+            strip.structStripBlack(idx), strip.structStripWhite(idx), strip.forbidMask(idx)
           )
         case Direction.Y => for (idx <- 0 until strip.size)
           this.applyParticle(
             Direction.Y,
             Pos.rowColToIdx(idx, Pos.idxToCol(strip.startIdx)),
-            strip.pointStripBlack(idx), strip.pointStripWhite(idx), strip.forbidMask(idx)
+            strip.structStripBlack(idx), strip.structStripWhite(idx), strip.forbidMask(idx)
           )
         case Direction.DEG45 => for (idx <- 0 until strip.size)
           this.applyParticle(
             Direction.DEG45,
             Pos.rowColToIdx(Pos.idxToRow(strip.startIdx) + idx, Pos.idxToCol(strip.startIdx) + idx),
-            strip.pointStripBlack(idx), strip.pointStripWhite(idx), strip.forbidMask(idx)
+            strip.structStripBlack(idx), strip.structStripWhite(idx), strip.forbidMask(idx)
           )
         case Direction.DEG315 => for (idx <- 0 until strip.size)
           this.applyParticle(
             Direction.DEG315,
             Pos.rowColToIdx(Pos.idxToRow(strip.startIdx) + idx, Pos.idxToCol(strip.startIdx) - idx),
-            strip.pointStripBlack(idx), strip.pointStripWhite(idx), strip.forbidMask(idx)
+            strip.structStripBlack(idx), strip.structStripWhite(idx), strip.forbidMask(idx)
           )
       }
     }

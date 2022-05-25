@@ -1,8 +1,7 @@
 package jrenju.solve
 
 import jrenju.Board
-import jrenju.BoardIO.BoardToText
-import jrenju.PointOps.pointsOps
+import jrenju.ParticleOps.particleOps
 import jrenju.notation.{Flag, Renju}
 
 //noinspection DuplicatedCode
@@ -12,29 +11,29 @@ object VCFSolver {
     if (parents.size > maxDepth || memo.probe(board).fold(false)(_ == 0)) return Seq.empty
 
     for (idx <- 0 until Renju.BOARD_SIZE) {
-      val points = board.pointFieldBlack(idx)
+      val particle = board.structFieldBlack(idx)
       if (
-        points.fourTotal == 1
+        particle.fourTotal == 1
           && !Flag.isForbid(board.boardField(idx))
-          && (!coerce || board.pointFieldWhite(idx).fiveTotal == 1)
+          && (!coerce || board.structFieldWhite(idx).fiveTotal == 1)
           && memo.probe(board, idx).fold(true)(_ != 0)
       ) {
-        if (points.openFourTotal == 1) {
+        if (particle.openFourTotal == 1) {
           memo.write(board, idx, Float.MaxValue)
           return parents.appended(idx)
         }
 
         val l1board = board.makeMove(idx, calculateForbid = false)
 
-        val counter = l1board.pointFieldBlack.indexWhere(_.fiveTotal == 1)
-        val counterPoint = l1board.pointFieldWhite(counter)
+        val counter = l1board.structFieldBlack.indexWhere(_.fiveTotal == 1)
+        val counterPoint = l1board.structFieldWhite(counter)
 
         val l2board = l1board.makeMove(counter)
 
         if (counterPoint.closedFourTotal < 2 && counterPoint.openFourTotal == 0) {
           if (
-            (points.threeTotal == 1 && counterPoint.closedFourTotal == 0)
-              || (l2board.pointFieldBlack.exists(_.openFourTotal == 1) && counterPoint.closedFourTotal == 0)
+            (particle.threeTotal == 1 && counterPoint.closedFourTotal == 0)
+              || (l2board.structFieldBlack.exists(_.openFourTotal == 1) && counterPoint.closedFourTotal == 0)
           ) {
             memo.write(board, idx, Float.MaxValue)
             return parents.appended(idx)
@@ -64,29 +63,29 @@ object VCFSolver {
     if (parents.size > maxDepth) return Seq.empty
 
     for (idx <- 0 until Renju.BOARD_SIZE) {
-      val points = board.pointFieldWhite(idx)
+      val particle = board.structFieldWhite(idx)
       if (
-        points.fourTotal == 1
-          && (!coerce || board.pointFieldBlack(idx).fiveTotal == 1)
+        particle.fourTotal == 1
+          && (!coerce || board.structFieldBlack(idx).fiveTotal == 1)
           && memo.probe(board, idx).fold(true)(_ != 0)
       ) {
-        if (points.openFourTotal == 1) {
+        if (particle.openFourTotal == 1) {
           memo.write(board, idx, Float.MaxValue)
           return parents.appended(idx)
         }
 
         val l1board = board.makeMove(idx, calculateForbid = false)
 
-        val counter = l1board.pointFieldWhite.indexWhere(_.fiveTotal > 0)
-        val counterPoint = l1board.pointFieldBlack(counter)
+        val counter = l1board.structFieldWhite.indexWhere(_.fiveTotal > 0)
+        val counterPoint = l1board.structFieldBlack(counter)
 
         val l2board = l1board.makeMove(counter)
 
         if (counterPoint.openFourTotal == 0 || Flag.isForbid(board.boardField(counter))) {
           if (
-            (points.threeTotal > 1 || points.fourTotal > 1 && counterPoint.fourTotal == 0)
+            (particle.threeTotal > 1 || particle.fourTotal > 1 && counterPoint.fourTotal == 0)
               || Flag.isForbid(board.boardField(counter))
-              || (l2board.pointFieldWhite.exists(_.openFourTotal == 1) && counterPoint.closedFourTotal == 0)
+              || (l2board.structFieldWhite.exists(_.openFourTotal == 1) && counterPoint.closedFourTotal == 0)
           ) {
             memo.write(board, idx, Float.MaxValue)
             return parents.appended(idx)

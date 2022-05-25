@@ -1,6 +1,6 @@
 package jrenju
 
-import jrenju.PointOps.pointsOps
+import jrenju.ParticleOps.particleOps
 import jrenju.notation.{Flag, Pos, Renju}
 import utils.lang.Transform.joinHorizontal
 
@@ -35,8 +35,8 @@ object BoardIO {
 
     val board = new Board(
       boardField = field,
-      pointFieldBlack = Array.fill(Renju.BOARD_SIZE)(0),
-      pointFieldWhite = Array.fill(Renju.BOARD_SIZE)(0),
+      structFieldBlack = Array.fill(Renju.BOARD_SIZE)(0),
+      structFieldWhite = Array.fill(Renju.BOARD_SIZE)(0),
       moves = source.length,
       latestMove = source.last,
       winner = Option.empty,
@@ -71,8 +71,8 @@ object BoardIO {
     else {
       val board = new Board(
         boardField = source,
-        pointFieldBlack = Array.fill(Renju.BOARD_SIZE)(0),
-        pointFieldWhite = Array.fill(Renju.BOARD_SIZE)(0),
+        structFieldBlack = Array.fill(Renju.BOARD_SIZE)(0),
+        structFieldWhite = Array.fill(Renju.BOARD_SIZE)(0),
         moves = source.count {
           case Flag.BLACK | Flag.WHITE => true
           case _ => false
@@ -113,8 +113,8 @@ object BoardIO {
 
     def boardText: String = this.attributeText(_.boardField)(flag => Flag.flagToChar(flag).toString)
 
-    private val pointFieldTextBlack: (Int => String) => String = this.attributeText(_.pointFieldBlack)
-    private val pointFieldTextWhite: (Int => String) => String = this.attributeText(_.pointFieldWhite)
+    private val pointFieldTextBlack: (Int => String) => String = this.attributeText(_.structFieldBlack)
+    private val pointFieldTextWhite: (Int => String) => String = this.attributeText(_.structFieldWhite)
 
     implicit def dotIfZero(i: Int): String = if (i == 0) "." else i.toString
 
