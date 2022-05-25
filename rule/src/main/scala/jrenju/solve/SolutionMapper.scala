@@ -3,7 +3,7 @@ package jrenju.solve
 import jrenju.Board
 import jrenju.notation.{Flag, Renju}
 import jrenju.protocol.{Solution, SolutionLeaf, SolutionNode}
-import jrenju.solve.ZobristHash.IncrementHash
+import jrenju.ZobristHash.IncrementHash
 
 object SolutionMapper {
 

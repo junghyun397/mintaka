@@ -45,6 +45,7 @@ object TestHelper {
     def t2s: L1Strip = new L1Strip(
       Direction.X,
       0,
+      source.length,
       source
         .map(Flag.charToFlag)
         .map(_.get)

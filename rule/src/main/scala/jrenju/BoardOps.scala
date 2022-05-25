@@ -1,5 +1,6 @@
 package jrenju
 
+import jrenju.PointOps.pointsOps
 import jrenju.notation.{Direction, Flag, Pos, Renju}
 
 import scala.collection.mutable
@@ -44,10 +45,10 @@ final class BoardOps(private val b: Board) extends AnyVal {
 
     val builder = new mutable.ArrayBuilder.ofRef[L2Strip]()
 
-    builder += new L1Strip(Direction.X, Pos.rowColToIdx(row, 0), this.collectStonesX(row))
+    builder += new L1Strip(Direction.X, Pos.rowColToIdx(row, 0), Renju.BOARD_WIDTH, this.collectStonesX(row))
       .calculateL2Strip()
 
-    builder += new L1Strip(Direction.Y, Pos.rowColToIdx(0, col), this.collectStonesY(col))
+    builder += new L1Strip(Direction.Y, Pos.rowColToIdx(0, col), Renju.BOARD_WIDTH, this.collectStonesY(col))
       .calculateL2Strip()
 
     if (col - row < 0) { // TOP
@@ -57,6 +58,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
         builder += new L1Strip(
           Direction.DEG45,
           Pos.rowColToIdx(y, 0),
+          size,
           this.collectStonesDEG45(size, y, 0)
         )
           .calculateL2Strip()
@@ -67,6 +69,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
         builder += new L1Strip(
           Direction.DEG45,
           Pos.rowColToIdx(0, x),
+          size,
           this.collectStonesDEG45(size, 0, x)
         )
           .calculateL2Strip()
@@ -79,6 +82,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
         builder += new L1Strip(
           Direction.DEG315,
           Pos.rowColToIdx(y, Renju.BOARD_WIDTH_MAX_IDX),
+          size,
           this.collectStonesDEG315(size, y, Renju.BOARD_WIDTH_MAX_IDX)
         )
           .calculateL2Strip()
@@ -89,6 +93,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
         builder += new L1Strip(
           Direction.DEG315,
           Pos.rowColToIdx(0, col + row),
+          size,
           this.collectStonesDEG315(size, 0, col + row)
         )
           .calculateL2Strip()
@@ -104,6 +109,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
       strips(idx * 2) = new L1Strip(
         Direction.X,
         Pos.rowColToIdx(idx, 0),
+        Renju.BOARD_WIDTH,
         this.collectStonesX(idx)
       )
         .calculateL2Strip()
@@ -111,6 +117,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
       strips(idx * 2 + 1) = new L1Strip(
         Direction.Y,
         Pos.rowColToIdx(0, idx),
+        Renju.BOARD_WIDTH,
         this.collectStonesY(idx)
       )
         .calculateL2Strip()
@@ -121,6 +128,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
       strips(offset45Bottom + idx) = new L1Strip(
         Direction.DEG45,
         Pos.rowColToIdx(0, idx),
+        Renju.BOARD_WIDTH - idx,
         this.collectStonesDEG45(Renju.BOARD_WIDTH - idx, 0, idx)
       )
         .calculateL2Strip()
@@ -131,6 +139,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
       strips(offset45Top + idx) = new L1Strip(
         Direction.DEG45,
         Pos.rowColToIdx(idx + 1, 0),
+        Renju.BOARD_WIDTH_MAX_IDX - idx,
         this.collectStonesDEG45(Renju.BOARD_WIDTH_MAX_IDX - idx, idx + 1, 0)
       )
         .calculateL2Strip()
@@ -141,6 +150,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
       strips(offset315Bottom + idx) = new L1Strip(
         Direction.DEG315,
         Pos.rowColToIdx(0, Renju.BOARD_WIDTH - idx - 1),
+        Renju.BOARD_WIDTH - idx,
         this.collectStonesDEG315(Renju.BOARD_WIDTH - idx, 0, Renju.BOARD_WIDTH_MAX_IDX - idx)
       )
         .calculateL2Strip()
@@ -151,6 +161,7 @@ final class BoardOps(private val b: Board) extends AnyVal {
       strips(offset315Top + idx) = new L1Strip(
         Direction.DEG315,
         Pos.rowColToIdx(idx + 1, Renju.BOARD_WIDTH - 1),
+        Renju.BOARD_WIDTH_MAX_IDX - idx,
         this.collectStonesDEG315(Renju.BOARD_WIDTH_MAX_IDX - idx, idx + 1, Renju.BOARD_WIDTH_MAX_IDX)
       )
         .calculateL2Strip()
@@ -159,9 +170,9 @@ final class BoardOps(private val b: Board) extends AnyVal {
     strips
   }
 
-  private def applyParticle(direction: Int, idx: Int, points: PointsProvidePair, forbidMask: Byte): Unit = {
-    if (b.pointsField(idx).isDifference(direction, points))
-      b.pointsField(idx) = b.pointsField(idx).merged(direction, points)
+  private def applyParticle(direction: Int, idx: Int, pointsBlack: Int, pointsWhite: Int, forbidMask: Byte): Unit = {
+    b.pointFieldBlack(idx) = b.pointFieldBlack(idx).merged(direction, pointsBlack)
+    b.pointFieldWhite(idx) = b.pointFieldWhite(idx).merged(direction, pointsWhite)
 
     if (forbidMask != Flag.FREE)
       b.boardField(idx) = forbidMask
@@ -182,29 +193,29 @@ final class BoardOps(private val b: Board) extends AnyVal {
       if (strip.winner != Flag.FREE) winner = Option(strip.winner)
 
       strip.direction match {
-        case Direction.X => for (idx <- strip.pointsStrip.indices)
+        case Direction.X => for (idx <- 0 until strip.size)
           this.applyParticle(
             Direction.X,
             strip.startIdx + idx,
-            strip.pointsStrip(idx), strip.forbidMask(idx),
+            strip.pointStripBlack(idx), strip.pointStripWhite(idx), strip.forbidMask(idx)
           )
-        case Direction.Y => for (idx <- strip.pointsStrip.indices)
+        case Direction.Y => for (idx <- 0 until strip.size)
           this.applyParticle(
             Direction.Y,
             Pos.rowColToIdx(idx, Pos.idxToCol(strip.startIdx)),
-            strip.pointsStrip(idx), strip.forbidMask(idx),
+            strip.pointStripBlack(idx), strip.pointStripWhite(idx), strip.forbidMask(idx)
           )
-        case Direction.DEG45 => for (idx <- strip.pointsStrip.indices)
+        case Direction.DEG45 => for (idx <- 0 until strip.size)
           this.applyParticle(
             Direction.DEG45,
             Pos.rowColToIdx(Pos.idxToRow(strip.startIdx) + idx, Pos.idxToCol(strip.startIdx) + idx),
-            strip.pointsStrip(idx), strip.forbidMask(idx),
+            strip.pointStripBlack(idx), strip.pointStripWhite(idx), strip.forbidMask(idx)
           )
-        case Direction.DEG315 => for (idx <- strip.pointsStrip.indices)
+        case Direction.DEG315 => for (idx <- 0 until strip.size)
           this.applyParticle(
             Direction.DEG315,
             Pos.rowColToIdx(Pos.idxToRow(strip.startIdx) + idx, Pos.idxToCol(strip.startIdx) - idx),
-            strip.pointsStrip(idx), strip.forbidMask(idx),
+            strip.pointStripBlack(idx), strip.pointStripWhite(idx), strip.forbidMask(idx)
           )
       }
     }

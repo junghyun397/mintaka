@@ -483,7 +483,7 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
 
     val (threeSide, fourSide) = board.collectTrapPoints()
 
-    (threeSide ++ fourSide).map(Pos.fromIdx).map(_.toCartesian).toSet == answer should be (true)
+    (threeSide ++ fourSide).map(Pos.fromIdx).map(_.toCartesian).toSet should be (answer)
   }
 
   "traps" should "analyse correctly" in {

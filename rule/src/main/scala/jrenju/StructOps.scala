@@ -1,7 +1,7 @@
 package jrenju
 
+import jrenju.PointOps.pointsOps
 import jrenju.notation.{Direction, Flag, Pos, Renju}
-import utils.lang.Transform.IntTransform
 
 import scala.collection.mutable
 import scala.language.implicitConversions
@@ -20,11 +20,11 @@ final class StructOps(private val b: Board) extends AnyVal {
     if (idx < 0 || idx >= Renju.BOARD_SIZE) Flag.WALL
     else b.boardField(idx)
 
-  @inline private def getPointsBounded(idx: Int, op: PointsPair => Boolean): Boolean =
+  @inline private def getPointsBounded(idx: Int, process: Int => Boolean): Boolean =
     if (idx < 0 || idx >= Renju.BOARD_SIZE) false
-    else op(b.pointsField(idx))
+    else process(idx)
 
-  def collectOpen3Counters(direction: Int, idx: Int, op: PointsPair => Points, flag: Byte): Array[Int] = {
+  def collectOpen3Counters(direction: Int, idx: Int, extract: Int => Int, flag: Byte): Array[Int] = {
     val row = Pos.idxToRow(idx)
     val col = Pos.idxToCol(idx)
 
@@ -41,10 +41,10 @@ final class StructOps(private val b: Board) extends AnyVal {
     if (a1Value == flag && a2Value == flag) {
       val builder = new mutable.ArrayBuilder.ofInt
 
-      if (op(b.pointsField(p1Pointer)).open3(direction))
+      if (extract(p1Pointer).threeAt(direction))
         builder += p1Pointer
       val end = this.getOffsetIdx(direction, row, col, 3)
-      if (op(b.pointsField(end)).open3(direction))
+      if (extract(end).threeAt(direction))
         builder += end
 
       builder.result()
@@ -54,10 +54,10 @@ final class StructOps(private val b: Board) extends AnyVal {
     else if (p1Value == flag && p2Value == flag) {
       val builder = new mutable.ArrayBuilder.ofInt
 
-      if (op(b.pointsField(a1Pointer)).open3(direction))
+      if (extract(a1Pointer).threeAt(direction))
         builder += a1Pointer
       val start = this.getOffsetIdx(direction, row, col, -3)
-      if (op(b.pointsField(start)).open3(direction))
+      if (extract(start).threeAt(direction))
         builder += start
 
       builder.result()
@@ -90,9 +90,9 @@ final class StructOps(private val b: Board) extends AnyVal {
     else if (p1Value == flag && a1Value == flag) {
       val builder = new mutable.ArrayBuilder.ofInt
 
-      if (op(b.pointsField(a2Pointer)).open3(direction))
+      if (extract(a2Pointer).threeAt(direction))
         builder += a2Pointer
-      if (op(b.pointsField(p2Pointer)).open3(direction))
+      if (extract(p2Pointer).threeAt(direction))
         builder += p2Pointer
 
       builder.result()
@@ -110,14 +110,14 @@ final class StructOps(private val b: Board) extends AnyVal {
       Array.empty
   }
 
-  def collectClosed4Counter(direction: Int, idx: Int, op: PointsPair => Points): Int = {
+  def collectClosed4Counter(direction: Int, idx: Int, extract: Int => Int): Int = {
     val row = Pos.idxToRow(idx)
     val col = Pos.idxToCol(idx)
 
     for (offset <- -5 to 5) {
       if (offset != 0) {
         val pointer = this.getOffsetIdx(direction, row, col, offset)
-        if (this.getPointsBounded(pointer, op(_).closed4(direction).toBoolean))
+        if (this.getPointsBounded(pointer, extract(_).closedFourAt(direction)))
           return pointer
       }
     }
@@ -126,14 +126,14 @@ final class StructOps(private val b: Board) extends AnyVal {
   }
 
   private def isNotPseudoThree(direction: Int, idx: Int, from: Int): Boolean = {
-    val counters = this.collectOpen3Counters(direction, idx, _.black, Flag.BLACK)
+    val counters = this.collectOpen3Counters(direction, idx, b.pointFieldBlack, Flag.BLACK)
     for (idx <- counters.indices) {
       val counter = counters(idx)
       val flag = b.boardField(counter)
       if (flag != Flag.FORBIDDEN_6 && flag != Flag.FORBIDDEN_44) {
-        val points = b.pointsField(counter).black
-        if (points.four == 0 && points.fiveInRow == 0) {
-          if (points.three > 2) {
+        val points = b.pointFieldBlack(counter)
+        if (points.fourTotal == 0 && points.fiveTotal == 0) {
+          if (points.threeTotal > 2) {
             if (this.isPseudoForbid(direction, counter, from))
               return true
           } else
@@ -147,9 +147,9 @@ final class StructOps(private val b: Board) extends AnyVal {
 
   private def isPseudoForbid(idx: Int): Boolean = {
     var count = 0
-    val open3 = b.pointsField(idx).black.open3
+    val points = b.pointFieldBlack(idx)
     for (direction <- 0 until 4)
-      if (open3(direction) && this.isNotPseudoThree(direction, idx, idx))
+      if (points.threeAt(direction) && this.isNotPseudoThree(direction, idx, idx))
         count += 1
 
     count < 2
@@ -159,9 +159,9 @@ final class StructOps(private val b: Board) extends AnyVal {
     if (idx == from) return false
 
     var count = 0
-    val open3 = b.pointsField(idx).black.open3
+    val points = b.pointFieldBlack(idx)
     for (direction <- 0 until 4)
-      if (direction != excludeDirection && open3(direction) && this.isNotPseudoThree(direction, idx, from))
+      if (direction != excludeDirection && points.threeAt(direction) && this.isNotPseudoThree(direction, idx, from))
         count += 1
 
     count < 2
@@ -173,14 +173,14 @@ final class StructOps(private val b: Board) extends AnyVal {
 
     for (idx <- 0 until Renju.BOARD_SIZE) {
       if (Flag.isForbid(b.boardField(idx))) {
-        val points = b.pointsField(idx).white
+        val points = b.pointFieldWhite(idx)
 
         for (direction <- 0 until 4) {
-          if (points.open3(direction))
-            threeSideTraps.addAll(this.collectOpen3Counters(direction, idx, _.white, Flag.WHITE))
+          if (points.threeAt(direction))
+            threeSideTraps.addAll(this.collectOpen3Counters(direction, idx, b.pointFieldWhite, Flag.WHITE))
 
-          if (points.closed4(direction).toBoolean) {
-            val counter = this.collectClosed4Counter(direction, idx, _.white)
+          if (points.closedFourAt(direction)) {
+            val counter = this.collectClosed4Counter(direction, idx, b.pointFieldWhite)
             if (counter != -1)
               fourSideTraps += counter
           }
@@ -195,15 +195,15 @@ final class StructOps(private val b: Board) extends AnyVal {
     var di3ForbidFlag = false
 
     for (idx <- 0 until Renju.BOARD_SIZE) {
-      val points = b.pointsField(idx).black
+      val points = b.pointFieldBlack(idx)
 
-      if (points.fiveInRow > 0)
+      if (points.fiveTotal > 0)
         b.boardField(idx) = Flag.FREE
       else if (b.boardField(idx) == Flag.FORBIDDEN_6)
         b.boardField(idx) = Flag.FORBIDDEN_6
-      else if (points.four > 1)
+      else if (points.fourTotal > 1)
         b.boardField(idx) = Flag.FORBIDDEN_44
-      else if (points.three > 1) {
+      else if (points.threeTotal > 1) {
         b.boardField(idx) = Flag.FORBIDDEN_33
         di3ForbidFlag = true
       }

@@ -2,14 +2,14 @@ package jrenju
 
 import jrenju.Board.boardOps
 import jrenju.notation.{Color, Flag, Pos, RejectReason, Renju, Rotation}
-import jrenju.solve.ZobristHash
-import jrenju.solve.ZobristHash.IncrementHash
+import ZobristHash.IncrementHash
 
 import scala.language.implicitConversions
 
 class Board(
   val boardField: Array[Byte],
-  val pointsField: Array[PointsPair],
+  val pointFieldBlack: Array[Int],
+  val pointFieldWhite: Array[Int],
 
   val moves: Int,
   val latestMove: Int,
@@ -31,6 +31,9 @@ class Board(
 
   def latestPos: Option[Pos] = Option(Pos.fromIdx(this.latestMove))
 
+  def getPoints(idx: Int): (PointOps, PointOps) =
+    (new PointOps(this.pointFieldBlack(idx)), new PointOps(this.pointFieldWhite(idx)))
+
   def validateMove(pos: Pos): Option[RejectReason.Value] = this.validateMove(pos.idx)
 
   def validateMove(idx: Int): Option[RejectReason.Value] = {
@@ -48,12 +51,10 @@ class Board(
   def makeMove(idx: Int): Board = this.makeMove(idx, calculateForbid = true)
 
   def makeMove(idx: Int, calculateForbid: Boolean): Board = {
-    val thenField = boardField.updated(idx, this.nextColorFlag)
-    val thenPoints = this.pointsField.updated(idx, PointsPair.empty)
-
     val board = new Board(
-      boardField = thenField,
-      pointsField = thenPoints,
+      boardField = this.boardField.updated(idx, this.nextColorFlag),
+      pointFieldBlack = this.pointFieldBlack.updated(idx, 0),
+      pointFieldWhite = this.pointFieldWhite.updated(idx, 0),
       moves = this.moves + 1,
       latestMove = idx,
       winner = Option.empty,
@@ -86,7 +87,8 @@ class Board(
 
   override def clone(): Board = new Board(
     boardField = this.boardField.clone(),
-    pointsField = this.pointsField.clone(),
+    pointFieldBlack = this.pointFieldBlack.clone(),
+    pointFieldWhite = this.pointFieldWhite.clone(),
     moves = this.moves,
     latestMove = this.latestMove,
     winner = this.winner,
@@ -105,7 +107,8 @@ object Board {
 
   def newBoard(initIdx: Int): Board = new Board(
     boardField = Array.fill(Renju.BOARD_SIZE)(Flag.FREE).updated(initIdx, Flag.BLACK),
-    pointsField = Array.fill(Renju.BOARD_SIZE)(PointsPair.empty),
+    pointFieldBlack = Array.fill(Renju.BOARD_SIZE)(0),
+    pointFieldWhite = Array.fill(Renju.BOARD_SIZE)(0),
     moves = 1,
     winner = Option.empty,
     latestMove = initIdx,

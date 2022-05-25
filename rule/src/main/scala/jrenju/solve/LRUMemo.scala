@@ -2,7 +2,7 @@ package jrenju.solve
 
 import jrenju.Board
 import jrenju.notation.Flag
-import jrenju.solve.ZobristHash.IncrementHash
+import jrenju.ZobristHash.IncrementHash
 import utils.lang.LRUCache
 
 import java.util.Collections.synchronizedMap

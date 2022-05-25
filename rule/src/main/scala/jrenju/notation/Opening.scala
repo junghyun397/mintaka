@@ -1,7 +1,7 @@
 package jrenju.notation
 
-import jrenju.solve.ZobristHash
-import jrenju.solve.ZobristHash.IncrementHash
+import jrenju.ZobristHash
+import ZobristHash.IncrementHash
 
 sealed abstract class Opening(val name: String, val jName: String, val rotation: Rotation.Value)
 

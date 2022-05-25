@@ -1,4 +1,4 @@
-package jrenju.solve
+package jrenju
 
 import jrenju.notation.{Flag, Renju}
 

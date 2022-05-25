@@ -1,8 +1,9 @@
 package jrenju.solve
 
 import jrenju.TestHelper.T2
+import jrenju.ZobristHash
 import jrenju.notation.Flag
-import jrenju.solve.ZobristHash.IncrementHash
+import jrenju.ZobristHash.IncrementHash
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 

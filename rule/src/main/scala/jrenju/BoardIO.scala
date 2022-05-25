@@ -1,7 +1,7 @@
 package jrenju
 
+import jrenju.PointOps.pointsOps
 import jrenju.notation.{Flag, Pos, Renju}
-import jrenju.solve.ZobristHash
 import utils.lang.Transform.joinHorizontal
 
 import scala.language.implicitConversions
@@ -35,7 +35,8 @@ object BoardIO {
 
     val board = new Board(
       boardField = field,
-      pointsField = Array.fill(Renju.BOARD_SIZE)(new PointsPair()),
+      pointFieldBlack = Array.fill(Renju.BOARD_SIZE)(0),
+      pointFieldWhite = Array.fill(Renju.BOARD_SIZE)(0),
       moves = source.length,
       latestMove = source.last,
       winner = Option.empty,
@@ -70,7 +71,8 @@ object BoardIO {
     else {
       val board = new Board(
         boardField = source,
-        pointsField = Array.fill(Renju.BOARD_SIZE)(new PointsPair()),
+        pointFieldBlack = Array.fill(Renju.BOARD_SIZE)(0),
+        pointFieldWhite = Array.fill(Renju.BOARD_SIZE)(0),
         moves = source.count {
           case Flag.BLACK | Flag.WHITE => true
           case _ => false
@@ -111,25 +113,26 @@ object BoardIO {
 
     def boardText: String = this.attributeText(_.boardField)(flag => Flag.flagToChar(flag).toString)
 
-    private val structText: (PointsPair => String) => String = this.attributeText(_.pointsField)
+    private val pointFieldTextBlack: (Int => String) => String = this.attributeText(_.pointFieldBlack)
+    private val pointFieldTextWhite: (Int => String) => String = this.attributeText(_.pointFieldWhite)
 
     implicit def dotIfZero(i: Int): String = if (i == 0) "." else i.toString
 
     def debugText: String =
       f"${this.boardText}\n" +
         joinHorizontal(
-          f"\nblack-open-3 /\n${this.structText(_.black.three)}\n",
-          f"\nblack-block-3 /\n${this.structText(_.black.block3.count(_ == true))}\n",
-          f"\nblack-closed-4 /\n${this.structText(_.black.closedFour)}\n",
-          f"\nblack-open-4 /\n${this.structText(_.black.open4.count(_ == true))}\n",
-          f"\nblack-5\n${this.structText(_.black.fiveInRow)}\n"
+          f"\nblack-three /\n${this.pointFieldTextBlack(_.threeTotal)}\n",
+          f"\nblack-block-three /\n${this.pointFieldTextBlack(_.blockThreeTotal)}\n",
+          f"\nblack-closed-four /\n${this.pointFieldTextBlack(_.closedFourTotal)}\n",
+          f"\nblack-open-four /\n${this.pointFieldTextBlack(_.openFourTotal)}\n",
+          f"\nblack-five\n${this.pointFieldTextBlack(_.fiveTotal)}\n"
         ) +
         joinHorizontal(
-          f"\nwhite-open-3 /\n${this.structText(_.white.three)}\n",
-          f"\nwhite-block-3 /\n${this.structText(_.white.block3.count(_ == true))}\n",
-          f"\nwhite-closed-4 /\n${this.structText(_.white.closedFour)}\n",
-          f"\nwhite-open-4 /\n${this.structText(_.white.open4.count(_ == true))}\n",
-          f"\nwhite-5\n${this.structText(_.white.fiveInRow)}\n"
+          f"\nwhite-open-three /\n${this.pointFieldTextWhite(_.threeTotal)}\n",
+          f"\nwhite-block-three /\n${this.pointFieldTextWhite(_.blockThreeTotal)}\n",
+          f"\nwhite-closed-four /\n${this.pointFieldTextWhite(_.closedFourTotal)}\n",
+          f"\nwhite-open-four /\n${this.pointFieldTextWhite(_.openFourTotal)}\n",
+          f"\nwhite-five\n${this.pointFieldTextWhite(_.fiveTotal)}\n"
         )
 
   }
