@@ -12,10 +12,10 @@ object EmptyBoard extends Board(
   zobristKey = ZobristHash.empty
 ) {
 
-  override def color: Color.Value = Color.EMPTY
+  override val color: Color.Value = Color.EMPTY
 
-  override def nextColor: Color.Value = Color.BLACK
+  override val nextColor: Color.Value = Color.BLACK
 
-  override def latestPos: Option[Pos] = Option.empty
+  override val latestPos: Option[Pos] = Option.empty
 
 }

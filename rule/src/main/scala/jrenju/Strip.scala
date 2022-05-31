@@ -6,26 +6,26 @@ import jrenju.notation.Flag
 import utils.lang.ConcurrentMapOps.concurrentMapOps
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.language.implicitConversions
+import scala.language.{implicitConversions, postfixOps}
 import scala.math.Numeric.IntIsIntegral.{minus, plus}
 
 sealed class Strip(val direction: Int, val startIdx: Int, val size: Int)
 
-final class PointProviderOps(private var xs: Array[Int]) {
+final class StructProviderOps(private var xs: Array[Int]) {
 
-  def setThree(idx: Int): Unit = this.xs(idx) |= 0x80000000
+  def setThree(idx: Int): Unit = this.xs(idx) |= 0x8000_0000
 
-  def setBlockThree(idx: Int): Unit = this.xs(idx) |= 0x08000000
+  def setBlockThree(idx: Int): Unit = this.xs(idx) |= 0x0800_0000
 
   def increaseClosedFour(idx: Int): Unit =
     if (((xs(idx) >>> 23) & 0x1) == 0)
-      this.xs(idx) |= 0x00800000
+      this.xs(idx) |= 0x0080_0000
     else
-      this.xs(idx) |= 0x00080000
+      this.xs(idx) |= 0x0008_0000
 
-  def setOpenFour(idx: Int): Unit = this.xs(idx) |= 0x00008000
+  def setOpenFour(idx: Int): Unit = this.xs(idx) |= 0x0000_8000
 
-  def setFive(idx: Int): Unit = this.xs(idx) |= 0x00000800
+  def setFive(idx: Int): Unit = this.xs(idx) |= 0x0000_0800
 
 }
 
@@ -37,7 +37,7 @@ final class L1Strip(
   val stripField: Array[Byte]
 ) extends Strip(direction, startIdx, size) {
 
-  var zobristHash: Long = ZobristHash.stripHash(this.stripField)
+  private implicit def pointProviderOps(xs: Array[Int]): StructProviderOps = new StructProviderOps(xs)
 
   @inline private def isNotOver6(mask: Int): Boolean = this.isNotOver6(mask, -1, -1)
 
@@ -60,7 +60,22 @@ final class L1Strip(
     true
   }
 
-  private implicit def pointProviderOps(xs: Array[Int]): PointProviderOps = new PointProviderOps(xs)
+  private def isNotOver6White(mask1: Int, mask2: Int, mask3: Int): Boolean = {
+    var bridged = 0
+
+    var pointer = 0
+    while (pointer < this.stripField.length) {
+      if (this.stripField(pointer) == Flag.WHITE || pointer == mask1 || pointer == mask2 || pointer == mask3)
+        bridged += 1
+      else
+        bridged = 0
+
+      if (bridged > 5) return false
+      pointer += 1
+    }
+
+    true
+  }
 
   private def pattern2Mutate(
     structStripBlack: Array[Int],
@@ -104,13 +119,16 @@ final class L1Strip(
       !isSolid && p4Flag != Flag.FREE
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
     ) {
-      if (p2Flag == Flag.WHITE)
+      if (p2Flag == Flag.WHITE) {
         structStripWhite.setOpenFour(op(pointer, 1))
-      else if (this.isNotOver6(op(pointer, 1), op(pointer, 5)))
+        structStripWhite.setBlockThree(op(pointer, 1))
+      } else if (this.isNotOver6(op(pointer, 1), op(pointer, 5))) {
         if (this.isNotOver6(pointer, op(pointer, 1)))
           structStripBlack.setOpenFour(op(pointer, 1))
         else
           structStripBlack.increaseClosedFour(op(pointer, 1))
+        structStripBlack.setBlockThree(op(pointer, 1))
+      }
     }
 
     // -OO+O-
@@ -118,14 +136,16 @@ final class L1Strip(
       !isSolid && p4Flag != Flag.FREE
         && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p3Flag == p1Flag
     ) {
-      if (p1Flag == Flag.WHITE)
+      if (p1Flag == Flag.WHITE) {
         structStripWhite.setOpenFour(op(pointer, 2))
-      else {
+        structStripWhite.setBlockThree(op(pointer, 2))
+      } else {
         val condL = this.isNotOver6(op(pointer, 2), pointer)
         val condR = this.isNotOver6(op(pointer, 2), op(pointer, 5))
-        if (condL && condR)
+        if (condL && condR) {
           structStripBlack.setOpenFour(op(pointer, 2))
-        else if (condL || condR)
+          structStripBlack.setBlockThree(op(pointer, 2))
+        } else if (condL || condR)
           structStripBlack.increaseClosedFour(op(pointer, 2))
       }
     }
@@ -139,8 +159,18 @@ final class L1Strip(
       if (p2Flag == Flag.WHITE) {
         if (!whiteC4MarksDouble(op(pointer, 1)) && !whiteC4MarksDouble(pointer))
           structStripWhite.increaseClosedFour(pointer)
-      } else if (this.isNotOver6(pointer, op(pointer, 1)))
+
+        if (p6Flag != Flag.FREE && structStripWhite(op(pointer, 1)).openFourAt(0))
+          structStripWhite.setBlockThree(pointer)
+      } else if (this.isNotOver6(pointer, op(pointer, 1))) {
         structStripBlack.increaseClosedFour(pointer)
+
+        if (
+          (p6Flag != Flag.FREE || !this.isNotOver6(op(pointer, 5), op(pointer, 6)))
+            && structStripBlack(op(pointer, 1)).openFourAt(0)
+        )
+          structStripBlack.setBlockThree(pointer)
+      }
     }
 
     // OO++O
@@ -191,16 +221,22 @@ final class L1Strip(
           structStripWhite.increaseClosedFour(pointer)
           whiteC4MarksSingle(pointer) = true
         }
+        structStripWhite.setBlockThree(pointer)
 
         if (!whiteC4MarksSingle(op(pointer, 5))) {
           structStripWhite.increaseClosedFour(op(pointer, 5))
           whiteC4MarksSingle(op(pointer, 5)) = true
         }
+        structStripWhite.setBlockThree(op(pointer, 5))
       } else {
-        if (this.isNotOver6(pointer, op(pointer, 2)))
+        if (this.isNotOver6(pointer, op(pointer, 2))) {
           structStripBlack.increaseClosedFour(pointer)
-        if (this.isNotOver6(op(pointer, 2), op(pointer, 5)))
+          structStripBlack.setBlockThree(pointer)
+        }
+        if (this.isNotOver6(op(pointer, 2), op(pointer, 5))) {
           structStripBlack.increaseClosedFour(op(pointer, 5))
+          structStripBlack.setBlockThree(op(pointer, 5))
+        }
       }
     }
 
@@ -210,10 +246,13 @@ final class L1Strip(
         && p5Flag != Flag.FREE && p5Flag != p3Flag
         && p4Flag == Flag.FREE && p3Flag == p2Flag && p2Flag == p1Flag
     ) {
-      if (p2Flag == Flag.WHITE)
+      if (p2Flag == Flag.WHITE) {
         structStripWhite.increaseClosedFour(op(pointer, 4))
-      else if (this.isNotOver6(pointer, op(pointer, 4)))
+        structStripWhite.setBlockThree(op(pointer, 4))
+      } else if (this.isNotOver6(pointer, op(pointer, 4))) {
         structStripBlack.increaseClosedFour(op(pointer, 4))
+        structStripBlack.setBlockThree(op(pointer, 4))
+      }
     }
 
     // XOO+O+
@@ -279,7 +318,8 @@ final class L1Strip(
         && p5Flag == Flag.FREE && p4Flag == Flag.FREE && p3Flag == p2Flag && p1Flag == Flag.FREE
     ) {
       if (p3Flag == Flag.WHITE) {
-        structStripWhite.setThree(op(pointer, 1))
+        if (this.isNotOver6White(pointer, op(pointer, 1), op(pointer, 4)))
+          structStripWhite.setThree(op(pointer, 1))
         structStripWhite.setThree(op(pointer, 4))
       } else if (this.isNotOver6(pointer, op(pointer, 1))) {
         if (this.isNotOver6(pointer, op(pointer, 1), op(pointer, 4)))
@@ -318,8 +358,8 @@ final class L1Strip(
   }
 
   private def calculateStruct(): (Array[Int], Array[Int], Array[Byte], Byte) = {
-    val structStripBlack = Array.fill(this.stripField.length)(0)
-    val structStripWhite = Array.fill(this.stripField.length)(0)
+    val structStripBlack = new Array[Int](this.stripField.length)
+    val structStripWhite = new Array[Int](this.stripField.length)
 
     val forbidMask = Array.fill(this.stripField.length)(Flag.FREE)
 
@@ -328,7 +368,7 @@ final class L1Strip(
 
     var winner = Flag.FREE
 
-    // registers
+    // flags
     var p6Flag = Flag.WALL
     var p5Flag = Flag.WALL
     var p4Flag = Flag.WALL
@@ -487,6 +527,8 @@ final class L1Strip(
 //    val assembly = calculateStruct() // VCF * 10000 for 58,525 ms
     new L2Strip(this.direction, this.startIdx, this.size, assembly._1, assembly._2, assembly._3, assembly._4)
   }
+
+  def zobristHash: Long = ZobristHash.stripHash(this.stripField)
 
 }
 

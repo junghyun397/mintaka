@@ -2,6 +2,7 @@ package jrenju.notation
 
 object Renju {
 
+  // max jvm word(32)
   val BOARD_WIDTH: Int = 15
 
   val BOARD_WIDTH_MAX_IDX: Int = BOARD_WIDTH - 1

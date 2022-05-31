@@ -6,18 +6,18 @@ import scala.language.implicitConversions
 
 final class ParticlePair(val color: Color.Value, val forbidKind: Option[Byte], val black: ParticleOps, val white: ParticleOps) {
 
+  def apply(flag: Byte): ParticleOps =
+    flag match {
+      case Flag.BLACK => this.black
+      case Flag.WHITE => this.white
+      case _ => ParticleOps.empty
+    }
+
   def apply(color: Color.Value): ParticleOps =
     color match {
       case Color.BLACK => this.black
       case Color.WHITE => this.white
-      case _ => throw new IllegalStateException()
-    }
-
-  def apply(flag: Int): ParticleOps =
-    flag match {
-      case Flag.BLACK => this.black
-      case Flag.WHITE => this.white
-      case _ => throw new IllegalStateException()
+      case _ => ParticleOps.empty
     }
 
 }
@@ -26,9 +26,9 @@ final class ParticlePair(val color: Color.Value, val forbidKind: Option[Byte], v
 // three(4bits) blockThree(4bits) closedFour_1(4bits) closedFour_2(4bits) openFour(4bits) five(4bits) -> 3bytes
 final class ParticleOps(private val x: Int) {
 
-  // mask: 0111 0111 0111 0111 0111 0111 0000 1111
+  // mask: 0111 0111 0111 0111 0111 0111 0000 0000
   def merged(direction: Int, that: Int): Int =
-    ((x & (0x7777770F >>> direction | 0x7777770F << -direction)) | (that >>> direction)) & 0xFFFFFF00
+    (x & (0x7777_7700 >>> direction | ~(0xFFFF_FFFF >>> direction))) | (that >>> direction)
 
   def threeAt(direction: Int): Boolean = ((x >>> 31 - direction) & 0x1) == 1
 
@@ -52,10 +52,14 @@ final class ParticleOps(private val x: Int) {
 
   def fiveTotal: Int = Integer.bitCount((x >>> 8) & 0xF)
 
+  override def hashCode(): Int = x
+
 }
 
 object ParticleOps {
 
   implicit def particleOps(particle: Int): ParticleOps = new ParticleOps(particle)
+
+  val empty: ParticleOps = new ParticleOps(0)
 
 }

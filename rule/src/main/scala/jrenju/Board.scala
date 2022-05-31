@@ -31,6 +31,12 @@ class Board(
 
   def latestPos: Option[Pos] = Option(Pos.fromIdx(this.latestMove))
 
+  def structField(idx: Int, flag: Byte): Int = flag match {
+    case Flag.BLACK => this.structFieldBlack(idx)
+    case Flag.WHITE => this.structFieldWhite(idx)
+    case _ => 0
+  }
+
   def getParticlePair(idx: Int): ParticlePair = {
     val flag = this.boardField(idx)
 
@@ -87,7 +93,7 @@ class Board(
     case _ => this.zobristKey
   }
 
-  def rotated(rotation: Rotation.Value): Board = rotation match {
+  def rotated(rotation: Rotation.Value): this.type = rotation match {
     case Rotation.CLOCKWISE => this
     case Rotation.COUNTER_CLOCKWISE => this
     case Rotation.OVERTURN => this
@@ -96,7 +102,7 @@ class Board(
 
   def transposedKey(): Long = this.zobristKey
 
-  def transposed(): Board = this
+  def transposed(): this.type = this
 
   override def clone(): Board = new Board(
     boardField = this.boardField.clone(),

@@ -9,7 +9,22 @@ import utils.lang.Transform.IntTransform
 
 class StripTest extends AnyFlatSpec with should.Matchers {
 
-  def open3(problem: String, answer: String, op: L2Strip => Array[Int]): Unit = {
+  def both(op: (L2Strip => Array[Int], String, String) => Unit, problem: String, answer: String): Unit = {
+    op(_.structStripBlack, problem, answer)
+    op(
+      _.structStripWhite,
+      problem.replace('X', '?').replace('O', 'X').replace('?', 'O'),
+      answer.replace('X', '?').replace('O', 'X').replace('?', 'O'),
+    )
+  }
+
+  def black(op: (L2Strip => Array[Int], String, String) => Unit, problem: String, answer: String): Unit =
+    op(_.structStripBlack, problem, answer)
+
+  def white(op: (L2Strip => Array[Int], String, String) => Unit, problem: String, answer: String): Unit =
+    op(_.structStripWhite, problem, answer)
+
+  def open3(op: L2Strip => Array[Int], problem: String, answer: String): Unit = {
     op(problem.t2s.calculateL2Strip()).map(v => if (v.threeTotal.toBoolean) "1" else ".").mkString should be (answer)
     op(problem.reverse.t2s.calculateL2Strip()).map(v => if (v.threeTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
   }
@@ -17,78 +32,83 @@ class StripTest extends AnyFlatSpec with should.Matchers {
   "open-3 points" should "detect correctly" in {
     // XX
 
-    open3("...XX...", ".11..11.", _.structStripBlack)
+    both(open3, "...XX...", ".11..11.")
 
-    open3("...XX..X...", ".11........", _.structStripBlack)
+    both(open3, "...XX..X...", ".11........")
 
-    open3("...O..XX..X...", ".....1........", _.structStripBlack)
+    both(open3, "...O..XX..X...", ".....1........")
 
-    open3("...XX..O...", ".11..1.....", _.structStripBlack)
+    both(open3, "...XX..O...", ".11..1.....")
 
-    open3("...XX.O...", ".11.......", _.structStripBlack)
+    both(open3, "...XX.O...", ".11.......")
 
-    open3("...X...XX...", "......1..11.", _.structStripBlack)
+    both(open3, "...O..XX..O...", ".....1..1.....")
 
-    open3("...X...XX.O...", "..............", _.structStripBlack)
+    black(open3, "...X...XX...", "......1..11.")
+    white(open3, "...O...OO...", ".....11..11.")
 
-    open3("...X...XX..O...", "......1..1.....", _.structStripBlack)
+    black(open3, "...X...XX..O...", "......1..1.....")
+    white(open3, "...O...OO..X...", ".....11..1.....")
 
-    open3("...O..XX..O...", ".....1..1.....", _.structStripBlack)
+    black(open3, "...X...XX...X...", "......1..1......")
+    white(open3, "...O...OO...O...", ".....11..11.....")
 
-    open3("...X...XX...X...", "......1..1......", _.structStripBlack)
+    black(open3, "...X...XX.O...", "..............")
+    white(open3, "...O...OO.X...", ".....11.......")
 
-    open3("...X...XX..XX..O...", "...................", _.structStripBlack)
+    black(open3, "...X...XX..XX..O...", "...................")
+    white(open3, "...O...OO..OO..X...", ".....11......1.....")
 
     // X.X
 
-    open3("...X.X...", "..1.1.1..", _.structStripBlack)
+    both(open3, "...X.X...", "..1.1.1..")
 
-    open3("...O.X.X..O...", "......1.1.....", _.structStripBlack)
+    both(open3, "...O.X.X..O...", "......1.1.....")
 
-    open3(".X.X...", "..1.1..", _.structStripBlack)
+    both(open3, ".X.X...", "..1.1..")
 
-    open3("...X.X..O...", "..1.1.1.....", _.structStripBlack)
+    both(open3, "...X.X..O...", "..1.1.1.....")
 
-    open3("...X.X.O...", "..1.1......", _.structStripBlack)
+    both(open3, "...X.X.O...", "..1.1......")
 
-    open3("....X..X.X.O...", "...............", _.structStripBlack)
+    both(open3, "...X...X.X.O...", "......1.1......")
 
-    open3("...X...X.X.O...", "......1.1......", _.structStripBlack)
+    black(open3, "....X..X.X.O...", "...............")
 
-    open3("...X..X.X..X...", "...............", _.structStripBlack)
+    black(open3, "...X..X.X..X...", "...............")
 
     // X..X
 
-    open3("...X..X...", "....11....", _.structStripBlack)
+    both(open3, "...X..X...", "....11....")
 
-    open3("...X..X.X.O...", "..............", _.structStripBlack)
+    both(open3, "...X..X..X...", "....11.11....")
 
-    open3("...X..X.X..O...", ".......1.1.....", _.structStripBlack)
+    black(open3, "...X..X.X..O...", ".......1.1.....")
 
-    open3("...X..X..X...", "....11.11....", _.structStripBlack)
+    black(open3, "...X..X.X...", ".......1.1..")
 
-    open3("...X..X.X...", ".......1.1..", _.structStripBlack)
-
+    black(open3, "...X..X.X.O...", "..............")
   }
 
-  def block3(problem: String, answer: String, op: L2Strip => Array[Int]): Unit = {
+  def block3(op: L2Strip => Array[Int], problem: String, answer: String): Unit = {
     op(problem.t2s.calculateL2Strip()).map(v => if (v.blockThreeTotal.toBoolean) "1" else ".").mkString should be (answer)
     op(problem.reverse.t2s.calculateL2Strip()).map(v => if (v.blockThreeTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
   }
 
-//  "block-3 points" should "detect correctly" in {
-//    block3("...XXX...", "..1...1..", _.pointStripBlack)
-//
-//    block3("...O.XXX...", "....1...11.", _.pointStripBlack)
-//
-//    block3("...O.XXX..O...", "....1...11....", _.pointStripBlack)
-//
-//    block3("...XXX..X...", ".11...1.....", _.pointStripBlack)
-//
-//    block3("...XX.X...", "..1..1.1..", _.pointStripBlack)
-//  }
+  "block-3 points" should "detect correctly" in {
+    both(block3, "...XXX...", "..1...1..")
 
-  def closed4(problem: String, answer: String, op: L2Strip => Array[Int]): Unit = {
+    both(block3, "...O.XXX...", "....1...11.")
+
+    both(block3, "...O.XXX..O...", "....1...11....")
+
+    both(block3, "...XX.X...", "..1..1.1..")
+
+    black(block3, "...XXX..X...", ".11...1.....")
+    white(block3, "...OOO..O...", "..1...1.....")
+  }
+
+  def closed4(op: L2Strip => Array[Int], problem: String, answer: String): Unit = {
     op(problem.t2s.calculateL2Strip()).map(v => if (v.closedFourTotal == 0) "." else v.closedFourTotal.toString).mkString should be (answer)
     op(problem.reverse.t2s.calculateL2Strip()).map(v => if (v.closedFourTotal == 0) "." else v.closedFourTotal.toString).mkString should be (answer.reverse)
   }
@@ -96,104 +116,104 @@ class StripTest extends AnyFlatSpec with should.Matchers {
   "closed-4 points" should "detect correctly" in {
     // XXX
 
-    closed4("...XXX...", ".1.....1.", _.structStripBlack)
+    black(closed4, "...XXX...", ".1.....1.")
 
-    closed4("...OXXX...", ".......11.", _.structStripBlack)
+    black(closed4, "...OXXX...", ".......11.")
 
-    closed4("...O.XXX...", "....1....1.", _.structStripBlack)
+    black(closed4, "...O.XXX...", "....1....1.")
 
-    closed4("...O.XXX.O...", "....1...1....", _.structStripBlack)
+    black(closed4, "...O.XXX.O...", "....1...1....")
 
-    closed4("...O.XXX..O...", "....1....1....", _.structStripBlack)
+    black(closed4, "...O.XXX..O...", "....1....1....")
 
-    closed4("...XXX..XXX...", ".1....11....1.", _.structStripBlack)
+    black(closed4, "...XXX..XXX...", ".1....11....1.")
 
-    closed4("...X.XXX..X...", "..............", _.structStripBlack)
+    black(closed4, "...X.XXX..X...", "..............")
 
     // XX.X
 
-    closed4("...XX.X...", "..1....1..", _.structStripBlack)
+    black(closed4, "...XX.X...", "..1....1..")
 
-    closed4("...OXX.X...", "......1.1..", _.structStripBlack)
+    black(closed4, "...OXX.X...", "......1.1..")
 
-    closed4("...O.XX.X...", "....1....1..", _.structStripBlack)
+    black(closed4, "...O.XX.X...", "....1....1..")
 
-    closed4("...O.XX.XO...", "....1..1.....", _.structStripBlack)
+    black(closed4, "...O.XX.XO...", "....1..1.....")
 
-    closed4("...OXX.X.O...", "......1.1....", _.structStripBlack)
+    black(closed4, "...OXX.X.O...", "......1.1....")
 
-    closed4("...O.XX.XO...", "....1..1.....", _.structStripBlack)
+    black(closed4, "...O.XX.XO...", "....1..1.....")
 
     // X.XX
 
-    closed4("...OX.XX...", ".....1..1..", _.structStripBlack)
+    black(closed4, "...OX.XX...", ".....1..1..")
 
-    closed4("...O.X.XXO...", "....1.1......", _.structStripBlack)
+    black(closed4, "...O.X.XXO...", "....1.1......")
 
-    closed4("...OX.XX..X...", ".....1..21....", _.structStripBlack)
+    black(closed4, "...OX.XX..X...", ".....1..21....")
 
-    closed4("...OXX.X.O...", "......1.1....", _.structStripBlack)
+    black(closed4, "...OXX.X.O...", "......1.1....")
 
     // XX..X
 
-    closed4("...XX..X...", ".....11....", _.structStripBlack)
+    black(closed4, "...XX..X...", ".....11....")
 
-    closed4("....XX..XX...", ".............", _.structStripBlack)
+    black(closed4, "....XX..XX...", ".............")
 
-    closed4("...XX..X..X", ".....11....", _.structStripBlack)
+    black(closed4, "...XX..X..X", ".....11....")
 
-    closed4("...XX..X", ".....11.", _.structStripBlack)
+    black(closed4, "...XX..X", ".....11.")
 
     // complex
 
-    closed4("...X.XX.X.X...", "..1.1.........", _.structStripBlack)
+    black(closed4, "...X.XX.X.X...", "..1.1.........")
 
-    closed4("...OX.XX.X...", "........1.1..", _.structStripBlack)
+    black(closed4, "...OX.XX.X...", "........1.1..")
 
-    closed4("...O.XXX..O...", "....1....1....", _.structStripBlack)
+    black(closed4, "...O.XXX..O...", "....1....1....")
 
-    closed4("...XX.X.X...", "..1..1......", _.structStripBlack)
+    black(closed4, "...XX.X.X...", "..1..1......")
   }
 
   "white closed-4 points" should "detect correctly" in {
     // WHITE DOUBLE 4 FORK
 
-    closed4("...O.OO..OO.O...", "..1....22....1..", _.structStripWhite)
+    white(closed4, "...O.OO..OO.O...", "..1....22....1..")
 
-    closed4("...OOO...OOO...", ".1.....2.....1.", _.structStripWhite)
+    white(closed4, "...OOO...OOO...", ".1.....2.....1.")
 
-    closed4("...OO..O.OO...", ".....12....1..", _.structStripWhite)
+    white(closed4, "...OO..O.OO...", ".....12....1..")
 
-    closed4("...O.O.O.O...", "....1.2.1....", _.structStripWhite)
+    white(closed4, "...O.O.O.O...", "....1.2.1....")
 
-    closed4("...O.O.O.O.O...", "....1.2.2.1....", _.structStripWhite)
+    white(closed4, "...O.O.O.O.O...", "....1.2.2.1....")
 
-    closed4("...OOO..OO.OX...", ".1....12..1.....", _.structStripWhite)
+    white(closed4, "...OOO..OO.OX...", ".1....12..1.....")
 
     // CLOSED 4
 
-    closed4("OO.OO.", ".....1", _.structStripWhite)
+    white(closed4, "OO.OO.", ".....1")
 
-    closed4("XO.OO.O..", "..1..1.1.", _.structStripWhite)
+    white(closed4, "XO.OO.O..", "..1..1.1.")
 
-    closed4("...XOOO..OOOX...", ".......11.......", _.structStripWhite)
+    white(closed4, "...XOOO..OOOX...", ".......11.......")
 
-    closed4("...X.OOO..OOOX...", "....1...11.......", _.structStripWhite)
+    white(closed4, "...X.OOO..OOOX...", "....1...11.......")
 
-    closed4("...XO.O.OOX...", ".....1.1......", _.structStripWhite)
+    white(closed4, "...XO.O.OOX...", ".....1.1......")
 
-    closed4("...XOOO..OOO.X...", ".......11...1....", _.structStripWhite)
+    white(closed4, "...XOOO..OOO.X...", ".......11...1....")
 
-    closed4("..XOOO..OX...", "......11.....", _.structStripWhite)
+    white(closed4, "..XOOO..OX...", "......11.....")
 
-    closed4("...OOO...", ".1.....1.", _.structStripWhite)
+    white(closed4, "...OOO...", ".1.....1.")
 
-    closed4("...O.OOO..O...", "..1.....11....", _.structStripWhite)
+    white(closed4, "...O.OOO..O...", "..1.....11....")
 
-    closed4("...XOOO...", ".......11.", _.structStripWhite)
+    white(closed4, "...XOOO...", ".......11.")
   }
 
-  def open4(problem: String, answer: String, op: L2Strip => Array[Int]): Unit = {
+  def open4(op: L2Strip => Array[Int], problem: String, answer: String): Unit = {
     op(problem.t2s.calculateL2Strip()).map(v => if (v.openFourTotal.toBoolean) "1" else ".").mkString should be (answer)
     op(problem.reverse.t2s.calculateL2Strip()).map(v => if (v.openFourTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
   }
@@ -201,52 +221,50 @@ class StripTest extends AnyFlatSpec with should.Matchers {
   "open-4 points" should "detect correctly" in {
     // XXX
 
-    open4("...XXX...", "..1...1..", _.structStripBlack)
+    both(open4, "...XXX...", "..1...1..")
 
-    open4("...XXX..X...", "..1.........", _.structStripBlack)
+    both(open4, "...O.XXX..O...", "........1.....")
 
-    open4("...OOO..O...", "..1...1.....", _.structStripWhite)
+    both(open4, "...O.XXX.O...", ".............")
 
-    open4("...XXX...XXX...", "..1...1.1...1..", _.structStripBlack)
+    both(open4, "...XXX...XXX...", "..1...1.1...1..")
 
-    open4("...O.XXX...", "........1..", _.structStripBlack)
+    both(open4, "...O.XXX...", "........1..")
 
-    open4("...O.XXX.O...", ".............", _.structStripBlack)
-
-    open4("...O.XXX..O...", "........1.....", _.structStripBlack)
+    black(open4, "...XXX..X...", "..1.........")
+    white(open4, "...OOO..O...", "..1...1.....")
 
     // XX.X
 
-    open4("...XX.X...", ".....1....", _.structStripBlack)
+    both(open4, "...XX.X...", ".....1....")
 
-    open4("...OXX.X...", "...........", _.structStripBlack)
+    both(open4, "...OXX.X...", "...........")
 
-    open4("...XX.X.X...", "............", _.structStripBlack)
-
-    open4("...OO.O.O...", ".....1......", _.structStripWhite)
+    black(open4, "...XX.X.X...", "............")
+    white(open4, "...OO.O.O...", ".....1......")
   }
 
-  def five(problem: String, answer: String, op: L2Strip => Array[Int]): Unit = {
+  def five(op: L2Strip => Array[Int], problem: String, answer: String): Unit = {
     op(problem.t2s.calculateL2Strip()).map(v => if (v.fiveTotal.toBoolean) "1" else ".").mkString should be (answer)
     op(problem.reverse.t2s.calculateL2Strip()).map(v => if (v.fiveTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
   }
 
   "move-to-win points" should "detect correctly" in {
-    five("...XXXX...", "..1....1..", _.structStripBlack)
+    both(five, "...XXXX...", "..1....1..")
 
-    five("...OXXXX...", "........1..", _.structStripBlack)
+    both(five, "...OXXXX...", "........1..")
 
-    five("...XX.XX...", ".....1.....", _.structStripBlack)
+    both(five, "...XX.XX...", ".....1.....")
 
-    five("...XXX.X...", "......1....", _.structStripBlack)
+    both(five, "...XXX.X...", "......1....")
 
-    five("...XXXX.XX...", "..1..........", _.structStripBlack)
+    black(five, "...XXXX.XX...", "..1..........")
 
-    five("...XXX.XX...", "............", _.structStripBlack)
+    black(five, "...XXXX..XXXX...", "..1....11....1..")
 
-    five("...OOO.OO...", "......1.....", _.structStripWhite)
+    black(five, "...XXX.XX...", "............")
 
-    five("...XXXX..XXXX...", "..1....11....1..", _.structStripBlack)
+    white(five, "...OOO.OO...", "......1.....")
   }
 
   def win(problem: String, answer: Byte): Unit = {
@@ -282,15 +300,15 @@ class StripTest extends AnyFlatSpec with should.Matchers {
 
     double4forbid("...XX..X.XX...", "......4.......")
 
-    double4forbid("...XXX..X.XX...", "...............")
-
-    double4forbid("...X.X.X.XX...", "..............")
-
     double4forbid("...X.X.X.X...", "......4......")
 
     double4forbid("...X.X.X.X.X...", "......4.4......")
 
     double4forbid("...X.X.X.X.X.X.X.X...", "......4.4.4.4.4......")
+
+    double4forbid("...XXX..X.XX...", "...............")
+
+    double4forbid("...X.X.X.XX...", "..............")
   }
 
   def over6forbid(problem: String, answer: String): Unit = {

@@ -7,31 +7,31 @@ import scala.collection.mutable
 import scala.language.implicitConversions
 
 //noinspection DuplicatedCode
-final class BoardOps(private val b: Board) extends AnyVal {
+final class BoardOps(val b: Board) extends AnyVal {
 
   private def collectStonesX(row: Int): Array[Byte] = {
-    val stones = Array.ofDim[Byte](Renju.BOARD_WIDTH)
+    val stones = new Array[Byte](Renju.BOARD_WIDTH)
     for (idx <- 0 until Renju.BOARD_WIDTH)
       stones(idx) = Flag.onlyStone(b.boardField(Pos.rowColToIdx(row, idx)))
     stones
   }
 
   private def collectStonesY(col: Int): Array[Byte] = {
-    val stones = Array.ofDim[Byte](Renju.BOARD_WIDTH)
+    val stones = new Array[Byte](Renju.BOARD_WIDTH)
     for (idx <- 0 until Renju.BOARD_WIDTH)
       stones(idx) = Flag.onlyStone(b.boardField(Pos.rowColToIdx(idx, col)))
     stones
   }
 
   private def collectStonesDEG45(size: Int, row: Int, col: Int): Array[Byte] = {
-    val stones = Array.ofDim[Byte](size)
+    val stones = new Array[Byte](size)
     for (idx <- 0 until size)
       stones(idx) = Flag.onlyStone(b.boardField(Pos.rowColToIdx(row + idx, col + idx)))
     stones
   }
 
   private def collectStonesDEG315(size: Int, row: Int, col: Int): Array[Byte] = {
-    val stones = Array.ofDim[Byte](size)
+    val stones = new Array[Byte](size)
     for (idx <- 0 until size)
       stones(idx) = Flag.onlyStone(b.boardField(Pos.rowColToIdx(row + idx, col - idx)))
     stones

@@ -2,8 +2,8 @@ package jrenju.solve
 
 import jrenju.Board
 
-object MoveGenerator {
+trait MoveGenerator {
 
-  def collectValidMoves(board: Board): Array[Int] = ???
+  def collectValidMoves(board: Board): Array[Int]
 
 }

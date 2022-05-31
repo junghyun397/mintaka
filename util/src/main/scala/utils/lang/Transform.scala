@@ -4,7 +4,7 @@ object Transform {
   
   def joinHorizontal(elems: String*): String = {
     val cleft = elems.map(_.split("\n"))
-    if (cleft.exists(_.length != cleft.head.length)) throw new Exception()
+    if (cleft.exists(_.length != cleft.head.length)) throw new IllegalArgumentException()
     Array.fill[StringBuilder](cleft.head.length)(new StringBuilder())
       .zipWithIndex
       .map(builderIdx =>
@@ -25,15 +25,17 @@ object Transform {
     
   }
 
-  implicit class ByteTransform(val b: Long) {
+  implicit class ByteTransform(val b: Byte) {
 
-    def toSolidBinaryString: String = {
+    def toGroupedBinaryString: String = {
       val binaryString = b.toBinaryString
 
-      if (binaryString.length == 8)
+      val rs = if (binaryString.length == 8)
         binaryString
       else
         "0" * (8 - binaryString.length) + binaryString
+
+      rs.grouped(4).reduce((acc, s) => acc + " " + s)
     }
   }
   
@@ -41,7 +43,7 @@ object Transform {
     
     def toBoolean: Boolean = if (i == 0) false else true
 
-    def toSeparatedBinaryString: String = {
+    def toGroupedBinaryString: String = {
       val binaryString = i.toBinaryString
 
       val rs = if (binaryString.length == 32)
@@ -54,16 +56,4 @@ object Transform {
     
   }
 
-  implicit class LongTransform(val l: Long) {
-
-    def toSeparatedBinaryString: String = {
-      val binaryString = l.toBinaryString
-
-      if (binaryString.length == 64)
-        binaryString
-      else
-        "0" * (64 - binaryString.length) + binaryString
-    }
-  }
-  
 }

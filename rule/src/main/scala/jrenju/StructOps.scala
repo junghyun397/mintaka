@@ -4,10 +4,11 @@ import jrenju.ParticleOps.particleOps
 import jrenju.notation.{Direction, Flag, Pos, Renju}
 
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.language.implicitConversions
 
 //noinspection DuplicatedCode
-final class StructOps(private val b: Board) extends AnyVal {
+final class StructOps(val b: Board) extends AnyVal {
 
   @inline private def getOffsetIdx(direction: Int, initRow: Int, initCol: Int, offset: Int): Int = direction match {
     case Direction.X => Pos.rowColToIdx(initRow, initCol + offset)
@@ -127,8 +128,7 @@ final class StructOps(private val b: Board) extends AnyVal {
 
   private def isNotPseudoThree(direction: Int, idx: Int, from: Int): Boolean = {
     val counters = this.collectOpen3Counters(direction, idx, b.structFieldBlack, Flag.BLACK)
-    for (idx <- counters.indices) {
-      val counter = counters(idx)
+    for (counter <- counters) {
       val flag = b.boardField(counter)
       if (flag != Flag.FORBIDDEN_6 && flag != Flag.FORBIDDEN_44) {
         val particle = b.structFieldBlack(counter)
@@ -142,6 +142,7 @@ final class StructOps(private val b: Board) extends AnyVal {
       }
     }
 
+    b.structFieldBlack(idx) = b.structFieldBlack(idx).merged(direction, 0x00000000)
     false
   }
 

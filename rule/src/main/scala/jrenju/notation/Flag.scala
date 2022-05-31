@@ -1,17 +1,19 @@
 package jrenju.notation
 
+// margin forbidKind(6-44-33) margin isForbid isEmpty isBlack
+// 0      000                 0      0        0       0
 object Flag {
 
-  val BLACK: Byte = 1
-  val WHITE: Byte = 0
+  val BLACK: Byte = 0x1 // 0000 0001
+  val WHITE: Byte = 0x0 // 0000 0000
 
-  val FREE: Byte = 2
+  val FREE: Byte = 0x2 // 0000 0010
 
-  val FORBIDDEN_33: Byte = 3
-  val FORBIDDEN_44: Byte = 4
-  val FORBIDDEN_6: Byte = 5
+  val FORBIDDEN_33: Byte = 0x16 // 0001 0110
+  val FORBIDDEN_44: Byte = 0x26 // 0010 0110
+  val FORBIDDEN_6: Byte = 0x46 // 0100 0110
 
-  val WALL: Byte = 9
+  val WALL: Byte = 0x08 // 0000 1000
 
   object Text {
 
@@ -45,18 +47,18 @@ object Flag {
     case _ => Option.empty
   }
 
-  @inline def colorFlag(moves: Int): Byte = (moves % 2).toByte
+  @inline def colorFlag(moves: Int): Byte = (moves & 0x01).toByte
 
-  @inline def nextColorFlag(moves: Int): Byte = ((moves + 1) % 2).toByte
+  @inline def nextColorFlag(moves: Int): Byte = (~moves & 0x01).toByte
 
-  @inline def onlyStone(flag: Byte): Byte = if (this.isForbid(flag)) Flag.FREE else flag
+  @inline def onlyStone(flag: Byte): Byte = (flag & 0x03).toByte
 
-  @inline def isEmpty(flag: Byte): Boolean = flag != Flag.BLACK && flag != Flag.WHITE
+  @inline def isEmpty(flag: Byte): Boolean = (flag >>> 1 & 0x01) == 0x01
 
-  @inline def isExist(flag: Byte): Boolean = flag == Flag.BLACK || flag == Flag.WHITE
+  @inline def isExist(flag: Byte): Boolean = (flag >>> 1 & 0x01) == 0x00
 
-  @inline def isForbid(flag: Byte): Boolean = flag == Flag.FORBIDDEN_33 || flag == Flag.FORBIDDEN_44 || flag == Flag.FORBIDDEN_6
+  @inline def isForbid(flag: Byte): Boolean = ((flag >>> 2) & 0x01) == 0x01
 
-  @inline def isForbid(flag: Byte, color: Byte): Boolean = color == Flag.BLACK && this.isForbid(flag)
+  @inline def isForbid(flag: Byte, color: Byte): Boolean = ((flag & (color << 2)) & 0x04) == 0x04
 
 }
