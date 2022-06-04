@@ -1,8 +1,8 @@
 package jrenju
 
 import jrenju.Board.boardOps
+import jrenju.ZobristHash.IncrementHash
 import jrenju.notation.{Color, Flag, Pos, RejectReason, Renju, Rotation}
-import ZobristHash.IncrementHash
 
 import scala.language.implicitConversions
 
@@ -77,7 +77,7 @@ class Board(
       moves = this.moves + 1,
       latestMove = idx,
       winner = Option.empty,
-      zobristKey = this.zobristKey.incrementHash(idx, this.nextColorFlag)
+      zobristKey = this.zobristKey.incrementBoardHash(idx, this.nextColorFlag)
     )
 
     board.integrateStrips(board.composeStrips(idx))

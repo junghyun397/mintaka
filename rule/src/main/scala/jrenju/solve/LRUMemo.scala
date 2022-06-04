@@ -28,7 +28,7 @@ class LRUMemo(
       this.probeWhite(board.zobristKey)
 
   def probe(board: Board, move: Int): Option[Float] = {
-    val key = board.zobristKey.incrementHash(move, board.nextColorFlag)
+    val key = board.zobristKey.incrementBoardHash(move, board.nextColorFlag)
     if (board.isNextColorBlack)
       this.probeBlack(key)
     else
@@ -56,7 +56,7 @@ class LRUMemo(
       this.writeWhite(board.zobristKey, eval)
 
   def write(board: Board, move: Int, eval: Float): Unit = {
-    val key = board.zobristKey.incrementHash(move, board.nextColorFlag)
+    val key = board.zobristKey.incrementBoardHash(move, board.nextColorFlag)
     if (board.isNextColorBlack)
       this.writeBlack(key, eval)
     else

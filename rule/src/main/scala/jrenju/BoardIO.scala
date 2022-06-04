@@ -92,29 +92,40 @@ object BoardIO {
 
     private lazy val columnHint: String = f"   ${
       Seq.range(65, 65 + Renju.BOARD_WIDTH)
-        .map(idx => f"${idx.toChar} ")
+        .map(_.toChar.toString)
+        .reduce((acc, col) => f"$acc $col")
         .mkString
     }  "
 
-    def attributeText[T](extract: Board => Array[T])(transform: T => String): String = f"$columnHint\n${
-      extract(this.source)
+    def attributeText[T](markLastMove: Boolean)(extract: Board => Array[T])(transform: T => String): String = f"$columnHint\n${
+      val result = extract(this.source)
         .grouped(Renju.BOARD_WIDTH)
         .zipWithIndex
         .map(colIdx => f"${colIdx._2 + 1}%2d ${
           colIdx._1
-            .map(value => f"${transform(value)} ")
-            .mkString
-        }${colIdx._2 + 1}%-2d\n")
+            .map(value => transform(value))
+            .reduce((acc, elem) => f"$acc $elem")
+        } ${colIdx._2 + 1}%-2d\n")
         .toArray
         .reverse
         .flatten
         .mkString
+
+      if (markLastMove && source.latestMove != -1) {
+        val offset =(Renju.BOARD_WIDTH_MAX_IDX - Pos.idxToRow(source.latestMove)) * (6 + Renju.BOARD_WIDTH * 2) + Pos.idxToCol(source.latestMove) * 2 + 2
+        result
+          .updated(offset, '[')
+          .updated(offset + 2, ']')
+      } else result
     }$columnHint"
 
-    def boardText: String = this.attributeText(_.boardField)(flag => Flag.flagToChar(flag).toString)
+    def boardText: String = this.boardText(true)
 
-    private val pointFieldTextBlack: (Int => String) => String = this.attributeText(_.structFieldBlack)
-    private val pointFieldTextWhite: (Int => String) => String = this.attributeText(_.structFieldWhite)
+    def boardText(markLatestMove: Boolean): String =
+      this.attributeText(markLatestMove)(_.boardField)(flag => Flag.flagToChar(flag).toString)
+
+    private val pointFieldTextBlack: (Int => String) => String = this.attributeText(markLastMove = false)(_.structFieldBlack)
+    private val pointFieldTextWhite: (Int => String) => String = this.attributeText(markLastMove = false)(_.structFieldWhite)
 
     implicit def dotIfZero(i: Int): String = if (i == 0) "." else i.toString
 

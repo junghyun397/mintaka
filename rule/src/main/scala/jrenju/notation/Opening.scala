@@ -1,7 +1,7 @@
 package jrenju.notation
 
 import jrenju.ZobristHash
-import ZobristHash.IncrementHash
+import jrenju.ZobristHash.IncrementHash
 
 sealed abstract class Opening(val name: String, val jName: String, val rotation: Rotation.Value)
 
@@ -37,17 +37,17 @@ object Opening {
 
   private val directHashes: Map[Rotation.Value, Long] = Map(
     Rotation.STRAIGHT -> ZobristHash.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(127, Flag.WHITE),
+      .incrementBoardHash(112, Flag.BLACK)
+      .incrementBoardHash(127, Flag.WHITE),
     Rotation.CLOCKWISE -> ZobristHash.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(113, Flag.WHITE),
+      .incrementBoardHash(112, Flag.BLACK)
+      .incrementBoardHash(113, Flag.WHITE),
     Rotation.COUNTER_CLOCKWISE -> ZobristHash.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(111, Flag.WHITE),
+      .incrementBoardHash(112, Flag.BLACK)
+      .incrementBoardHash(111, Flag.WHITE),
     Rotation.OVERTURN -> ZobristHash.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(97, Flag.WHITE)
+      .incrementBoardHash(112, Flag.BLACK)
+      .incrementBoardHash(97, Flag.WHITE)
   )
 
   private val directOpeningHashes: Map[Int, Rotation.Value => Opening] = Map(
@@ -68,17 +68,17 @@ object Opening {
 
   private val indirectHashes: Map[Rotation.Value, Long] = Map(
     Rotation.STRAIGHT -> ZobristHash.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(128, Flag.WHITE),
+      .incrementBoardHash(112, Flag.BLACK)
+      .incrementBoardHash(128, Flag.WHITE),
     Rotation.CLOCKWISE -> ZobristHash.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(98, Flag.WHITE),
+      .incrementBoardHash(112, Flag.BLACK)
+      .incrementBoardHash(98, Flag.WHITE),
     Rotation.COUNTER_CLOCKWISE -> ZobristHash.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(126, Flag.WHITE),
+      .incrementBoardHash(112, Flag.BLACK)
+      .incrementBoardHash(126, Flag.WHITE),
     Rotation.OVERTURN -> ZobristHash.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(96, Flag.WHITE)
+      .incrementBoardHash(112, Flag.BLACK)
+      .incrementBoardHash(96, Flag.WHITE)
   )
 
   private val indirectOpeningHashes: Map[Int, Rotation.Value => Opening] = Map(

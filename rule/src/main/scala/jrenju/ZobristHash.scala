@@ -7,7 +7,7 @@ import scala.util.Random
 
 object ZobristHash {
 
-  private val TABLE_SEED = 10204
+  private val TABLE_SEED = 42
 
   private val table: Array[Long] = {
     val random = new Random(TABLE_SEED)
@@ -27,12 +27,10 @@ object ZobristHash {
     var flag = Flag.WALL
     for (move <- 0 until Renju.BOARD_SIZE) {
       flag = field(move)
-      if (Flag.isExist(flag)) {
-        if (flag == Flag.BLACK)
-          result ^= this.table(move)
-        else
-          result ^= this.table(Renju.BOARD_SIZE + move)
-      }
+      if (flag == Flag.BLACK)
+        result ^= this.table(move)
+      else if (flag == Flag.WHITE)
+        result ^= this.table(Renju.BOARD_SIZE + move)
     }
 
     result
@@ -59,7 +57,7 @@ object ZobristHash {
 
   implicit class IncrementHash(source: Long) {
 
-    def incrementHash(move: Int, flag: Byte): Long =
+    def incrementBoardHash(move: Int, flag: Byte): Long =
       if (flag == Flag.BLACK) source ^ table(move)
       else source ^ table(Renju.BOARD_SIZE + move)
 

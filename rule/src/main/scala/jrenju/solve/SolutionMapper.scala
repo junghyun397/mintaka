@@ -15,11 +15,11 @@ object SolutionMapper {
       val color = Flag.colorFlag(moves + 1)
       val nextColor = Flag.colorFlag(moves)
       for (idx <- 0 until Renju.BOARD_SIZE) {
-        val l1hash = hash.incrementHash(idx, color)
+        val l1hash = hash.incrementBoardHash(idx, color)
         if (m.probe(l1hash, color).fold(false)(_ == threshold)) {
           var counter = -1
           for (cIdx <- 0 until Renju.BOARD_SIZE) {
-            if (m.probe(l1hash.incrementHash(cIdx, nextColor), nextColor).fold(false)(_ == -threshold))
+            if (m.probe(l1hash.incrementBoardHash(cIdx, nextColor), nextColor).fold(false)(_ == -threshold))
               counter = cIdx
           }
 

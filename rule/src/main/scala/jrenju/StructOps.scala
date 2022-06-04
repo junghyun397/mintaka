@@ -4,7 +4,7 @@ import jrenju.ParticleOps.particleOps
 import jrenju.notation.{Direction, Flag, Pos, Renju}
 
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.ArrayBuilder
 import scala.language.implicitConversions
 
 //noinspection DuplicatedCode
@@ -73,17 +73,17 @@ final class StructOps(val b: Board) extends AnyVal {
 
     // -0O+O
     else if (
-      Flag.onlyStone(p1Value) == Flag.FREE
+      Flag.isEmpty(p1Value)
         && a1Value == flag
-        && Flag.onlyStone(p2Value) == Flag.FREE
+        && Flag.isEmpty(p2Value)
     )
       Array(a2Pointer)
 
     // O+O0-
     else if (
       p1Value == flag
-        && Flag.onlyStone(p2Value) == Flag.FREE
-        && Flag.onlyStone(a1Value) == Flag.FREE
+        && Flag.isEmpty(p2Value)
+        && Flag.isEmpty(a1Value)
     )
       Array(p2Pointer)
 
@@ -193,7 +193,7 @@ final class StructOps(val b: Board) extends AnyVal {
   }
 
   def calculateForbids(): Unit = {
-    var di3ForbidFlag = false
+    var hasDi3Forbid = false
 
     for (idx <- 0 until Renju.BOARD_SIZE) {
       val particle = b.structFieldBlack(idx)
@@ -206,11 +206,11 @@ final class StructOps(val b: Board) extends AnyVal {
         b.boardField(idx) = Flag.FORBIDDEN_44
       else if (particle.threeTotal > 1) {
         b.boardField(idx) = Flag.FORBIDDEN_33
-        di3ForbidFlag = true
+        hasDi3Forbid = true
       }
     }
 
-    if (di3ForbidFlag)
+    if (hasDi3Forbid)
       for (idx <- 0 until Renju.BOARD_SIZE)
         if (b.boardField(idx) == Flag.FORBIDDEN_33 && this.isPseudoForbid(idx))
           b.boardField(idx) = Flag.FREE

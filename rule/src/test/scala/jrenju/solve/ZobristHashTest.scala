@@ -10,7 +10,7 @@ import org.scalatest.matchers.should
 class ZobristHashTest extends AnyFlatSpec with should.Matchers {
 
   "increment hash" should "same" in {
-    println(ZobristHash.empty.incrementHash("h8".t2i, Flag.BLACK))
+    println(ZobristHash.empty.incrementBoardHash("h8".t2i, Flag.BLACK))
   }
 
 }
