@@ -47,11 +47,11 @@ object Flag {
     case _ => Option.empty
   }
 
-  @inline def colorFlag(moves: Int): Byte = (moves & 0x01).toByte
+  @inline def colorFlag(moves: Int): Byte = (moves & 0x01).byteValue
 
-  @inline def nextColorFlag(moves: Int): Byte = (~moves & 0x01).toByte
+  @inline def nextColorFlag(moves: Int): Byte = (~moves & 0x01).byteValue
 
-  @inline def onlyStone(flag: Byte): Byte = (flag & 0x03).toByte
+  @inline def onlyStone(flag: Byte): Byte = (flag & 0x03).byteValue
 
   @inline def isEmpty(flag: Byte): Boolean = (flag >>> 1 & 0x01) == 0x01
 

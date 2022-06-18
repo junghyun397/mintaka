@@ -11,7 +11,7 @@ object BoardIO {
 
   // regex: [a-z][0-9][0-9]?[0-9]?
   def buildPosSequence(source: String): Option[Seq[Pos]] = {
-    val seq = "[a-z][0-9][0-9]?[0-9]?".r
+    val seq = "[a-z]\\d\\d?\\d?".r
       .findAllIn(source)
       .map(Pos.fromCartesian)
       .toSeq
@@ -27,9 +27,9 @@ object BoardIO {
   def fromSequence(source: Seq[Int]): Option[Board] = {
     val field = Array.fill(Renju.BOARD_SIZE)(Flag.FREE)
 
-    source.zipWithIndex foreach { idxOrder =>
-      field(idxOrder._1) =
-        if (idxOrder._2 % 2 == 0) Flag.BLACK
+    source.zipWithIndex foreach { case (idx, order) =>
+      field(idx) =
+        if (order % 2 == 0) Flag.BLACK
         else Flag.WHITE
     }
 
@@ -43,15 +43,16 @@ object BoardIO {
       zobristKey = ZobristHash.boardHash(field)
     )
 
-    board.integrateStrips(board.composeGlobalStrips())
+    board.integrateStrips(board.composeGlobalStrips().map(_.calculateL2Strip()))
     board.calculateForbids()
 
     Option(board)
   }
 
-  // regex: [0-9][\s(]([^\s][\s()]){15}[0-9]
+  //noinspection ScalaUnnecessaryParentheses
+  // regex: [0-9][\s\[]([^\s][\s\[\]]){15}[0-9]
   def fromBoardText(source: String, latestMove: Int): Option[Board] = this.fromFieldArray(
-    ("[0-9][\\s(]([^\\s()]\\s){" + Renju.BOARD_WIDTH + "}[0-9]").r.findAllIn(source)
+    (f"[0-9][\\s\\[]([^\\s\\[\\]]\\s){${Renju.BOARD_WIDTH}}[0-9]").r.findAllIn(source)
       .toArray
       .flatMap(_
         .drop(1)
@@ -82,7 +83,7 @@ object BoardIO {
         zobristKey = ZobristHash.boardHash(source)
       )
 
-      board.integrateStrips(board.composeGlobalStrips())
+      board.integrateStrips(board.composeGlobalStrips().map(_.calculateL2Strip()))
       board.calculateForbids()
 
       Option(board)
@@ -95,23 +96,25 @@ object BoardIO {
         .map(_.toChar.toString)
         .reduce((acc, col) => f"$acc $col")
         .mkString
-    }  "
+    }   "
 
     def attributeText[T](markLastMove: Boolean)(extract: Board => Array[T])(transform: T => String): String = f"$columnHint\n${
       val result = extract(this.source)
         .grouped(Renju.BOARD_WIDTH)
         .zipWithIndex
-        .map(colIdx => f"${colIdx._2 + 1}%2d ${
-          colIdx._1
-            .map(value => transform(value))
-            .reduce((acc, elem) => f"$acc $elem")
-        } ${colIdx._2 + 1}%-2d\n")
+        .map { case (col, idx) =>
+          f"${idx + 1}%2d ${
+            col
+              .map(value => transform(value))
+              .reduce((acc, elem) => f"$acc $elem")
+          } ${idx + 1}%-2d\n"
+        }
         .toArray
         .reverse
         .flatten
         .mkString
 
-      if (markLastMove && source.latestMove != -1) {
+      if (markLastMove && source.moves != 0) {
         val offset =(Renju.BOARD_WIDTH_MAX_IDX - Pos.idxToRow(source.latestMove)) * (6 + Renju.BOARD_WIDTH * 2) + Pos.idxToCol(source.latestMove) * 2 + 2
         result
           .updated(offset, '[')

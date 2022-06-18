@@ -1,31 +1,33 @@
 package utils.lang
 
+import scala.collection.mutable
+
 object Transform {
   
   def joinHorizontal(elems: String*): String = {
     val cleft = elems.map(_.split("\n"))
     if (cleft.exists(_.length != cleft.head.length)) throw new IllegalArgumentException()
-    Array.fill[StringBuilder](cleft.head.length)(new StringBuilder())
+    Array.fill[mutable.StringBuilder](cleft.head.length)(new mutable.StringBuilder())
       .zipWithIndex
-      .map(builderIdx =>
-        builderIdx._1
+      .map { case (acc, idx) =>
+        acc
           .append(
             cleft
-              .map(line => f"${line(builderIdx._2)} ")
+              .map(line => f"${line(idx)} ")
               .mkString
           )
           .append("\n")
-      )
+      }
       .mkString
   }
 
-  implicit class BoolTransform(val b: Boolean) {
+  implicit class BoolTransform(val b: Boolean) extends AnyVal {
     
     def toInt: Int = if (b) 1 else 0
     
   }
 
-  implicit class ByteTransform(val b: Byte) {
+  implicit class ByteTransform(val b: Byte) extends AnyVal {
 
     def toGroupedBinaryString: String = {
       val binaryString = b.toBinaryString
@@ -39,7 +41,7 @@ object Transform {
     }
   }
   
-  implicit class IntTransform(val i: Int) {
+  implicit class IntTransform(val i: Int) extends AnyVal {
     
     def toBoolean: Boolean = if (i == 0) false else true
 
@@ -53,6 +55,12 @@ object Transform {
         
       rs.grouped(4).reduce((acc, s) => acc + " " + s)
     }
+
+    def integerShift(shift: Int): Int =
+      if (shift < 0)
+        i << -shift
+      else
+        i >>> shift
     
   }
 

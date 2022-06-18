@@ -9,11 +9,11 @@ class BitField(val elems: Array[Int]) extends AnyVal {
 
   def apply(row: Int, col: Int): Boolean = ((this.elems(row) << col) & 0x8000_0000) == 0x8000_0000
 
-  def applyMaskOr(row: Int, shift: Int, mask: Int): Unit = this.elems(row) |= (mask >>> shift)
+  def applyMaskOr(row: Int, mask: Int): Unit = this.elems(row) |= mask
 
-  def applyMaskAnd(row: Int, shift: Int, mask: Int): Unit = this.elems(row) &= (mask >>> shift)
+  def applyMaskAnd(row: Int, mask: Int): Unit = this.elems(row) &= mask
 
-  def applyMaskXor(row: Int, shift: Int, mask: Int): Unit = this.elems(row) ^= (mask >>> shift)
+  def applyMaskXor(row: Int, mask: Int): Unit = this.elems(row) ^= mask
 
   def |= (other: this.type): Unit = {
     var idx = 0

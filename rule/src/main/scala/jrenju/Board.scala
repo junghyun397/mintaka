@@ -2,7 +2,7 @@ package jrenju
 
 import jrenju.Board.boardOps
 import jrenju.ZobristHash.IncrementHash
-import jrenju.notation.{Color, Flag, Pos, RejectReason, Renju, Rotation}
+import jrenju.notation._
 
 import scala.language.implicitConversions
 
@@ -80,7 +80,7 @@ class Board(
       zobristKey = this.zobristKey.incrementBoardHash(idx, this.nextColorFlag)
     )
 
-    board.integrateStrips(board.composeStrips(idx))
+    board.integrateStrips(board.composeStrips(idx).map(_.calculateL2Strip()))
     if (calculateForbid) board.calculateForbids()
 
     board

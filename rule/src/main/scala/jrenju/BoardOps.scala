@@ -37,19 +37,17 @@ final class BoardOps(val b: Board) extends AnyVal {
     stones
   }
 
-  def composeStrips(pivot: Int): Array[L2Strip] = {
+  def composeStrips(pivot: Int): Array[L1Strip] = {
     val col = Pos.idxToCol(pivot)
     val row = Pos.idxToRow(pivot)
 
     val rCol = Renju.BOARD_WIDTH_MAX_IDX - col
 
-    val builder = new mutable.ArrayBuilder.ofRef[L2Strip]()
+    val builder = new mutable.ArrayBuilder.ofRef[L1Strip]()
 
     builder += new L1Strip(Direction.X, Pos.rowColToIdx(row, 0), Renju.BOARD_WIDTH, this.collectStonesX(row))
-      .calculateL2Strip()
 
     builder += new L1Strip(Direction.Y, Pos.rowColToIdx(0, col), Renju.BOARD_WIDTH, this.collectStonesY(col))
-      .calculateL2Strip()
 
     if (col - row < 0) { // TOP
       val y = row - col
@@ -61,7 +59,6 @@ final class BoardOps(val b: Board) extends AnyVal {
           size,
           this.collectStonesDEG45(size, y, 0)
         )
-          .calculateL2Strip()
     } else { // BOTTOM
       val x = col - row
       val size = Renju.BOARD_WIDTH - x
@@ -72,7 +69,6 @@ final class BoardOps(val b: Board) extends AnyVal {
           size,
           this.collectStonesDEG45(size, 0, x)
         )
-          .calculateL2Strip()
     }
 
     if (rCol - row < 0) { // TOP
@@ -85,7 +81,6 @@ final class BoardOps(val b: Board) extends AnyVal {
           size,
           this.collectStonesDEG315(size, y, Renju.BOARD_WIDTH_MAX_IDX)
         )
-          .calculateL2Strip()
     } else { // BOTTOM
       val x = rCol - row
       val size = Renju.BOARD_WIDTH - x
@@ -96,14 +91,13 @@ final class BoardOps(val b: Board) extends AnyVal {
           size,
           this.collectStonesDEG315(size, 0, col + row)
         )
-          .calculateL2Strip()
     }
 
     builder.result()
   }
 
-  def composeGlobalStrips(): Array[L2Strip] = {
-    val strips = Array.ofDim[L2Strip](Renju.BOARD_WIDTH * 6 - 18)
+  def composeGlobalStrips(): Array[L1Strip] = {
+    val strips = new Array[L1Strip](Renju.BOARD_WIDTH * 6 - 18)
 
     for (idx <- 0 until Renju.BOARD_WIDTH) {
       strips(idx * 2) = new L1Strip(
@@ -112,7 +106,6 @@ final class BoardOps(val b: Board) extends AnyVal {
         Renju.BOARD_WIDTH,
         this.collectStonesX(idx)
       )
-        .calculateL2Strip()
 
       strips(idx * 2 + 1) = new L1Strip(
         Direction.Y,
@@ -120,7 +113,6 @@ final class BoardOps(val b: Board) extends AnyVal {
         Renju.BOARD_WIDTH,
         this.collectStonesY(idx)
       )
-        .calculateL2Strip()
     }
 
     val offset45Bottom = Renju.BOARD_WIDTH * 2
@@ -131,7 +123,6 @@ final class BoardOps(val b: Board) extends AnyVal {
         Renju.BOARD_WIDTH - idx,
         this.collectStonesDEG45(Renju.BOARD_WIDTH - idx, 0, idx)
       )
-        .calculateL2Strip()
     }
 
     val offset45Top = Renju.BOARD_WIDTH * 3 - 4
@@ -142,7 +133,6 @@ final class BoardOps(val b: Board) extends AnyVal {
         Renju.BOARD_WIDTH_MAX_IDX - idx,
         this.collectStonesDEG45(Renju.BOARD_WIDTH_MAX_IDX - idx, idx + 1, 0)
       )
-        .calculateL2Strip()
     }
 
     val offset315Bottom = Renju.BOARD_WIDTH * 4 - 9
@@ -153,7 +143,6 @@ final class BoardOps(val b: Board) extends AnyVal {
         Renju.BOARD_WIDTH - idx,
         this.collectStonesDEG315(Renju.BOARD_WIDTH - idx, 0, Renju.BOARD_WIDTH_MAX_IDX - idx)
       )
-        .calculateL2Strip()
     }
 
     val offset315Top = Renju.BOARD_WIDTH * 5 - 13
@@ -164,7 +153,6 @@ final class BoardOps(val b: Board) extends AnyVal {
         Renju.BOARD_WIDTH_MAX_IDX - idx,
         this.collectStonesDEG315(Renju.BOARD_WIDTH_MAX_IDX - idx, idx + 1, Renju.BOARD_WIDTH_MAX_IDX)
       )
-        .calculateL2Strip()
     }
 
     strips

@@ -25,7 +25,7 @@ object VCFSolver {
 
         val l1board = board.makeMove(idx, calculateForbid = false)
 
-        val counter = l1board.structFieldBlack.indexWhere(_.fiveTotal == 1)
+        val counter = l1board.structFieldBlack.indexWhere(_.fiveTotal > 0)
         val counterPoint = l1board.structFieldWhite(counter)
 
         val l2board = l1board.makeMove(counter)

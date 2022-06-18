@@ -13,7 +13,7 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
 
     println(board.debugText)
 
-    answer.filterNot(c => c == ' ' || c == '\n') should include (board.boardText.filterNot(c => c == ' ' || c == '\n'))
+    answer.filter(c => c == 'O' || c == 'X' || c == '.') should include (board.boardText.filter(c => c == 'O' || c == 'X' || c == '.'))
   }
 
   "edge cases" should "analyze correctly" in {
