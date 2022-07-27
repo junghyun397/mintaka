@@ -320,7 +320,7 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
         | 9 . . . . O X O X X . . . . . . 9
         | 8 . . . . . . X X . . O . . . . 8
         | 7 . . . . . . O O X X . . . . . 7
-        | 6 . . . . . X . . . . . . . . . 6
+        | 6 . . . . . X O . . . . . . . . 6
         | 5 . . . . O X . . . . . . . . . 5
         | 4 . . . . . O . . . . . . . . . 4
         | 3 . . . . . . . . . . . . . . . 3
@@ -339,7 +339,7 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
         | 9 . . . . O X O X X . . . . . . 9
         | 8 . . . . . . X X 3 . O . . . . 8
         | 7 . . . . . . O O X X . . . . . 7
-        | 6 . . . . . X . . . . . . . . . 6
+        | 6 . . . . . X O . . . . . . . . 6
         | 5 . . . . O X . . . . . . . . . 5
         | 4 . . . . . O . . . . . . . . . 4
         | 3 . . . . . . . . . . . . . . . 3

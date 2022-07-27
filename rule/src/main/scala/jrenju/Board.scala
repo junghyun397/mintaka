@@ -1,6 +1,7 @@
 package jrenju
 
 import jrenju.Board.boardOps
+import jrenju.BoardIO.BoardToText
 import jrenju.ZobristHash.IncrementHash
 import jrenju.notation._
 
@@ -16,7 +17,7 @@ class Board(
 
   var winner: Option[Byte],
 
-  val zobristKey: Long,
+  val hashKey: Long,
 ) extends Cloneable {
 
   def colorFlag: Byte = Flag.colorFlag(this.moves)
@@ -77,20 +78,13 @@ class Board(
       moves = this.moves + 1,
       latestMove = idx,
       winner = Option.empty,
-      zobristKey = this.zobristKey.incrementBoardHash(idx, this.nextColorFlag)
+      hashKey = this.hashKey.incrementBoardHash(idx, this.nextColorFlag)
     )
 
     board.integrateStrips(board.composeStrips(idx).map(_.calculateL2Strip()))
     if (calculateForbid) board.calculateForbids()
 
     board
-  }
-
-  def rotatedKey(rotation: Rotation.Value): Long = rotation match {
-    case Rotation.CLOCKWISE => 0
-    case Rotation.COUNTER_CLOCKWISE => 0
-    case Rotation.OVERTURN => 0
-    case _ => this.zobristKey
   }
 
   def rotated(rotation: Rotation.Value): this.type = rotation match {
@@ -100,7 +94,7 @@ class Board(
     case _ => this
   }
 
-  def transposedKey(): Long = this.zobristKey
+  def transposedKey(): Long = this.hashKey
 
   def transposed(): this.type = this
 
@@ -111,8 +105,10 @@ class Board(
     moves = this.moves,
     latestMove = this.latestMove,
     winner = this.winner,
-    zobristKey = this.zobristKey
+    hashKey = this.hashKey
   )
+
+  override def toString: String = this.boardText
 
 }
 
@@ -131,7 +127,7 @@ object Board {
     moves = 1,
     winner = Option.empty,
     latestMove = initIdx,
-    zobristKey = ZobristHash.empty
+    hashKey = ZobristHash.empty
   )
 
 }

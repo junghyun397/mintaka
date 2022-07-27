@@ -37,7 +37,7 @@ object LargeMoveGenerator extends MoveGenerator {
     if (opponentHasOpenFour) {
       val validMoves = mutable.ArrayBuilder.make[Int]
 
-      for (idx <- 9 until Renju.BOARD_SIZE) {
+      for (idx <- 0 until Renju.BOARD_SIZE) {
         val flag = board.boardField(idx)
 
         if (!Flag.isForbid(flag, board.nextColorFlag)) {

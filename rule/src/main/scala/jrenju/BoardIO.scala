@@ -40,7 +40,7 @@ object BoardIO {
       moves = source.length,
       latestMove = source.last,
       winner = Option.empty,
-      zobristKey = ZobristHash.boardHash(field)
+      hashKey = ZobristHash.boardHash(field)
     )
 
     board.integrateStrips(board.composeGlobalStrips().map(_.calculateL2Strip()))
@@ -49,23 +49,25 @@ object BoardIO {
     Option(board)
   }
 
-  //noinspection ScalaUnnecessaryParentheses
-  // regex: [0-9][\s\[]([^\s][\s\[\]]){15}[0-9]
-  def fromBoardText(source: String, latestMove: Int): Option[Board] = this.fromFieldArray(
-    (f"[0-9][\\s\\[]([^\\s\\[\\]]\\s){${Renju.BOARD_WIDTH}}[0-9]").r.findAllIn(source)
-      .toArray
-      .flatMap(_
-        .drop(1)
-        .dropRight(1)
-        .toUpperCase
-        .map(Flag.charToFlag)
-        .filter(_.isDefined)
-        .map(_.get)
-        .reverse
-      )
-      .reverse,
-    latestMove,
-  )
+  def fromBoardText(source: String, latestMove: Int): Option[Board] = {
+    val regex = """\d[\s\[](\S[\s\[\]]){15}\d""".r
+
+    this.fromFieldArray(
+      regex.findAllIn(source)
+        .toArray
+        .flatMap(_
+          .drop(1)
+          .dropRight(1)
+          .toUpperCase
+          .map(Flag.charToFlag)
+          .filter(_.isDefined)
+          .map(_.get)
+          .reverse
+        )
+        .reverse,
+      latestMove,
+    )
+  }
 
   def fromFieldArray(source: Array[Byte], latestMove: Int): Option[Board] =
     if (source.length != Renju.BOARD_SIZE) Option.empty
@@ -80,7 +82,7 @@ object BoardIO {
         },
         latestMove = latestMove,
         winner = Option.empty,
-        zobristKey = ZobristHash.boardHash(source)
+        hashKey = ZobristHash.boardHash(source)
       )
 
       board.integrateStrips(board.composeGlobalStrips().map(_.calculateL2Strip()))
@@ -135,7 +137,7 @@ object BoardIO {
     def debugText: String =
       f"${this.boardText}\n" +
         joinHorizontal(
-          f"\nblack-three /\n${this.pointFieldTextBlack(_.threeTotal)}\n",
+          f"\nblack-open-three /\n${this.pointFieldTextBlack(_.threeTotal)}\n",
           f"\nblack-block-three /\n${this.pointFieldTextBlack(_.blockThreeTotal)}\n",
           f"\nblack-closed-four /\n${this.pointFieldTextBlack(_.closedFourTotal)}\n",
           f"\nblack-open-four /\n${this.pointFieldTextBlack(_.openFourTotal)}\n",

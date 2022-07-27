@@ -9,7 +9,7 @@ object EmptyBoard extends Board(
   moves = 0,
   latestMove = 0,
   winner = Option.empty,
-  zobristKey = ZobristHash.empty
+  hashKey = ZobristHash.empty
 ) {
 
   override val color: Color.Value = Color.EMPTY

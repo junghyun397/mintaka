@@ -311,19 +311,19 @@ class StripTest extends AnyFlatSpec with should.Matchers {
     double4forbid("...X.X.X.XX...", "..............")
   }
 
-  def over6forbid(problem: String, answer: String): Unit = {
+  def over5forbid(problem: String, answer: String): Unit = {
     problem.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_6) "6" else ".").mkString should be (answer)
     problem.reverse.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_6) "6" else ".").mkString should be (answer.reverse)
   }
 
   "over-6 forbidden points" should "detect correctly" in {
-    over6forbid("...XXX.XX...", "......6.....")
+    over5forbid("...XXX.XX...", "......6.....")
 
-    over6forbid("...X.XXXX...", "....6.......")
+    over5forbid("...X.XXXX...", "....6.......")
 
-    over6forbid("...X.XXX.XXX...", "........6......")
+    over5forbid("...X.XXX.XXX...", "........6......")
 
-    over6forbid("...OXXXX.X...", "........6....")
+    over5forbid("...OXXXX.X...", "........6....")
   }
 
 }

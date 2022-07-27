@@ -1,15 +1,15 @@
 package jrenju.solve
 
 import jrenju.Board
+import jrenju.ZobristHash.IncrementHash
 import jrenju.notation.{Flag, Renju}
 import jrenju.protocol.{Solution, SolutionLeaf, SolutionNode}
-import jrenju.ZobristHash.IncrementHash
 
 object SolutionMapper {
 
   implicit class SolutionFinder(val m: LRUMemo) extends AnyVal {
 
-    def findSolution(board: Board, threshold: Float): Option[Solution] = this.findSolution(threshold, board.moves, board.zobristKey)
+    def findSolution(board: Board, threshold: Float): Option[Solution] = this.findSolution(threshold, board.moves, board.hashKey)
 
     def findSolution(threshold: Float, moves: Int, hash: Long): Option[Solution] = {
       val color = Flag.colorFlag(moves + 1)

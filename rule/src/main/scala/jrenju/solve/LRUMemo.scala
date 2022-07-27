@@ -1,8 +1,8 @@
 package jrenju.solve
 
 import jrenju.Board
-import jrenju.notation.Flag
 import jrenju.ZobristHash.IncrementHash
+import jrenju.notation.Flag
 import utils.lang.LRUCache
 
 import java.util.Collections.synchronizedMap
@@ -23,12 +23,12 @@ class LRUMemo(
 
   def probe(board: Board): Option[Float] =
     if (board.isNextColorBlack)
-      this.probeBlack(board.zobristKey)
+      this.probeBlack(board.hashKey)
     else
-      this.probeWhite(board.zobristKey)
+      this.probeWhite(board.hashKey)
 
   def probe(board: Board, move: Int): Option[Float] = {
-    val key = board.zobristKey.incrementBoardHash(move, board.nextColorFlag)
+    val key = board.hashKey.incrementBoardHash(move, board.nextColorFlag)
     if (board.isNextColorBlack)
       this.probeBlack(key)
     else
@@ -51,12 +51,12 @@ class LRUMemo(
 
   def write(board: Board, eval: Float): Unit =
     if (board.isNextColorBlack)
-      this.writeBlack(board.zobristKey, eval)
+      this.writeBlack(board.hashKey, eval)
     else
-      this.writeWhite(board.zobristKey, eval)
+      this.writeWhite(board.hashKey, eval)
 
   def write(board: Board, move: Int, eval: Float): Unit = {
-    val key = board.zobristKey.incrementBoardHash(move, board.nextColorFlag)
+    val key = board.hashKey.incrementBoardHash(move, board.nextColorFlag)
     if (board.isNextColorBlack)
       this.writeBlack(key, eval)
     else

@@ -39,11 +39,11 @@ final class L1Strip(
 
   private implicit def pointProviderOps(xs: Array[Int]): StructProviderOps = new StructProviderOps(xs)
 
-  @inline private def isNotOver6(mask: Int): Boolean = this.isNotOver6(mask, -1, -1)
+  @inline private def isNotOver5(mask: Int): Boolean = this.isNotOver5(mask, -1, -1)
 
-  @inline private def isNotOver6(mask1: Int, mask2: Int): Boolean = this.isNotOver6(mask1, mask2, -1)
+  @inline private def isNotOver5(mask1: Int, mask2: Int): Boolean = this.isNotOver5(mask1, mask2, -1)
 
-  private def isNotOver6(mask1: Int, mask2: Int, mask3: Int): Boolean = {
+  private def isNotOver5(mask1: Int, mask2: Int, mask3: Int): Boolean = {
     var bridged = 0
 
     var pointer = 0
@@ -60,7 +60,7 @@ final class L1Strip(
     true
   }
 
-  private def isNotOver6White(mask1: Int, mask2: Int, mask3: Int): Boolean = {
+  private def isNotOver5White(mask1: Int, mask2: Int, mask3: Int): Boolean = {
     var bridged = 0
 
     var pointer = 0
@@ -94,7 +94,7 @@ final class L1Strip(
     ) {
       if (p1Flag == Flag.WHITE)
         structStripWhite.setFive(pointer)
-      else if (this.isNotOver6(pointer))
+      else if (this.isNotOver5(pointer))
         structStripBlack.setFive(pointer)
       else if (p5Flag != Flag.BLACK)
         forbidMask(pointer) = Flag.FORBIDDEN_6
@@ -107,7 +107,7 @@ final class L1Strip(
     ) {
       if (flag == Flag.WHITE)
         structStripWhite.setFive(op(pointer, 1))
-      else if (this.isNotOver6(op(pointer, 1)))
+      else if (this.isNotOver5(op(pointer, 1)))
         structStripBlack.setFive(op(pointer, 1))
       else
         forbidMask(op(pointer, 1)) = Flag.FORBIDDEN_6
@@ -122,8 +122,8 @@ final class L1Strip(
       if (p2Flag == Flag.WHITE) {
         structStripWhite.setOpenFour(op(pointer, 1))
         structStripWhite.setBlockThree(op(pointer, 1))
-      } else if (this.isNotOver6(op(pointer, 1), op(pointer, 5))) {
-        if (this.isNotOver6(pointer, op(pointer, 1)))
+      } else if (this.isNotOver5(op(pointer, 1), op(pointer, 5))) {
+        if (this.isNotOver5(pointer, op(pointer, 1)))
           structStripBlack.setOpenFour(op(pointer, 1))
         else
           structStripBlack.increaseClosedFour(op(pointer, 1))
@@ -140,8 +140,8 @@ final class L1Strip(
         structStripWhite.setOpenFour(op(pointer, 2))
         structStripWhite.setBlockThree(op(pointer, 2))
       } else {
-        val condL = this.isNotOver6(op(pointer, 2), pointer)
-        val condR = this.isNotOver6(op(pointer, 2), op(pointer, 5))
+        val condL = this.isNotOver5(op(pointer, 2), pointer)
+        val condR = this.isNotOver5(op(pointer, 2), op(pointer, 5))
         if (condL && condR) {
           structStripBlack.setOpenFour(op(pointer, 2))
           structStripBlack.setBlockThree(op(pointer, 2))
@@ -162,11 +162,11 @@ final class L1Strip(
 
         if (p6Flag != Flag.FREE && structStripWhite(op(pointer, 1)).openFourAt(0))
           structStripWhite.setBlockThree(pointer)
-      } else if (this.isNotOver6(pointer, op(pointer, 1))) {
+      } else if (this.isNotOver5(pointer, op(pointer, 1))) {
         structStripBlack.increaseClosedFour(pointer)
 
         if (
-          (p6Flag != Flag.FREE || !this.isNotOver6(op(pointer, 5), op(pointer, 6)))
+          (p6Flag != Flag.FREE || !this.isNotOver5(op(pointer, 5), op(pointer, 6)))
             && structStripBlack(op(pointer, 1)).openFourAt(0)
         )
           structStripBlack.setBlockThree(pointer)
@@ -186,7 +186,7 @@ final class L1Strip(
           whiteC4MarksDouble(op(pointer, 1)) = true
           whiteC4MarksDouble(op(pointer, 2)) = true
         }
-      } else if (this.isNotOver6(op(pointer, 1), op(pointer, 2))) {
+      } else if (this.isNotOver5(op(pointer, 1), op(pointer, 2))) {
         structStripBlack.increaseClosedFour(op(pointer, 1))
         structStripBlack.increaseClosedFour(op(pointer, 2))
       }
@@ -205,7 +205,7 @@ final class L1Strip(
           whiteC4MarksDouble(pointer) = true
           whiteC4MarksDouble(op(pointer, 1)) = true
         }
-      } else if (this.isNotOver6(pointer, op(pointer, 1))) {
+      } else if (this.isNotOver5(pointer, op(pointer, 1))) {
         structStripBlack.increaseClosedFour(pointer)
         structStripBlack.increaseClosedFour(op(pointer, 1))
       }
@@ -229,11 +229,11 @@ final class L1Strip(
         }
         structStripWhite.setBlockThree(op(pointer, 5))
       } else {
-        if (this.isNotOver6(pointer, op(pointer, 2))) {
+        if (this.isNotOver5(pointer, op(pointer, 2))) {
           structStripBlack.increaseClosedFour(pointer)
           structStripBlack.setBlockThree(pointer)
         }
-        if (this.isNotOver6(op(pointer, 2), op(pointer, 5))) {
+        if (this.isNotOver5(op(pointer, 2), op(pointer, 5))) {
           structStripBlack.increaseClosedFour(op(pointer, 5))
           structStripBlack.setBlockThree(op(pointer, 5))
         }
@@ -249,7 +249,7 @@ final class L1Strip(
       if (p2Flag == Flag.WHITE) {
         structStripWhite.increaseClosedFour(op(pointer, 4))
         structStripWhite.setBlockThree(op(pointer, 4))
-      } else if (this.isNotOver6(pointer, op(pointer, 4))) {
+      } else if (this.isNotOver5(pointer, op(pointer, 4))) {
         structStripBlack.increaseClosedFour(op(pointer, 4))
         structStripBlack.setBlockThree(op(pointer, 4))
       }
@@ -265,7 +265,7 @@ final class L1Strip(
         structStripWhite.increaseClosedFour(pointer)
         if (p5Flag != p4Flag)
           structStripWhite.increaseClosedFour(op(pointer, 2))
-      } else if (p5Flag != p4Flag && this.isNotOver6(pointer, op(pointer, 2))) {
+      } else if (p5Flag != p4Flag && this.isNotOver5(pointer, op(pointer, 2))) {
         structStripBlack.increaseClosedFour(pointer)
         structStripBlack.increaseClosedFour(op(pointer, 2))
       }
@@ -287,7 +287,7 @@ final class L1Strip(
           structStripWhite.increaseClosedFour(op(pointer, 3))
           whiteC4MarksSingle(op(pointer, 3)) = true
         }
-      } else if (p5Flag != p4Flag && this.isNotOver6(pointer, op(pointer, 3))) {
+      } else if (p5Flag != p4Flag && this.isNotOver5(pointer, op(pointer, 3))) {
         structStripBlack.increaseClosedFour(pointer)
         structStripBlack.increaseClosedFour(op(pointer, 3))
       }
@@ -303,10 +303,10 @@ final class L1Strip(
       if (p4Flag == Flag.WHITE) {
         structStripWhite.setThree(op(pointer, 1))
         structStripWhite.setThree(op(pointer, 2))
-      } else if (this.isNotOver6(pointer, op(pointer, 1), op(pointer, 2))) {
+      } else if (this.isNotOver5(pointer, op(pointer, 1), op(pointer, 2))) {
         structStripBlack.setThree(op(pointer, 1))
         structStripBlack.setThree(op(pointer, 2))
-      } else if (p6Flag != Flag.WHITE && this.isNotOver6(op(pointer, 5), op(pointer, 6))) {
+      } else if (p6Flag != Flag.WHITE && this.isNotOver5(op(pointer, 5), op(pointer, 6))) {
         structStripBlack.setThree(op(pointer, 2))
       }
     }
@@ -318,11 +318,11 @@ final class L1Strip(
         && p5Flag == Flag.FREE && p4Flag == Flag.FREE && p3Flag == p2Flag && p1Flag == Flag.FREE
     ) {
       if (p3Flag == Flag.WHITE) {
-        if (this.isNotOver6White(pointer, op(pointer, 1), op(pointer, 4)))
+        if (this.isNotOver5White(pointer, op(pointer, 1), op(pointer, 4)))
           structStripWhite.setThree(op(pointer, 1))
         structStripWhite.setThree(op(pointer, 4))
-      } else if (this.isNotOver6(pointer, op(pointer, 1))) {
-        if (this.isNotOver6(pointer, op(pointer, 1), op(pointer, 4)))
+      } else if (this.isNotOver5(pointer, op(pointer, 1))) {
+        if (this.isNotOver5(pointer, op(pointer, 1), op(pointer, 4)))
           structStripBlack.setThree(op(pointer, 1))
         structStripBlack.setThree(op(pointer, 4))
       }
@@ -336,7 +336,7 @@ final class L1Strip(
     ) {
       if (p4Flag == Flag.WHITE) {
         structStripWhite.setThree(op(pointer, 1))
-      } else if (this.isNotOver6(pointer, op(pointer, 1), op(pointer, 3))) {
+      } else if (this.isNotOver5(pointer, op(pointer, 1), op(pointer, 3))) {
         structStripBlack.setThree(op(pointer, 1))
       }
     }
@@ -350,7 +350,7 @@ final class L1Strip(
       if (p4Flag == Flag.WHITE) {
         structStripWhite.setThree(op(pointer, 1))
         structStripWhite.setThree(op(pointer, 3))
-      } else if (this.isNotOver6(pointer, op(pointer, 1), op(pointer, 3))) {
+      } else if (this.isNotOver5(pointer, op(pointer, 1), op(pointer, 3))) {
         structStripBlack.setThree(op(pointer, 1))
         structStripBlack.setThree(op(pointer, 3))
       }
@@ -390,7 +390,7 @@ final class L1Strip(
       if (
         isSolid
           && p4Flag == p3Flag && p3Flag == p2Flag && p2Flag == p1Flag && p1Flag == flag
-          && (flag == Flag.WHITE || this.isNotOver6(pointer))
+          && (flag == Flag.WHITE || this.isNotOver5(pointer))
       )
         winner = flag
 
@@ -402,7 +402,7 @@ final class L1Strip(
       )
         if (flag == Flag.WHITE)
           structStripWhite.setFive(pointer - 2)
-        else if (this.isNotOver6(pointer - 2))
+        else if (this.isNotOver5(pointer - 2))
           structStripBlack.setFive(pointer - 2)
         else
           forbidMask(pointer - 2) = Flag.FORBIDDEN_6
@@ -421,7 +421,7 @@ final class L1Strip(
             structStripWhite.increaseClosedFour(pointer - 1)
             structStripWhite.increaseClosedFour(pointer - 3)
           }
-        } else if (this.isNotOver6(pointer - 1, pointer - 3)) {
+        } else if (this.isNotOver5(pointer - 1, pointer - 3)) {
           structStripBlack.increaseClosedFour(pointer - 1)
           structStripBlack.increaseClosedFour(pointer - 3)
         }
@@ -436,8 +436,8 @@ final class L1Strip(
           structStripWhite.setThree(pointer - 2)
           structStripWhite.setThree(pointer - 3)
         } else if (
-          this.isNotOver6(pointer, pointer - 2, pointer - 3)
-            && this.isNotOver6(pointer - 2, pointer - 3, pointer - 5)
+          this.isNotOver5(pointer, pointer - 2, pointer - 3)
+            && this.isNotOver5(pointer - 2, pointer - 3, pointer - 5)
         ) {
           structStripBlack.setThree(pointer - 2)
           structStripBlack.setThree(pointer - 3)
@@ -451,8 +451,8 @@ final class L1Strip(
         if (p2Flag == Flag.WHITE)
           structStripWhite.setThree(pointer - 3)
         else if (!(
-          !this.isNotOver6(pointer, pointer - 1, pointer - 3)
-            && !this.isNotOver6(pointer - 3, pointer - 5, pointer - 6)
+          !this.isNotOver5(pointer, pointer - 1, pointer - 3)
+            && !this.isNotOver5(pointer - 3, pointer - 5, pointer - 6)
           ))
           structStripBlack.setThree(pointer - 3)
 
@@ -528,7 +528,7 @@ final class L1Strip(
     new L2Strip(this.direction, this.startIdx, this.size, assembly._1, assembly._2, assembly._3, assembly._4)
   }
 
-  def zobristHash: Long = ZobristHash.stripHash(this.stripField)
+  def hashKey: Long = ZobristHash.stripHash(this.stripField)
 
 }
 
@@ -537,7 +537,7 @@ object L1Strip {
   private val stripMemo = new ConcurrentHashMap[Long, (Array[Int], Array[Int], Array[Byte], Byte)]()
 
   private def retrieveStripFieldSolution(strip: L1Strip): (Array[Int], Array[Int], Array[Byte], Byte) =
-    this.stripMemo.getOrElseUpdate(strip.zobristHash, () => strip.calculateStruct())
+    this.stripMemo.getOrElseUpdate(strip.hashKey, () => strip.calculateStruct())
 
 }
 
