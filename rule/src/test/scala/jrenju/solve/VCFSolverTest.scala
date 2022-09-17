@@ -4,7 +4,6 @@ import jrenju.BoardIO.BoardToText
 import jrenju.TestHelper.T2
 import jrenju.notation.Pos
 import jrenju.solve.SolutionMapper.SequenceToNode
-import jrenju.solve.VCFSolver.VCFFinder
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 import utils.lang.Transform.joinHorizontal
@@ -14,9 +13,9 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
   def vcf(problem: String, answer: Int): Unit = {
     val board = problem.t2b
 
-    val seq = board.findVCFSequence()
+    val seq = VCFSolver.findVCFSequence(board)
 
-    val markedBoard = seq.foldLeft(board.clone()) { (board, idx) =>
+    val markedBoard = seq.foldLeft(board) { (board, idx) =>
       board.makeMove(idx)
     }
 

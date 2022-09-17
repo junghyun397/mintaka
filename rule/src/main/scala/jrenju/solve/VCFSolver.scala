@@ -14,7 +14,7 @@ object VCFSolver {
       val particle = board.structFieldBlack(idx)
       if (
         particle.fourTotal == 1
-          && !Flag.isForbid(board.boardField(idx))
+          && !Flag.isForbid(board.field(idx))
           && (!coerce || board.structFieldWhite(idx).fiveTotal == 1)
           && memo.probe(board, idx).fold(true)(_ != 0)
       ) {
@@ -81,10 +81,10 @@ object VCFSolver {
 
         val l2board = l1board.makeMove(counter)
 
-        if (counterPoint.openFourTotal == 0 || Flag.isForbid(board.boardField(counter))) {
+        if (counterPoint.openFourTotal == 0 || Flag.isForbid(board.field(counter))) {
           if (
             (particle.threeTotal > 1 || particle.fourTotal > 1 && counterPoint.fourTotal == 0)
-              || Flag.isForbid(board.boardField(counter))
+              || Flag.isForbid(board.field(counter))
               || (l2board.structFieldWhite.exists(_.openFourTotal == 1) && counterPoint.closedFourTotal == 0)
           ) {
             memo.write(board, idx, Float.MaxValue)
@@ -110,17 +110,10 @@ object VCFSolver {
     Seq.empty
   }
 
-  implicit class VCFFinder(val b: Board) { self =>
-
-    def isVCFRoot(memo: LRUMemo, maxDepth: Int): Boolean =
-      self.findVCFSequence(memo, maxDepth).nonEmpty
-
-    def findVCFSequence(memo: LRUMemo = LRUMemo.empty, maxDepth: Int = Int.MaxValue): Seq[Int] =
-      if (self.b.isNextColorBlack)
-        findVCFSequenceBlack(memo, maxDepth, self.b, Seq.empty, coerce = false)
-      else
-        findVCFSequenceWhite(memo, maxDepth, self.b, Seq.empty, coerce = false)
-
-  }
+  def findVCFSequence(board: Board, cache: LRUMemo = LRUMemo.empty, maxDepth: Int = Int.MaxValue): Seq[Int] =
+    if (board.isNextColorBlack)
+      findVCFSequenceBlack(cache, maxDepth, board, Seq.empty, coerce = false)
+    else
+      findVCFSequenceWhite(cache, maxDepth, board, Seq.empty, coerce = false)
 
 }

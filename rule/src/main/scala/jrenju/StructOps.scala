@@ -4,10 +4,8 @@ import jrenju.ParticleOps.particleOps
 import jrenju.notation.{Direction, Flag, Pos, Renju}
 
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuilder
 import scala.language.implicitConversions
 
-//noinspection DuplicatedCode
 final class StructOps(val b: Board) extends AnyVal {
 
   @inline private def getOffsetIdx(direction: Int, initRow: Int, initCol: Int, offset: Int): Int = direction match {
@@ -19,7 +17,7 @@ final class StructOps(val b: Board) extends AnyVal {
 
   @inline private def getBoardFieldBounded(idx: Int): Byte =
     if (idx < 0 || idx >= Renju.BOARD_SIZE) Flag.WALL
-    else b.boardField(idx)
+    else b.field(idx)
 
   @inline private def processParticleBounded(idx: Int, process: Int => Boolean): Boolean =
     if (idx < 0 || idx >= Renju.BOARD_SIZE) false
@@ -129,7 +127,7 @@ final class StructOps(val b: Board) extends AnyVal {
   private def isNotPseudoThree(direction: Int, idx: Int, from: Int): Boolean = {
     val counters = this.collectOpen3Counters(direction, idx, b.structFieldBlack, Flag.BLACK)
     for (counter <- counters) {
-      val flag = b.boardField(counter)
+      val flag = b.field(counter)
       if (flag != Flag.FORBIDDEN_6 && flag != Flag.FORBIDDEN_44) {
         val particle = b.structFieldBlack(counter)
         if (particle.fourTotal == 0 && particle.fiveTotal == 0) {
@@ -173,7 +171,7 @@ final class StructOps(val b: Board) extends AnyVal {
     val fourSideTraps = new mutable.ArrayBuilder.ofInt
 
     for (idx <- 0 until Renju.BOARD_SIZE) {
-      if (Flag.isForbid(b.boardField(idx))) {
+      if (Flag.isForbid(b.field(idx))) {
         val particle = b.structFieldWhite(idx)
 
         for (direction <- 0 until 4) {
@@ -199,21 +197,21 @@ final class StructOps(val b: Board) extends AnyVal {
       val particle = b.structFieldBlack(idx)
 
       if (particle.fiveTotal > 0)
-        b.boardField(idx) = Flag.FREE
-      else if (b.boardField(idx) == Flag.FORBIDDEN_6)
-        b.boardField(idx) = Flag.FORBIDDEN_6
+        b.field(idx) = Flag.FREE
+      else if (b.field(idx) == Flag.FORBIDDEN_6)
+        b.field(idx) = Flag.FORBIDDEN_6
       else if (particle.fourTotal > 1)
-        b.boardField(idx) = Flag.FORBIDDEN_44
+        b.field(idx) = Flag.FORBIDDEN_44
       else if (particle.threeTotal > 1) {
-        b.boardField(idx) = Flag.FORBIDDEN_33
+        b.field(idx) = Flag.FORBIDDEN_33
         hasDi3Forbid = true
       }
     }
 
     if (hasDi3Forbid)
       for (idx <- 0 until Renju.BOARD_SIZE)
-        if (b.boardField(idx) == Flag.FORBIDDEN_33 && this.isPseudoForbid(idx))
-          b.boardField(idx) = Flag.FREE
+        if (b.field(idx) == Flag.FORBIDDEN_33 && this.isPseudoForbid(idx))
+          b.field(idx) = Flag.FREE
   }
 
 }

@@ -1,8 +1,7 @@
 package jrenju
 
 import jrenju.TestHelper.T2
-import jrenju.solve.LRUMemo
-import jrenju.solve.VCFSolver.VCFFinder
+import jrenju.solve.{LRUMemo, VCFSolver}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 
@@ -53,8 +52,8 @@ class Benchmark extends AnyFlatSpec with should.Matchers {
     """.t2b
 
     for (_ <- 1 to 1000) {
-      black43Fork.findVCFSequence(memoBlack)
-      whiteTrap.findVCFSequence(memoWhite)
+      VCFSolver.findVCFSequence(black43Fork, memoBlack)
+      VCFSolver.findVCFSequence(whiteTrap, memoWhite)
     }
   }
 

@@ -1,36 +1,36 @@
 package jrenju
 
-import jrenju.Board.boardOps
 import jrenju.BoardIO.BoardToText
-import jrenju.ZobristHash.IncrementHash
 import jrenju.notation._
+import utils.lang.IterableWith
 
-import scala.language.implicitConversions
+trait Board extends IterableWith[FieldStatus] {
 
-class Board(
-  val boardField: Array[Byte],
-  val structFieldBlack: Array[Int],
-  val structFieldWhite: Array[Int],
+  val field: Array[Byte]
 
-  val moves: Int,
-  val latestMove: Int,
+  val structFieldBlack: Array[Int]
 
-  var winner: Option[Byte],
+  val structFieldWhite: Array[Int]
 
-  val hashKey: Long,
-) extends Cloneable {
+  val moves: Int
+
+  val lastMove: Int
+
+  var winner: Option[Byte]
+
+  val hashKey: Long
+
+  def isNextColorBlack: Boolean = (this.moves & 0x01) == 0x00
 
   def colorFlag: Byte = Flag.colorFlag(this.moves)
 
   def nextColorFlag: Byte = Flag.nextColorFlag(this.moves)
 
-  def isNextColorBlack: Boolean = this.nextColorFlag == Flag.BLACK
-
   def color: Color.Value = Color(this.colorFlag)
 
   def nextColor: Color.Value = Color(this.nextColorFlag)
 
-  def latestPos: Option[Pos] = Option(Pos.fromIdx(this.latestMove))
+  def latestPos: Option[Pos] = Option(Pos.fromIdx(this.lastMove))
 
   def structField(idx: Int, flag: Byte): Int = flag match {
     case Flag.BLACK => this.structFieldBlack(idx)
@@ -38,8 +38,8 @@ class Board(
     case _ => 0
   }
 
-  def getParticlePair(idx: Int): ParticlePair = {
-    val flag = this.boardField(idx)
+  def getFieldStatus(idx: Int): FieldStatus = {
+    val flag = this.field(idx)
 
     val color =
       if (Flag.isEmpty(flag)) Color.EMPTY
@@ -51,83 +51,23 @@ class Board(
       else
         Option.empty
 
-    new ParticlePair(color, forbidKind, new ParticleOps(this.structFieldBlack(idx)), new ParticleOps(this.structFieldWhite(idx)))
+    new FieldStatus(color, forbidKind, new ParticleOps(this.structFieldBlack(idx)), new ParticleOps(this.structFieldWhite(idx)))
   }
 
   def validateMove(pos: Pos): Option[RejectReason.Value] = this.validateMove(pos.idx)
 
-  def validateMove(idx: Int): Option[RejectReason.Value] = {
-    val flag = this.boardField(idx)
-    if (this.isNextColorBlack && Flag.isForbid(flag))
-      Option(RejectReason.FORBIDDEN)
-    else if (Flag.isExist(flag))
-      Option(RejectReason.EXIST)
-    else
-      Option.empty
-  }
+  def validateMove(idx: Int): Option[RejectReason.Value]
 
   def makeMove(pos: Pos): Board = this.makeMove(pos.idx)
 
   def makeMove(idx: Int): Board = this.makeMove(idx, calculateForbid = true)
 
-  def makeMove(idx: Int, calculateForbid: Boolean): Board = {
-    val board = new Board(
-      boardField = this.boardField.updated(idx, this.nextColorFlag),
-      structFieldBlack = this.structFieldBlack.updated(idx, 0),
-      structFieldWhite = this.structFieldWhite.updated(idx, 0),
-      moves = this.moves + 1,
-      latestMove = idx,
-      winner = Option.empty,
-      hashKey = this.hashKey.incrementBoardHash(idx, this.nextColorFlag)
-    )
+  def makeMove(idx: Int, calculateForbid: Boolean): Board
 
-    board.integrateStrips(board.composeStrips(idx).map(_.calculateL2Strip()))
-    if (calculateForbid) board.calculateForbids()
+  def maxSize: Int = this.field.length
 
-    board
-  }
-
-  def rotated(rotation: Rotation.Value): this.type = rotation match {
-    case Rotation.CLOCKWISE => this
-    case Rotation.COUNTER_CLOCKWISE => this
-    case Rotation.OVERTURN => this
-    case _ => this
-  }
-
-  def transposedKey(): Long = this.hashKey
-
-  def transposed(): this.type = this
-
-  override def clone(): Board = new Board(
-    boardField = this.boardField.clone(),
-    structFieldBlack = this.structFieldBlack.clone(),
-    structFieldWhite = this.structFieldWhite.clone(),
-    moves = this.moves,
-    latestMove = this.latestMove,
-    winner = this.winner,
-    hashKey = this.hashKey
-  )
+  def elementAt(idx: Int): FieldStatus = this.getFieldStatus(idx)
 
   override def toString: String = this.boardText
-
-}
-
-object Board {
-
-  @inline implicit def boardOps(board: Board): BoardOps = new BoardOps(board)
-
-  @inline implicit def structOps(board: Board): StructOps = new StructOps(board)
-
-  val newBoard: Board = newBoard(Renju.BOARD_CENTER_POS.idx)
-
-  def newBoard(initIdx: Int): Board = new Board(
-    boardField = Array.fill(Renju.BOARD_SIZE)(Flag.FREE).updated(initIdx, Flag.BLACK),
-    structFieldBlack = Array.fill(Renju.BOARD_SIZE)(0),
-    structFieldWhite = Array.fill(Renju.BOARD_SIZE)(0),
-    moves = 1,
-    winner = Option.empty,
-    latestMove = initIdx,
-    hashKey = ZobristHash.empty
-  )
 
 }

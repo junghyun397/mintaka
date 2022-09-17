@@ -2,7 +2,6 @@ package jrenju
 
 import jrenju.notation.{Flag, Renju}
 
-import scala.collection.mutable
 import scala.util.Random
 
 object ZobristHash {
@@ -62,7 +61,5 @@ object ZobristHash {
       else source ^ table(Renju.BOARD_SIZE + move)
 
   }
-
-  type Memo = mutable.HashMap[Long, Int]
 
 }

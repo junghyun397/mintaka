@@ -12,28 +12,28 @@ final class BoardOps(val b: Board) extends AnyVal {
   private def collectStonesX(row: Int): Array[Byte] = {
     val stones = new Array[Byte](Renju.BOARD_WIDTH)
     for (idx <- 0 until Renju.BOARD_WIDTH)
-      stones(idx) = Flag.onlyStone(b.boardField(Pos.rowColToIdx(row, idx)))
+      stones(idx) = Flag.onlyStone(b.field(Pos.rowColToIdx(row, idx)))
     stones
   }
 
   private def collectStonesY(col: Int): Array[Byte] = {
     val stones = new Array[Byte](Renju.BOARD_WIDTH)
     for (idx <- 0 until Renju.BOARD_WIDTH)
-      stones(idx) = Flag.onlyStone(b.boardField(Pos.rowColToIdx(idx, col)))
+      stones(idx) = Flag.onlyStone(b.field(Pos.rowColToIdx(idx, col)))
     stones
   }
 
   private def collectStonesDEG45(size: Int, row: Int, col: Int): Array[Byte] = {
     val stones = new Array[Byte](size)
     for (idx <- 0 until size)
-      stones(idx) = Flag.onlyStone(b.boardField(Pos.rowColToIdx(row + idx, col + idx)))
+      stones(idx) = Flag.onlyStone(b.field(Pos.rowColToIdx(row + idx, col + idx)))
     stones
   }
 
   private def collectStonesDEG315(size: Int, row: Int, col: Int): Array[Byte] = {
     val stones = new Array[Byte](size)
     for (idx <- 0 until size)
-      stones(idx) = Flag.onlyStone(b.boardField(Pos.rowColToIdx(row + idx, col - idx)))
+      stones(idx) = Flag.onlyStone(b.field(Pos.rowColToIdx(row + idx, col - idx)))
     stones
   }
 
@@ -163,7 +163,7 @@ final class BoardOps(val b: Board) extends AnyVal {
     b.structFieldWhite(idx) = b.structFieldWhite(idx).merged(direction, particleWhite)
 
     if (forbidMask != Flag.FREE)
-      b.boardField(idx) = forbidMask
+      b.field(idx) = forbidMask
   }
 
   def integrateStrips(strips: Array[L2Strip]): Unit = {
@@ -171,10 +171,10 @@ final class BoardOps(val b: Board) extends AnyVal {
 
     for (idx <- 0 until Renju.BOARD_SIZE) {
       if (
-        b.boardField(idx) == Flag.FORBIDDEN_33
-          || b.boardField(idx) == Flag.FORBIDDEN_44
+        b.field(idx) == Flag.FORBIDDEN_33
+          || b.field(idx) == Flag.FORBIDDEN_44
       )
-        b.boardField(idx) = Flag.FREE
+        b.field(idx) = Flag.FREE
     }
 
     for (strip <- strips) {

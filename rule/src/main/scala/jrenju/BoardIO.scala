@@ -33,12 +33,12 @@ object BoardIO {
         else Flag.WHITE
     }
 
-    val board = new Board(
-      boardField = field,
+    val board = new ScalaBoard(
+      field = field,
       structFieldBlack = Array.fill(Renju.BOARD_SIZE)(0),
       structFieldWhite = Array.fill(Renju.BOARD_SIZE)(0),
       moves = source.length,
-      latestMove = source.last,
+      lastMove = source.last,
       winner = Option.empty,
       hashKey = ZobristHash.boardHash(field)
     )
@@ -72,15 +72,15 @@ object BoardIO {
   def fromFieldArray(source: Array[Byte], latestMove: Int): Option[Board] =
     if (source.length != Renju.BOARD_SIZE) Option.empty
     else {
-      val board = new Board(
-        boardField = source,
+      val board = new ScalaBoard(
+        field = source,
         structFieldBlack = Array.fill(Renju.BOARD_SIZE)(0),
         structFieldWhite = Array.fill(Renju.BOARD_SIZE)(0),
         moves = source.count {
           case Flag.BLACK | Flag.WHITE => true
           case _ => false
         },
-        latestMove = latestMove,
+        lastMove = latestMove,
         winner = Option.empty,
         hashKey = ZobristHash.boardHash(source)
       )
@@ -117,7 +117,7 @@ object BoardIO {
         .mkString
 
       if (markLastMove && source.moves != 0) {
-        val offset =(Renju.BOARD_WIDTH_MAX_IDX - Pos.idxToRow(source.latestMove)) * (6 + Renju.BOARD_WIDTH * 2) + Pos.idxToCol(source.latestMove) * 2 + 2
+        val offset =(Renju.BOARD_WIDTH_MAX_IDX - Pos.idxToRow(source.lastMove)) * (6 + Renju.BOARD_WIDTH * 2) + Pos.idxToCol(source.lastMove) * 2 + 2
         result
           .updated(offset, '[')
           .updated(offset + 2, ']')
@@ -127,7 +127,7 @@ object BoardIO {
     def boardText: String = this.boardText(true)
 
     def boardText(markLatestMove: Boolean): String =
-      this.attributeText(markLatestMove)(_.boardField)(flag => Flag.flagToChar(flag).toString)
+      this.attributeText(markLatestMove)(_.field)(flag => Flag.flagToChar(flag).toString)
 
     private val pointFieldTextBlack: (Int => String) => String = this.attributeText(markLastMove = false)(_.structFieldBlack)
     private val pointFieldTextWhite: (Int => String) => String = this.attributeText(markLastMove = false)(_.structFieldWhite)

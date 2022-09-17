@@ -1,22 +1,29 @@
+//noinspection ScalaUnusedSymbol
+
 package jrenju
 
 import jrenju.notation.{Color, Flag}
 
 import scala.language.implicitConversions
 
-final class ParticlePair(val color: Color.Value, val forbidKind: Option[Byte], val black: ParticleOps, val white: ParticleOps) {
+final class FieldStatus(
+  val color: Color.Value,
+  val forbidKind: Option[Byte],
+  val blackStruct: ParticleOps,
+  val whiteStruct: ParticleOps,
+) {
 
   def apply(flag: Byte): ParticleOps =
     flag match {
-      case Flag.BLACK => this.black
-      case Flag.WHITE => this.white
+      case Flag.BLACK => this.blackStruct
+      case Flag.WHITE => this.whiteStruct
       case _ => ParticleOps.empty
     }
 
   def apply(color: Color.Value): ParticleOps =
     color match {
-      case Color.BLACK => this.black
-      case Color.WHITE => this.white
+      case Color.BLACK => this.blackStruct
+      case Color.WHITE => this.whiteStruct
       case _ => ParticleOps.empty
     }
 

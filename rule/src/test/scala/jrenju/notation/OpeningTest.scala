@@ -11,6 +11,7 @@ class OpeningTest extends AnyFlatSpec with should.Matchers {
   def moveGenerator(problem: String): Unit = {
     val moves = LargeMoveGenerator.collectValidMoves(problem.t2b)
     val ids = Array.fill(Renju.BOARD_SIZE)(false).zipWithIndex.map(combined => moves.contains(combined._2))
+    println(problem.t2b.map(_.color).size)
     println(problem.t2b.attributeText(markLastMove = false)(_ => ids)(if (_) "@" else "."))
   }
 

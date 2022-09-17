@@ -1,6 +1,6 @@
 package jrenju.notation
 
-// margin forbidKind(6-44-33) margin isForbid isEmpty isBlack
+// margin forbidKind(6-44-33) bound  isForbid isEmpty isBlack
 // 0      000                 0      0        0       0
 object Flag {
 

@@ -14,7 +14,7 @@ object LargeMoveGenerator extends MoveGenerator {
     var opponentFiveAt = -1
 
     for (idx <- 0 until Renju.BOARD_SIZE) {
-      val flag = board.boardField(idx)
+      val flag = board.field(idx)
 
       if (!Flag.isForbid(flag, board.nextColorFlag)) {
         val particle = board.structField(idx, board.nextColorFlag)
@@ -38,7 +38,7 @@ object LargeMoveGenerator extends MoveGenerator {
       val validMoves = mutable.ArrayBuilder.make[Int]
 
       for (idx <- 0 until Renju.BOARD_SIZE) {
-        val flag = board.boardField(idx)
+        val flag = board.field(idx)
 
         if (!Flag.isForbid(flag, board.nextColorFlag)) {
           val particle = board.structField(idx, board.nextColorFlag)
@@ -58,7 +58,7 @@ object LargeMoveGenerator extends MoveGenerator {
     val moveField = BitField.empty(Renju.BOARD_WIDTH)
 
     for (idx <- 0 until Renju.BOARD_SIZE) {
-      if (Flag.isExist(board.boardField(idx))) {
+      if (Flag.isExist(board.field(idx))) {
         val row = Pos.idxToRow(idx)
         val shift = Pos.idxToCol(idx) - 3
 
@@ -88,7 +88,7 @@ object LargeMoveGenerator extends MoveGenerator {
     val validMoves = mutable.ArrayBuilder.make[Int]
 
     for (idx <- 0 until Renju.BOARD_SIZE)
-      if (moveField(idx) && Flag.isEmpty(board.boardField(idx)) && !Flag.isForbid(board.boardField(idx), board.nextColorFlag))
+      if (moveField(idx) && Flag.isEmpty(board.field(idx)) && !Flag.isForbid(board.field(idx), board.nextColorFlag))
         validMoves += idx
 
     validMoves.result()

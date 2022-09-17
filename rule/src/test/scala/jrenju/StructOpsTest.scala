@@ -1,6 +1,7 @@
 package jrenju
 
 import jrenju.BoardIO.BoardToText
+import jrenju.ScalaBoard.structOps
 import jrenju.TestHelper.T2
 import jrenju.notation.Pos
 import org.scalatest.flatspec._
