@@ -1,6 +1,6 @@
 package jrenju
 
-import jrenju.BoardIO.BoardToText
+import jrenju.BoardIO.BoardToString
 import jrenju.notation._
 import utils.lang.IterableWith
 
@@ -30,7 +30,7 @@ trait Board extends IterableWith[FieldStatus] {
 
   def nextColor: Color.Value = Color(this.nextColorFlag)
 
-  def latestPos: Option[Pos] = Option(Pos.fromIdx(this.lastMove))
+  def latestPos: Option[Pos] = Some(Pos.fromIdx(this.lastMove))
 
   def structField(idx: Int, flag: Byte): Int = flag match {
     case Flag.BLACK => this.structFieldBlack(idx)
@@ -45,11 +45,7 @@ trait Board extends IterableWith[FieldStatus] {
       if (Flag.isEmpty(flag)) Color.EMPTY
       else Color(flag)
 
-    val forbidKind =
-      if (Flag.isForbid(flag))
-        Option(flag)
-      else
-        Option.empty
+    val forbidKind = Option.when(Flag.isForbid(flag)) { flag }
 
     new FieldStatus(color, forbidKind, new ParticleOps(this.structFieldBlack(idx)), new ParticleOps(this.structFieldWhite(idx)))
   }
@@ -68,6 +64,6 @@ trait Board extends IterableWith[FieldStatus] {
 
   def elementAt(idx: Int): FieldStatus = this.getFieldStatus(idx)
 
-  override def toString: String = this.boardText
+  override def toString: String = this.boardString
 
 }

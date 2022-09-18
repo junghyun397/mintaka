@@ -1,3 +1,5 @@
+//noinspection ScalaUnusedSymbol
+
 package jrenju.notation
 
 final case class Pos(row: Int, col: Int) {
@@ -24,8 +26,8 @@ object Pos {
   def fromCartesian(rawCol: Char, rawRow: Int): Option[Pos] = {
     val col = rawCol.toUpper - 65
     val row = rawRow - 1
-    if (col < 0 || col >= Renju.BOARD_WIDTH || row < 0 || row >= Renju.BOARD_WIDTH) Option.empty
-    else Option(new Pos(row, col))
+
+    Option.when(!(col < 0 || col >= Renju.BOARD_WIDTH || row < 0 || row >= Renju.BOARD_WIDTH)) { new Pos(row, col) }
   }
 
   def fromIdx(idx: Int): Pos = new Pos(idxToRow(idx), idxToCol(idx))

@@ -1,6 +1,6 @@
 package jrenju.notation
 
-import jrenju.BoardIO.BoardToText
+import jrenju.BoardIO.BoardToString
 import jrenju.TestHelper.T2
 import jrenju.solve.LargeMoveGenerator
 import org.scalatest.flatspec._
@@ -12,7 +12,7 @@ class OpeningTest extends AnyFlatSpec with should.Matchers {
     val moves = LargeMoveGenerator.collectValidMoves(problem.t2b)
     val ids = Array.fill(Renju.BOARD_SIZE)(false).zipWithIndex.map(combined => moves.contains(combined._2))
     println(problem.t2b.map(_.color).size)
-    println(problem.t2b.attributeText(markLastMove = false)(_ => ids)(if (_) "@" else "."))
+    println(problem.t2b.attributeString(markLastMove = false)(_ => ids)(if (_) "@" else "."))
   }
 
   "d" should "a" in {

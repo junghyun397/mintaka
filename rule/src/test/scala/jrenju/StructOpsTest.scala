@@ -1,6 +1,6 @@
 package jrenju
 
-import jrenju.BoardIO.BoardToText
+import jrenju.BoardIO.BoardToString
 import jrenju.ScalaBoard.structOps
 import jrenju.TestHelper.T2
 import jrenju.notation.Pos
@@ -12,9 +12,9 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
   def deepForbid(problem: String, answer: String): Unit = {
     val board = problem.t2b
 
-    println(board.debugText)
+    println(board.debugString)
 
-    answer.filter(c => c == 'O' || c == 'X' || c == '.') should include (board.boardText.filter(c => c == 'O' || c == 'X' || c == '.'))
+    answer.filter(c => c == 'O' || c == 'X' || c == '.') should include (board.boardString.filter(c => c == 'O' || c == 'X' || c == '.'))
   }
 
   "edge cases" should "analyze correctly" in {

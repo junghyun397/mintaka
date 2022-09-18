@@ -16,8 +16,7 @@ object BoardIO {
       .map(Pos.fromCartesian)
       .toSeq
 
-    if (seq.exists(_.isEmpty)) Option.empty
-    else Option(seq.map(_.get))
+    Option.when(!seq.exists(_.isEmpty)) { seq.map(_.get) }
   }
 
   def fromSequence(source: String): Option[Board] = this.buildPosSequence(source)
@@ -46,7 +45,7 @@ object BoardIO {
     board.integrateStrips(board.composeGlobalStrips().map(_.calculateL2Strip()))
     board.calculateForbids()
 
-    Option(board)
+    Some(board)
   }
 
   def fromBoardText(source: String, latestMove: Int): Option[Board] = {
@@ -88,10 +87,10 @@ object BoardIO {
       board.integrateStrips(board.composeGlobalStrips().map(_.calculateL2Strip()))
       board.calculateForbids()
 
-      Option(board)
+      Some(board)
     }
 
-  implicit class BoardToText(source: Board) {
+  implicit class BoardToString(b: Board) {
 
     private lazy val columnHint: String = f"   ${
       Seq.range(65, 65 + Renju.BOARD_WIDTH)
@@ -100,8 +99,8 @@ object BoardIO {
         .mkString
     }   "
 
-    def attributeText[T](markLastMove: Boolean)(extract: Board => Array[T])(transform: T => String): String = f"$columnHint\n${
-      val result = extract(this.source)
+    def attributeString[T](markLastMove: Boolean)(extract: Board => Array[T])(transform: T => String): String = f"$columnHint\n${
+      val result = extract(this.b)
         .grouped(Renju.BOARD_WIDTH)
         .zipWithIndex
         .map { case (col, idx) =>
@@ -116,26 +115,26 @@ object BoardIO {
         .flatten
         .mkString
 
-      if (markLastMove && source.moves != 0) {
-        val offset =(Renju.BOARD_WIDTH_MAX_IDX - Pos.idxToRow(source.lastMove)) * (6 + Renju.BOARD_WIDTH * 2) + Pos.idxToCol(source.lastMove) * 2 + 2
+      if (markLastMove && b.moves != 0) {
+        val offset =(Renju.BOARD_WIDTH_MAX_IDX - Pos.idxToRow(b.lastMove)) * (6 + Renju.BOARD_WIDTH * 2) + Pos.idxToCol(b.lastMove) * 2 + 2
         result
           .updated(offset, '[')
           .updated(offset + 2, ']')
       } else result
     }$columnHint"
 
-    def boardText: String = this.boardText(true)
+    def boardString: String = this.boardString(true)
 
-    def boardText(markLatestMove: Boolean): String =
-      this.attributeText(markLatestMove)(_.field)(flag => Flag.flagToChar(flag).toString)
+    def boardString(markLatestMove: Boolean): String =
+      this.attributeString(markLatestMove)(_.field)(flag => Flag.flagToChar(flag).toString)
 
-    private val pointFieldTextBlack: (Int => String) => String = this.attributeText(markLastMove = false)(_.structFieldBlack)
-    private val pointFieldTextWhite: (Int => String) => String = this.attributeText(markLastMove = false)(_.structFieldWhite)
+    private val pointFieldTextBlack: (Int => String) => String = this.attributeString(markLastMove = false)(_.structFieldBlack)
+    private val pointFieldTextWhite: (Int => String) => String = this.attributeString(markLastMove = false)(_.structFieldWhite)
 
     implicit def dotIfZero(i: Int): String = if (i == 0) "." else i.toString
 
-    def debugText: String =
-      f"${this.boardText}\n" +
+    def debugString: String =
+      f"${this.boardString}\n" +
         joinHorizontal(
           f"\nblack-open-three /\n${this.pointFieldTextBlack(_.threeTotal)}\n",
           f"\nblack-block-three /\n${this.pointFieldTextBlack(_.blockThreeTotal)}\n",

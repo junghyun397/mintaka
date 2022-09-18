@@ -178,7 +178,7 @@ final class BoardOps(val b: Board) extends AnyVal {
     }
 
     for (strip <- strips) {
-      if (strip.winner != Flag.FREE) winner = Option(strip.winner)
+      if (strip.winner != Flag.FREE) winner = Some(strip.winner)
 
       strip.direction match {
         case Direction.X => for (idx <- 0 until strip.size)

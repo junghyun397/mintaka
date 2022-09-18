@@ -15,6 +15,11 @@ lazy val utils = (project in file("util"))
     description := "utility library",
 
     scalaVersion := scala2Version,
+
+    libraryDependencies ++= Seq(
+      "org.mongodb" % "bson" % "4.7.1"
+    ),
+
     publishMavenStyle := true,
   )
 
@@ -24,6 +29,7 @@ lazy val jrenju = (project in file("rule"))
     description := "jrenju jvm renju library written in scala",
 
     scalaVersion := scala2Version,
+
     publishMavenStyle := true,
   )
   .dependsOn(utils)

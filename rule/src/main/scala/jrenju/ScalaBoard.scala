@@ -22,10 +22,11 @@ class ScalaBoard(
 
   def validateMove(idx: Int): Option[RejectReason.Value] = {
     val flag = this.field(idx)
+
     if (this.isNextColorBlack && Flag.isForbid(flag))
-      Option(RejectReason.FORBIDDEN)
+      Some(RejectReason.FORBIDDEN)
     else if (Flag.isExist(flag))
-      Option(RejectReason.EXIST)
+      Some(RejectReason.EXIST)
     else
       Option.empty
   }

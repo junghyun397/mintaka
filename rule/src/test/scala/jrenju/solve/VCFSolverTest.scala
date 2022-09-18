@@ -1,9 +1,9 @@
 package jrenju.solve
 
-import jrenju.BoardIO.BoardToText
+import jrenju.BoardIO.BoardToString
 import jrenju.TestHelper.T2
 import jrenju.notation.Pos
-import jrenju.solve.SolutionMapper.SequenceToNode
+import jrenju.protocol.Solution
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 import utils.lang.Transform.joinHorizontal
@@ -19,8 +19,8 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
       board.makeMove(idx)
     }
 
-    println(joinHorizontal(board.boardText, markedBoard.boardText))
-    println(f"${seq.length}, ${Pos.fromIdx(seq.last).toCartesian}, ${seq.toSolution}")
+    println(joinHorizontal(board.boardString, markedBoard.boardString))
+    println(f"${seq.length}, ${Pos.fromIdx(seq.last).toCartesian}, ${Solution.fromIterable(seq)}")
 
     seq.size should be (answer)
   }

@@ -38,12 +38,12 @@ object Flag {
   }
 
   def charToFlag(char: Char): Option[Byte] = char match {
-    case Flag.Text.FREE => Option(Flag.FREE)
-    case Flag.Text.BLACK => Option(Flag.BLACK)
-    case Flag.Text.WHITE => Option(Flag.WHITE)
-    case Flag.Text.FORBIDDEN_33 => Option(Flag.FORBIDDEN_33)
-    case Flag.Text.FORBIDDEN_44 => Option(Flag.FORBIDDEN_44)
-    case Flag.Text.FORBIDDEN_6 => Option(Flag.FORBIDDEN_6)
+    case Flag.Text.FREE => Some(Flag.FREE)
+    case Flag.Text.BLACK => Some(Flag.BLACK)
+    case Flag.Text.WHITE => Some(Flag.WHITE)
+    case Flag.Text.FORBIDDEN_33 => Some(Flag.FORBIDDEN_33)
+    case Flag.Text.FORBIDDEN_44 => Some(Flag.FORBIDDEN_44)
+    case Flag.Text.FORBIDDEN_6 => Some(Flag.FORBIDDEN_6)
     case _ => Option.empty
   }
 
