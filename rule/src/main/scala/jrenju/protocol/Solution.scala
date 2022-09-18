@@ -116,10 +116,10 @@ final class SolutionNode(val idx: Int, val child: Map[Int, Solution]) extends So
       .asJavaList
 
     new BsonDocument(
-      java.util.List.of(
+      List(
         new BsonElement(SHORT_SOLUTION_KEY, new BsonInt32(idx)),
         new BsonElement(SHORT_CHILD_KEY, new BsonDocument(childElements)),
-      )
+      ).asJavaList
     )
   }
 
