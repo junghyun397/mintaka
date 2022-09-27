@@ -6,7 +6,9 @@ object Transform {
   
   def joinHorizontal(elems: String*): String = {
     val cleft = elems.map(_.split("\n"))
+
     if (cleft.exists(_.length != cleft.head.length)) throw new IllegalArgumentException()
+
     Array.fill[mutable.StringBuilder](cleft.head.length)(new mutable.StringBuilder())
       .zipWithIndex
       .map { case (acc, idx) =>
@@ -29,7 +31,7 @@ object Transform {
 
   implicit class ByteTransform(val b: Byte) extends AnyVal {
 
-    def toGroupedBinaryString: String = {
+    def toChunkedBinaryString: String = {
       val binaryString = b.toBinaryString
 
       val rs = if (binaryString.length == 8)
@@ -45,7 +47,7 @@ object Transform {
     
     def toBoolean: Boolean = if (i == 0) false else true
 
-    def toGroupedBinaryString: String = {
+    def toChunkedBinaryString: String = {
       val binaryString = i.toBinaryString
 
       val rs = if (binaryString.length == 32)
@@ -56,7 +58,7 @@ object Transform {
       rs.grouped(4).reduce((acc, s) => acc + " " + s)
     }
 
-    def integerShift(shift: Int): Int =
+    @inline def <<|>>> (shift: Int): Int =
       if (shift < 0)
         i << -shift
       else

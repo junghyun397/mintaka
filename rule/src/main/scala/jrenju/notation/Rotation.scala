@@ -1,7 +1,12 @@
 package jrenju.notation
 
-object Rotation extends Enumeration {
+sealed trait Rotation
 
-  val STRAIGHT, CLOCKWISE, COUNTER_CLOCKWISE, OVERTURN = Value
+object Rotation {
+
+  case object Straight extends Rotation
+  case object Clockwise extends Rotation
+  case object CounterClockwise extends Rotation
+  case object Overturn extends Rotation
 
 }

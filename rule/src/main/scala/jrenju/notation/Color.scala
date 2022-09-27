@@ -1,9 +1,20 @@
 package jrenju.notation
 
-object Color extends Enumeration {
+sealed trait Color {
 
-  val EMPTY: Color.Value = Value(Flag.FREE)
-  val BLACK: Color.Value = Value(Flag.BLACK)
-  val WHITE: Color.Value = Value(Flag.WHITE)
+  val flag: Flag
+
+}
+
+object Color {
+
+  case object Black extends Color { val flag: Flag = new Flag(Flag.BLACK) }
+  case object White extends Color { val flag: Flag = new Flag(Flag.WHITE) }
+
+  def fromColor(flag: Byte): Color = flag match {
+    case Flag.BLACK => Black
+    case Flag.WHITE => White
+    case _ => throw new IllegalArgumentException()
+  }
 
 }

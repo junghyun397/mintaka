@@ -1,5 +1,3 @@
-//noinspection ScalaUnusedSymbol
-
 package jrenju
 
 import jrenju.ZobristHash.IncrementHash
@@ -7,7 +5,7 @@ import jrenju.notation._
 
 object EmptyScalaBoard extends Board {
 
-  val field: Array[Byte] = Array.fill(Renju.BOARD_SIZE)(Flag.FREE)
+  val field: Array[Byte] = Array.fill(Renju.BOARD_SIZE)(Flag.EMPTY)
 
   val structFieldBlack: Array[Int] = Array.fill(Renju.BOARD_SIZE)(0)
 
@@ -17,26 +15,24 @@ object EmptyScalaBoard extends Board {
 
   val lastMove: Int = 0
 
-  var winner: Option[Byte] = Option.empty
+  var winner: Option[Either[Unit, Color]] = Option.empty
 
   val hashKey: Long = ZobristHash.empty
 
-  override val color: Color.Value = Color.EMPTY
-
-  override val nextColor: Color.Value = Color.BLACK
+  override val nextColor: Color = Color.Black
 
   override val latestPos: Option[Pos] = Option.empty
 
-  def validateMove(idx: Int): Option[RejectReason.Value] = Option.empty
+  def validateMove(move: Int): Option[InvalidKind] = Option.empty
 
-  def makeMove(idx: Int, calculateForbid: Boolean): Board = new ScalaBoard(
-    field = this.field.updated(idx, Flag.BLACK),
-    structFieldBlack = this.structFieldBlack.updated(idx, 0),
-    structFieldWhite = this.structFieldWhite.updated(idx, 0),
+  def makeMove(move: Int, calculateForbid: Boolean): Board = new ScalaBoard(
+    field = this.field.updated(move, Flag.BLACK),
+    structFieldBlack = this.structFieldBlack.updated(move, 0),
+    structFieldWhite = this.structFieldWhite.updated(move, 0),
     moves = 1,
-    lastMove = idx,
+    lastMove = move,
     winner = Option.empty,
-    hashKey = this.hashKey.incrementBoardHash(idx, Flag.BLACK)
+    hashKey = this.hashKey.incrementBoardHash(move, Flag.BLACK)
   )
 
 }

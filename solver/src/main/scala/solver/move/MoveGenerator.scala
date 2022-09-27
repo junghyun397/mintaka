@@ -1,4 +1,4 @@
-package jrenju.solve
+package solver.move
 
 import jrenju.Board
 

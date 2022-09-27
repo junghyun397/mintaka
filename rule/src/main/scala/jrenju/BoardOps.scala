@@ -1,6 +1,6 @@
 package jrenju
 
-import jrenju.ParticleOps.particleOps
+import jrenju.Struct.particleOps
 import jrenju.notation.{Direction, Flag, Pos, Renju}
 
 import scala.collection.mutable
@@ -54,7 +54,7 @@ final class BoardOps(val b: Board) extends AnyVal {
       val size = Renju.BOARD_WIDTH - y
       if (size > 4)
         builder += new L1Strip(
-          Direction.DEG45,
+          Direction.IncreaseUp,
           Pos.rowColToIdx(y, 0),
           size,
           this.collectStonesDEG45(size, y, 0)
@@ -64,7 +64,7 @@ final class BoardOps(val b: Board) extends AnyVal {
       val size = Renju.BOARD_WIDTH - x
       if (size > 4)
         builder += new L1Strip(
-          Direction.DEG45,
+          Direction.IncreaseUp,
           Pos.rowColToIdx(0, x),
           size,
           this.collectStonesDEG45(size, 0, x)
@@ -76,7 +76,7 @@ final class BoardOps(val b: Board) extends AnyVal {
       val size = Renju.BOARD_WIDTH - y
       if (size > 4)
         builder += new L1Strip(
-          Direction.DEG315,
+          Direction.DescentUp,
           Pos.rowColToIdx(y, Renju.BOARD_WIDTH_MAX_IDX),
           size,
           this.collectStonesDEG315(size, y, Renju.BOARD_WIDTH_MAX_IDX)
@@ -86,7 +86,7 @@ final class BoardOps(val b: Board) extends AnyVal {
       val size = Renju.BOARD_WIDTH - x
       if (size > 4)
         builder += new L1Strip(
-          Direction.DEG315,
+          Direction.DescentUp,
           Pos.rowColToIdx(0, col + row),
           size,
           this.collectStonesDEG315(size, 0, col + row)
@@ -118,7 +118,7 @@ final class BoardOps(val b: Board) extends AnyVal {
     val offset45Bottom = Renju.BOARD_WIDTH * 2
     for (idx <- 0 until Renju.BOARD_WIDTH - 4) {
       strips(offset45Bottom + idx) = new L1Strip(
-        Direction.DEG45,
+        Direction.IncreaseUp,
         Pos.rowColToIdx(0, idx),
         Renju.BOARD_WIDTH - idx,
         this.collectStonesDEG45(Renju.BOARD_WIDTH - idx, 0, idx)
@@ -128,7 +128,7 @@ final class BoardOps(val b: Board) extends AnyVal {
     val offset45Top = Renju.BOARD_WIDTH * 3 - 4
     for (idx <- 0 until Renju.BOARD_WIDTH - 5) {
       strips(offset45Top + idx) = new L1Strip(
-        Direction.DEG45,
+        Direction.IncreaseUp,
         Pos.rowColToIdx(idx + 1, 0),
         Renju.BOARD_WIDTH_MAX_IDX - idx,
         this.collectStonesDEG45(Renju.BOARD_WIDTH_MAX_IDX - idx, idx + 1, 0)
@@ -138,7 +138,7 @@ final class BoardOps(val b: Board) extends AnyVal {
     val offset315Bottom = Renju.BOARD_WIDTH * 4 - 9
     for (idx <- 0 until Renju.BOARD_WIDTH - 4) {
       strips(offset315Bottom + idx) = new L1Strip(
-        Direction.DEG315,
+        Direction.DescentUp,
         Pos.rowColToIdx(0, Renju.BOARD_WIDTH - idx - 1),
         Renju.BOARD_WIDTH - idx,
         this.collectStonesDEG315(Renju.BOARD_WIDTH - idx, 0, Renju.BOARD_WIDTH_MAX_IDX - idx)
@@ -148,7 +148,7 @@ final class BoardOps(val b: Board) extends AnyVal {
     val offset315Top = Renju.BOARD_WIDTH * 5 - 13
     for (idx <- 0 until Renju.BOARD_WIDTH - 5) {
       strips(offset315Top + idx) = new L1Strip(
-        Direction.DEG315,
+        Direction.DescentUp,
         Pos.rowColToIdx(idx + 1, Renju.BOARD_WIDTH - 1),
         Renju.BOARD_WIDTH_MAX_IDX - idx,
         this.collectStonesDEG315(Renju.BOARD_WIDTH_MAX_IDX - idx, idx + 1, Renju.BOARD_WIDTH_MAX_IDX)
@@ -158,27 +158,27 @@ final class BoardOps(val b: Board) extends AnyVal {
     strips
   }
 
-  private def applyParticle(direction: Int, idx: Int, particleBlack: Int, particleWhite: Int, forbidMask: Byte): Unit = {
+  private def applyParticle(direction: Direction, idx: Int, particleBlack: Int, particleWhite: Int, forbidMask: Byte): Unit = {
     b.structFieldBlack(idx) = b.structFieldBlack(idx).merged(direction, particleBlack)
     b.structFieldWhite(idx) = b.structFieldWhite(idx).merged(direction, particleWhite)
 
-    if (forbidMask != Flag.FREE)
+    if (forbidMask != Flag.EMPTY)
       b.field(idx) = forbidMask
   }
 
   def integrateStrips(strips: Array[L2Strip]): Unit = {
-    var winner = Option.empty[Byte]
-
     for (idx <- 0 until Renju.BOARD_SIZE) {
       if (
         b.field(idx) == Flag.FORBIDDEN_33
           || b.field(idx) == Flag.FORBIDDEN_44
       )
-        b.field(idx) = Flag.FREE
+        b.field(idx) = Flag.EMPTY
     }
 
     for (strip <- strips) {
-      if (strip.winner != Flag.FREE) winner = Some(strip.winner)
+      strip.winner.foreach { color =>
+        b.winner = Some(Right(color))
+      }
 
       strip.direction match {
         case Direction.X => for (idx <- 0 until strip.size)
@@ -193,22 +193,20 @@ final class BoardOps(val b: Board) extends AnyVal {
             Pos.rowColToIdx(idx, Pos.idxToCol(strip.startIdx)),
             strip.structStripBlack(idx), strip.structStripWhite(idx), strip.forbidMask(idx)
           )
-        case Direction.DEG45 => for (idx <- 0 until strip.size)
+        case Direction.IncreaseUp => for (idx <- 0 until strip.size)
           this.applyParticle(
-            Direction.DEG45,
+            Direction.IncreaseUp,
             Pos.rowColToIdx(Pos.idxToRow(strip.startIdx) + idx, Pos.idxToCol(strip.startIdx) + idx),
             strip.structStripBlack(idx), strip.structStripWhite(idx), strip.forbidMask(idx)
           )
-        case Direction.DEG315 => for (idx <- 0 until strip.size)
+        case Direction.DescentUp => for (idx <- 0 until strip.size)
           this.applyParticle(
-            Direction.DEG315,
+            Direction.DescentUp,
             Pos.rowColToIdx(Pos.idxToRow(strip.startIdx) + idx, Pos.idxToCol(strip.startIdx) - idx),
             strip.structStripBlack(idx), strip.structStripWhite(idx), strip.forbidMask(idx)
           )
       }
     }
-
-    b.winner = winner
   }
 
 }

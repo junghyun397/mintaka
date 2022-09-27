@@ -1,11 +1,11 @@
-package jrenju.solve
+package solver.vcf
 
 import jrenju.BoardIO.BoardToString
 import jrenju.TestHelper.T2
 import jrenju.notation.Pos
 import jrenju.protocol.Solution
-import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should
+import org.scalatest.flatspec.*
+import org.scalatest.matchers.*
 import utils.lang.Transform.joinHorizontal
 
 class VCFSolverTest extends AnyFlatSpec with should.Matchers {
@@ -15,9 +15,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
 
     val seq = VCFSolver.findVCFSequence(board)
 
-    val markedBoard = seq.foldLeft(board) { (board, idx) =>
-      board.makeMove(idx)
-    }
+    val markedBoard = seq.foldLeft(board) { (board, idx) => board.makeMove(idx) }
 
     println(joinHorizontal(board.boardString, markedBoard.boardString))
     println(f"${seq.length}, ${Pos.fromIdx(seq.last).toCartesian}, ${Solution.fromIterable(seq)}")

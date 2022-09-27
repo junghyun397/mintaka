@@ -1,6 +1,7 @@
-package jrenju
+package solver
 
 import jrenju.notation.{Direction, Flag, Pos, Renju}
+import jrenju.{Board, BoardIO, L1Strip}
 
 import scala.language.implicitConversions
 

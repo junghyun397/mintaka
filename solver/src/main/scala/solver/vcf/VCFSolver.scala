@@ -1,10 +1,12 @@
-package jrenju.solve
+//noinspection DuplicatedCode, ScalaUnusedSymbol
+
+package solver.vcf
 
 import jrenju.Board
-import jrenju.ParticleOps.particleOps
+import jrenju.Struct.particleOps
 import jrenju.notation.{Flag, Renju}
+import solver.cache.LRUMemo
 
-//noinspection DuplicatedCode
 object VCFSolver {
 
   private def findVCFSequenceBlack(memo: LRUMemo, maxDepth: Int, board: Board, parents: Seq[Int], coerce: Boolean): Seq[Int] = {

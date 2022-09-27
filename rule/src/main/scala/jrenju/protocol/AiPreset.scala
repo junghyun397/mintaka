@@ -1,4 +1,3 @@
-//noinspection ScalaUnusedSymbol
 
 package jrenju.protocol
 

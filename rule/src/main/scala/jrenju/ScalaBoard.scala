@@ -1,9 +1,8 @@
-//noinspection ScalaUnusedSymbol
 
 package jrenju
 
 import jrenju.ZobristHash.IncrementHash
-import jrenju.notation.{Flag, RejectReason, Renju}
+import jrenju.notation.{Color, Flag, InvalidKind, Renju}
 
 import scala.language.implicitConversions
 
@@ -15,36 +14,43 @@ class ScalaBoard(
   val moves: Int,
   val lastMove: Int,
 
-  var winner: Option[Byte],
+  var winner: Option[Either[Unit, Color]],
 
   val hashKey: Long,
 ) extends Board {
 
-  def validateMove(idx: Int): Option[RejectReason.Value] = {
-    val flag = this.field(idx)
+  def validateMove(move: Int): Option[InvalidKind] = {
+    val flag = this.field(move)
 
     if (this.isNextColorBlack && Flag.isForbid(flag))
-      Some(RejectReason.FORBIDDEN)
+      Some(InvalidKind.Forbidden)
     else if (Flag.isExist(flag))
-      Some(RejectReason.EXIST)
+      Some(InvalidKind.Exist)
     else
       Option.empty
   }
 
-  def makeMove(idx: Int, calculateForbid: Boolean): Board = {
+  def makeMove(move: Int, calculateForbid: Boolean): Board = {
     val board = new ScalaBoard(
-      field = this.field.updated(idx, this.nextColorFlag),
-      structFieldBlack = this.structFieldBlack.updated(idx, 0),
-      structFieldWhite = this.structFieldWhite.updated(idx, 0),
+      field = this.field.updated(move, this.nextColorFlag.raw),
+      structFieldBlack = this.structFieldBlack.updated(move, 0),
+      structFieldWhite = this.structFieldWhite.updated(move, 0),
       moves = this.moves + 1,
-      lastMove = idx,
+      lastMove = move,
       winner = Option.empty,
-      hashKey = this.hashKey.incrementBoardHash(idx, this.nextColorFlag)
+      hashKey = this.hashKey.incrementBoardHash(move, this.nextColorFlag.raw)
     )
 
-    board.integrateStrips(board.composeStrips(idx).map(_.calculateL2Strip()))
+    board.integrateStrips(board.composeStrips(move).map(_.calculateL2Strip()))
 
-    if (calculateForbid) board.calculateForbids()
+    if (calculateForbid)
+      board.calculateForbids()
+
+    if (
+      this.moves == Renju.BOARD_SIZE
+        || (this.isNextColorBlack && (Renju.BOARD_SIZE - board.field.count(Flag.isForbid)) < 1)
+    )
+      this.winner = Some(Left())
 
     board
   }
@@ -57,16 +63,6 @@ object ScalaBoard {
 
   implicit def structOps(board: Board): StructOps = new StructOps(board)
 
-  val newBoard: Board = this.newBoard(Renju.BOARD_CENTER_POS.idx)
-
-  def newBoard(initIdx: Int): Board = new ScalaBoard(
-    field = Array.fill(Renju.BOARD_SIZE)(Flag.FREE).updated(initIdx, Flag.BLACK),
-    structFieldBlack = Array.fill(Renju.BOARD_SIZE)(0),
-    structFieldWhite = Array.fill(Renju.BOARD_SIZE)(0),
-    moves = 1,
-    winner = Option.empty,
-    lastMove = initIdx,
-    hashKey = ZobristHash.empty
-  )
+  val newBoard: Board = EmptyScalaBoard.makeMove(Renju.BOARD_CENTER_POS)
 
 }

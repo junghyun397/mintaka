@@ -1,10 +1,18 @@
 package jrenju.notation
 
+sealed trait Direction {
+  
+  val shift: Int
+  
+}
+
 object Direction {
 
-  val X: Int = 0
-  val Y: Int = 1
-  val DEG45: Int = 2
-  val DEG315: Int = 3
+  case object X extends Direction { val shift = 0 }
+  case object Y extends Direction { val shift = 1 }
+  case object IncreaseUp extends Direction { val shift = 2 }
+  case object DescentUp extends Direction { val shift = 3 }
+  
+  val values: Array[Direction] = Array(Direction.X, Direction.Y, Direction.IncreaseUp, Direction.DescentUp)
 
 }

@@ -16,23 +16,35 @@ lazy val utils = (project in file("util"))
 
     scalaVersion := scala2Version,
 
-    libraryDependencies ++= Seq(
-      "org.mongodb" % "bson" % "4.7.1"
-    ),
-
     publishMavenStyle := true,
   )
 
 lazy val jrenju = (project in file("rule"))
+  .enablePlugins(ScalaJSPlugin)
   .settings(
     name := "jrenju",
-    description := "jrenju jvm renju library written in scala",
+    description := "jrenju jvm/js renju library written in scala",
 
     scalaVersion := scala2Version,
 
     publishMavenStyle := true,
   )
   .dependsOn(utils)
+
+lazy val solver = (project in file("solver"))
+  .settings(
+    name := "solver",
+    description := "renju solver",
+
+    scalaVersion := scala3Version,
+
+    libraryDependencies ++= Seq(
+      "org.mongodb" % "bson" % "4.7.1"
+    ),
+
+    publishMavenStyle := true,
+  )
+  .dependsOn(utils, jrenju)
 
 lazy val protobuf = (project in file("protobuf"))
   .settings(
@@ -68,10 +80,10 @@ lazy val app = (project in file("app"))
       "org.yaml" % "snakeyaml" % "1.30",
     ),
   )
-  .dependsOn(utils, jrenju, protobuf)
+  .dependsOn(utils, jrenju, solver, protobuf)
 
 lazy val root = (project in file("."))
   .settings(
     name := "Kvine",
   )
-  .aggregate(utils, jrenju, protobuf, app)
+  .aggregate(utils, jrenju, solver, protobuf, app)

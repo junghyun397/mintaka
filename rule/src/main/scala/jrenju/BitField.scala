@@ -51,7 +51,7 @@ class BitField(val elems: Array[Int]) extends AnyVal {
     }
   }
 
-  override def toString: String = this.elems.flatMap(_.toGroupedBinaryString.appended('\n')).mkString
+  override def toString: String = this.elems.flatMap(_.toChunkedBinaryString.appended('\n')).mkString
 
 }
 

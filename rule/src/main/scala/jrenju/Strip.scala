@@ -1,27 +1,31 @@
 package jrenju
 
 import jrenju.L1Strip.retrieveStripFieldSolution
-import jrenju.ParticleOps.particleOps
-import jrenju.notation.Flag
+import jrenju.Struct.particleOps
+import jrenju.notation.{Color, Direction, Flag}
 import utils.lang.ConcurrentMapOps.concurrentMapOps
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.language.{implicitConversions, postfixOps}
 import scala.math.Numeric.IntIsIntegral.{minus, plus}
 
-sealed class Strip(val direction: Int, val startIdx: Int, val size: Int)
+trait Strip {
 
-final class StructProviderOps(private var xs: Array[Int]) {
+  val direction: Direction
+
+  val startIdx: Int
+
+  val size: Int
+
+}
+
+private class StructProviderOps(val xs: Array[Int]) extends AnyVal {
 
   def setThree(idx: Int): Unit = this.xs(idx) |= 0x8000_0000
 
   def setBlockThree(idx: Int): Unit = this.xs(idx) |= 0x0800_0000
 
-  def increaseClosedFour(idx: Int): Unit =
-    if (((xs(idx) >>> 23) & 0x1) == 0)
-      this.xs(idx) |= 0x0080_0000
-    else
-      this.xs(idx) |= 0x0008_0000
+  def increaseClosedFour(idx: Int): Unit = this.xs(idx) |= (0x0080_0000 >> (((xs(idx) >>> 23) & 0x1) << 2))
 
   def setOpenFour(idx: Int): Unit = this.xs(idx) |= 0x0000_8000
 
@@ -29,15 +33,25 @@ final class StructProviderOps(private var xs: Array[Int]) {
 
 }
 
+final class L2Strip(
+  val direction: Direction,
+  val startIdx: Int,
+  val size: Int,
+  val structStripBlack: Array[Int],
+  val structStripWhite: Array[Int],
+  val forbidMask: Array[Byte],
+  val winner: Option[Color]
+) extends Strip
+
 //noinspection DuplicatedCode
 final class L1Strip(
-  direction: Int,
-  startIdx: Int,
-  size: Int,
+  val direction: Direction,
+  val startIdx: Int,
+  val size: Int,
   val stripField: Array[Byte]
-) extends Strip(direction, startIdx, size) {
+) extends Strip {
 
-  private implicit def pointProviderOps(xs: Array[Int]): StructProviderOps = new StructProviderOps(xs)
+  private implicit def structProviderOps(xs: Array[Int]): StructProviderOps = new StructProviderOps(xs)
 
   @inline private def isNotOver5(mask: Int): Boolean = this.isNotOver5(mask, -1, -1)
 
@@ -89,7 +103,7 @@ final class L1Strip(
     // check five
     // OOOO+
     if (
-      !isSolid && p4Flag != Flag.FREE && p4Flag != Flag.WALL
+      !isSolid && p4Flag != Flag.EMPTY && p4Flag != Flag.WALL
         && p4Flag == p3Flag && p3Flag == p2Flag && p2Flag == p1Flag
     ) {
       if (p1Flag == Flag.WHITE)
@@ -102,8 +116,8 @@ final class L1Strip(
 
     // OOO+O
     if (
-      isSolid && p4Flag != Flag.FREE
-        && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE && flag == p2Flag
+      isSolid && p4Flag != Flag.EMPTY
+        && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.EMPTY && flag == p2Flag
     ) {
       if (flag == Flag.WHITE)
         structStripWhite.setFive(op(pointer, 1))
@@ -116,8 +130,8 @@ final class L1Strip(
     // check open-4
     // -OOO+-
     if (
-      !isSolid && p4Flag != Flag.FREE
-        && p5Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
+      !isSolid && p4Flag != Flag.EMPTY
+        && p5Flag == Flag.EMPTY && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.EMPTY
     ) {
       if (p2Flag == Flag.WHITE) {
         structStripWhite.setOpenFour(op(pointer, 1))
@@ -133,8 +147,8 @@ final class L1Strip(
 
     // -OO+O-
     else if (
-      !isSolid && p4Flag != Flag.FREE
-        && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p3Flag == p1Flag
+      !isSolid && p4Flag != Flag.EMPTY
+        && p5Flag == Flag.EMPTY && p4Flag == p3Flag && p2Flag == Flag.EMPTY && p3Flag == p1Flag
     ) {
       if (p1Flag == Flag.WHITE) {
         structStripWhite.setOpenFour(op(pointer, 2))
@@ -153,21 +167,21 @@ final class L1Strip(
     // check closed-4
     // -OOO-+
     if (
-      !isSolid && p4Flag != Flag.FREE
-        && p5Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
+      !isSolid && p4Flag != Flag.EMPTY
+        && p5Flag == Flag.EMPTY && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.EMPTY
     ) {
       if (p2Flag == Flag.WHITE) {
         if (!whiteC4MarksDouble(op(pointer, 1)) && !whiteC4MarksDouble(pointer))
           structStripWhite.increaseClosedFour(pointer)
 
-        if (p6Flag != Flag.FREE && structStripWhite(op(pointer, 1)).openFourAt(0))
+        if (p6Flag != Flag.EMPTY && structStripWhite(op(pointer, 1)).openFourAt(Direction.X))
           structStripWhite.setBlockThree(pointer)
       } else if (this.isNotOver5(pointer, op(pointer, 1))) {
         structStripBlack.increaseClosedFour(pointer)
 
         if (
-          (p6Flag != Flag.FREE || !this.isNotOver5(op(pointer, 5), op(pointer, 6)))
-            && structStripBlack(op(pointer, 1)).openFourAt(0)
+          (p6Flag != Flag.EMPTY || !this.isNotOver5(op(pointer, 5), op(pointer, 6)))
+            && structStripBlack(op(pointer, 1)).openFourAt(Direction.X)
         )
           structStripBlack.setBlockThree(pointer)
       }
@@ -175,8 +189,8 @@ final class L1Strip(
 
     // OO++O
     else if (
-      isSolid && p4Flag != Flag.FREE
-        && p4Flag == p3Flag && p3Flag == flag && p2Flag == Flag.FREE && p1Flag == Flag.FREE
+      isSolid && p4Flag != Flag.EMPTY
+        && p4Flag == p3Flag && p3Flag == flag && p2Flag == Flag.EMPTY && p1Flag == Flag.EMPTY
     ) {
       if (flag == Flag.WHITE) {
         if (!whiteC4MarksDouble(op(pointer, 1)) && !whiteC4MarksDouble(op(pointer, 2))) {
@@ -194,9 +208,9 @@ final class L1Strip(
 
     // XOOO++
     else if (
-      !isSolid && p4Flag != Flag.FREE
-        && p5Flag != Flag.FREE && p5Flag != p4Flag
-        && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.FREE
+      !isSolid && p4Flag != Flag.EMPTY
+        && p5Flag != Flag.EMPTY && p5Flag != p4Flag
+        && p4Flag == p3Flag && p3Flag == p2Flag && p1Flag == Flag.EMPTY
     ) {
       if (p2Flag == Flag.WHITE) {
         if (!whiteC4MarksDouble(pointer) && !whiteC4MarksDouble(op(pointer, 1))) {
@@ -213,8 +227,8 @@ final class L1Strip(
 
     // +OO-O+
     else if (
-      !isSolid && p4Flag != Flag.FREE
-        && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p3Flag == p1Flag
+      !isSolid && p4Flag != Flag.EMPTY
+        && p5Flag == Flag.EMPTY && p4Flag == p3Flag && p2Flag == Flag.EMPTY && p3Flag == p1Flag
     ) {
       if (p1Flag == Flag.WHITE) {
         if (!whiteC4MarksSingle(pointer)) {
@@ -242,9 +256,9 @@ final class L1Strip(
 
     // X+OOO-
     else if (
-      !isSolid && p3Flag != Flag.FREE
-        && p5Flag != Flag.FREE && p5Flag != p3Flag
-        && p4Flag == Flag.FREE && p3Flag == p2Flag && p2Flag == p1Flag
+      !isSolid && p3Flag != Flag.EMPTY
+        && p5Flag != Flag.EMPTY && p5Flag != p3Flag
+        && p4Flag == Flag.EMPTY && p3Flag == p2Flag && p2Flag == p1Flag
     ) {
       if (p2Flag == Flag.WHITE) {
         structStripWhite.increaseClosedFour(op(pointer, 4))
@@ -257,9 +271,9 @@ final class L1Strip(
 
     // XOO+O+
     else if (
-      !isSolid && p4Flag != Flag.FREE
-        && p5Flag != Flag.FREE
-        && p4Flag == p3Flag && p2Flag == Flag.FREE && p1Flag == p3Flag
+      !isSolid && p4Flag != Flag.EMPTY
+        && p5Flag != Flag.EMPTY
+        && p4Flag == p3Flag && p2Flag == Flag.EMPTY && p1Flag == p3Flag
     ) {
       if (p1Flag == Flag.WHITE) {
         structStripWhite.increaseClosedFour(pointer)
@@ -273,9 +287,9 @@ final class L1Strip(
 
     // XO+OO+
     else if (
-      !isSolid && p4Flag != Flag.FREE
-        && p5Flag != Flag.FREE
-        && p4Flag == p2Flag && p3Flag == Flag.FREE && p2Flag == p1Flag
+      !isSolid && p4Flag != Flag.EMPTY
+        && p5Flag != Flag.EMPTY
+        && p4Flag == p2Flag && p3Flag == Flag.EMPTY && p2Flag == p1Flag
     ) {
       if (p1Flag == Flag.WHITE) {
         if (!whiteC4MarksSingle(pointer)) {
@@ -296,9 +310,9 @@ final class L1Strip(
     // check open-3
     // !-OO++-
     if (
-      !isSolid && p4Flag != Flag.FREE
+      !isSolid && p4Flag != Flag.EMPTY
         && p6Flag != p4Flag
-        && p5Flag == Flag.FREE && p4Flag == p3Flag && p2Flag == Flag.FREE && p1Flag == Flag.FREE
+        && p5Flag == Flag.EMPTY && p4Flag == p3Flag && p2Flag == Flag.EMPTY && p1Flag == Flag.EMPTY
     ) {
       if (p4Flag == Flag.WHITE) {
         structStripWhite.setThree(op(pointer, 1))
@@ -313,9 +327,9 @@ final class L1Strip(
 
     // X-+OO+-
     if (
-      !isSolid && p3Flag != Flag.FREE
-        && p6Flag != Flag.FREE && p6Flag != p3Flag
-        && p5Flag == Flag.FREE && p4Flag == Flag.FREE && p3Flag == p2Flag && p1Flag == Flag.FREE
+      !isSolid && p3Flag != Flag.EMPTY
+        && p6Flag != Flag.EMPTY && p6Flag != p3Flag
+        && p5Flag == Flag.EMPTY && p4Flag == Flag.EMPTY && p3Flag == p2Flag && p1Flag == Flag.EMPTY
     ) {
       if (p3Flag == Flag.WHITE) {
         if (this.isNotOver5White(pointer, op(pointer, 1), op(pointer, 4)))
@@ -330,9 +344,9 @@ final class L1Strip(
 
     // !-O-O+-
     if (
-      !isSolid && p4Flag != Flag.FREE
+      !isSolid && p4Flag != Flag.EMPTY
         && p6Flag != p4Flag
-        && p5Flag == Flag.FREE && p4Flag == p2Flag && p3Flag == Flag.FREE && p1Flag == Flag.FREE
+        && p5Flag == Flag.EMPTY && p4Flag == p2Flag && p3Flag == Flag.EMPTY && p1Flag == Flag.EMPTY
     ) {
       if (p4Flag == Flag.WHITE) {
         structStripWhite.setThree(op(pointer, 1))
@@ -343,9 +357,9 @@ final class L1Strip(
 
     // X-O+O+-
     if (
-      !isSolid && p4Flag != Flag.FREE
+      !isSolid && p4Flag != Flag.EMPTY
         && p6Flag != p4Flag
-        && p1Flag == Flag.FREE && p2Flag == p4Flag && p3Flag == Flag.FREE && p5Flag == Flag.FREE
+        && p1Flag == Flag.EMPTY && p2Flag == p4Flag && p3Flag == Flag.EMPTY && p5Flag == Flag.EMPTY
     ) {
       if (p4Flag == Flag.WHITE) {
         structStripWhite.setThree(op(pointer, 1))
@@ -357,16 +371,16 @@ final class L1Strip(
     }
   }
 
-  private def calculateStruct(): (Array[Int], Array[Int], Array[Byte], Byte) = {
+  private def calculateStruct(): (Array[Int], Array[Int], Array[Byte], Option[Color]) = {
     val structStripBlack = new Array[Int](this.stripField.length)
     val structStripWhite = new Array[Int](this.stripField.length)
 
-    val forbidMask = Array.fill(this.stripField.length)(Flag.FREE)
+    val forbidMask = Array.fill(this.stripField.length)(Flag.EMPTY)
 
     val whiteC4MarksSingle = Array.fill(this.stripField.length)(false)
     val whiteC4MarksDouble = Array.fill(this.stripField.length)(false)
 
-    var winner = Flag.FREE
+    var winner = Option.empty[Color]
 
     // flags
     var p6Flag = Flag.WALL
@@ -384,7 +398,7 @@ final class L1Strip(
     var pointer = 0
     while (pointer < this.stripField.length) {
       flag = this.stripField(pointer)
-      isSolid = flag != Flag.FREE
+      isSolid = flag != Flag.EMPTY
 
       // check win
       if (
@@ -392,13 +406,13 @@ final class L1Strip(
           && p4Flag == p3Flag && p3Flag == p2Flag && p2Flag == p1Flag && p1Flag == flag
           && (flag == Flag.WHITE || this.isNotOver5(pointer))
       )
-        winner = flag
+        winner = Some(Color.fromColor(flag))
 
       // check five
       // OO+OO
       if (
         isSolid
-          && p2Flag == Flag.FREE && p4Flag == p3Flag && p3Flag == p1Flag && p1Flag == flag
+          && p2Flag == Flag.EMPTY && p4Flag == p3Flag && p3Flag == p1Flag && p1Flag == flag
       )
         if (flag == Flag.WHITE)
           structStripWhite.setFive(pointer - 2)
@@ -411,7 +425,7 @@ final class L1Strip(
       // O+O+O
       if (
         isSolid
-          && p4Flag == p2Flag && p2Flag == flag && p3Flag == Flag.FREE && p1Flag == Flag.FREE
+          && p4Flag == p2Flag && p2Flag == flag && p3Flag == Flag.EMPTY && p1Flag == Flag.EMPTY
       )
         if (flag == Flag.WHITE) {
           if (
@@ -429,8 +443,8 @@ final class L1Strip(
       // check open-3
       // -O++O-
       if (
-        !isSolid && p1Flag != Flag.FREE
-          && p5Flag == Flag.FREE && p4Flag == p1Flag && p3Flag == Flag.FREE && p2Flag == Flag.FREE
+        !isSolid && p1Flag != Flag.EMPTY
+          && p5Flag == Flag.EMPTY && p4Flag == p1Flag && p3Flag == Flag.EMPTY && p2Flag == Flag.EMPTY
       )
         if (p1Flag == Flag.WHITE) {
           structStripWhite.setThree(pointer - 2)
@@ -445,8 +459,8 @@ final class L1Strip(
 
       // --O+O--
       if (
-        !isSolid && p4Flag != Flag.FREE
-          && p6Flag == Flag.FREE && p5Flag == Flag.FREE && p4Flag == p2Flag && p3Flag == Flag.FREE && p1Flag == Flag.FREE
+        !isSolid && p4Flag != Flag.EMPTY
+          && p6Flag == Flag.EMPTY && p5Flag == Flag.EMPTY && p4Flag == p2Flag && p3Flag == Flag.EMPTY && p1Flag == Flag.EMPTY
       )
         if (p2Flag == Flag.WHITE)
           structStripWhite.setThree(pointer - 3)
@@ -490,7 +504,7 @@ final class L1Strip(
     pointer = this.size - 1
     while (pointer >= 0) {
       flag = this.stripField(pointer)
-      isSolid = flag != Flag.FREE
+      isSolid = flag != Flag.EMPTY
 
       this.pattern2Mutate(
         structStripBlack,
@@ -534,19 +548,9 @@ final class L1Strip(
 
 object L1Strip {
 
-  private val stripMemo = new ConcurrentHashMap[Long, (Array[Int], Array[Int], Array[Byte], Byte)]()
+  private val stripMemo = new ConcurrentHashMap[Long, (Array[Int], Array[Int], Array[Byte], Option[Color])]()
 
-  private def retrieveStripFieldSolution(strip: L1Strip): (Array[Int], Array[Int], Array[Byte], Byte) =
+  private def retrieveStripFieldSolution(strip: L1Strip): (Array[Int], Array[Int], Array[Byte], Option[Color]) =
     this.stripMemo.getOrElseUpdate(strip.hashKey, () => strip.calculateStruct())
 
 }
-
-final class L2Strip(
-  direction: Int,
-  startIdx: Int,
-  size: Int,
-  val structStripBlack: Array[Int],
-  val structStripWhite: Array[Int],
-  val forbidMask: Array[Byte],
-  val winner: Byte
-) extends Strip(direction, startIdx, size)

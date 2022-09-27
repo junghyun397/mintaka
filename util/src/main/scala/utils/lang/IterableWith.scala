@@ -4,7 +4,7 @@ import scala.collection.AbstractIterator
 
 trait IterableWith[T] extends Iterable[T] {
 
-  def maxSize: Int
+  def length: Int
 
   def elementAt(idx: Int): T
 
@@ -12,7 +12,7 @@ trait IterableWith[T] extends Iterable[T] {
 
     private var idx: Int = 0
 
-    override def hasNext: Boolean = idx < maxSize
+    override def hasNext: Boolean = idx < this.length
 
     override def next(): T = {
       val status = elementAt(idx)

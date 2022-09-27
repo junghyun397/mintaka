@@ -1,6 +1,6 @@
 package jrenju
 
-import jrenju.ParticleOps.particleOps
+import jrenju.Struct.particleOps
 import jrenju.TestHelper.T2
 import jrenju.notation.Flag
 import org.scalatest.flatspec._
@@ -273,9 +273,9 @@ class StripTest extends AnyFlatSpec with should.Matchers {
   }
 
   "win" should "detect correctly" in {
-    win(".XXOX..OXXXX.X", Flag.FREE)
+    win(".XXOX..OXXXX.X", Flag.EMPTY)
 
-    win("..XOOXO.OOOO.O", Flag.FREE)
+    win("..XOOXO.OOOO.O", Flag.EMPTY)
 
     win("XXXXX", Flag.BLACK)
 

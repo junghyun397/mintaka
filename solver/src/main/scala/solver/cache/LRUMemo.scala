@@ -1,4 +1,4 @@
-package jrenju.solve
+package solver.cache
 
 import jrenju.Board
 import jrenju.ZobristHash.IncrementHash
@@ -8,11 +8,11 @@ import utils.lang.LRUCache
 import java.util.Collections.synchronizedMap
 
 class LRUMemo(
-  private val blackMemo: java.util.Map[Long, Float] = new java.util.concurrent.ConcurrentHashMap(),
-  private val whiteMemo: java.util.Map[Long, Float] = new java.util.concurrent.ConcurrentHashMap(),
+  private val blackMemo: java.util.Map[Long, Float] = java.util.concurrent.ConcurrentHashMap(),
+  private val whiteMemo: java.util.Map[Long, Float] = java.util.concurrent.ConcurrentHashMap(),
 
-  private val blackCache: java.util.Map[Long, Float] = synchronizedMap(new LRUCache[Long, Float](1_000)),
-  private val whiteCache: java.util.Map[Long, Float] = synchronizedMap(new LRUCache[Long, Float](1_000)),
+  private val blackCache: java.util.Map[Long, Float] = synchronizedMap(LRUCache[Long, Float](1_000)),
+  private val whiteCache: java.util.Map[Long, Float] = synchronizedMap(LRUCache[Long, Float](1_000)),
 ) extends Cloneable {
 
   def probe(key: Long, color: Byte): Option[Float] =
@@ -28,7 +28,7 @@ class LRUMemo(
       this.probeWhite(board.hashKey)
 
   def probe(board: Board, move: Int): Option[Float] = {
-    val key = board.hashKey.incrementBoardHash(move, board.nextColorFlag)
+    val key = board.hashKey.incrementBoardHash(move, board.nextColorFlag.raw)
     if (board.isNextColorBlack)
       this.probeBlack(key)
     else
@@ -56,7 +56,7 @@ class LRUMemo(
       this.writeWhite(board.hashKey, eval)
 
   def write(board: Board, move: Int, eval: Float): Unit = {
-    val key = board.hashKey.incrementBoardHash(move, board.nextColorFlag)
+    val key = board.hashKey.incrementBoardHash(move, board.nextColorFlag.raw)
     if (board.isNextColorBlack)
       this.writeBlack(key, eval)
     else
@@ -73,12 +73,12 @@ class LRUMemo(
     this.whiteMemo.put(key, eval)
   }
 
-  override def clone(): LRUMemo = new LRUMemo(this.blackCache, this.whiteCache)
+  override def clone(): LRUMemo = LRUMemo(this.blackCache, this.whiteCache)
 
 }
 
 object LRUMemo {
 
-  def empty: LRUMemo = new LRUMemo()
+  def empty: LRUMemo = LRUMemo()
 
 }

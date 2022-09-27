@@ -1,12 +1,13 @@
+//noinspection DuplicatedCode, ScalaUnusedSymbol
+
 package jrenju
 
-import jrenju.ParticleOps.particleOps
+import jrenju.Struct.particleOps
 import jrenju.notation.{Flag, Pos, Renju}
 import utils.lang.Transform.joinHorizontal
 
 import scala.language.implicitConversions
 
-//noinspection DuplicatedCode
 object BoardIO {
 
   // regex: [a-z][0-9][0-9]?[0-9]?
@@ -24,7 +25,7 @@ object BoardIO {
     .flatMap(this.fromSequence)
 
   def fromSequence(source: Seq[Int]): Option[Board] = {
-    val field = Array.fill(Renju.BOARD_SIZE)(Flag.FREE)
+    val field = Array.fill(Renju.BOARD_SIZE)(Flag.EMPTY)
 
     source.zipWithIndex foreach { case (idx, order) =>
       field(idx) =

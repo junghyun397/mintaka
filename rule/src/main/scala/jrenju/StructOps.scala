@@ -1,6 +1,6 @@
 package jrenju
 
-import jrenju.ParticleOps.particleOps
+import jrenju.Struct.particleOps
 import jrenju.notation.{Direction, Flag, Pos, Renju}
 
 import scala.collection.mutable
@@ -8,11 +8,11 @@ import scala.language.implicitConversions
 
 final class StructOps(val b: Board) extends AnyVal {
 
-  @inline private def getOffsetIdx(direction: Int, initRow: Int, initCol: Int, offset: Int): Int = direction match {
+  @inline private def getOffsetIdx(direction: Direction, initRow: Int, initCol: Int, offset: Int): Int = direction match {
     case Direction.X => Pos.rowColToIdx(initRow, initCol + offset)
     case Direction.Y => Pos.rowColToIdx(initRow + offset, initCol)
-    case Direction.DEG45 => Pos.rowColToIdx(initRow + offset, initCol + offset)
-    case Direction.DEG315 => Pos.rowColToIdx(initRow + offset, initCol - offset)
+    case Direction.IncreaseUp => Pos.rowColToIdx(initRow + offset, initCol + offset)
+    case Direction.DescentUp => Pos.rowColToIdx(initRow + offset, initCol - offset)
   }
 
   @inline private def getBoardFieldBounded(idx: Int): Byte =
@@ -23,7 +23,7 @@ final class StructOps(val b: Board) extends AnyVal {
     if (idx < 0 || idx >= Renju.BOARD_SIZE) false
     else process(idx)
 
-  def collectOpen3Counters(direction: Int, idx: Int, extract: Int => Int, flag: Byte): Array[Int] = {
+  def collectOpen3Counters(direction: Direction, idx: Int, extract: Int => Int, flag: Byte): Array[Int] = {
     val row = Pos.idxToRow(idx)
     val col = Pos.idxToCol(idx)
 
@@ -98,18 +98,18 @@ final class StructOps(val b: Board) extends AnyVal {
     }
 
     // OO+0
-    else if (Flag.onlyStone(p1Value) == Flag.FREE && p2Value == flag)
+    else if (Flag.onlyStone(p1Value) == Flag.EMPTY && p2Value == flag)
       Array(p1Pointer)
 
     // 0+OO
-    else if (Flag.onlyStone(a1Value) == Flag.FREE && a2Value == flag)
+    else if (Flag.onlyStone(a1Value) == Flag.EMPTY && a2Value == flag)
       Array(a1Pointer)
 
     else
       Array.empty
   }
 
-  def collectClosed4Counter(direction: Int, idx: Int, extract: Int => Int): Int = {
+  def collectClosed4Counter(direction: Direction, idx: Int, extract: Int => Int): Int = {
     val row = Pos.idxToRow(idx)
     val col = Pos.idxToCol(idx)
 
@@ -124,7 +124,7 @@ final class StructOps(val b: Board) extends AnyVal {
     -1
   }
 
-  private def isNotPseudoThree(direction: Int, idx: Int, from: Int): Boolean = {
+  private def isNotPseudoThree(direction: Direction, idx: Int, from: Int): Boolean = {
     val counters = this.collectOpen3Counters(direction, idx, b.structFieldBlack, Flag.BLACK)
     for (counter <- counters) {
       val flag = b.field(counter)
@@ -147,19 +147,19 @@ final class StructOps(val b: Board) extends AnyVal {
   private def isPseudoForbid(idx: Int): Boolean = {
     var count = 0
     val particle = b.structFieldBlack(idx)
-    for (direction <- 0 until 4)
+    for (direction <- Direction.values)
       if (particle.threeAt(direction) && this.isNotPseudoThree(direction, idx, idx))
         count += 1
 
     count < 2
   }
 
-  private def isPseudoForbid(excludeDirection: Int, idx: Int, from: Int): Boolean = {
+  private def isPseudoForbid(excludeDirection: Direction, idx: Int, from: Int): Boolean = {
     if (idx == from) return false
 
     var count = 0
     val particle = b.structFieldBlack(idx)
-    for (direction <- 0 until 4)
+    for (direction <- Direction.values)
       if (direction != excludeDirection && particle.threeAt(direction) && this.isNotPseudoThree(direction, idx, from))
         count += 1
 
@@ -174,7 +174,7 @@ final class StructOps(val b: Board) extends AnyVal {
       if (Flag.isForbid(b.field(idx))) {
         val particle = b.structFieldWhite(idx)
 
-        for (direction <- 0 until 4) {
+        for (direction <- Direction.values) {
           if (particle.threeAt(direction))
             threeSideTraps.addAll(this.collectOpen3Counters(direction, idx, b.structFieldWhite, Flag.WHITE))
 
@@ -197,7 +197,7 @@ final class StructOps(val b: Board) extends AnyVal {
       val particle = b.structFieldBlack(idx)
 
       if (particle.fiveTotal > 0)
-        b.field(idx) = Flag.FREE
+        b.field(idx) = Flag.EMPTY
       else if (b.field(idx) == Flag.FORBIDDEN_6)
         b.field(idx) = Flag.FORBIDDEN_6
       else if (particle.fourTotal > 1)
@@ -211,7 +211,7 @@ final class StructOps(val b: Board) extends AnyVal {
     if (hasDi3Forbid)
       for (idx <- 0 until Renju.BOARD_SIZE)
         if (b.field(idx) == Flag.FORBIDDEN_33 && this.isPseudoForbid(idx))
-          b.field(idx) = Flag.FREE
+          b.field(idx) = Flag.EMPTY
   }
 
 }

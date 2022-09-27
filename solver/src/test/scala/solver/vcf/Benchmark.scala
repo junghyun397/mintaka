@@ -1,9 +1,9 @@
-package jrenju
+package solver.vcf
 
 import jrenju.TestHelper.T2
-import jrenju.solve.{LRUMemo, VCFSolver}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
+import solver.cache.LRUMemo
 
 class Benchmark extends AnyFlatSpec with should.Matchers {
 
