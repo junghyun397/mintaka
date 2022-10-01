@@ -9,32 +9,21 @@ ThisBuild / libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.2.12" % Test
 )
 
-lazy val utils = (project in file("util"))
-  .settings(
-    name := "utils",
-    description := "utility library",
-
-    scalaVersion := scala2Version,
-
-    publishMavenStyle := true,
-  )
-
-lazy val jrenju = (project in file("rule"))
+lazy val renju = (project in file("renju"))
   .enablePlugins(ScalaJSPlugin)
   .settings(
-    name := "jrenju",
+    name := "renju",
     description := "jrenju jvm/js renju library written in scala",
 
     scalaVersion := scala2Version,
 
     publishMavenStyle := true,
   )
-  .dependsOn(utils)
 
-lazy val solver = (project in file("solver"))
+lazy val engine = (project in file("engine"))
   .settings(
-    name := "solver",
-    description := "renju solver",
+    name := "engine",
+    description := "renju engine",
 
     scalaVersion := scala3Version,
 
@@ -44,7 +33,7 @@ lazy val solver = (project in file("solver"))
 
     publishMavenStyle := true,
   )
-  .dependsOn(utils, jrenju)
+  .dependsOn(renju)
 
 lazy val protobuf = (project in file("protobuf"))
   .settings(
@@ -52,9 +41,9 @@ lazy val protobuf = (project in file("protobuf"))
   )
   .enablePlugins(Fs2Grpc)
 
-lazy val app = (project in file("app"))
+lazy val server = (project in file("server"))
   .settings(
-    name := "app",
+    name := "server",
     description := "online self-learning renju solver",
 
     scalaVersion := scala3Version,
@@ -80,10 +69,10 @@ lazy val app = (project in file("app"))
       "org.yaml" % "snakeyaml" % "1.30",
     ),
   )
-  .dependsOn(utils, jrenju, solver, protobuf)
+  .dependsOn(renju, engine, protobuf)
 
 lazy val root = (project in file("."))
   .settings(
     name := "Kvine",
   )
-  .aggregate(utils, jrenju, solver, protobuf, app)
+  .aggregate(renju, engine, protobuf, server)
