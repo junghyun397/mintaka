@@ -5,6 +5,9 @@ import engine.search.vcf.VCFSolver
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 import renju.TestHelper.T2
+import renju.protocol.Solution
+
+import scala.scalajs.js.JSON
 
 class Benchmark extends AnyFlatSpec with should.Matchers {
 
@@ -52,7 +55,7 @@ class Benchmark extends AnyFlatSpec with should.Matchers {
       |   A B C D E F G H I J K L M N O
     """.t2b
 
-    for (_ <- 1 to 1000) {
+    for (_ <- 1 to 2) {
       VCFSolver.findVCFSequence(black43Fork, memoBlack)
       VCFSolver.findVCFSequence(whiteTrap, memoWhite)
     }

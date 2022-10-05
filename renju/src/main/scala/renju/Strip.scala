@@ -439,7 +439,7 @@ final class L1Strip(
           && p4Flag == p3Flag && p3Flag == p2Flag && p2Flag == p1Flag && p1Flag == flag
           && (flag == Flag.WHITE || this.isNotOver5(pointer))
       )
-        winner = Some(Color.fromFlag(flag))
+        winner = Some(Color.fromFlag(flag).get)
 
       // check five
       // OO+OO

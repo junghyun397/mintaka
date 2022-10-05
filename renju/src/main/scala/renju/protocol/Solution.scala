@@ -43,7 +43,7 @@ object Solution {
 
 }
 
-final case class SolutionNode(idx: Int, child: Map[Int, Solution]) extends Solution {
+case class SolutionNode(idx: Int, child: Map[Int, Solution]) extends Solution {
 
   def toJSON: String =
     f"{\"$SOLUTION_KEY\": \"${Pos.fromIdx(idx)}\", \"$CHILD_KEY\": ${child.map { case (key, value) => f"\"${Pos.fromIdx(key)}\": $value" }.mkString("{", ", ", "}")}}"
@@ -51,7 +51,7 @@ final case class SolutionNode(idx: Int, child: Map[Int, Solution]) extends Solut
 }
 
 
-final case class SolutionLeaf(idx: Int) extends Solution {
+case class SolutionLeaf(idx: Int) extends Solution {
 
   def toJSON: String =
     f"{\"$SOLUTION_KEY\": \"${Pos.fromIdx(idx).toString}\"}"

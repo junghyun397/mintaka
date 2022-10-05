@@ -26,10 +26,10 @@ object Color {
 
   }
 
-  def fromFlag(flag: Byte): Color = flag match {
-    case Flag.BLACK => Black
-    case Flag.WHITE => White
-    case _ => throw new IllegalArgumentException()
+  def fromFlag(flag: Byte): Option[Color] = flag match {
+    case Flag.BLACK => Some(Black)
+    case Flag.WHITE => Some(White)
+    case _ => Option.empty
   }
 
 }
