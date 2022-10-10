@@ -11,15 +11,15 @@ object EmptyScalaBoard extends Board {
 
   val structFieldWhite: Array[Int] = Array.fill(Renju.BOARD_SIZE)(0)
 
-  val moves: Int = 0
+  var moves: Int = 0
 
-  val lastMove: Int = 0
+  var lastMove: Int = 0
 
   override val lastPos: Option[Pos] = Option.empty
 
-  val winner: Option[Result] = Option.empty
+  var winner: Option[Result] = Option.empty
 
-  val hashKey: HashKey = HashKey.empty
+  var hashKey: HashKey = HashKey.empty
 
   override val nextColor: Color = Color.Black
 
