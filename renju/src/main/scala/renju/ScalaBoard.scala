@@ -47,7 +47,7 @@ class ScalaBoard(
 
     if (
       board.moves == Renju.BOARD_SIZE
-        || (this.isNextColorBlack && (Renju.BOARD_SIZE - board.field.count(Flag.isForbid)) < 1)
+        || (this.isNextColorBlack && (Renju.BOARD_SIZE - board.moves - board.field.count(Flag.isForbid)) < 1)
     )
       board.winner = Some(Result.Full)
 
