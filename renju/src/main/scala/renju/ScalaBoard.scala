@@ -10,12 +10,12 @@ class ScalaBoard(
   val structFieldBlack: Array[Int],
   val structFieldWhite: Array[Int],
 
-  val moves: Int,
-  val lastMove: Int,
+  var moves: Int,
+  var lastMove: Int,
 
   var winner: Option[Result],
 
-  val hashKey: HashKey,
+  var hashKey: HashKey,
 ) extends Board {
 
   def validateMove(move: Int): Option[InvalidKind] = {
@@ -46,10 +46,10 @@ class ScalaBoard(
       board.calculateForbids()
 
     if (
-      this.moves == Renju.BOARD_SIZE
+      board.moves == Renju.BOARD_SIZE
         || (this.isNextColorBlack && (Renju.BOARD_SIZE - board.field.count(Flag.isForbid)) < 1)
     )
-      this.winner = Some(Result.Full)
+      board.winner = Some(Result.Full)
 
     board
   }

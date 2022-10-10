@@ -13,15 +13,15 @@ trait Board extends IterableWith[FieldStatus] {
 
   val structFieldWhite: Array[Int]
 
-  val moves: Int
+  var moves: Int
 
-  val lastMove: Int
+  var lastMove: Int
 
   def lastPos: Option[Pos] = Some(Pos.fromIdx(this.lastMove))
 
   var winner: Option[Result]
 
-  val hashKey: HashKey
+  var hashKey: HashKey
 
   def isNextColorBlack: Boolean = (this.moves & 0x01) == 0x00
 

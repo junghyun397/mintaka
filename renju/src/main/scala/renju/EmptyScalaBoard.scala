@@ -17,7 +17,7 @@ object EmptyScalaBoard extends Board {
 
   override val lastPos: Option[Pos] = Option.empty
 
-  var winner: Option[Result] = Option.empty
+  val winner: Option[Result] = Option.empty
 
   val hashKey: HashKey = HashKey.empty
 

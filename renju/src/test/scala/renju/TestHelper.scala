@@ -1,7 +1,10 @@
 package renju
 
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should
 import renju.notation.{Direction, Flag, Pos, Renju}
 
+import scala.io.StdIn.readLine
 import scala.language.implicitConversions
 
 /*
@@ -46,6 +49,23 @@ object TestHelper {
         .toArray
     )
 
+  }
+
+}
+
+class TestHelper extends AnyFlatSpec with should.Matchers {
+
+  "board from history text" should "run" in {
+    val source = readLine()
+
+    val history = for {
+      matched <- """\d{1,3}""".r.findAllIn(source)
+      idx = matched.toInt
+    } yield idx
+
+    val board = BoardIO.fromSequence(history.toSeq)
+
+    println(board)
   }
 
 }
