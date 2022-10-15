@@ -36,17 +36,17 @@ object Opening {
 
   private val directHashes: Map[Rotation, HashKey] = Map(
     Rotation.Straight -> HashKey.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(127, Flag.WHITE),
+      .move(112, Flag.BLACK)
+      .move(127, Flag.WHITE),
     Rotation.Clockwise -> HashKey.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(113, Flag.WHITE),
+      .move(112, Flag.BLACK)
+      .move(113, Flag.WHITE),
     Rotation.CounterClockwise -> HashKey.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(111, Flag.WHITE),
+      .move(112, Flag.BLACK)
+      .move(111, Flag.WHITE),
     Rotation.Overturn -> HashKey.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(97, Flag.WHITE)
+      .move(112, Flag.BLACK)
+      .move(97, Flag.WHITE)
   )
 
   private val directOpeningHashes: Map[Int, Rotation => Opening] = Map(
@@ -67,17 +67,17 @@ object Opening {
 
   private val indirectHashes: Map[Rotation, HashKey] = Map(
     Rotation.Straight -> HashKey.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(128, Flag.WHITE),
+      .move(112, Flag.BLACK)
+      .move(128, Flag.WHITE),
     Rotation.Clockwise -> HashKey.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(98, Flag.WHITE),
+      .move(112, Flag.BLACK)
+      .move(98, Flag.WHITE),
     Rotation.CounterClockwise -> HashKey.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(126, Flag.WHITE),
+      .move(112, Flag.BLACK)
+      .move(126, Flag.WHITE),
     Rotation.Overturn -> HashKey.empty
-      .incrementHash(112, Flag.BLACK)
-      .incrementHash(96, Flag.WHITE)
+      .move(112, Flag.BLACK)
+      .move(96, Flag.WHITE)
   )
 
   private val indirectOpeningHashes: Map[Int, Rotation => Opening] = Map(

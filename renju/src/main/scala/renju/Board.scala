@@ -23,11 +23,11 @@ trait Board extends IterableWith[FieldStatus] {
 
   var hashKey: HashKey
 
-  def isNextColorBlack: Boolean = (this.moves & 0x01) == 0x00
+  def isNextColorBlack: Boolean = (this.moves & 0x1) == 0x0
 
-  def color: Color = if (moves % 2 == 1) Color.Black else Color.White
+  def color: Color = if ((moves & 0x1) == 0x1) Color.Black else Color.White
   
-  def nextColor: Color = if (moves % 2 == 1) Color.White else Color.Black
+  def nextColor: Color = if ((moves & 0x1) == 0x1) Color.White else Color.Black
 
   def colorFlag: Flag = new Flag(Flag.fromMoves(this.moves))
 
@@ -54,6 +54,10 @@ trait Board extends IterableWith[FieldStatus] {
   def makeMove(move: Int): Board = this.makeMove(move, calculateForbid = true)
 
   def makeMove(move: Int, calculateForbid: Boolean): Board
+
+  def insertMove(move: Int, calculateForbid: Boolean): Unit
+
+  def deleteMove(move: Int, calculateForbid: Boolean): Unit
 
   def length: Int = this.field.length
 

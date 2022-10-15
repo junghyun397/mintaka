@@ -1,11 +1,9 @@
-//noinspection DuplicatedCode
-
 package engine.move
 
-import renju.Struct.struct
-import renju.notation.{Flag, Pos, Renju}
+import renju.notation.Struct.struct
+import renju.notation.{Flag, Pos, Renju, Struct}
 import renju.util.Transform.IntTransform
-import renju.{BitField, Board, Struct}
+import renju.{BitField, Board}
 
 import scala.collection.mutable
 

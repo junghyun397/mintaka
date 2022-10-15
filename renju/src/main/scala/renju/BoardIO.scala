@@ -1,9 +1,8 @@
-//noinspection DuplicatedCode
-
 package renju
 
+import renju.BoardIO.BoardToString.columnHint
 import renju.hash.HashKey
-import renju.notation.{Flag, Pos, Renju}
+import renju.notation.{Flag, Pos, Renju, Struct}
 import renju.util.Transform.joinHorizontal
 
 import scala.language.implicitConversions
@@ -20,11 +19,13 @@ object BoardIO {
     Option.when(!seq.exists(_.isEmpty)) { seq.map(_.get) }
   }
 
-  def fromSequence(source: String): Option[Board] = this.buildPosSequence(source)
-    .map(_.map(_.idx))
-    .flatMap(this.fromSequence)
+  def fromPosSequence(source: String): Option[Board] = for {
+    posSeq <- this.buildPosSequence(source)
+    idxSeq = posSeq.map(_.idx)
+    board <- this.fromIdxSequence(idxSeq)
+  } yield board
 
-  def fromSequence(source: Seq[Int]): Option[Board] = {
+  def fromIdxSequence(source: Seq[Int]): Option[Board] = {
     val field = Array.fill(Renju.BOARD_SIZE)(Flag.EMPTY)
 
     source.zipWithIndex foreach { case (idx, order) =>
@@ -50,28 +51,24 @@ object BoardIO {
   }
 
   def fromBoardText(source: String, latestMove: Int): Option[Board] = {
-    val regex = """\d[\s\[](\S[\s\[\]]){15}\d""".r
-
-    this.fromFieldArray(
-      regex.findAllIn(source)
+    val reversedField = for {
+      row <- """\d[\s\[](\S[\s\[\]]){15}\d""".r
+        .findAllIn(source)
         .toArray
-        .flatMap(_
-          .drop(1)
-          .dropRight(1)
-          .toUpperCase
-          .map(Flag.charToFlag)
-          .filter(_.isDefined)
-          .map(_.get)
-          .reverse
-        )
-        .reverse,
-      latestMove,
-    )
+      char <- row
+        .drop(1)
+        .dropRight(1)
+        .toUpperCase
+        .reverse
+      flag = Flag.charToFlag(char)
+      if flag.isDefined
+    } yield flag.get
+
+    this.fromFieldArray(reversedField.reverse, latestMove)
   }
 
   def fromFieldArray(source: Array[Byte], latestMove: Int): Option[Board] =
-    if (source.length != Renju.BOARD_SIZE) Option.empty
-    else {
+    Option.when(source.length == Renju.BOARD_SIZE) {
       val board = new ScalaBoard(
         field = source,
         structFieldBlack = Array.fill(Renju.BOARD_SIZE)(0),
@@ -88,17 +85,10 @@ object BoardIO {
       board.integrateStrips(board.composeGlobalStrips().map(_.calculateL2Strip()))
       board.calculateForbids()
 
-      Some(board)
+      board
     }
 
-  implicit class BoardToString(b: Board) {
-
-    private lazy val columnHint: String = f"   ${
-      Seq.range(65, 65 + Renju.BOARD_WIDTH)
-        .map(_.toChar.toString)
-        .reduce((acc, col) => f"$acc $col")
-        .mkString
-    }   "
+  implicit class BoardToString(val b: Board) extends AnyVal {
 
     def attributeString[T](markLastMove: Boolean)(extract: Board => Array[T])(transform: T => String): String = f"$columnHint\n${
       val result = extract(this.b)
@@ -118,6 +108,7 @@ object BoardIO {
 
       if (markLastMove && b.moves != 0) {
         val offset =(Renju.BOARD_WIDTH_MAX_IDX - Pos.idxToRow(b.lastMove)) * (6 + Renju.BOARD_WIDTH * 2) + Pos.idxToCol(b.lastMove) * 2 + 2
+
         result
           .updated(offset, '[')
           .updated(offset + 2, ']')
@@ -129,8 +120,8 @@ object BoardIO {
     def boardString(markLatestMove: Boolean): String =
       this.attributeString(markLatestMove)(_.field)(flag => Flag.flagToChar(flag).toString)
 
-    private val blackStructToText: (Struct => String) => String = this.attributeString(markLastMove = false)(_.structFieldBlack.map(Struct.apply))
-    private val whiteStructToText: (Struct => String) => String = this.attributeString(markLastMove = false)(_.structFieldWhite.map(Struct.apply))
+    private def blackStructToText: (Struct => String) => String = this.attributeString(markLastMove = false)(_.structFieldBlack.map(Struct.apply))
+    private def whiteStructToText: (Struct => String) => String = this.attributeString(markLastMove = false)(_.structFieldWhite.map(Struct.apply))
 
     implicit def dotIfZero(i: Int): String = if (i == 0) "." else i.toString
 
@@ -150,6 +141,17 @@ object BoardIO {
           f"\nwhite-open-four /\n${this.whiteStructToText(_.openFourTotal)}\n",
           f"\nwhite-five\n${this.whiteStructToText(_.fiveTotal)}\n"
         )
+
+  }
+
+  object BoardToString {
+
+    private lazy val columnHint: String = f"   ${
+      Seq.range(65, 65 + Renju.BOARD_WIDTH)
+        .map(_.toChar.toString)
+        .reduce((acc, col) => f"$acc $col")
+        .mkString
+    }   "
 
   }
 

@@ -1,6 +1,6 @@
 package renju
 
-import renju.notation.Flag
+import renju.notation.{Flag, Struct}
 
 class FieldStatus(
   val flag: Flag,

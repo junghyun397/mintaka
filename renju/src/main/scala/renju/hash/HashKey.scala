@@ -5,9 +5,10 @@ import renju.notation.{Flag, Renju}
 
 import scala.util.Random
 
+// Zobrist Hash, collision at sqrt(2^64) = 2^32
 class HashKey(val raw: Long) extends AnyVal {
 
-  def incrementHash(move: Int, flag: Byte): HashKey = {
+  def move(move: Int, flag: Byte): HashKey = {
     val raw =
       if (flag == Flag.BLACK) this.raw ^ table(move)
       else this.raw ^ table(Renju.BOARD_SIZE + move)
@@ -34,6 +35,7 @@ object HashKey {
     var flag = Flag.WALL
     for (move <- 0 until Renju.BOARD_SIZE) {
       flag = field(move)
+
       if (flag == Flag.BLACK)
         result ^= this.table(move)
       else if (flag == Flag.WHITE)

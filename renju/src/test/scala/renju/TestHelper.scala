@@ -44,8 +44,7 @@ object TestHelper {
       0,
       source.length,
       source
-        .map(Flag.charToFlag)
-        .map(_.get)
+        .map { char => Flag.charToFlag(char).get }
         .toArray
     )
 
@@ -57,13 +56,12 @@ class TestHelper extends AnyFlatSpec with should.Matchers {
 
   "board from history text" should "run" in {
     val source = readLine()
+    
+    val history = """\d{1,3}""".r.findAllIn(source)
+      .map(_.toInt)
+      .toSeq
 
-    val history = for {
-      matched <- """\d{1,3}""".r.findAllIn(source)
-      idx = matched.toInt
-    } yield idx
-
-    val board = BoardIO.fromSequence(history.toSeq)
+    val board = BoardIO.fromIdxSequence(history)
 
     println(board)
   }

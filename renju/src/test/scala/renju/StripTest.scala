@@ -3,7 +3,7 @@ package renju
 import org.scalatest.flatspec._
 import org.scalatest.matchers._
 import renju.TestHelper.T2
-import renju.notation.{Color, Flag}
+import renju.notation.{Color, Flag, Struct}
 import renju.util.Transform.IntTransform
 
 class StripTest extends AnyFlatSpec with should.Matchers {

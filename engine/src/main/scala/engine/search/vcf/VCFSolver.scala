@@ -3,9 +3,9 @@
 package engine.search.vcf
 
 import engine.cache.LRUMemo
-import renju.Struct.struct
-import renju.notation.{Flag, Renju}
-import renju.{Board, Struct}
+import renju.Board
+import renju.notation.Struct.struct
+import renju.notation.{Flag, Renju, Struct}
 
 object VCFSolver {
 

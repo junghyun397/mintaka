@@ -1,19 +1,16 @@
-
-package renju
-
-import renju.notation.Direction
+package renju.notation
 
 import scala.language.implicitConversions
 
 // jvm word(4bytes)
-// three(4bits) blockThree(4bits) closedFour_1(4bits) closedFour_2(4bits) openFour(4bits) five(4bits) -> 3bytes
+// three blockThree closedFour_1 closedFour_2 openFour five -> 3bytes
+// 0000  0000       0000         0000         0000     0000
 class Struct(val raw: Int) extends AnyVal {
 
   // mask: 0111 0111 0111 0111 0111 0111 0000 0000
-  def merged(direction: Direction, that: Int): Struct = new Struct(
-    raw = (raw & (0x7777_7700 >>> direction.shift | ~(0xFFFF_FFFF >>> direction.shift))) | (that >>> direction.shift)
+  def merged(direction: Direction, single: Int): Struct = new Struct(
+    raw = (raw & (0x7777_7700 >>> direction.shift | ~(0xFFFF_FFFF >>> direction.shift))) | (single >>> direction.shift)
   )
-
 
   def threeAt(direction: Direction): Boolean = ((raw >>> 31 - direction.shift) & 0x1) == 1
 

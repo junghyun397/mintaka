@@ -1,7 +1,7 @@
 package renju
 
 import renju.L1Strip.retrieveStripFieldSolution
-import renju.Struct.struct
+import renju.notation.Struct.struct
 import renju.notation.{Color, Direction, Flag, Renju}
 import renju.util.ConcurrentMapOps.concurrentMapOps
 

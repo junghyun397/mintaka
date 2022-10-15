@@ -22,7 +22,8 @@ class Flag(val raw: Byte) extends AnyVal {
 
 }
 
-// margin forbidKind(6-44-33) bound  isForbid isEmpty isBlack
+// jvm byte(1byte)
+// margin forbidKind(6-44-33) bound  isForbid isEmpty isBlack -> 1byte
 // 0      000                 0      0        0       0
 object Flag {
 

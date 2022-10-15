@@ -1,6 +1,6 @@
 package renju
 
-import renju.notation.{Direction, Flag, Pos, Renju}
+import renju.notation._
 
 import scala.collection.mutable
 import scala.language.implicitConversions

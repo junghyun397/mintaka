@@ -32,7 +32,13 @@ object EmptyScalaBoard extends Board {
     moves = 1,
     lastMove = move,
     winner = Option.empty,
-    hashKey = this.hashKey.incrementHash(move, Flag.BLACK)
+    hashKey = this.hashKey.move(move, Flag.BLACK)
   )
+
+  def insertMove(move: Int, calculateForbid: Boolean): Unit =
+    throw new UnsupportedOperationException()
+
+  def deleteMove(move: Int, calculateForbid: Boolean): Unit =
+    throw new UnsupportedOperationException()
 
 }

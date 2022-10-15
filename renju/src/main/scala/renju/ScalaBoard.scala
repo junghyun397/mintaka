@@ -37,7 +37,7 @@ class ScalaBoard(
       moves = this.moves + 1,
       lastMove = move,
       winner = Option.empty,
-      hashKey = this.hashKey.incrementHash(move, this.nextColorFlag.raw)
+      hashKey = this.hashKey.move(move, this.nextColorFlag.raw)
     )
 
     board.integrateStrips(board.composeStrips(move).map(_.calculateL2Strip()))
@@ -54,6 +54,10 @@ class ScalaBoard(
     board
   }
 
+  def insertMove(move: Int, calculateForbid: Boolean): Unit = ???
+
+  def deleteMove(move: Int, calculateForbid: Boolean): Unit = ???
+  
 }
 
 object ScalaBoard {
