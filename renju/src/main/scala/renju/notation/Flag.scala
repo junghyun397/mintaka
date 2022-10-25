@@ -2,6 +2,10 @@ package renju.notation
 
 import scala.language.implicitConversions
 
+// jvm byte(1byte)
+// margin forbidKind(6-44-33) bound  isForbid isEmpty isBlack
+// 1bit   3bits               1bit   1bit     1bit    1bit
+// 7<     6<                  3<     2<       1<      0<
 class Flag(val raw: Byte) extends AnyVal {
 
   def stone: Flag = new Flag(Flag.onlyStone(this.raw))
@@ -22,9 +26,6 @@ class Flag(val raw: Byte) extends AnyVal {
 
 }
 
-// jvm byte(1byte)
-// margin forbidKind(6-44-33) bound  isForbid isEmpty isBlack -> 1byte
-// 0      000                 0      0        0       0
 object Flag {
 
   implicit def flag(raw: Byte): Flag = new Flag(raw)

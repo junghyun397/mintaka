@@ -3,65 +3,74 @@ package engine.cache
 import engine.cache.TranspositionTable.BUCKET_SIZE
 import renju.hash.HashKey
 
-// Transposition Table with Zobrist Hash, collision at
-// key: Long = zobrist key 64bits
-// entry: Long = bestMove 8bits + eval 16bits + score 16bits + depth 8bits + type 2bits
-// 1 key-entry pair = 128bits, 16bytes 1KB = 64 pairs
+// Transposition Table with Zobrist Hash
+// total size = tableSize * BUCKET_SIZE * 16bytes, 1KB = 64pairs
 class TranspositionTable(
   val tableSize: Int
 ) {
 
   private val totalSize: Int = this.tableSize * BUCKET_SIZE
 
-  private val keys: Array[Long] = Array[Long](this.totalSize)
-  private val entries: Array[Long] = Array[Long](this.totalSize)
+  private val keys: Array[Long] = new Array[Long](this.totalSize)
+  private val entries: Array[Long] = new Array[Long](this.totalSize)
 
-  def write(hashKey: HashKey, bestMove: Int = 0, eval: Int, score: Int = 0, depth: Int = 0, entryType: Int = 0, ply: Int = 0): Unit = {
-    val beginIdx: Int = this.calculateBeginIdx(hashKey)
-    val endIdx: Int = beginIdx + BUCKET_SIZE
+  def write(hashKey: HashKey, eval: Int = 0, score: Int = 0, bestMove: Int = 0, depth: Int = 0, entryType: Int = 0, vcPass: Boolean = false, ply: Int = 0): Unit = {
+    var idx = this.calculateBeginIdx(hashKey)
+    val endIdx = idx + BUCKET_SIZE
 
-    var targetIdx: Int = -1
+    var targetIdx = -1
+    var targetDepth = Int.MaxValue
 
-    var idx: Int = beginIdx
-    var escape: Boolean = false
-    while (idx < endIdx && !escape) {
+    var take = true
+    while (idx < endIdx && take) {
       val key = this.keys(idx)
-      val entry = this.entries(idx)
+      val entry = new TTEntry(this.entries(idx))
 
-      if (key == 0 && entry == 0) {
+      if (key == 0 && entry.isEmpty) {
         targetIdx = idx
-        escape = true
+        take = false
       } else if (key == hashKey.raw) {
+        if (entry.depth > depth) return
+
         targetIdx = idx
-        escape = true
+        take = false
       } else {
+        if (targetDepth > entry.depth) {
+          targetIdx = idx
+          targetDepth = entry.depth
+        }
+
         idx += 1
       }
     }
 
-    this.keys(idx) = hashKey.raw
-    this.entries(idx) = eval
+    this.keys(targetIdx) = hashKey.raw
+    this.entries(targetIdx) = TTEntry(eval, score, bestMove, depth, entryType, vcPass).raw
   }
 
-  def find(hashKey: HashKey, ply: Int = 0): Long = {
-    val beginIdx: Int = this.calculateBeginIdx(hashKey)
-    val endIdx: Int = beginIdx + BUCKET_SIZE
+  def find(hashKey: HashKey, ply: Int = 0): TTEntry = {
+    var idx = this.calculateBeginIdx(hashKey)
+    val endIdx = idx + BUCKET_SIZE
 
-    var idx: Int = beginIdx
     while (idx < endIdx) {
-      val key = this.keys(idx)
-
-      if (key == hashKey.raw)
-        return this.entries(idx)
+      if (this.keys(idx) == hashKey.raw)
+        return new TTEntry(this.entries(idx))
 
       idx += 1
     }
 
-    0
+    TTEntry.empty
+  }
+
+  def resize(tableSize: Int): Unit = {
+    if (this.tableSize == tableSize) return
+  }
+
+  def clear(): Unit = {
   }
 
   private def calculateBeginIdx(hashKey: HashKey): Int =
-    (hashKey.raw % this.totalSize).toInt
+    (hashKey.raw % this.tableSize).toInt.abs
 
 }
 
@@ -69,14 +78,9 @@ object TranspositionTable {
 
   private val BUCKET_SIZE: Int = 4
 
-  def extractBestMove(entry: Long): Int = ???
+  def ofSizeKb(sizeInKb: Int): TranspositionTable =
+    new TranspositionTable((sizeInKb * 64) / BUCKET_SIZE)
 
-  def extractBestEval(entry: Long): Int = ???
-
-  def extractBestScore(entry: Long): Int = ???
-
-  def extractBestDepth(entry: Long): Int = ???
-
-  def extractBestEntryType(entry: Long): Int = ???
+  def empty: TranspositionTable = TranspositionTable.ofSizeKb(128 * 1024)
 
 }

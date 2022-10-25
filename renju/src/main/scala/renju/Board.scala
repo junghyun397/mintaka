@@ -33,7 +33,7 @@ trait Board extends IterableWith[FieldStatus] {
 
   def nextColorFlag: Flag = new Flag(Flag.nextFromMoves(this.moves))
 
-  def structField(idx: Int, flag: Byte): Int = flag match {
+  def structField(idx: Int, flag: Byte): Struct = flag match {
     case Flag.BLACK => this.structFieldBlack(idx)
     case Flag.WHITE => this.structFieldWhite(idx)
     case _ => 0

@@ -1,8 +1,9 @@
 package renju.util
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.collection.mutable
 
-object Transform {
+object Extensions {
 
   def joinHorizontal(elems: String*): String = {
     val cleft = elems.map(_.split("\n"))
@@ -23,13 +24,26 @@ object Transform {
       .mkString
   }
 
-  implicit class BoolTransform(val b: Boolean) extends AnyVal {
+  implicit class StringExtensions(val s: String) extends AnyVal {
+
+    def trimLines: String = {
+      val lines = for {
+        line <- s.split("\n")
+        trim = line.reverse.dropWhile(_ == ' ').reverse
+      } yield trim
+
+      lines.mkString("\n")
+    }
+
+  }
+
+  implicit class BoolExtensions(val b: Boolean) extends AnyVal {
 
     def toInt: Int = if (b) 1 else 0
 
   }
 
-  implicit class ByteTransform(val b: Byte) extends AnyVal {
+  implicit class ByteExtensions(val b: Byte) extends AnyVal {
 
     def toChunkedBinaryString: String = {
       val binaryString = b.toBinaryString
@@ -43,7 +57,7 @@ object Transform {
     }
   }
 
-  implicit class IntTransform(val i: Int) extends AnyVal {
+  implicit class IntExtensions(val i: Int) extends AnyVal {
 
     def toBoolean: Boolean = if (i == 0) false else true
 
@@ -59,11 +73,24 @@ object Transform {
       rs.grouped(4).reduce((acc, s) => acc + " " + s)
     }
 
-    @inline def <<|>>>(shift: Int): Int =
+    @inline def shi(shift: Int): Int =
       if (shift < 0)
         i << -shift
       else
         i >>> shift
+
+  }
+
+  implicit class ConcurrentMapExtension[K, V](private val xm: ConcurrentHashMap[K, V]) extends AnyVal {
+
+    def getOrElseUpdate(key: K, f: () => V): V = {
+      var value = xm.get(key)
+      if (value == null) {
+        value = f()
+        xm.put(key, value)
+      }
+      value
+    }
 
   }
 

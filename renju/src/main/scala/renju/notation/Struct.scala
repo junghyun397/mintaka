@@ -3,8 +3,9 @@ package renju.notation
 import scala.language.implicitConversions
 
 // jvm word(4bytes)
-// three blockThree closedFour_1 closedFour_2 openFour five -> 3bytes
-// 0000  0000       0000         0000         0000     0000
+// three blockThree closedFour_1 closedFour_2 openFour five  margin
+// 4bits 4bits      4bits        4bits        4bits    4bits 8bits
+// 28<   24<        20<          16<          12<      8<    0<       
 class Struct(val raw: Int) extends AnyVal {
 
   // mask: 0111 0111 0111 0111 0111 0111 0000 0000

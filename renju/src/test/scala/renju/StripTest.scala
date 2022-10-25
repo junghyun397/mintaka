@@ -2,9 +2,9 @@ package renju
 
 import org.scalatest.flatspec._
 import org.scalatest.matchers._
-import renju.TestHelper.T2
+import renju.TestHelper.S2
 import renju.notation.{Color, Flag, Struct}
-import renju.util.Transform.IntTransform
+import renju.util.Extensions.IntExtensions
 
 class StripTest extends AnyFlatSpec with should.Matchers {
 
@@ -24,8 +24,8 @@ class StripTest extends AnyFlatSpec with should.Matchers {
     op(_.structStripWhite, problem, answer)
 
   def open3(op: L2Strip => Array[Int], problem: String, answer: String): Unit = {
-    op(problem.t2s.calculateL2Strip()).map(v => if (Struct(v).threeTotal.toBoolean) "1" else ".").mkString should be (answer)
-    op(problem.reverse.t2s.calculateL2Strip()).map(v => if (Struct(v).threeTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
+    op(problem.s2s.calculateL2Strip()).map(v => if (Struct(v).threeTotal.toBoolean) "1" else ".").mkString should be (answer)
+    op(problem.reverse.s2s.calculateL2Strip()).map(v => if (Struct(v).threeTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
   }
 
   "open-3 points" should "detect correctly" in {
@@ -90,8 +90,8 @@ class StripTest extends AnyFlatSpec with should.Matchers {
   }
 
   def block3(op: L2Strip => Array[Int], problem: String, answer: String): Unit = {
-    op(problem.t2s.calculateL2Strip()).map(v => if (Struct(v).blockThreeTotal.toBoolean) "1" else ".").mkString should be (answer)
-    op(problem.reverse.t2s.calculateL2Strip()).map(v => if (Struct(v).blockThreeTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
+    op(problem.s2s.calculateL2Strip()).map(v => if (Struct(v).blockThreeTotal.toBoolean) "1" else ".").mkString should be (answer)
+    op(problem.reverse.s2s.calculateL2Strip()).map(v => if (Struct(v).blockThreeTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
   }
 
   "block-3 points" should "detect correctly" in {
@@ -108,8 +108,8 @@ class StripTest extends AnyFlatSpec with should.Matchers {
   }
 
   def closed4(op: L2Strip => Array[Int], problem: String, answer: String): Unit = {
-    op(problem.t2s.calculateL2Strip()).map(v => if (Struct(v).closedFourTotal == 0) "." else Struct(v).closedFourTotal.toString).mkString should be (answer)
-    op(problem.reverse.t2s.calculateL2Strip()).map(v => if (Struct(v).closedFourTotal == 0) "." else Struct(v).closedFourTotal.toString).mkString should be (answer.reverse)
+    op(problem.s2s.calculateL2Strip()).map(v => if (Struct(v).closedFourTotal == 0) "." else Struct(v).closedFourTotal.toString).mkString should be (answer)
+    op(problem.reverse.s2s.calculateL2Strip()).map(v => if (Struct(v).closedFourTotal == 0) "." else Struct(v).closedFourTotal.toString).mkString should be (answer.reverse)
   }
 
   "closed-4 points" should "detect correctly" in {
@@ -213,8 +213,8 @@ class StripTest extends AnyFlatSpec with should.Matchers {
   }
 
   def open4(op: L2Strip => Array[Int], problem: String, answer: String): Unit = {
-    op(problem.t2s.calculateL2Strip()).map(v => if (Struct(v).openFourTotal.toBoolean) "1" else ".").mkString should be (answer)
-    op(problem.reverse.t2s.calculateL2Strip()).map(v => if (Struct(v).openFourTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
+    op(problem.s2s.calculateL2Strip()).map(v => if (Struct(v).openFourTotal.toBoolean) "1" else ".").mkString should be (answer)
+    op(problem.reverse.s2s.calculateL2Strip()).map(v => if (Struct(v).openFourTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
   }
 
   "open-4 points" should "detect correctly" in {
@@ -244,8 +244,8 @@ class StripTest extends AnyFlatSpec with should.Matchers {
   }
 
   def five(op: L2Strip => Array[Int], problem: String, answer: String): Unit = {
-    op(problem.t2s.calculateL2Strip()).map(v => if (Struct(v).fiveTotal.toBoolean) "1" else ".").mkString should be (answer)
-    op(problem.reverse.t2s.calculateL2Strip()).map(v => if (Struct(v).fiveTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
+    op(problem.s2s.calculateL2Strip()).map(v => if (Struct(v).fiveTotal.toBoolean) "1" else ".").mkString should be (answer)
+    op(problem.reverse.s2s.calculateL2Strip()).map(v => if (Struct(v).fiveTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
   }
 
   "move-to-win points" should "detect correctly" in {
@@ -267,8 +267,8 @@ class StripTest extends AnyFlatSpec with should.Matchers {
   }
 
   def win(problem: String, answer: Option[Color]): Unit = {
-    problem.t2s.calculateL2Strip().winner should be (answer)
-    problem.reverse.t2s.calculateL2Strip().winner should be (answer)
+    problem.s2s.calculateL2Strip().winner should be (answer)
+    problem.reverse.s2s.calculateL2Strip().winner should be (answer)
   }
 
   "win" should "detect correctly" in {
@@ -286,8 +286,8 @@ class StripTest extends AnyFlatSpec with should.Matchers {
   }
 
   def double4forbid(problem: String, answer: String): Unit = {
-    problem.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_44) "4" else ".").mkString should be (answer)
-    problem.reverse.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_44) "4" else ".").mkString should be (answer.reverse)
+    problem.s2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_44) "4" else ".").mkString should be (answer)
+    problem.reverse.s2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_44) "4" else ".").mkString should be (answer.reverse)
   }
 
   "double-4 forbidden points" should "detect correctly" in {
@@ -311,8 +311,8 @@ class StripTest extends AnyFlatSpec with should.Matchers {
   }
 
   def over5forbid(problem: String, answer: String): Unit = {
-    problem.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_6) "6" else ".").mkString should be (answer)
-    problem.reverse.t2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_6) "6" else ".").mkString should be (answer.reverse)
+    problem.s2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_6) "6" else ".").mkString should be (answer)
+    problem.reverse.s2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_6) "6" else ".").mkString should be (answer.reverse)
   }
 
   "over-6 forbidden points" should "detect correctly" in {

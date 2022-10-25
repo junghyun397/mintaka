@@ -1,7 +1,7 @@
 package renju
 
 import renju.notation.Pos
-import renju.util.Transform.IntTransform
+import renju.util.Extensions.IntExtensions
 
 class BitField(val elems: Array[Int]) extends AnyVal {
 

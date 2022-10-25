@@ -29,17 +29,17 @@ import scala.language.implicitConversions
 
 object TestHelper {
 
-  implicit class T2(val source: String) {
+  implicit class S2(val source: String) {
 
-    def t2p: Pos = Pos.fromCartesian(source).get
+    def s2p: Pos = Pos.fromCartesian(source).get
 
-    def t2i: Int = source.t2p.idx
+    def s2pi: Int = source.s2p.idx
 
-    def t2b: Board = source.t2b(Renju.BOARD_CENTER_POS.idx)
+    def s2b: Board = source.s2b(Renju.BOARD_CENTER_POS.idx)
 
-    def t2b(latestMove: Int): Board = BoardIO.fromBoardText(source, latestMove).get
+    def s2b(latestMove: Int): Board = BoardIO.fromBoardText(source, latestMove).get
 
-    def t2s: L1Strip = new L1Strip(
+    def s2s: L1Strip = new L1Strip(
       Direction.X,
       0,
       source.length,

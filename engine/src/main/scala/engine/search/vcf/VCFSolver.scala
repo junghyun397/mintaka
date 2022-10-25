@@ -2,26 +2,26 @@
 
 package engine.search.vcf
 
-import engine.cache.LRUMemo
+import engine.cache.TranspositionTable
 import renju.Board
 import renju.notation.Struct.struct
 import renju.notation.{Flag, Renju, Struct}
 
 object VCFSolver {
 
-  private def findVCFSequenceBlack(memo: LRUMemo, maxDepth: Int, board: Board, parents: Seq[Int], coerce: Boolean): Seq[Int] = {
-    if (parents.size > maxDepth || memo.probe(board).fold(false)(_ == 0)) return Seq.empty
+  private def findVCFSequenceBlack(tt: TranspositionTable, maxDepth: Int, board: Board, parents: Seq[Int], treat: Boolean): Seq[Int] = {
+    if (parents.size > maxDepth || tt.find(board.hashKey).vcPass) return Seq.empty
 
     for (idx <- 0 until Renju.BOARD_SIZE) {
       val struct = board.structFieldBlack(idx)
       if (
         struct.fourTotal == 1
           && !Flag.isForbid(board.field(idx))
-          && (!coerce || board.structFieldWhite(idx).fiveTotal == 1)
-          && memo.probe(board, idx).fold(true)(_ != 0)
+          && (!treat || board.structFieldWhite(idx).fiveTotal == 1)
+          && tt.find(board.hashKey.move(idx, board.nextColorFlag.raw)).isEmpty
       ) {
         if (struct.openFourTotal == 1) {
-          memo.write(board, idx, Float.MaxValue)
+          tt.write(board.hashKey, eval = Int.MaxValue, bestMove = idx, depth = board.moves)
           return parents.appended(idx)
         }
 
@@ -37,42 +37,41 @@ object VCFSolver {
             (struct.threeTotal == 1 && counterStruct.closedFourTotal == 0)
               || (l2board.structFieldBlack.exists(_.openFourTotal == 1) && counterStruct.closedFourTotal == 0)
           ) {
-            memo.write(board, idx, Float.MaxValue)
+            tt.write(board.hashKey, eval = Int.MaxValue, bestMove = idx, depth = board.moves)
             return parents.appended(idx)
           }
 
           val solution = this.findVCFSequenceBlack(
-            memo, maxDepth,
+            tt, maxDepth,
             l2board, parents.appended(idx).appended(counter),
             counterStruct.closedFourTotal == 1
           )
 
           if (solution.nonEmpty) {
-            memo.write(l1board, Float.MaxValue)
-            memo.write(l2board, Float.MinValue)
+            tt.write(l1board.hashKey, eval = Int.MinValue, depth = l1board.moves + 1)
             return solution
           }
         }
       }
 
-      memo.write(board, idx, 0)
+      tt.write(board.hashKey.move(idx, board.nextColorFlag.raw), vcPass = true, depth = board.moves + 1)
     }
 
     Seq.empty
   }
 
-  private def findVCFSequenceWhite(memo: LRUMemo, maxDepth: Int, board: Board, parents: Seq[Int], coerce: Boolean): Seq[Int] = {
-    if (parents.size > maxDepth) return Seq.empty
+  private def findVCFSequenceWhite(tt: TranspositionTable, maxDepth: Int, board: Board, parents: Seq[Int], treat: Boolean): Seq[Int] = {
+    if (parents.size > maxDepth || tt.find(board.hashKey).vcPass) return Seq.empty
 
     for (idx <- 0 until Renju.BOARD_SIZE) {
       val struct = board.structFieldWhite(idx)
       if (
         struct.fourTotal == 1
-          && (!coerce || board.structFieldBlack(idx).fiveTotal == 1)
-          && memo.probe(board, idx).fold(true)(_ != 0)
+          && (!treat || board.structFieldBlack(idx).fiveTotal == 1)
+          && tt.find(board.hashKey.move(idx, board.nextColorFlag.raw)).isEmpty
       ) {
         if (struct.openFourTotal == 1) {
-          memo.write(board, idx, Float.MaxValue)
+          tt.write(board.hashKey, eval = Int.MaxValue, bestMove = idx, depth = board.moves)
           return parents.appended(idx)
         }
 
@@ -89,35 +88,34 @@ object VCFSolver {
               || Flag.isForbid(board.field(counter))
               || (l2board.structFieldWhite.exists(_.openFourTotal == 1) && counterStruct.closedFourTotal == 0)
           ) {
-            memo.write(board, idx, Float.MaxValue)
+            tt.write(board.hashKey, eval = Int.MaxValue, bestMove = idx, depth = board.moves)
             return parents.appended(idx)
           }
 
           val solution = this.findVCFSequenceWhite(
-            memo, maxDepth,
+            tt, maxDepth,
             l2board, parents.appended(idx).appended(counter), counterStruct.closedFourTotal == 1
           )
 
           if (solution.nonEmpty) {
-            memo.write(l1board, Float.MaxValue)
-            memo.write(l2board, Float.MinValue)
+            tt.write(l1board.hashKey, eval = Int.MinValue, depth = l2board.moves + 1)
             return solution
           }
         }
       }
 
-      memo.write(board, idx, 0)
+      tt.write(board.hashKey.move(idx, board.nextColorFlag.raw), vcPass = true, depth = board.moves + 1)
     }
 
     Seq.empty
   }
 
-  def findVCFSequence(board: Board): Seq[Int] = this.findVCFSequence(board, LRUMemo.empty, Int.MaxValue)
+  def findVCFSequence(board: Board): Seq[Int] = this.findVCFSequence(board, TranspositionTable.empty, Int.MaxValue)
 
-  def findVCFSequence(board: Board, cache: LRUMemo = LRUMemo.empty, maxDepth: Int = Int.MaxValue): Seq[Int] =
+  def findVCFSequence(board: Board, tt: TranspositionTable, maxDepth: Int): Seq[Int] =
     if (board.isNextColorBlack)
-      findVCFSequenceBlack(cache, maxDepth, board, Seq.empty, coerce = false)
+      findVCFSequenceBlack(tt, maxDepth, board, Seq.empty, treat = false)
     else
-      findVCFSequenceWhite(cache, maxDepth, board, Seq.empty, coerce = false)
+      findVCFSequenceWhite(tt, maxDepth, board, Seq.empty, treat = false)
 
 }

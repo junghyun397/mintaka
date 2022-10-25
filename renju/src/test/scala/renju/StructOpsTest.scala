@@ -4,17 +4,16 @@ import org.scalatest.flatspec._
 import org.scalatest.matchers._
 import renju.BoardIO.BoardToString
 import renju.ScalaBoard.structOps
-import renju.TestHelper.T2
+import renju.TestHelper.S2
 import renju.notation.Pos
+import renju.util.Extensions.StringExtensions
 
 class StructOpsTest extends AnyFlatSpec with should.Matchers {
 
   def deepForbid(problem: String, answer: String): Unit = {
-    val board = problem.t2b
+    val board = problem.s2b
 
-    println(board.debugString)
-
-    answer.filter(c => c == 'O' || c == 'X' || c == '.') should include (board.boardString.filter(c => c == 'O' || c == 'X' || c == '.'))
+    answer should include (board.boardString(false).trimLines)
   }
 
   "edge cases" should "analyze correctly" in {
@@ -480,7 +479,7 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
   }
 
   def trap(problem: String, answer: Set[String]): Unit = {
-    val board = problem.t2b
+    val board = problem.s2b
 
     val (threeSide, fourSide) = board.collectTrapPoints()
 

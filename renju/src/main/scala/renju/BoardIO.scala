@@ -3,7 +3,7 @@ package renju
 import renju.BoardIO.BoardToString.columnHint
 import renju.hash.HashKey
 import renju.notation.{Flag, Pos, Renju, Struct}
-import renju.util.Transform.joinHorizontal
+import renju.util.Extensions.joinHorizontal
 
 import scala.language.implicitConversions
 
@@ -50,6 +50,7 @@ object BoardIO {
     Some(board)
   }
 
+  // regex: \d[\s\[](\S[\s\[\]]){15}\d
   def fromBoardText(source: String, latestMove: Int): Option[Board] = {
     val reversedField = for {
       row <- """\d[\s\[](\S[\s\[\]]){15}\d""".r
