@@ -156,4 +156,10 @@ object BoardIO {
 
   }
 
+  def buildBoardString(board: Board, markLastMove: Boolean): String =
+    board.boardString(markLastMove)
+
+  def buildBoardDebugString(board: Board): String =
+    board.debugString
+
 }
