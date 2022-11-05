@@ -3,7 +3,7 @@ package engine.search.vcf
 import engine.search.vcf.VCFSolver
 import org.scalatest.flatspec.*
 import org.scalatest.matchers.*
-import renju.BoardIO.BoardToString
+import renju.BoardIO.BoardIOExtension
 import renju.L1Strip
 import renju.TestHelper.S2
 import renju.notation.Pos

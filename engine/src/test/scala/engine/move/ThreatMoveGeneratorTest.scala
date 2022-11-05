@@ -3,7 +3,7 @@ package engine.move
 import org.scalatest.flatspec.*
 import org.scalatest.matchers.*
 import renju.BoardIO
-import renju.BoardIO.BoardToString
+import renju.BoardIO.BoardIOExtension
 import renju.TestHelper.S2
 import renju.notation.Renju
 import renju.util.Extensions.StringExtensions

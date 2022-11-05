@@ -2,7 +2,7 @@ package renju
 
 import org.scalatest.flatspec._
 import org.scalatest.matchers._
-import renju.BoardIO.BoardToString
+import renju.BoardIO.BoardIOExtension
 import renju.ScalaBoard.structOps
 import renju.TestHelper.S2
 import renju.notation.Pos

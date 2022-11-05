@@ -1,6 +1,6 @@
 package renju
 
-import renju.BoardIO.BoardToString
+import renju.BoardIO.BoardIOExtension
 import renju.hash.HashKey
 import renju.notation._
 import renju.util.IterableWith

@@ -1,6 +1,6 @@
 package renju
 
-import renju.BoardIO.BoardToString.columnHint
+import renju.BoardIO.BoardIOExtension.columnHint
 import renju.hash.HashKey
 import renju.notation.{Flag, Pos, Renju, Struct}
 import renju.util.Extensions.joinHorizontal
@@ -89,7 +89,7 @@ object BoardIO {
       board
     }
 
-  implicit class BoardToString(val b: Board) extends AnyVal {
+  implicit class BoardIOExtension(val b: Board) extends AnyVal {
 
     def attributeString[T](markLastMove: Boolean)(extract: Board => Array[T])(transform: T => String): String = f"$columnHint\n${
       val result = extract(this.b)
@@ -145,7 +145,7 @@ object BoardIO {
 
   }
 
-  object BoardToString {
+  object BoardIOExtension {
 
     private lazy val columnHint: String = f"   ${
       Seq.range(65, 65 + Renju.BOARD_WIDTH)
