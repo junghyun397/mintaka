@@ -81,6 +81,6 @@ object TranspositionTable {
   def ofSizeKb(sizeInKb: Int): TranspositionTable =
     new TranspositionTable((sizeInKb * 64) / BUCKET_SIZE)
 
-  def empty: TranspositionTable = TranspositionTable.ofSizeKb(128 * 1024)
+  def empty: TranspositionTable = TranspositionTable.ofSizeKb(128 * 1024) // 128MB
 
 }

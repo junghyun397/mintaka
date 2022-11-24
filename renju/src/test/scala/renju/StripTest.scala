@@ -28,7 +28,7 @@ class StripTest extends AnyFlatSpec with should.Matchers {
     op(problem.reverse.s2s.calculateL2Strip()).map(v => if (Struct(v).threeTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
   }
 
-  "open-3 points" should "detect correctly" in {
+  "L1Strip" should "resolve open-3 points" in {
     // XX
 
     both(open3, "...XX...", ".11..11.")
@@ -94,7 +94,7 @@ class StripTest extends AnyFlatSpec with should.Matchers {
     op(problem.reverse.s2s.calculateL2Strip()).map(v => if (Struct(v).blockThreeTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
   }
 
-  "block-3 points" should "detect correctly" in {
+  "L1Strip" should "resolve block-3 points" in {
     both(block3, "...XXX...", "..1...1..")
 
     both(block3, "...O.XXX...", "....1...11.")
@@ -112,7 +112,7 @@ class StripTest extends AnyFlatSpec with should.Matchers {
     op(problem.reverse.s2s.calculateL2Strip()).map(v => if (Struct(v).closedFourTotal == 0) "." else Struct(v).closedFourTotal.toString).mkString should be (answer.reverse)
   }
 
-  "closed-4 points" should "detect correctly" in {
+  "L1Strip" should "resolve closed-4 points" in {
     // XXX
 
     black(closed4, "...XXX...", ".1.....1.")
@@ -174,7 +174,7 @@ class StripTest extends AnyFlatSpec with should.Matchers {
     black(closed4, "...XX.X.X...", "..1..1......")
   }
 
-  "white closed-4 points" should "detect correctly" in {
+  "L1Strip" should "resolve closed-4 points on white" in {
     // WHITE DOUBLE 4 FORK
 
     white(closed4, "...O.OO..OO.O...", "..1....22....1..")
@@ -217,7 +217,7 @@ class StripTest extends AnyFlatSpec with should.Matchers {
     op(problem.reverse.s2s.calculateL2Strip()).map(v => if (Struct(v).openFourTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
   }
 
-  "open-4 points" should "detect correctly" in {
+  "L1Strip" should "resolve open-4 points" in {
     // XXX
 
     both(open4, "...XXX...", "..1...1..")
@@ -248,7 +248,7 @@ class StripTest extends AnyFlatSpec with should.Matchers {
     op(problem.reverse.s2s.calculateL2Strip()).map(v => if (Struct(v).fiveTotal.toBoolean) "1" else ".").mkString should be (answer.reverse)
   }
 
-  "move-to-win points" should "detect correctly" in {
+  "L1Strip" should "resolve move-to-win points" in {
     both(five, "...XXXX...", "..1....1..")
 
     both(five, "...OXXXX...", "........1..")
@@ -271,7 +271,7 @@ class StripTest extends AnyFlatSpec with should.Matchers {
     problem.reverse.s2s.calculateL2Strip().winner should be (answer)
   }
 
-  "win" should "detect correctly" in {
+  "L1Strip" should "resolve five-in-a-row state" in {
     win(".XXOX..OXXXX.X", Option.empty)
 
     win("..XOOXO.OOOO.O", Option.empty)
@@ -290,7 +290,7 @@ class StripTest extends AnyFlatSpec with should.Matchers {
     problem.reverse.s2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_44) "4" else ".").mkString should be (answer.reverse)
   }
 
-  "double-4 forbidden points" should "detect correctly" in {
+  "L1Strip" should "resolve double-4 forbidden points" in {
     double4forbid("...X.XX..X...", ".......4.....")
 
     double4forbid("...X..XX.X...", ".....4.......")
@@ -315,7 +315,7 @@ class StripTest extends AnyFlatSpec with should.Matchers {
     problem.reverse.s2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_6) "6" else ".").mkString should be (answer.reverse)
   }
 
-  "over-6 forbidden points" should "detect correctly" in {
+  "L1Strip" should "resolve overline forbidden points" in {
     over5forbid("...XXX.XX...", "......6.....")
 
     over5forbid("...X.XXXX...", "....6.......")

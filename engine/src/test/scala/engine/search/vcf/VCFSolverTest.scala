@@ -24,7 +24,7 @@ class VCFSolverTest extends AnyFlatSpec with should.Matchers {
     answer should include (markedBoard.boardString.trimLines)
   }
 
-  "VCF Sequences" should "analyze correctly" in {
+  "VCF solver" should "resolve VCFs" in {
     // BLACK 4-3 FORK
     vcf(
       """

@@ -16,7 +16,7 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
     answer should include (board.boardString(false).trimLines)
   }
 
-  "edge cases" should "analyze correctly" in {
+  "StructOps" should "handle edge cases" in {
     deepForbid(
       """
         |   A B C D E F G H I J K L M N O
@@ -59,7 +59,7 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
     )
   }
 
-  "valid forbidden moves" should "analyze correctly" in {
+  "StructOps" should "resolve basic forbidden points" in {
     deepForbid(
       """
         |   A B C D E F G H I J K L M N O
@@ -102,7 +102,7 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
     )
   }
 
-  "pseudo forbidden moves" should "analyze correctly" in {
+  "StructOps" should "resolve pseudo forbidden points" in {
     deepForbid(
       """
         |   A B C D E F G H I J K L M N O
@@ -392,7 +392,7 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
 
   }
 
-  "uncommon forbidden moves" should "analyze correctly" in {
+  "StructOps" should "handle uncommon forbidden points" in {
     deepForbid(
       """
         |   A B C D E F G H I J K L M N O
@@ -435,7 +435,7 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
     )
   }
 
-  "recursive forbidden moves" should "analyze correctly" in {
+  "StructOps" should "handle recursive forbidden points" in {
     deepForbid(
       """
         |   A B C D E F G H I J K L M N O
@@ -486,7 +486,7 @@ class StructOpsTest extends AnyFlatSpec with should.Matchers {
     (threeSide ++ fourSide).map(Pos.fromIdx).map(_.toString).toSet should be (answer)
   }
 
-  "traps" should "analyse correctly" in {
+  "StructOps" should "resolve trap moves" in {
     trap(
       """
         |   A B C D E F G H I J K L M N O

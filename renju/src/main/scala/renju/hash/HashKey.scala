@@ -33,13 +33,16 @@ object HashKey {
     var result = this.empty.raw
 
     var flag = Flag.WALL
-    for (move <- 0 until Renju.BOARD_SIZE) {
+    var move = 0
+    while (move < Renju.BOARD_SIZE) {
       flag = field(move)
 
       if (flag == Flag.BLACK)
         result ^= this.table(move)
       else if (flag == Flag.WHITE)
         result ^= this.table(Renju.BOARD_SIZE + move)
+        
+      move += 1
     }
 
     new HashKey(result)

@@ -25,7 +25,7 @@ class ThreatMoveGeneratorTest extends AnyFlatSpec with should.Matchers {
     answer should include (marked.trimLines)
   }
 
-  "Threat moves" should "analyze correctly" in {
+  "ThreatMoveGenerator" should "resolve threat moves" in {
     validMove(
       """
         |   A B C D E F G H I J K L M N O
