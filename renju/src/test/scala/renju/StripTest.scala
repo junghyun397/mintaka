@@ -115,15 +115,15 @@ class StripTest extends AnyFlatSpec with should.Matchers {
   "L1Strip" should "resolve closed-4 points" in {
     // XXX
 
-    black(closed4, "...XXX...", ".1.....1.")
+    both(closed4, "...XXX...", ".1.....1.")
 
-    black(closed4, "...OXXX...", ".......11.")
+    both(closed4, "...OXXX...", ".......11.")
 
-    black(closed4, "...O.XXX...", "....1....1.")
+    both(closed4, "...O.XXX...", "....1....1.")
 
-    black(closed4, "...O.XXX.O...", "....1...1....")
+    both(closed4, "...O.XXX.O...", "....1...1....")
 
-    black(closed4, "...O.XXX..O...", "....1....1....")
+    both(closed4, "...O.XXX..O...", "....1....1....")
 
     black(closed4, "...XXX..XXX...", ".1....11....1.")
 
@@ -131,37 +131,37 @@ class StripTest extends AnyFlatSpec with should.Matchers {
 
     // XX.X
 
-    black(closed4, "...XX.X...", "..1....1..")
+    both(closed4, "...XX.X...", "..1....1..")
 
-    black(closed4, "...OXX.X...", "......1.1..")
+    both(closed4, "...OXX.X...", "......1.1..")
 
-    black(closed4, "...O.XX.X...", "....1....1..")
+    both(closed4, "...O.XX.X...", "....1....1..")
 
-    black(closed4, "...O.XX.XO...", "....1..1.....")
+    both(closed4, "...O.XX.XO...", "....1..1.....")
 
-    black(closed4, "...OXX.X.O...", "......1.1....")
+    both(closed4, "...OXX.X.O...", "......1.1....")
 
-    black(closed4, "...O.XX.XO...", "....1..1.....")
+    both(closed4, "...O.XX.XO...", "....1..1.....")
 
     // X.XX
 
-    black(closed4, "...OX.XX...", ".....1..1..")
+    both(closed4, "...OX.XX...", ".....1..1..")
 
-    black(closed4, "...O.X.XXO...", "....1.1......")
+    both(closed4, "...O.X.XXO...", "....1.1......")
 
-    black(closed4, "...OX.XX..X...", ".....1..21....")
+    both(closed4, "...OX.XX..X...", ".....1..21....")
 
-    black(closed4, "...OXX.X.O...", "......1.1....")
+    both(closed4, "...OXX.X.O...", "......1.1....")
 
     // XX..X
 
-    black(closed4, "...XX..X...", ".....11....")
+    both(closed4, "...XX..X...", ".....11....")
+
+    both(closed4, "...XX..X..X", ".....11....")
+
+    both(closed4, "...XX..X", ".....11.")
 
     black(closed4, "....XX..XX...", ".............")
-
-    black(closed4, "...XX..X..X", ".....11....")
-
-    black(closed4, "...XX..X", ".....11.")
 
     // complex
 
@@ -266,23 +266,23 @@ class StripTest extends AnyFlatSpec with should.Matchers {
     white(five, "...OOO.OO...", "......1.....")
   }
 
-  def win(problem: String, answer: Option[Color]): Unit = {
+  def fiveInRow(problem: String, answer: Option[Color]): Unit = {
     problem.s2s.calculateL2Strip().winner should be (answer)
     problem.reverse.s2s.calculateL2Strip().winner should be (answer)
   }
 
   "L1Strip" should "resolve five-in-a-row state" in {
-    win(".XXOX..OXXXX.X", Option.empty)
+    fiveInRow(".XXOX..OXXXX.X", Option.empty)
 
-    win("..XOOXO.OOOO.O", Option.empty)
+    fiveInRow("..XOOXO.OOOO.O", Option.empty)
 
-    win("XXXXX", Some(Color.Black))
+    fiveInRow("XXXXX", Some(Color.Black))
 
-    win("OOOOO", Some(Color.White))
+    fiveInRow("OOOOO", Some(Color.White))
 
-    win("..OX.XXO.XXXXXO..", Some(Color.Black))
+    fiveInRow("..OX.XXO.XXXXXO..", Some(Color.Black))
 
-    win("..OOOOX.OXOOOOOX", Some(Color.White))
+    fiveInRow("..OOOOX.OXOOOOOX", Some(Color.White))
   }
 
   def double4forbid(problem: String, answer: String): Unit = {
@@ -310,19 +310,19 @@ class StripTest extends AnyFlatSpec with should.Matchers {
     double4forbid("...X.X.X.XX...", "..............")
   }
 
-  def over5forbid(problem: String, answer: String): Unit = {
+  def overlineForbid(problem: String, answer: String): Unit = {
     problem.s2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_6) "6" else ".").mkString should be (answer)
     problem.reverse.s2s.calculateL2Strip().forbidMask.map(v => if (v == Flag.FORBIDDEN_6) "6" else ".").mkString should be (answer.reverse)
   }
 
   "L1Strip" should "resolve overline forbidden points" in {
-    over5forbid("...XXX.XX...", "......6.....")
+    overlineForbid("...XXX.XX...", "......6.....")
 
-    over5forbid("...X.XXXX...", "....6.......")
+    overlineForbid("...X.XXXX...", "....6.......")
 
-    over5forbid("...X.XXX.XXX...", "........6......")
+    overlineForbid("...X.XXX.XXX...", "........6......")
 
-    over5forbid("...OXXXX.X...", "........6....")
+    overlineForbid("...OXXXX.X...", "........6....")
   }
 
 }
