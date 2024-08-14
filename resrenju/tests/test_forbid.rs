@@ -1,29 +1,34 @@
-#[test]
-fn basic_double_three() {
+#[cfg(test)]
+mod test_forbid {
 
-}
+    #[test]
+    fn basic_double_three() {
+        todo!()
+    }
 
-#[test]
-fn complex_double_three() {
+    #[test]
+    fn complex_double_three() {
+        todo!()
+    }
 
-}
+    #[test]
+    fn basic_double_four() {
+        todo!()
+    }
 
-#[test]
-fn basic_double_four() {
+    #[test]
+    fn complex_double_four() {
+        todo!()
+    }
 
-}
+    #[test]
+    fn overline() {
+        todo!()
+    }
 
-#[test]
-fn complex_double_four() {
-
-}
-
-#[test]
-fn overline() {
-
-}
-
-#[test]
-fn five_in_a_row() {
+    #[test]
+    fn five_in_a_row() {
+        todo!()
+    }
 
 }

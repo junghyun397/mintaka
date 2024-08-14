@@ -1,19 +1,24 @@
-#[test]
-fn basic_vcf() {
+#[cfg(test)]
+mod test_endgame_vcf {
 
-}
+    #[test]
+    fn basic_vcf() {
+        todo!()
+    }
 
-#[test]
-fn complex_vcf() {
+    #[test]
+    fn complex_vcf() {
+        todo!()
+    }
 
-}
+    #[test]
+    fn forbidden_point_vcf() {
+        todo!()
+    }
 
-#[test]
-fn forbidden_point_vcf() {
-
-}
-
-#[test]
-fn vcf_length() {
+    #[test]
+    fn vcf_length() {
+        todo!()
+    }
 
 }
