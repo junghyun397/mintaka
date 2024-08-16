@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Display, Formatter};
-
+use std::io::Read;
+use std::str::FromStr;
 use crate::board::Board;
 use crate::notation::history::History;
 use crate::notation::pos::Pos;
@@ -14,11 +15,11 @@ impl Display for Board {
 
 }
 
-impl TryFrom<&str> for Board {
+impl FromStr for Board {
 
-    type Error = &'static str;
+    type Err = &'static str;
 
-    fn try_from(source: &str) -> Result<Self, Self::Error> {
+    fn from_str(source: &str) -> Result<Self, Self::Err> {
         Err("Invalid format. example:\n
      3 . . .
      2 . O X
@@ -28,11 +29,11 @@ impl TryFrom<&str> for Board {
 
 }
 
-impl TryFrom<&str> for Slice {
+impl FromStr for Slice {
 
-    type Error = &'static str;
+    type Err = &'static str;
 
-    fn try_from(source: &str) -> Result<Self, Self::Error> {
+    fn from_str(source: &str) -> Result<Self, Self::Err> {
         Err("Invalid format. example: X . . O O . . O . . . .")
     }
 
@@ -54,12 +55,12 @@ impl Display for History {
 
 }
 
-impl TryFrom<&str> for History {
+impl FromStr for History {
 
-    type Error = &'static str;
+    type Err = &'static str;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        // Err("Invalid format. example: 1.h8 2.i9 3.i7 ...");
+    fn from_str(source: &str) -> Result<Self, Self::Err> {
+        // Err("Invalid format. example: 1.h8 i9 2.i7 g7...");
         Err("History sequence has an conflict.")
     }
 
@@ -76,12 +77,17 @@ impl Into<Board> for History {
 
 }
 
-impl TryFrom<&str> for Pos {
+impl FromStr for Pos {
 
-    type Error = &'static str;
+    type Err = &'static str;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        todo!()
+    fn from_str(source: &str) -> Result<Self, Self::Err> {
+        let col = source.as_bytes()[0];
+        u8::from_str(&source[1..])
+            .map_err(|_| "row parsing failed")
+            .map(|row|
+                Pos::from_cartesian(row - 1, col - 97)
+            )
     }
 
 }
@@ -90,6 +96,14 @@ impl Debug for Pos {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}", (self.col() + 97) as char, self.row() + 1)
+    }
+
+}
+
+impl Display for Pos {
+
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(self, f)
     }
 
 }

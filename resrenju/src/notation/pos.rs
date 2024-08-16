@@ -34,7 +34,7 @@ impl Pos {
     }
 
     pub fn reverse_mask_col(&self) -> u8 {
-        0b0000_0001 << self.col()
+        !self.mask_col()
     }
 
 }

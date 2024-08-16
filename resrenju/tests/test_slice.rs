@@ -1,5 +1,16 @@
 #[cfg(test)]
 mod test_slice {
+    use resrenju::notation::pos::Pos;
+    use resrenju::slice::{Direction, Slices};
+
+    #[test]
+    fn basic_test() {
+        let slices = Slices::empty();
+        println!("pos: {}", slices.access_slice(
+            "m9".parse::<Pos>().unwrap(),
+            Direction::Descending
+        ).unwrap().start_pos);
+    }
 
     #[test]
     fn basic_three() {

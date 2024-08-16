@@ -12,12 +12,13 @@ pub enum Direction {
     Descending = 3
 }
 
-const DIAGONAL_SLICE_AMOUNT: usize = rule::BOARD_WIDTH as usize * 2 - 4 - 4 - 1;
-const SLICE_AMOUNT: usize = rule::BOARD_WIDTH as usize * 2 + DIAGONAL_SLICE_AMOUNT * 2;
+const DIAGONAL_SLICE_AMOUNT: usize = rule::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
+const SLICE_AMOUNT: usize = rule::U_BOARD_WIDTH * 2 + DIAGONAL_SLICE_AMOUNT * 2;
 
-#[derive(Debug)]
+const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
+
+#[derive(Debug, Copy, Clone)]
 pub struct Slice {
-    pub direction: Direction,
     pub length: u8,
     pub start_pos: Pos,
     pub black_stones: u16,
@@ -26,9 +27,8 @@ pub struct Slice {
 
 impl Slice {
 
-    pub fn empty(direction: Direction, length: u8, start_pos: Pos) -> Self {
+    pub fn empty(length: u8, start_pos: Pos) -> Self {
         Slice {
-            direction,
             length,
             start_pos,
             black_stones: 0,
@@ -69,18 +69,20 @@ impl Slice {
 
 }
 
+#[derive(Copy, Clone)]
 pub struct Slices {
-    pub horizontal_slices: [Slice; rule::BOARD_WIDTH as usize],
-    pub vertical_slices: [Slice; rule::BOARD_WIDTH as usize],
+    pub horizontal_slices: [Slice; rule::U_BOARD_WIDTH],
+    pub vertical_slices: [Slice; rule::U_BOARD_WIDTH],
     pub ascending_slices: [Slice; DIAGONAL_SLICE_AMOUNT],
     pub descending_slices: [Slice; DIAGONAL_SLICE_AMOUNT]
 }
 
+#[derive(Copy, Clone)]
 pub struct SliceSet {
     pub horizontal_slice: Slice,
     pub vertical_slice: Slice,
-    pub ascending_slice: Slice,
-    pub descending_slice: Slice
+    pub ascending_slice: Option<Slice>,
+    pub descending_slice: Option<Slice>
 }
 
 impl Slices {
@@ -88,24 +90,22 @@ impl Slices {
     pub fn empty() -> Self {
         Slices {
             horizontal_slices: std::array::from_fn(|idx|
-                Slice::empty(Direction::Horizontal, rule::BOARD_WIDTH, Pos::from_cartesian(idx as u8, 0))
+                Slice::empty(rule::BOARD_WIDTH, Pos::from_cartesian(idx as u8, 0))
             ),
             vertical_slices: std::array::from_fn(|idx|
-                Slice::empty(Direction::Horizontal, rule::BOARD_WIDTH, Pos::from_cartesian(0, idx as u8))
+                Slice::empty(rule::BOARD_WIDTH, Pos::from_cartesian(0, idx as u8))
             ),
             ascending_slices: std::array::from_fn(|idx| {
-                let seq_num = idx as isize + 5 - rule::BOARD_WIDTH as isize;
+                let seq_num = idx as isize + 5 - rule::I_BOARD_WIDTH;
                 Slice::empty(
-                    Direction::Ascending,
-                    (seq_num.abs() - rule::BOARD_WIDTH as isize).abs() as u8,
+                    (seq_num.abs() - rule::I_BOARD_WIDTH).abs() as u8,
                     Pos::from_cartesian(max(0, seq_num.neg()) as u8, max(0, seq_num) as u8)
                 )
             }),
             descending_slices: std::array::from_fn(|idx| {
-                let seq_num = idx as isize + 5 - rule::BOARD_WIDTH as isize;
+                let seq_num = idx as isize + 5 - rule::I_BOARD_WIDTH;
                 Slice::empty(
-                    Direction::Descending,
-                    (seq_num.abs() - rule::BOARD_WIDTH as isize).abs() as u8,
+                    (seq_num.abs() - rule::I_BOARD_WIDTH).abs() as u8,
                     Pos::from_cartesian(
                         rule::BOARD_WIDTH-1 - max(0, seq_num.neg()) as u8,
                         max(0, seq_num) as u8
@@ -115,12 +115,34 @@ impl Slices {
         }
     }
 
-    pub fn access_slice(&self, pos: Pos, direction: Direction) -> &Slice {
-        todo!()
+    pub fn access_slice(&self, pos: Pos, direction: Direction) -> Option<&Slice> {
+        match direction {
+            Direction::Horizontal => Some(&self.horizontal_slices[pos.row() as usize]),
+            Direction::Vertical => Some(&self.vertical_slices[pos.col() as usize]),
+            Direction::Ascending => { // y = x + b, b = y - x (reversed row sequence)
+                let idx = I_DIAGONAL_SLICE_AMOUNT - (pos.row() as isize - pos.col() as isize + rule::I_BOARD_WIDTH - 4);
+                match idx {
+                    0 .. I_DIAGONAL_SLICE_AMOUNT => Some(&self.ascending_slices[idx as usize]),
+                    _ => None
+                }
+            },
+            Direction::Descending => { // y = -x + 15 + b, b = y + x - 15
+                let idx = pos.row() as isize + pos.col() as isize - 4;
+                match idx {
+                    0 .. I_DIAGONAL_SLICE_AMOUNT => Some(&self.descending_slices[idx as usize]),
+                    _ => None
+                }
+            }
+        }
     }
 
     pub fn build_slice_set(&self, pos: Pos) -> SliceSet {
-        todo!()
+        SliceSet {
+            horizontal_slice: self.access_slice(pos, Direction::Horizontal).unwrap().clone(),
+            vertical_slice: self.access_slice(pos, Direction::Vertical).unwrap().clone(),
+            ascending_slice: self.access_slice(pos, Direction::Ascending).map(|x| x.clone()),
+            descending_slice: self.access_slice(pos, Direction::Descending).map(|x| x.clone()),
+        }
     }
 
 }

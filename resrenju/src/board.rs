@@ -7,6 +7,7 @@ use crate::slice::Slices;
 
 const SLICE_AMOUNT: usize = 0;
 
+#[derive(Copy, Clone)]
 pub struct Board {
     pub moves: u8,
     pub slices: Slices,
