@@ -7,3 +7,6 @@ pub mod movegen;
 pub mod notation;
 pub mod game;
 pub mod utils;
+pub mod opening;
+pub mod formation;
+pub mod pattern;

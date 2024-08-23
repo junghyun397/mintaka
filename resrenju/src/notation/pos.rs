@@ -1,6 +1,6 @@
 use crate::notation::rule;
 
-#[derive(Copy, Clone)]
+#[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub struct Pos(u8);
 
 impl Pos {
@@ -17,7 +17,7 @@ impl Pos {
         Pos(index)
     }
 
-    pub fn to_index(&self) -> u8 {
+    pub fn idx(&self) -> u8 {
         self.0
     }
 

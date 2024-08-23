@@ -1,28 +1,34 @@
 use crate::cache::hash_key::HashKey;
 use crate::notation::color::Color;
+use crate::formation::FormationPairs;
 use crate::notation::game_result::GameResult;
 use crate::notation::pos::Pos;
 use crate::notation::rule::RuleKind;
 use crate::slice::Slices;
 
-const SLICE_AMOUNT: usize = 0;
-
+// 1344-Bytes
 #[derive(Copy, Clone)]
 pub struct Board {
     pub moves: u8,
     pub slices: Slices,
-    pub hash_key: HashKey
+    pub formation_pairs: FormationPairs,
+    pub hash_key: HashKey,
+}
+
+impl Default for Board {
+
+    fn default() -> Self {
+        Self {
+            moves: 0,
+            slices: Default::default(),
+            formation_pairs: Default::default(),
+            hash_key: Default::default()
+        }
+    }
+
 }
 
 impl Board {
-
-    pub fn empty() -> Self {
-        Board {
-            moves: 0,
-            slices: Slices::empty(),
-            hash_key: HashKey::empty()
-        }
-    }
 
     pub fn player_color(&self) -> Color {
         match self.moves % 2 {
@@ -39,23 +45,41 @@ impl Board {
     }
 
     pub fn set(&self, pos: Pos, rule_kind: RuleKind) -> Self {
-        todo!()
+        let color = self.player_color();
+        let slices = self.slices.set(color, pos);
+
+        Board {
+            moves: self.moves + 1,
+            slices,
+            formation_pairs: todo!(),
+            hash_key: self.hash_key.set(self.player_color(), pos),
+        }
     }
 
     pub fn unset(&self, pos: Pos, rule_kind: RuleKind) -> Self {
-        todo!()
+        let color = self.player_color();
+        let slices = self.slices.unset(color, pos);
+
+        Board {
+            moves: self.moves - 1,
+            slices,
+            formation_pairs: todo!(),
+            hash_key: self.hash_key.set(self.player_color(), pos),
+        }
     }
 
     pub fn set_mut(&mut self, pos: Pos, rule_kind: RuleKind) {
-        todo!()
+        self.hash_key = self.hash_key.set(self.player_color(), pos);
+        self.moves += 1;
     }
 
     pub fn unset_mut(&mut self, pos: Pos, rule_kind: RuleKind) {
-        todo!()
+        self.hash_key = self.hash_key.set(self.player_color(), pos);
+        self.moves -= 1;
     }
 
     pub fn batch_set_mut(&mut self, batch_pos: &Vec<Pos>, rule_kind: RuleKind) {
-        todo!()
+        self.moves += batch_pos.len() as u8;
     }
 
     pub fn find_result(&self) -> Option<GameResult> {

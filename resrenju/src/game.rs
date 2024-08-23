@@ -10,29 +10,43 @@ pub struct Game {
     pub result: Option<GameResult>,
 }
 
-impl Game {
+impl Default for Game {
 
-    pub fn empty() -> Self {
-        Game {
-            board: Board::empty(),
-            history: History::empty(),
+    fn default() -> Self {
+        Self {
+            board: Default::default(),
+            history: Default::default(),
             result: None
         }
     }
 
-    pub fn play(&self, pos: Pos, rule_kind: RuleKind) -> Game {
-        todo!()
+}
+
+impl Game {
+
+    pub fn play(&self, pos: Pos, rule_kind: RuleKind) -> Self {
+        Self {
+            board: self.board.set(pos, rule_kind),
+            history: self.history.play(pos),
+            result: None
+        }
     }
 
-    pub fn undo(&self, pos: Pos, rule_kind: RuleKind) -> Game {
-        todo!()
+    pub fn undo(&self, pos: Pos, rule_kind: RuleKind) -> Self {
+        Self {
+            board: self.board.unset(pos, rule_kind),
+            history: self.history.undo(),
+            result: None
+        }
     }
 
     pub fn play_mut(&mut self, pos: Pos, rule_kind: RuleKind) {
+        self.history.play_mut(pos);
         todo!()
     }
 
     pub fn undo_mut(&mut self, pos: Pos, rule_kind: RuleKind) {
+        self.history.undo_mut();
         todo!()
     }
 

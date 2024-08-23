@@ -1,10 +1,11 @@
 use std::fmt::{Debug, Display, Formatter};
-use std::io::Read;
 use std::str::FromStr;
+
 use crate::board::Board;
+use crate::game::Game;
+use crate::notation::color::Color;
 use crate::notation::history::History;
 use crate::notation::pos::Pos;
-use crate::notation::rule::RuleKind;
 use crate::slice::Slice;
 
 impl Display for Board {
@@ -21,10 +22,10 @@ impl FromStr for Board {
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
         Err("Invalid format. example:\n
-     3 . . .
-     2 . O X
-     1 . . .
-       A B C\n")
+    3 . . .
+    2 . O X
+    1 . . .
+      A B C\n")
     }
 
 }
@@ -42,7 +43,7 @@ impl FromStr for Slice {
 impl Display for Slice {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(f, "{}", todo!())
     }
 
 }
@@ -66,13 +67,10 @@ impl FromStr for History {
 
 }
 
-impl Into<Board> for History {
+impl Into<Game> for History {
 
-    fn into(self) -> Board {
-        let mut board = Board::empty();
-        board.batch_set_mut(&self.0, RuleKind::Renju);
-
-        board
+    fn into(self) -> Game {
+        todo!()
     }
 
 }
@@ -101,6 +99,22 @@ impl Debug for Pos {
 }
 
 impl Display for Pos {
+
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(self, f)
+    }
+
+}
+
+impl Debug for Color {
+
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", if self == &Color::Black { "O" } else { "X" })
+    }
+
+}
+
+impl Display for Color {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(self, f)
