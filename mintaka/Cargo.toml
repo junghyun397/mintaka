@@ -1,6 +1,4 @@
 [package]
-name = "resrenju_engine"
+name = "mintaka"
 version = "0.1.0"
 edition = "2021"
-
-[dependencies]

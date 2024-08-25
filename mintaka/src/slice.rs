@@ -196,7 +196,8 @@ impl Slices {
         horizontal_op: F2,
         ascending_op: F3,
         descending_op: F4
-    ) -> Self where
+    ) -> Self
+    where
         F1: FnOnce(&Slice) -> Slice,
         F2: FnOnce(&Slice) -> Slice,
         F3: FnOnce(&Slice) -> Slice,
@@ -209,14 +210,12 @@ impl Slices {
         horizontal_slices[pos.col() as usize] = horizontal_op(&self.horizontal_slices[pos.col() as usize]);
 
         let mut ascending_slices = self.ascending_slices.clone();
-        let idx = I_DIAGONAL_SLICE_AMOUNT - (pos.row() as isize - pos.col() as isize + rule::I_BOARD_WIDTH - 4);
-        if 0 <= idx && idx < I_DIAGONAL_SLICE_AMOUNT {
-            ascending_slices[idx as usize] = ascending_op(&self.ascending_slices[idx as usize]);
+        if let Some(idx) = Self::ascending_slice_idx(pos) {
+            ascending_slices[idx] = ascending_op(&self.ascending_slices[idx]);
         }
 
         let mut descending_slices = self.descending_slices.clone();
-        let idx = pos.row() as isize + pos.col() as isize - 4;
-        if 0 <= idx && idx < I_DIAGONAL_SLICE_AMOUNT {
+        if let Some(idx) = Self::descending_slice_idx(pos) {
             descending_slices[idx as usize] = descending_op(&self.descending_slices[idx as usize]);
         }
 
@@ -271,7 +270,8 @@ impl Slices {
         horizontal_op: F2,
         ascending_op: F3,
         descending_op: F4
-    ) where
+    )
+    where
         F1: FnOnce(&mut Slice) -> (),
         F2: FnOnce(&mut Slice) -> (),
         F3: FnOnce(&mut Slice) -> (),
@@ -280,35 +280,49 @@ impl Slices {
         vertical_op(&mut self.vertical_slices[pos.row() as usize]);
         horizontal_op(&mut self.horizontal_slices[pos.col() as usize]);
 
-        let idx = I_DIAGONAL_SLICE_AMOUNT - (pos.row() as isize - pos.col() as isize + rule::I_BOARD_WIDTH - 4);
-        if 0 <= idx && idx < I_DIAGONAL_SLICE_AMOUNT {
-            ascending_op(&mut self.ascending_slices[idx as usize])
+        if let Some(idx) = Self::ascending_slice_idx(pos) {
+            ascending_op(&mut self.ascending_slices[idx])
         }
 
-        let idx = pos.row() as isize + pos.col() as isize - 4;
-        if 0 <= idx && idx < I_DIAGONAL_SLICE_AMOUNT {
-            descending_op(&mut self.descending_slices[idx as usize]);
+        if let Some(idx) = Self::descending_slice_idx(pos) {
+            descending_op(&mut self.descending_slices[idx]);
         }
     }
 
-    pub fn access_slice(&self, d: Direction, pos: Pos) -> Option<&Slice> {
-        match d {
+    pub fn access_slice(&self, direction: Direction, pos: Pos) -> Option<&Slice> {
+        match direction {
             Direction::Horizontal => Some(&self.horizontal_slices[pos.row() as usize]),
             Direction::Vertical => Some(&self.vertical_slices[pos.col() as usize]),
-            Direction::Ascending => { // y = x + b, b = y - x (reversed row sequence)
-                let idx = I_DIAGONAL_SLICE_AMOUNT - (pos.row() as isize - pos.col() as isize + rule::I_BOARD_WIDTH - 4);
-                match idx {
-                    0 .. I_DIAGONAL_SLICE_AMOUNT => Some(&self.ascending_slices[idx as usize]),
-                    _ => None
-                }
+            Direction::Ascending => {
+                Self::ascending_slice_idx(pos)
+                    .map(|idx| &self.ascending_slices[idx])
             },
-            Direction::Descending => { // y = -x + 15 + b, b = y + x - 15
-                let idx = pos.row() as isize + pos.col() as isize - 4;
-                match idx {
-                    0 .. I_DIAGONAL_SLICE_AMOUNT => Some(&self.descending_slices[idx as usize]),
-                    _ => None
-                }
+            Direction::Descending => {
+                Self::descending_slice_idx(pos)
+                    .map(|idx| &self.descending_slices[idx])
             }
+        }
+    }
+
+    #[inline(always)]
+    fn ascending_slice_idx(pos: Pos) -> Option<usize> {
+        // y = x + b, b = y - x (reversed row sequence)
+        let idx = I_DIAGONAL_SLICE_AMOUNT - (pos.row() as isize - pos.col() as isize + rule::I_BOARD_WIDTH - 4);
+        if 0 <= idx && idx < I_DIAGONAL_SLICE_AMOUNT {
+            Some(idx as usize)
+        } else {
+            None
+        }
+    }
+
+    #[inline(always)]
+    fn descending_slice_idx(pos: Pos) -> Option<usize> {
+        // y = -x + 15 + b, b = y + x - 15
+        let idx = pos.row() as isize + pos.col() as isize - 4;
+        if 0 <= idx && idx < I_DIAGONAL_SLICE_AMOUNT {
+            Some(idx as usize)
+        } else {
+            None
         }
     }
 

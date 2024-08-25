@@ -3,9 +3,9 @@
 version = 3
 
 [[package]]
-name = "resrenju"
+name = "mintaka"
 version = "0.1.0"
 
 [[package]]
-name = "resrenju_engine"
+name = "mintaka_engine"
 version = "0.1.0"

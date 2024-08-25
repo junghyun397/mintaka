@@ -1,6 +1,6 @@
 use crate::cache::hash_key::HashKey;
 use crate::notation::color::Color;
-use crate::formation::FormationPairs;
+use crate::formation::Cells;
 use crate::notation::game_result::GameResult;
 use crate::notation::pos::Pos;
 use crate::notation::rule::RuleKind;
@@ -11,7 +11,7 @@ use crate::slice::Slices;
 pub struct Board {
     pub moves: u8,
     pub slices: Slices,
-    pub formation_pairs: FormationPairs,
+    pub formation_pairs: Cells,
     pub hash_key: HashKey,
 }
 

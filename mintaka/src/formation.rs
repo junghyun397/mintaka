@@ -1,4 +1,5 @@
 use crate::notation::direction::Direction;
+use crate::notation::forbidden_kind::ForbiddenKind;
 use crate::notation::rule;
 
 // 4-bit open-three | 4-bit close-three | 4-bit open-four | 4-bit five | 8-bit closed-four | total 24 bits
@@ -19,15 +20,16 @@ pub struct Formation {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct FormationPair {
+pub struct Cell {
     pub black_formation: Formation,
     pub white_formation: Formation,
+    pub forbidden_kind: Option<ForbiddenKind>,
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct FormationPairs([FormationPair; rule::BOARD_SIZE]);
+pub struct Cells([Cell; rule::BOARD_SIZE]);
 
-pub type FormationPairLine = [FormationPair; rule::U_BOARD_WIDTH];
+pub type FormationPairLine = [Cell; rule::U_BOARD_WIDTH];
 
 impl Default for Formation {
 
@@ -40,7 +42,7 @@ impl Default for Formation {
 
 }
 
-impl Default for FormationPair {
+impl Default for Cell {
 
     fn default() -> Self {
         Self {
@@ -51,7 +53,7 @@ impl Default for FormationPair {
 
 }
 
-impl Default for FormationPairs {
+impl Default for Cells {
 
     fn default() -> Self {
         Self([Default::default(); rule::BOARD_SIZE])
@@ -61,7 +63,7 @@ impl Default for FormationPairs {
 
 impl Formation {
 
-    fn formation_at(&self, d: Direction) -> FormationKind {
+    fn formation_at(&self, direction: Direction) -> FormationKind {
         todo!()
     }
 
@@ -85,16 +87,11 @@ impl Formation {
         self.closed_four.count_ones()
     }
 
-    fn apply_mask(&self, d: Direction, mask: Formation) -> Self {
-        let open_three_close_three_open_four_five_mask = mask.o3_c3_o4_5 >> d as usize;
-        let closed_four_mask = mask.closed_four >> d as usize;
+    fn apply_mask(&self, direction: Direction, mask: Formation) -> Self {
+        let open_three_close_three_open_four_five_mask = mask.o3_c3_o4_5 >> direction as usize;
+        let closed_four_mask = mask.closed_four >> direction as usize;
 
-        Formation {
-            o3_c3_o4_5:
-                !(mask.o3_c3_o4_5 >> 1) ^ self.o3_c3_o4_5,
-            closed_four:
-                (self.closed_four | closed_four_mask) & (self.closed_four & !closed_four_mask),
-        }
+        todo!()
     }
 
 }

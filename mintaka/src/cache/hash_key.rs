@@ -32,11 +32,10 @@ impl Default for HashKey {
 
 }
 
-impl Into<HashKey> for Board {
+impl Into<HashKey> for [Slice; rule::U_BOARD_WIDTH] {
 
     fn into(self) -> HashKey {
-        self.slices.vertical_slices
-            .iter()
+        self.iter()
             .enumerate()
             .fold(Default::default(), |mut key, (row, slice)| {
                 for col in 0 .. rule::BOARD_WIDTH {
