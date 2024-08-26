@@ -1,4 +1,3 @@
-use crate::cache::hash_key::HashKey;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::Pos;
@@ -18,6 +17,8 @@ pub struct Slice {
     pub black_stones: u16,
     pub white_stones: u16
 }
+
+pub type SliceKey = u32;
 
 impl Slice {
 
@@ -75,28 +76,18 @@ impl Slice {
         }
     }
 
-    pub fn hash_key(&self) -> HashKey {
-        self.into()
+    pub fn slice_key(&self) -> SliceKey {
+        self.black_stones as u32 | self.white_stones as u32 >> rule::BOARD_WIDTH
     }
 
 }
-
-
 
 #[derive(Copy, Clone)]
 pub struct Slices {
     pub horizontal_slices: [Slice; rule::U_BOARD_WIDTH],
     pub vertical_slices: [Slice; rule::U_BOARD_WIDTH],
     pub ascending_slices: [Slice; DIAGONAL_SLICE_AMOUNT],
-    pub descending_slices: [Slice; DIAGONAL_SLICE_AMOUNT]
-}
-
-#[derive(Copy, Clone)]
-pub struct SliceSet {
-    pub horizontal_slice: Slice,
-    pub vertical_slice: Slice,
-    pub ascending_slice: Option<Slice>,
-    pub descending_slice: Option<Slice>
+    pub descending_slices: [Slice; DIAGONAL_SLICE_AMOUNT],
 }
 
 impl Default for Slices {

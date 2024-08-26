@@ -1,4 +1,3 @@
-use crate::board::Board;
 use crate::cache::hash_table;
 use crate::cache::hash_table::EMPTY_HASH;
 use crate::notation::color::Color;
@@ -52,7 +51,7 @@ impl Into<HashKey> for [Slice; rule::U_BOARD_WIDTH] {
 
 }
 
-impl Into<HashKey> for &Slice {
+impl Into<HashKey> for Slice {
 
     fn into(self) -> HashKey {
         HashKey(self.black_stones as u64 | (self.white_stones as u64 >> 16))

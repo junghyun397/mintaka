@@ -75,11 +75,11 @@ impl Board {
     }
 
     fn incremental_update_mut(&mut self, pos: Pos, rule_kind: RuleKind, slice_op: fn(&mut Slice, Color, u8)) {
-        let vertical_slice = self.slices.vertical_slices[pos.col()];
-        slice_op(vertical_slice, self.player_color, pos.col());
-
-        let horizontal_slice = self.slices.horizontal_slices[pos.row()];
+        let horizontal_slice = &mut self.slices.horizontal_slices[pos.row() as usize];
         slice_op(horizontal_slice, self.player_color, pos.row());
+
+        let vertical_slice = &mut self.slices.vertical_slices[pos.col() as usize];
+        slice_op(vertical_slice, self.player_color, pos.col());
 
         if let Some(ascending_slice) = self.slices.access_ascending_slice(pos) {
             slice_op(ascending_slice, self.player_color, pos.col() - ascending_slice.start_pos.col());

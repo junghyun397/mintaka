@@ -13,6 +13,12 @@ impl Default for History {
 
 impl History {
 
+    pub fn get(&self, idx: usize) -> Option<Pos> {
+        self.0.get(idx)
+            .map(|x| *x)
+            .flatten()
+    }
+
     pub fn play(&self, pos: Option<Pos>) -> Self {
         let mut history = self.0.clone();
         history.push(pos);

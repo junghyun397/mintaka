@@ -1,5 +1,4 @@
 use crate::notation::direction::Direction;
-use crate::notation::forbidden_kind::ForbiddenKind;
 use crate::notation::rule;
 
 // 4-bit open-three | 4-bit close-three | 4-bit open-four | 4-bit five | 8-bit closed-four | total 24 bits

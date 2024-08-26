@@ -51,10 +51,18 @@ impl OpeningGuide {
     }
 
     pub fn find_forbidden_symmetry_moves(game: Game) -> HashSet<Pos> {
-        let fifth_move = game.history.0[5];
+        let fifth_move = game.history.get(4).unwrap();
 
-        let black_symmetry_moves = Self::find_symmetry_moves(game.history.0[0], game.history.0[2], fifth_move);
-        let white_symmetry_moves = Self::find_symmetry_moves(game.history.0[1], game.history.0[3], fifth_move);
+        let black_symmetry_moves = Self::find_symmetry_moves(
+            game.history.get(0).unwrap(),
+            game.history.get(0).unwrap(),
+            fifth_move
+        );
+        let white_symmetry_moves = Self::find_symmetry_moves(
+            game.history.get(0).unwrap(),
+            game.history.get(3).unwrap(),
+            fifth_move
+        );
 
         black_symmetry_moves
             .intersection(&white_symmetry_moves)

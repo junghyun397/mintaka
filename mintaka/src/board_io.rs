@@ -6,20 +6,18 @@ use crate::notation::pos::Pos;
 use crate::notation::rule;
 use crate::notation::rule::RuleKind;
 use crate::slice::Slice;
+use regex_lite::Regex;
 use std::fmt::{Debug, Display, Formatter};
-use std::ops::RangeBounds;
 use std::str::FromStr;
 use std::u8;
 
+const BOARD_CHARACTER_SET: [char; 6] = ['O', 'X', '.', '3', '4', '6'];
+
+// regex: \d[\s\[](\S[\s\[\]]){N}\d
 fn filter_map_board_elements(source: &str) -> Vec<Option<Color>> {
-    source.chars()
-        .filter(|&c| c == 'O' || c == 'X' || c == '.')
-        .map(|c| match c {
-            'O' => Some(Color::White),
-            'X' => Some(Color::Black),
-            _ => None
-        })
-        .collect()
+    const RE: Regex = Regex::from_str(r"\d[\s\[](\S[\s\[\]]){15}\d").unwrap();
+
+    todo!()
 }
 
 fn filter_map_stones<F>(source: &Vec<Option<Color>>, op: F) -> Vec<Pos>
@@ -140,39 +138,10 @@ impl FromStr for History {
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        if source.len() < 2 {
-            return Err("Invalid format.");
-        }
+        // regex: [a-z][0-9][0-9]?[0-9]?
+        const RE: Regex = Regex::from_str(r"[a-z][0-9][0-9]?[0-9]?").unwrap();
 
-        let mut acc: Vec<char> = vec![];
-        let mut history: Vec<Pos> = vec![];
-        for char in source.chars().skip(1) {
-            match char {
-                'a' ..= 'z' => {
-                    if acc.is_empty() {
-                        acc.push(char);
-                    } else {
-                        if !(1 ..= 3).contains(&acc.len()) {
-                            return Err("Invalid format.");
-                        }
-
-                        let maybe_pos = acc.iter().collect::<String>().parse::<Pos>();
-                        if maybe_pos.is_err() {
-                            return Err(maybe_pos.err().unwrap());
-                        }
-
-                        history.push(maybe_pos?);
-                        acc.clear();
-                    }
-                },
-                '0' ..= '9' => {
-                    acc.push(char);
-                }
-                _ => {}
-            };
-        }
-
-        Err("History sequence has an conflict.")
+        todo!()
     }
 
 }
