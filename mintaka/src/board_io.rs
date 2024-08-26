@@ -65,6 +65,12 @@ impl FromStr for Board {
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
+        let boards = source.split("\n")
+            .flat_map(|row| row.chars()
+                .skip_while(|char| *char != ' ')
+            )
+            .clone();
+
         let fields = filter_map_board_elements(source);
 
         if fields.len() != rule::BOARD_SIZE {
@@ -166,8 +172,6 @@ impl FromStr for History {
             };
         }
 
-
-
         Err("History sequence has an conflict.")
     }
 
@@ -176,20 +180,9 @@ impl FromStr for History {
 impl Into<Game> for History {
 
     fn into(self) -> Game {
-        let mut board = Board::default();
+        let mut game = Game::default();
 
-        self.0
-            .iter()
-            .enumerate()
-            .for_each(|(idx, pos)| {
-                board.set_mut(*pos, rule::RuleKind::Renju);
-            });
-
-        Game {
-            board,
-            history: self.clone(),
-            result: None
-        }
+        game
     }
 
 }
@@ -202,7 +195,7 @@ impl FromStr for Pos {
         u8::from_str(&source[1..])
             .map_err(|_| "Invalid row charter")
             .and_then(|row| {
-                let col = *source.chars().next().unwrap() as u8 - 'a' as u8;
+                let col = source.chars().next().unwrap() as u8 - 'a' as u8;
                 let pos = Pos::from_cartesian(row , col - 97);
                 if pos.col() < rule::BOARD_WIDTH && pos.row() < rule::BOARD_WIDTH {
                     Ok(pos)

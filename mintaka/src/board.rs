@@ -1,17 +1,16 @@
 use crate::cache::hash_key::HashKey;
 use crate::notation::color::Color;
 use crate::formation::Cells;
-use crate::notation::game_result::GameResult;
 use crate::notation::pos::Pos;
 use crate::notation::rule::RuleKind;
-use crate::slice::Slices;
+use crate::slice::{Slice, Slices};
 
 // 1344-Bytes
 #[derive(Copy, Clone)]
 pub struct Board {
-    pub moves: u8,
+    pub player_color: Color,
     pub slices: Slices,
-    pub formation_pairs: Cells,
+    pub cells: Cells,
     pub hash_key: HashKey,
 }
 
@@ -19,9 +18,9 @@ impl Default for Board {
 
     fn default() -> Self {
         Self {
-            moves: 0,
+            player_color: Color::Black,
             slices: Default::default(),
-            formation_pairs: Default::default(),
+            cells: Default::default(),
             hash_key: Default::default()
         }
     }
@@ -30,60 +29,91 @@ impl Default for Board {
 
 impl Board {
 
-    pub fn player_color(&self) -> Color {
-        match self.moves % 2 {
-            1 => Color::White,
-            _ => Color::Black
-        }
-    }
-
-    pub fn next_color(&self) -> Color {
-        match self.moves % 2 {
-            1 => Color::Black,
-            _ => Color::White
-        }
+    pub fn opponent_color(&self) -> Color {
+        self.player_color.reversed()
     }
 
     pub fn set(&self, pos: Pos, rule_kind: RuleKind) -> Self {
-        let color = self.player_color();
-        let slices = self.slices.set(color, pos);
-
-        Board {
-            moves: self.moves + 1,
-            slices,
-            formation_pairs: todo!(),
-            hash_key: self.hash_key.set(self.player_color(), pos),
-        }
+        let mut board = self.clone();
+        board.set_mut(pos, rule_kind);
+        board
     }
 
     pub fn unset(&self, pos: Pos, rule_kind: RuleKind) -> Self {
-        let color = self.player_color();
-        let slices = self.slices.unset(color, pos);
+        let mut board = self.clone();
+        board.unset_mut(pos, rule_kind);
+        board
+    }
 
-        Board {
-            moves: self.moves - 1,
-            slices,
-            formation_pairs: todo!(),
-            hash_key: self.hash_key.set(self.player_color(), pos),
-        }
+    pub fn pass(&self) -> Self {
+        let mut board = self.clone();
+        board.pass_mut();
+        board
     }
 
     pub fn set_mut(&mut self, pos: Pos, rule_kind: RuleKind) {
-        self.hash_key = self.hash_key.set(self.player_color(), pos);
-        self.moves += 1;
+        self.incremental_update_mut(pos, rule_kind, Slice::set_mut);
+
+        self.switch_player_mut();
+        self.hash_key = self.hash_key.set(self.player_color, pos);
     }
 
     pub fn unset_mut(&mut self, pos: Pos, rule_kind: RuleKind) {
-        self.hash_key = self.hash_key.set(self.player_color(), pos);
-        self.moves -= 1;
+        self.incremental_update_mut(pos, rule_kind, Slice::unset_mut);
+
+        self.switch_player_mut();
+        self.hash_key = self.hash_key.set(self.player_color, pos);
     }
 
-    pub fn batch_set_mut(&mut self, batch_pos: &Vec<Pos>, rule_kind: RuleKind) {
-        self.moves += batch_pos.len() as u8;
+    pub fn pass_mut(&mut self) {
+        self.switch_player_mut();
     }
 
-    pub fn find_result(&self) -> Option<GameResult> {
+    pub fn batch_set_mut(&mut self, blacks: Vec<Pos>, whites: Vec<Pos>, next_player: Color, rule_kind: RuleKind) {
+        self.player_color = next_player;
+        self.full_update_mut(rule_kind)
+    }
+
+    fn incremental_update_mut(&mut self, pos: Pos, rule_kind: RuleKind, slice_op: fn(&mut Slice, Color, u8)) {
+        let vertical_slice = self.slices.vertical_slices[pos.col()];
+        slice_op(vertical_slice, self.player_color, pos.col());
+
+        let horizontal_slice = self.slices.horizontal_slices[pos.row()];
+        slice_op(horizontal_slice, self.player_color, pos.row());
+
+        if let Some(ascending_slice) = self.slices.access_ascending_slice(pos) {
+            slice_op(ascending_slice, self.player_color, pos.col() - ascending_slice.start_pos.col());
+        }
+
+        if let Some(descending_slice) = self.slices.access_descending_slice(pos) {
+            slice_op(descending_slice, self.player_color, pos.col() - descending_slice.start_pos.col());
+        }
+
         todo!()
+    }
+
+    fn full_update_mut(&mut self, rule_kind: RuleKind) {
+        for vertical_slice in self.slices.vertical_slices {
+
+        }
+
+        for horizontal_slice in self.slices.horizontal_slices {
+
+        }
+
+        for ascending_slice in self.slices.ascending_slices {
+
+        }
+
+        for descending_slice in self.slices.descending_slices {
+
+        }
+
+        todo!()
+    }
+
+    fn switch_player_mut(&mut self) {
+        self.player_color = self.opponent_color();
     }
 
 }

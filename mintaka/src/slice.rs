@@ -31,37 +31,17 @@ impl Slice {
     }
 
     pub fn set(&self, color: Color, idx: u8) -> Self {
-        let mask = 0b1000_0000_0000_0000 >> idx;
+        let mut slice = self.clone();
+        slice.set_mut(color, idx);
 
-        let (black_stones, white_stones) = if color == Color::Black {
-            (self.black_stones | mask, self.white_stones)
-        } else {
-            (self.black_stones, self.white_stones | mask)
-        };
-
-        Slice {
-            length: self.length,
-            start_pos: self.start_pos,
-            black_stones,
-            white_stones
-        }
+        slice
     }
 
     pub fn unset(&self, color: Color, idx: u8) -> Self {
-        let mask = !(0b1000_0000_0000_0000 >> idx);
+        let mut slice = self.clone();
+        slice.unset_mut(color, idx);
 
-        let (black_stones, white_stones) = if color == Color::Black {
-            (self.black_stones & mask, self.white_stones)
-        } else {
-            (self.black_stones, self.white_stones & mask)
-        };
-
-        Slice {
-            length: self.length,
-            start_pos: self.start_pos,
-            black_stones,
-            white_stones
-        }
+        slice
     }
 
     pub fn set_mut(&mut self, color: Color, idx: u8) {
@@ -153,142 +133,6 @@ impl Default for Slices {
 
 impl Slices {
 
-    pub fn set(&self, color: Color, pos: Pos) -> Self {
-        self.slice_op(
-            pos,
-            |vertical_slice| {
-               vertical_slice.set(color, pos.row())
-            },
-            |horizontal_slice| {
-                horizontal_slice.set(color, pos.col())
-            },
-            |ascending_slice| {
-                ascending_slice.set(color, pos.col() - ascending_slice.start_pos.col())
-            },
-            |descending_slice| {
-                descending_slice.set(color, pos.col() - descending_slice.start_pos.col())
-            }
-        )
-    }
-
-    pub fn unset(&self, color: Color, pos: Pos) -> Self {
-        self.slice_op(
-            pos,
-            |vertical_slice| {
-                vertical_slice.unset(color, pos.row())
-            },
-            |horizontal_slice| {
-                horizontal_slice.unset(color, pos.col())
-            },
-            |ascending_slice| {
-                ascending_slice.unset(color, pos.col() - ascending_slice.start_pos.col())
-            },
-            |descending_slice| {
-                descending_slice.unset(color, pos.col() - descending_slice.start_pos.col())
-            }
-        )
-    }
-
-    #[inline(always)]
-    fn slice_op<F1, F2, F3, F4>(
-        &self, pos: Pos,
-        vertical_op: F1,
-        horizontal_op: F2,
-        ascending_op: F3,
-        descending_op: F4
-    ) -> Self
-    where
-        F1: FnOnce(&Slice) -> Slice,
-        F2: FnOnce(&Slice) -> Slice,
-        F3: FnOnce(&Slice) -> Slice,
-        F4: FnOnce(&Slice) -> Slice,
-    {
-        let mut vertical_slices = self.vertical_slices.clone();
-        vertical_slices[pos.row() as usize] = vertical_op(&self.vertical_slices[pos.row() as usize]);
-
-        let mut horizontal_slices = self.horizontal_slices.clone();
-        horizontal_slices[pos.col() as usize] = horizontal_op(&self.horizontal_slices[pos.col() as usize]);
-
-        let mut ascending_slices = self.ascending_slices.clone();
-        if let Some(idx) = Self::ascending_slice_idx(pos) {
-            ascending_slices[idx] = ascending_op(&self.ascending_slices[idx]);
-        }
-
-        let mut descending_slices = self.descending_slices.clone();
-        if let Some(idx) = Self::descending_slice_idx(pos) {
-            descending_slices[idx as usize] = descending_op(&self.descending_slices[idx as usize]);
-        }
-
-        Slices {
-            vertical_slices,
-            horizontal_slices,
-            ascending_slices,
-            descending_slices
-        }
-    }
-
-    pub fn set_mut<T>(&mut self, color: Color, pos: Pos) {
-        self.slice_op_mut(
-            pos,
-            |vertical_slice| {
-               vertical_slice.set_mut(color, pos.row());
-            },
-            |horizontal_slice| {
-                horizontal_slice.set_mut(color, pos.col());
-            },
-            |ascending_slice| {
-                ascending_slice.set_mut(color, pos.col() - ascending_slice.start_pos.col());
-            },
-            |descending_slice| {
-                descending_slice.set_mut(color, pos.col() - descending_slice.start_pos.col());
-            }
-        )
-    }
-
-    fn unset_mut(&mut self, color: Color, pos: Pos) {
-        self.slice_op_mut(
-            pos,
-            |vertical_slice| {
-               vertical_slice.unset_mut(color, pos.row());
-            },
-            |horizontal_slice| {
-                horizontal_slice.unset_mut(color, pos.col());
-            },
-            |ascending_slice| {
-                ascending_slice.unset_mut(color, pos.col() - ascending_slice.start_pos.col());
-            },
-            |descending_slice| {
-                descending_slice.unset_mut(color, pos.col() - descending_slice.start_pos.col());
-            }
-        )
-    }
-
-    #[inline(always)]
-    fn slice_op_mut<F1, F2, F3, F4>(
-        &mut self, pos: Pos,
-        vertical_op: F1,
-        horizontal_op: F2,
-        ascending_op: F3,
-        descending_op: F4
-    )
-    where
-        F1: FnOnce(&mut Slice) -> (),
-        F2: FnOnce(&mut Slice) -> (),
-        F3: FnOnce(&mut Slice) -> (),
-        F4: FnOnce(&mut Slice) -> (),
-    {
-        vertical_op(&mut self.vertical_slices[pos.row() as usize]);
-        horizontal_op(&mut self.horizontal_slices[pos.col() as usize]);
-
-        if let Some(idx) = Self::ascending_slice_idx(pos) {
-            ascending_op(&mut self.ascending_slices[idx])
-        }
-
-        if let Some(idx) = Self::descending_slice_idx(pos) {
-            descending_op(&mut self.descending_slices[idx]);
-        }
-    }
-
     pub fn access_slice(&self, direction: Direction, pos: Pos) -> Option<&Slice> {
         match direction {
             Direction::Horizontal => Some(&self.horizontal_slices[pos.row() as usize]),
@@ -304,8 +148,18 @@ impl Slices {
         }
     }
 
+    pub fn access_ascending_slice(&mut self, pos: Pos) -> Option<&mut Slice> {
+        Self::ascending_slice_idx(pos)
+            .map(|idx| &mut self.ascending_slices[idx])
+    }
+
+    pub fn access_descending_slice(&mut self, pos: Pos) -> Option<&mut Slice> {
+        Self::descending_slice_idx(pos)
+            .map(|idx| &mut self.descending_slices[idx])
+    }
+
     #[inline(always)]
-    fn ascending_slice_idx(pos: Pos) -> Option<usize> {
+    pub fn ascending_slice_idx(pos: Pos) -> Option<usize> {
         // y = x + b, b = y - x (reversed row sequence)
         let idx = I_DIAGONAL_SLICE_AMOUNT - (pos.row() as isize - pos.col() as isize + rule::I_BOARD_WIDTH - 4);
         if 0 <= idx && idx < I_DIAGONAL_SLICE_AMOUNT {
@@ -316,7 +170,7 @@ impl Slices {
     }
 
     #[inline(always)]
-    fn descending_slice_idx(pos: Pos) -> Option<usize> {
+    pub fn descending_slice_idx(pos: Pos) -> Option<usize> {
         // y = -x + 15 + b, b = y + x - 15
         let idx = pos.row() as isize + pos.col() as isize - 4;
         if 0 <= idx && idx < I_DIAGONAL_SLICE_AMOUNT {

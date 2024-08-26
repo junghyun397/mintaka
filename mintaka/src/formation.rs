@@ -23,7 +23,6 @@ pub struct Formation {
 pub struct Cell {
     pub black_formation: Formation,
     pub white_formation: Formation,
-    pub forbidden_kind: Option<ForbiddenKind>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -62,10 +61,6 @@ impl Default for Cells {
 }
 
 impl Formation {
-
-    fn formation_at(&self, direction: Direction) -> FormationKind {
-        todo!()
-    }
 
     fn count_open_threes(&self) -> u32 {
         (self.o3_c3_o4_5 & 0b1111_0000_0000_0000).count_ones()
