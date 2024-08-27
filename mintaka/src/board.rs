@@ -70,8 +70,16 @@ impl Board {
     }
 
     pub fn batch_set_mut(&mut self, blacks: Vec<Pos>, whites: Vec<Pos>, next_player: Color, rule_kind: RuleKind) {
+        for pos in blacks {
+            self.slices.set_mut(Color::Black, pos);
+        }
+
+        for pos in whites {
+            self.slices.set_mut(Color::White, pos);
+        }
+
         self.player_color = next_player;
-        self.full_update_mut(rule_kind)
+        self.full_update_mut(rule_kind);
     }
 
     fn incremental_update_mut(&mut self, pos: Pos, rule_kind: RuleKind, slice_op: fn(&mut Slice, Color, u8)) {

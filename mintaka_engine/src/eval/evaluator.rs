@@ -1,8 +1,8 @@
 use mintaka::board::Board;
 use crate::eval::score::Score;
 
-trait Evaluator {
+pub trait Evaluator : Default {
 
-    fn eval(board: &Board) -> Score;
+    fn eval(&self, board: &Board) -> Score;
 
 }

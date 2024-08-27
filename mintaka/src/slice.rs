@@ -124,6 +124,19 @@ impl Default for Slices {
 
 impl Slices {
 
+    pub fn set_mut(&mut self, color: Color, pos: Pos) {
+        self.horizontal_slices[pos.row() as usize].set_mut(color, pos.col());
+        self.vertical_slices[pos.col() as usize].set_mut(color, pos.row());
+
+        if let Some(ascending_slice) = self.access_ascending_slice(pos) {
+            ascending_slice.set_mut(color, pos.col() - ascending_slice.start_pos.col())
+        }
+
+        if let Some(descending_slice) = self.access_descending_slice(pos) {
+            descending_slice.set_mut(color, pos.col() - descending_slice.start_pos.col())
+        }
+    }
+
     pub fn access_slice(&self, direction: Direction, pos: Pos) -> Option<&Slice> {
         match direction {
             Direction::Horizontal => Some(&self.horizontal_slices[pos.row() as usize]),
