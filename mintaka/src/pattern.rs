@@ -1,9 +1,9 @@
-use crate::formation::FormationPairLine;
+use crate::formation::FormationLine;
 use crate::slice::Slice;
 
 struct PatternInfo {
     pattern: u8,
-    formation_pair_line: FormationPairLine,
+    formation_pair_line: FormationLine,
     wall: u8,
 }
 
@@ -13,11 +13,11 @@ mod pattern {
 
 impl Slice {
 
-    pub fn calculate_formation_masks(&self) -> FormationPairLine {
+    pub fn calculate_formation_masks(&self) -> FormationLine {
         todo!()
     }
 
-    fn find_pattern(&self) -> FormationPairLine {
+    fn find_pattern(&self) -> FormationLine {
         todo!()
     }
 
@@ -26,7 +26,7 @@ impl Slice {
         black_stones: u8,
         white_stones: u8,
         wall: u8
-    ) -> FormationPairLine {
+    ) -> FormationLine {
         todo!()
     }
 

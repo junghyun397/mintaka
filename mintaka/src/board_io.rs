@@ -4,7 +4,7 @@ use crate::notation::color::Color;
 use crate::notation::history::History;
 use crate::notation::pos::Pos;
 use crate::notation::rule;
-use crate::notation::rule::{RuleKind, U_BOARD_WIDTH};
+use crate::notation::rule::U_BOARD_WIDTH;
 use crate::slice::Slice;
 use regex_lite::Regex;
 use std::fmt::{Debug, Display, Formatter};
@@ -44,10 +44,10 @@ fn parse_board_elements(source: &str) -> Result<Vec<FieldSymbol>, &'static str> 
         .flat_map(|m| m
             .as_str()
             .chars()
-            .skip(1)
-            .take(rule::BOARD_WIDTH as usize * 2)
+            .skip(1) // 1> . . . . . 1
+            .take(rule::BOARD_WIDTH as usize * 2) // 1 . . . . .< 1
         )
-        .filter_map(|x| match_symbol(x))
+        .flat_map(|x| match_symbol(x))
         .collect();
 
     if elements.len() != rule::BOARD_SIZE {
@@ -74,34 +74,31 @@ fn extract_color_stones(source: &Vec<FieldSymbol>, target_color: Color) -> Vec<P
 
 impl Board {
 
-    fn render_attribute_text<F>(&self, transform: F) -> String
+    pub fn render_attribute_board<F>(&self, transform: F) -> String
     where
-        F: Fn(&Board, usize) -> String
+        F: Fn(&Board, Pos) -> String
     {
         let content = Vec::from_iter(0 .. rule::BOARD_SIZE)
-            .chunks(rule::U_BOARD_WIDTH)
+            .chunks(U_BOARD_WIDTH)
             .enumerate()
             .map(|(row_idx, row)| {
-                let prefix: String = "".into();
-                let postfix: String = "".into();
-
-                let content: String = row.iter()
-                    .map(|col_idx|
-                        transform(self, *col_idx)
+                let content: String = row.into_iter()
+                    .map(|&col_idx|
+                        transform(self, Pos::from_cartesian(row_idx as u8, col_idx as u8))
                     )
                     .reduce(|head, tail| {
-                        format!("{head} {tail}").to_owned()
+                        format!("{head} {tail}").to_string()
                     })
                     .unwrap();
 
-                format!("{prefix} {content} {postfix}").to_owned()
+                format!("{:-2} {content} {}", row_idx, row_idx).to_string()
             })
             .reduce(|head, tail|
                 format!("{head}\n{tail}")
             )
             .unwrap();
 
-        let column_hint_content: String = (65u8 .. 65u8 + rule::BOARD_WIDTH).into_iter()
+        let column_hint_content: String = (65u8 .. 65u8 + rule::BOARD_WIDTH)
             .flat_map(|x| [x as char, ' '])
             .collect();
 
@@ -115,7 +112,19 @@ impl Board {
 impl Display for Board {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", todo!())
+        write!(f, "{}", self.render_attribute_board(|board, pos| {
+            let row = board.slices.horizontal_slices[pos.row() as usize];
+
+            let char = if row.black_stone_at(pos.col()) {
+                SYMBOL_BLACK
+            } else if row.white_stone_at(pos.col()) {
+                SYMBOL_WHITE
+            } else {
+                SYMBOL_EMPTY
+            };
+
+            char.to_string()
+        }))
     }
 
 }
@@ -131,14 +140,9 @@ impl FromStr for Board {
         let whites = extract_color_stones(&elements, Color::White);
 
         let mut board = Board::default();
-        let player_color =
-            if blacks.len() > whites.len() {
-                Color::White
-            } else {
-                Color::Black
-            };
+        let player_color = Color::player_color_by_moves(blacks.len(), whites.len());
 
-        board.batch_set_mut(blacks, whites, player_color, RuleKind::Renju);
+        board.batch_set_mut(blacks, whites, player_color);
 
         Ok(board)
     }
@@ -154,17 +158,18 @@ impl FromStr for Slice {
             .filter_map(|x| match_symbol(x))
             .collect();
 
-        if 5 > fields.len() || fields.len() > rule::U_BOARD_WIDTH {
+        let field_len = fields.len() as u8;
+        if 5 > field_len || field_len > rule::BOARD_WIDTH {
             return Err("Invalid size.");
         }
 
-        Ok(fields.iter()
+        Ok(fields.into_iter()
             .enumerate()
             .fold(
-                Slice::empty(fields.len() as u8, Pos::from_index(0)),
+                Slice::empty(field_len, Pos::from_index(0)),
                 |acc, (idx, field)| {
                     match field {
-                        FieldSymbol::Stone(color) => acc.set(*color, idx as u8),
+                        FieldSymbol::Stone(color) => acc.set(color, idx as u8),
                         _ => acc
                     }
                 }
@@ -177,7 +182,25 @@ impl FromStr for Slice {
 impl Display for Slice {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", todo!())
+        let content = (0 .. self.length).into_iter()
+            .map(|idx| {
+                let symbol = if self.black_stone_at(idx) {
+                    SYMBOL_BLACK
+                } else if self.white_stone_at(idx) {
+                    SYMBOL_WHITE
+                } else {
+                    SYMBOL_EMPTY
+                };
+
+                symbol
+            })
+            .rfold(String::new(), |mut acc, symbol| {
+                acc.push(symbol);
+                acc.push(' ');
+                acc
+            });
+
+        write!(f, "{}", content)
     }
 
 }
@@ -195,8 +218,8 @@ impl FromStr for History {
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        // regex: [a-z][0-9][0-9]?[0-9]?
-        let re: Regex = Regex::from_str(r"[a-z][0-9][0-9]?[0-9]?").unwrap();
+        // regex: [a-z][0-9][0-9]?
+        let re: Regex = Regex::from_str(r"[a-z][0-9][0-9]?").unwrap();
 
         let history: Vec<Result<Pos, &str>> = re.find_iter(source)
             .map(|m| Pos::from_str(m.as_str()))
@@ -206,7 +229,7 @@ impl FromStr for History {
             return Err(result.unwrap_err());
         }
 
-        Ok(History(history.iter()
+        Ok(History(history.into_iter()
             .filter_map(|r| r.ok()
                 .map(|pos| Some(pos))
             )
@@ -219,7 +242,27 @@ impl FromStr for History {
 impl Into<Game> for History {
 
     fn into(self) -> Game {
-        let mut game = Game::default();
+        let blacks: Vec<Pos> = self.0.iter()
+            .enumerate()
+            .filter_map(|(idx, pos)| pos
+                .filter(|_| idx % 2 == 0)
+            )
+            .collect();
+
+        let whites: Vec<Pos> = self.0.iter()
+            .enumerate()
+            .filter_map(|(idx, pos)| pos
+                .filter(|_| idx % 2 == 1)
+            )
+            .collect();
+
+        let mut game = Game {
+            board: Board::default(),
+            history: self,
+            result: None
+        };
+
+        game.batch_set_mut(blacks, whites);
 
         game
     }
@@ -263,7 +306,7 @@ impl Display for Pos {
 impl Debug for Color {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", if self == &Color::Black { "O" } else { "X" })
+        write!(f, "{}", if self == &Color::Black { SYMBOL_BLACK } else { SYMBOL_WHITE })
     }
 
 }

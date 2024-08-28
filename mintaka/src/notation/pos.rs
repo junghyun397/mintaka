@@ -3,10 +3,14 @@ use crate::notation::rule;
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub struct Pos(u8);
 
+pub fn cartesian_to_index(row: u8, col: u8) -> u8 {
+    row * rule::BOARD_WIDTH + col
+}
+
 impl Pos {
 
     pub fn from_cartesian(row: u8, col: u8) -> Self {
-        Pos(row * rule::BOARD_WIDTH + col)
+        Pos(cartesian_to_index(row, col))
     }
 
     pub fn to_cartesian(&self) -> (u8, u8) {

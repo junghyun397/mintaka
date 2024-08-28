@@ -36,7 +36,7 @@ impl Into<HashKey> for [Slice; rule::U_BOARD_WIDTH] {
     fn into(self) -> HashKey {
         self.iter()
             .enumerate()
-            .fold(Default::default(), |mut key, (row, slice)| {
+            .fold(HashKey::default(), |mut key, (row, slice)| {
                 for col in 0 .. rule::BOARD_WIDTH {
                     if slice.black_stone_at(col) {
                         key = key.set(Color::Black, Pos::from_cartesian(row as u8, col))
