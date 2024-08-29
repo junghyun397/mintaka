@@ -16,20 +16,15 @@ struct PatternInfo {
 
 impl Slice {
 
-    pub fn calculate_formation_patch(&self) -> SlicePatch {
+    pub fn calculate_slice_patch(&self) -> SlicePatch {
         todo!()
     }
 
-    fn find_pattern(&self) -> SlicePatch {
+    fn find_unidirectional_patterns(acc: &mut SlicePatch, black_stones: u8, white_stones: u8, wall: u8) -> SlicePatch {
         todo!()
     }
 
-    fn find_bidirectional_pattern(
-        &self,
-        black_stones: u8,
-        white_stones: u8,
-        wall: u8
-    ) -> SlicePatch {
+    fn find_bidirectional_patterns(acc: &mut SlicePatch, black_stones: u8, white_stones: u8, wall: u8) -> SlicePatch {
         todo!()
     }
 

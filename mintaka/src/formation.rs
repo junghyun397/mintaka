@@ -98,16 +98,10 @@ impl FormationUnit {
     }
 
     fn with_mask(&self, mask: u32) -> u32 {
-        let self_raw: u32 = unsafe {
-            std::mem::transmute(*self)
-        };
-
-        self_raw & mask
+        unsafe { std::mem::transmute::<_, u32>(*self) & mask }
     }
 
 }
-
-const U64_MASK: u64 = 0b1111_1111_0000_0000_0000_0000_0000_0000__1111_1111_0000_0000_0000_0000_0000_0000;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Formation {
@@ -145,11 +139,23 @@ impl Formation {
     }
 
     pub fn apply_mask_mut<const D: Direction>(mut self, patch: FormationPatch) {
-        unsafe {
-            let mask_raw: u64 = patch.black_patch as u64 >> D as usize | (patch.white_patch as u64 >> 32 + D as usize);
-            let mut self_raw: u64 = std::mem::transmute::<_, u64>(self) & !(U64_MASK >> D as usize);
-            self_raw = self_raw | mask_raw;
-            self = std::mem::transmute(self_raw);
+        match D {
+            Direction::Horizontal => {
+                self.black_formation.vertical = patch.black_patch;
+                self.white_formation.vertical = patch.white_patch;
+            },
+            Direction::Vertical => {
+                self.black_formation.horizontal = patch.black_patch;
+                self.white_formation.horizontal = patch.white_patch;
+            },
+            Direction::Ascending => {
+                self.black_formation.ascending = patch.black_patch;
+                self.white_formation.ascending = patch.white_patch;
+            },
+            Direction::Descending => {
+                self.black_formation.descending = patch.black_patch;
+                self.white_formation.descending = patch.white_patch;
+            }
         }
     }
 
@@ -172,10 +178,10 @@ impl Formations {
     pub fn update_with_slice_mut<const D: Direction, F>(&mut self, slice: &Slice, build_idx: F)
     where F: Fn(usize, &Pos) -> usize
     {
-        // for (offset, mask) in slice.calculate_formation_patch().into_iter().enumerate() {
-        //     let idx = build_idx(offset, &slice.start_pos);
-        //     self.0[idx].apply_mask_mut::<D>(mask);
-        // } TODO
+        for (offset, mask) in slice.calculate_slice_patch().into_iter().enumerate() {
+            let idx = build_idx(offset, &slice.start_pos);
+            self.0[idx].apply_mask_mut::<D>(mask);
+        }
     }
 
 }

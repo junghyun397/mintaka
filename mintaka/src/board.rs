@@ -83,7 +83,6 @@ impl Board {
     }
 
     //noinspection DuplicatedCode
-    #[inline(always)]
     fn incremental_update_mut(&mut self, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row() as usize];
         slice_mut_op(horizontal_slice, self.player_color, pos.col());
@@ -113,7 +112,6 @@ impl Board {
     }
 
     //noinspection DuplicatedCode
-    #[inline(always)]
     fn full_update_mut(&mut self) {
         for horizontal_slice in self.slices.horizontal_slices.iter() {
             self.formations.update_with_slice_mut::<{ Direction::Horizontal }, _>(horizontal_slice, |offset, start_pos|
