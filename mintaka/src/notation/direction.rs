@@ -1,7 +1,10 @@
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+use std::marker::ConstParamTy;
+
+#[derive(ConstParamTy, Debug, PartialEq, Eq, Copy, Clone)]
+#[repr(u8)]
 pub enum Direction {
     Horizontal = 0,
-    Vertical = 1,
-    Ascending = 2,
-    Descending = 3
+    Vertical = 8,
+    Ascending = 16,
+    Descending = 24
 }

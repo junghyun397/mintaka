@@ -82,55 +82,59 @@ impl Board {
         self.full_update_mut();
     }
 
+    //noinspection DuplicatedCode
+    #[inline(always)]
     fn incremental_update_mut(&mut self, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row() as usize];
-        slice_mut_op(horizontal_slice, self.player_color, pos.row());
-        self.formations.update_with_slice_mut(horizontal_slice, Direction::Horizontal, |offset, start_pos|
+        slice_mut_op(horizontal_slice, self.player_color, pos.col());
+        self.formations.update_with_slice_mut::<{ Direction::Horizontal }, _>(horizontal_slice, |offset, start_pos|
             cartesian_to_index(start_pos.row(), start_pos.col() + offset as u8) as usize
         );
 
         let vertical_slice = &mut self.slices.vertical_slices[pos.col() as usize];
-        slice_mut_op(vertical_slice, self.player_color, pos.col());
-        self.formations.update_with_slice_mut(vertical_slice, Direction::Vertical, |offset, start_pos|
+        slice_mut_op(vertical_slice, self.player_color, pos.row());
+        self.formations.update_with_slice_mut::<{ Direction::Vertical }, _>(vertical_slice, |offset, start_pos|
             cartesian_to_index(start_pos.row() + offset as u8, start_pos.col()) as usize
         );
 
         if let Some(ascending_slice) = self.slices.access_ascending_slice(pos) {
             slice_mut_op(ascending_slice, self.player_color, pos.col() - ascending_slice.start_pos.col());
-            self.formations.update_with_slice_mut(ascending_slice, Direction::Ascending, |offset, start_pos|
+            self.formations.update_with_slice_mut::<{ Direction::Ascending }, _>(ascending_slice, |offset, start_pos|
                 cartesian_to_index(start_pos.row() + offset as u8, start_pos.col() + offset as u8) as usize
             )
         }
 
         if let Some(descending_slice) = self.slices.access_descending_slice(pos) {
             slice_mut_op(descending_slice, self.player_color, pos.col() - descending_slice.start_pos.col());
-            self.formations.update_with_slice_mut(descending_slice, Direction::Descending, |offset, start_pos|
+            self.formations.update_with_slice_mut::<{ Direction::Descending }, _>(descending_slice, |offset, start_pos|
                 cartesian_to_index(start_pos.row() - offset as u8, start_pos.col() + offset as u8) as usize
             )
         }
     }
 
+    //noinspection DuplicatedCode
+    #[inline(always)]
     fn full_update_mut(&mut self) {
         for horizontal_slice in self.slices.horizontal_slices.iter() {
-            self.formations.update_with_slice_mut(horizontal_slice, Direction::Horizontal, |offset, start_pos|
+            self.formations.update_with_slice_mut::<{ Direction::Horizontal }, _>(horizontal_slice, |offset, start_pos|
                 cartesian_to_index(start_pos.row(), start_pos.col() + offset as u8) as usize
             );
         }
 
         for vertical_slice in self.slices.vertical_slices.iter() {
-            self.formations.update_with_slice_mut(vertical_slice, Direction::Vertical, |offset, start_pos|
+            self.formations.update_with_slice_mut::<{ Direction::Vertical }, _>(vertical_slice, |offset, start_pos|
                 cartesian_to_index(start_pos.row() + offset as u8, start_pos.col()) as usize
             );
         }
 
         for ascending_slice in self.slices.ascending_slices.iter() {
-            self.formations.update_with_slice_mut(ascending_slice, Direction::Ascending, |offset, start_pos|
+            self.formations.update_with_slice_mut::<{ Direction::Ascending }, _>(ascending_slice, |offset, start_pos|
                 cartesian_to_index(start_pos.row() + offset as u8, start_pos.col() + offset as u8) as usize
             )
         }
 
         for descending_slice in self.slices.descending_slices.iter() {
-            self.formations.update_with_slice_mut(descending_slice, Direction::Descending, |offset, start_pos|
+            self.formations.update_with_slice_mut::<{ Direction::Descending }, _>(descending_slice, |offset, start_pos|
                 cartesian_to_index(start_pos.row() - offset as u8, start_pos.col() + offset as u8) as usize
             )
         }

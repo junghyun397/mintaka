@@ -75,15 +75,15 @@ fn extract_color_stones(source: &Vec<FieldSymbol>, target_color: Color) -> Vec<P
 impl Board {
 
     pub fn render_attribute_board<F>(&self, transform: F) -> String
-    where
-        F: Fn(&Board, Pos) -> String
+    where F: Fn(&Board, Pos) -> String
     {
         let content = Vec::from_iter(0 .. rule::BOARD_SIZE)
             .chunks(U_BOARD_WIDTH)
             .enumerate()
             .map(|(row_idx, row)| {
                 let content: String = row.into_iter()
-                    .map(|&col_idx|
+                    .enumerate()
+                    .map(|(col_idx, _)|
                         transform(self, Pos::from_cartesian(row_idx as u8, col_idx as u8))
                     )
                     .reduce(|head, tail| {
@@ -91,8 +91,9 @@ impl Board {
                     })
                     .unwrap();
 
-                format!("{:-2} {content} {}", row_idx, row_idx).to_string()
+                format!("{:-2} {content} {}", row_idx + 1, row_idx + 1).to_string()
             })
+            .rev()
             .reduce(|head, tail|
                 format!("{head}\n{tail}")
             )
@@ -113,11 +114,11 @@ impl Display for Board {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.render_attribute_board(|board, pos| {
-            let row = board.slices.horizontal_slices[pos.row() as usize];
+            let slice = board.slices.horizontal_slices[pos.row() as usize];
 
-            let char = if row.black_stone_at(pos.col()) {
+            let char = if slice.black_stone_at(pos.col()) {
                 SYMBOL_BLACK
-            } else if row.white_stone_at(pos.col()) {
+            } else if slice.white_stone_at(pos.col()) {
                 SYMBOL_WHITE
             } else {
                 SYMBOL_EMPTY
@@ -278,7 +279,7 @@ impl FromStr for Pos {
             .map_err(|_| "Invalid row charter")
             .and_then(|row| {
                 let col = source.chars().next().unwrap() as u8 - 'a' as u8;
-                let pos = Pos::from_cartesian(row , col - 97);
+                let pos = Pos::from_cartesian(row - 1 , col);
                 if pos.col() < rule::BOARD_WIDTH && pos.row() < rule::BOARD_WIDTH {
                     Ok(pos)
                 } else { Err("Invalid range") }

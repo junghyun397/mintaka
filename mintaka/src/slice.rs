@@ -62,11 +62,13 @@ impl Slice {
     }
 
     pub fn black_stone_at(&self, idx: u8) -> bool {
-        self.black_stones & 0b1000_0000_0000_0000 >> idx == 0b1
+        let mask = 0b1000_0000_0000_0000 >> idx;
+        self.black_stones & mask == mask
     }
 
     pub fn white_stone_at(&self, idx: u8) -> bool {
-        self.white_stones & 0b1000_0000_0000_0000 >> idx == 0b1
+        let mask = 0b1000_0000_0000_0000 >> idx;
+        self.white_stones & mask == mask
     }
 
     pub fn stone_at(&self, color: &Color, idx: u8) -> bool {

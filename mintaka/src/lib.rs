@@ -1,3 +1,6 @@
+#![feature(adt_const_params)]
+#![allow(incomplete_features)]
+
 pub mod board;
 pub mod board_io;
 pub mod slice;

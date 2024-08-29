@@ -2,28 +2,43 @@ use crate::notation::direction::Direction;
 use crate::notation::forbidden_kind::ForbiddenKind;
 use crate::notation::pos::Pos;
 use crate::notation::rule;
+use crate::pattern::FormationPatch;
 use crate::slice::Slice;
 
-const OPEN_THREE_MASK: u16 = 0b1111_0000_0000_0000;
-const CLOSE_THREE_MASK: u16 = 0b0000_1111_0000_0000;
-const OPEN_FOUR_MASK: u16 = 0b0000_0000_1111_0000;
-const FIVE_MASK: u16 = 0b0000_0000_0000_1111;
+const CLOSED_FOUR_SINGLE_MASK: u8   = 0b1000_0000;
+const CLOSED_FOUR_DOUBLE_MASK: u8   = 0b1100_0000;
+const OPEN_FOUR_MASK: u8            = 0b0010_0000;
+const TOTAL_FOUR_MASK: u8           = 0b1110_0000;
 
-// 32-bit
+const OPEN_THREE_MASK: u8           = 0b0000_1000;
+const CLOSE_THREE_MASK: u8          = 0b0000_0100;
+const FIVE_MASK: u8                 = 0b0000_0010;
+const OVERLINE_MASK: u8             = 0b0000_0001;
+
+const UNIT_TOTAL_FOUR_MASK: u32     = 0b1110_0000__1110_0000__1110_0000__1110_0000;
+
+const UNIT_OPEN_THREE_MASK: u32     = 0b0000_1000__0000_1000__0000_1000__0000_1000;
+const UNIT_CLOSE_THREE_MASK: u32    = 0b0000_0100__0000_0100__0000_0100__0000_0100;
+const UNIT_FIVE_MASK: u32           = 0b0000_0010__0000_0010__0000_0010__0000_0010;
+const UNIT_OVERLINE_MASK: u32       = 0b0000_0001__0000_0001__0000_0001__0000_0001;
+
+// 8-bit: closed-4-1 closed-4-2 open-4 padding _ open-3 close-3 five overline
 #[derive(Debug, Copy, Clone)]
 pub struct FormationUnit {
-    pub o3_c3_o4_5: u16,
-    pub closed_four: u8,
-    pub etc: u8,
+    pub horizontal: u8,
+    pub vertical: u8,
+    pub ascending: u8,
+    pub descending: u8
 }
 
 impl Default for FormationUnit {
 
     fn default() -> Self {
         Self {
-            o3_c3_o4_5: 0,
-            closed_four: 0,
-            etc: 0
+            horizontal: 0,
+            vertical: 0,
+            ascending: 0,
+            descending: 0
         }
     }
 
@@ -31,29 +46,68 @@ impl Default for FormationUnit {
 
 impl FormationUnit {
 
-    fn count_open_threes(&self) -> u32 {
-        (self.o3_c3_o4_5 & OPEN_THREE_MASK).count_ones()
+    pub fn open_three_at<const D: Direction>(&self) -> bool {
+        self.with_mask_at::<D>(OPEN_THREE_MASK)
     }
 
-    fn count_close_threes(&self) -> u32 {
-        (self.o3_c3_o4_5 & CLOSE_THREE_MASK).count_ones()
+    pub fn close_three_at<const D: Direction>(&self) -> bool {
+        self.with_mask_at::<D>(CLOSE_THREE_MASK)
     }
 
-    fn count_open_fours(&self) -> u32 {
-        (self.o3_c3_o4_5 & OPEN_FOUR_MASK).count_ones()
+    pub fn open_four_at<const D: Direction>(&self) -> bool {
+        self.with_mask_at::<D>(OPEN_FOUR_MASK)
     }
 
-    fn count_fives(&self) -> u32 {
-        (self.o3_c3_o4_5 & FIVE_MASK).count_ones()
+    pub fn five_at<const D: Direction>(&self) -> bool {
+        self.with_mask_at::<D>(FIVE_MASK)
     }
 
-    fn count_closed_fours(&self) -> u32 {
-        self.closed_four.count_ones()
+    pub fn closed_four_at<const D: Direction>(&self) -> bool {
+        self.with_mask_at::<D>(CLOSED_FOUR_SINGLE_MASK)
+    }
+
+    fn with_mask_at<const D: Direction>(&self, mask: u8) -> bool {
+        let encoded = match D {
+            Direction::Horizontal => self.horizontal,
+            Direction::Vertical => self.vertical,
+            Direction::Ascending => self.ascending,
+            Direction::Descending => self.descending
+        };
+
+        encoded & mask == mask
+    }
+
+    pub fn count_open_threes(&self) -> u32 {
+        self.with_mask(UNIT_OPEN_THREE_MASK).count_ones()
+    }
+
+    pub fn count_close_threes(&self) -> u32 {
+        self.with_mask(UNIT_CLOSE_THREE_MASK).count_ones()
+    }
+
+    pub fn count_fours(&self) -> u32 {
+        self.with_mask(UNIT_TOTAL_FOUR_MASK).count_ones()
+    }
+
+    pub fn has_five(&self) -> bool {
+        self.with_mask(UNIT_FIVE_MASK) > 0
+    }
+
+    pub fn has_overline(&self) -> bool {
+        self.with_mask(UNIT_OVERLINE_MASK) > 0
+    }
+
+    fn with_mask(&self, mask: u32) -> u32 {
+        let self_raw: u32 = unsafe {
+            std::mem::transmute(*self)
+        };
+
+        self_raw & mask
     }
 
 }
 
-const U64_MASK: u64 = 0b1000_1000_1000_1000__1000_1000_1000_1000__1000_1000_1000_1000__1000_1000_1000_1000;
+const U64_MASK: u64 = 0b1111_1111_0000_0000_0000_0000_0000_0000__1111_1111_0000_0000_0000_0000_0000_0000;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Formation {
@@ -79,29 +133,27 @@ impl Formation {
     }
 
     pub fn forbidden_kind(&self) -> Option<ForbiddenKind> {
-        if (self.black_formation.o3_c3_o4_5 & OPEN_THREE_MASK).count_ones() > 1 {
+        if self.black_formation.count_open_threes() > 1 {
             Some(ForbiddenKind::DoubleThree)
-        } else if (self.black_formation.o3_c3_o4_5 & OPEN_FOUR_MASK).count_ones()
-            + self.black_formation.closed_four.count_ones() > 1 {
+        } else if self.black_formation.count_fours() > 1 {
             Some(ForbiddenKind::DoubleFour)
+        } else if self.black_formation.has_overline() {
+            Some(ForbiddenKind::Overline)
         } else {
             None
         }
     }
 
-    pub fn apply_mask(self, direction: Direction, mask: Self) -> Self {
+    pub fn apply_mask_mut<const D: Direction>(mut self, patch: FormationPatch) {
         unsafe {
-            let mut mask_raw: u64 = std::mem::transmute(mask);
-            mask_raw = mask_raw >> direction as usize;
-            let mut self_raw: u64 = std::mem::transmute(self);
-            self_raw = self_raw & !(U64_MASK >> direction as usize) | mask_raw;
-            std::mem::transmute(self_raw)
+            let mask_raw: u64 = patch.black_patch as u64 >> D as usize | (patch.white_patch as u64 >> 32 + D as usize);
+            let mut self_raw: u64 = std::mem::transmute::<_, u64>(self) & !(U64_MASK >> D as usize);
+            self_raw = self_raw | mask_raw;
+            self = std::mem::transmute(self_raw);
         }
     }
 
 }
-
-pub type FormationLine = [Formation; rule::U_BOARD_WIDTH];
 
 #[derive(Debug, Copy, Clone)]
 pub struct Formations(pub [Formation; rule::BOARD_SIZE]);
@@ -117,60 +169,13 @@ impl Default for Formations {
 impl Formations {
 
     #[inline(always)]
-    pub fn update_with_slice_mut<F>(&mut self, slice: &Slice, direction: Direction, build_idx: F)
+    pub fn update_with_slice_mut<const D: Direction, F>(&mut self, slice: &Slice, build_idx: F)
     where F: Fn(usize, &Pos) -> usize
     {
-        for (offset, mask) in slice.calculate_formation_masks().into_iter().enumerate() {
-            let idx = build_idx(offset, &slice.start_pos);
-            self.0[idx] = self.0[idx].apply_mask(direction, mask);
-        }
+        // for (offset, mask) in slice.calculate_formation_patch().into_iter().enumerate() {
+        //     let idx = build_idx(offset, &slice.start_pos);
+        //     self.0[idx].apply_mask_mut::<D>(mask);
+        // } TODO
     }
-
-}
-
-pub mod preset {
-    use crate::formation::FormationUnit;
-
-    pub const OPEN_THREE: FormationUnit = FormationUnit {
-        o3_c3_o4_5: 0b1000_0000_0000_0000,
-        closed_four: 0b0,
-        etc: 0b0,
-    };
-
-    pub const CLOSE_THREE: FormationUnit = FormationUnit {
-        o3_c3_o4_5: 0b0000_1000_0000_0000,
-        closed_four: 0b0,
-        etc: 0b0,
-    };
-
-    pub const OPEN_FOUR: FormationUnit = FormationUnit {
-        o3_c3_o4_5: 0b0000_0000_1000_0000,
-        closed_four: 0b0,
-        etc: 0b0,
-    };
-
-    pub const FIVE: FormationUnit = FormationUnit {
-        o3_c3_o4_5: 0b0000_0000_0000_1000,
-        closed_four: 0b0,
-        etc: 0b0,
-    };
-
-    pub const CLOSED_FOUR_SINGLE: FormationUnit = FormationUnit {
-        o3_c3_o4_5: 0b0000_0000_0000_0000,
-        closed_four: 0b1000_0000,
-        etc: 0b0,
-    };
-
-    pub const CLOSED_FOUR_DOUBLE: FormationUnit = FormationUnit {
-        o3_c3_o4_5: 0b0000_0000_0000_0000,
-        closed_four: 0b1000_1000,
-        etc: 0b0,
-    };
-
-    pub const OVERLINE: FormationUnit = FormationUnit {
-        o3_c3_o4_5: 0b0000_0000_0000_0000,
-        closed_four: 0b0000_0000,
-        etc: 0b1000_0000,
-    };
 
 }

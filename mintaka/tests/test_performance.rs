@@ -2,15 +2,18 @@
 mod test_performance {
     use mintaka::board::Board;
     use mintaka::formation::{Formation, Formations};
+    use mintaka::pattern::{FormationPatch, SlicePatch};
     use mintaka::slice::{Slice, Slices};
 
     #[test]
     fn test_size() {
-        println!("slice size: {} bytes", size_of::<Slice>());
-        println!("slices size: {} bytes", size_of::<Slices>());
-        println!("formation size: {} bytes", size_of::<Formation>());
-        println!("formations size: {} bytes", size_of::<Formations>());
-        println!("board size: {} bytes", size_of::<Board>());
+        assert_eq!(size_of::<Slice>(), 6);
+        assert_eq!(size_of::<Slices>(), 432);
+        assert_eq!(size_of::<Formation>(), 8);
+        assert_eq!(size_of::<Formations>(), 1800);
+        assert_eq!(size_of::<Board>(), 2248);
+        assert_eq!(size_of::<FormationPatch>(), 2);
+        assert_eq!(size_of::<SlicePatch>(), 30)
     }
 
 }

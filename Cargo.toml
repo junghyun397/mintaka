@@ -1,6 +1,7 @@
 [workspace]
 members = ["mintaka", "mintaka_engine"]
 default-members = ["mintaka", "mintaka_engine"]
+workspace.resolver = "2"
 
 [profile.release]
 opt-level = 3
