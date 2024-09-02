@@ -1,4 +1,7 @@
-#[derive(PartialEq, Eq, Clone, Copy)]
+use std::marker::ConstParamTy;
+
+//noinspection RsUnresolvedPath
+#[derive(ConstParamTy, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Color {
     Black,
     White

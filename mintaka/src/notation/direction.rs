@@ -1,6 +1,7 @@
 use std::marker::ConstParamTy;
 
-#[derive(ConstParamTy, Debug, PartialEq, Eq, Copy, Clone)]
+//noinspection RsUnresolvedPath
+#[derive(ConstParamTy, PartialEq, Eq, Copy, Clone, Debug)]
 #[repr(u8)]
 pub enum Direction {
     Horizontal = 0,

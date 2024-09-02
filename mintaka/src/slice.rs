@@ -14,8 +14,8 @@ const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
 pub struct Slice {
     pub length: u8,
     pub start_pos: Pos,
-    pub black_stones: u16,
-    pub white_stones: u16
+    black_stones: u16,
+    white_stones: u16
 }
 
 pub type SliceKey = u32;
@@ -78,6 +78,16 @@ impl Slice {
         }
     }
 
+    pub fn stone_kind(&self, idx: u8) -> Option<Color> {
+        if self.black_stone_at(idx) {
+            Some(Color::Black)
+        } else if self.white_stone_at(idx) {
+            Some(Color::White)
+        } else {
+            None
+        }
+    }
+
     pub fn slice_key(&self) -> SliceKey {
         self.black_stones as u32 | self.white_stones as u32 >> rule::BOARD_WIDTH
     }
@@ -127,22 +137,22 @@ impl Default for Slices {
 impl Slices {
 
     pub fn set_mut(&mut self, color: Color, pos: Pos) {
-        self.horizontal_slices[pos.row() as usize].set_mut(color, pos.col());
-        self.vertical_slices[pos.col() as usize].set_mut(color, pos.row());
+        self.horizontal_slices[pos.row_usize()].set_mut(color, pos.col());
+        self.vertical_slices[pos.col_usize()].set_mut(color, pos.row());
 
-        if let Some(ascending_slice) = self.access_ascending_slice(pos) {
+        if let Some(ascending_slice) = self.occupy_ascending_slice(pos) {
             ascending_slice.set_mut(color, pos.col() - ascending_slice.start_pos.col())
         }
 
-        if let Some(descending_slice) = self.access_descending_slice(pos) {
+        if let Some(descending_slice) = self.occupy_descending_slice(pos) {
             descending_slice.set_mut(color, pos.col() - descending_slice.start_pos.col())
         }
     }
 
-    pub fn access_slice(&self, direction: Direction, pos: Pos) -> Option<&Slice> {
-        match direction {
-            Direction::Horizontal => Some(&self.horizontal_slices[pos.row() as usize]),
-            Direction::Vertical => Some(&self.vertical_slices[pos.col() as usize]),
+    pub fn access_slice<const D: Direction>(&self, pos: Pos) -> Option<&Slice> {
+        match D {
+            Direction::Horizontal => Some(&self.horizontal_slices[pos.row_usize()]),
+            Direction::Vertical => Some(&self.vertical_slices[pos.col_usize()]),
             Direction::Ascending => {
                 Self::ascending_slice_idx(pos)
                     .map(|idx| &self.ascending_slices[idx])
@@ -154,12 +164,12 @@ impl Slices {
         }
     }
 
-    pub fn access_ascending_slice(&mut self, pos: Pos) -> Option<&mut Slice> {
+    pub fn occupy_ascending_slice(&mut self, pos: Pos) -> Option<&mut Slice> {
         Self::ascending_slice_idx(pos)
             .map(|idx| &mut self.ascending_slices[idx])
     }
 
-    pub fn access_descending_slice(&mut self, pos: Pos) -> Option<&mut Slice> {
+    pub fn occupy_descending_slice(&mut self, pos: Pos) -> Option<&mut Slice> {
         Self::descending_slice_idx(pos)
             .map(|idx| &mut self.descending_slices[idx])
     }

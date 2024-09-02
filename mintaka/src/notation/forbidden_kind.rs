@@ -1,6 +1,6 @@
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum ForbiddenKind {
-    DoubleThree = 0b0100,
-    DoubleFour = 0b0010,
-    Overline = 0b0001,
+    DoubleThree,
+    DoubleFour,
+    Overline,
 }

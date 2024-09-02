@@ -3,6 +3,7 @@ use crate::cache::hash_table::EMPTY_HASH;
 use crate::notation::color::Color;
 use crate::notation::pos::Pos;
 use crate::notation::rule;
+use crate::notation::rule::U_BOARD_WIDTH;
 use crate::slice::Slice;
 
 #[derive(Copy, Clone)]
@@ -11,13 +12,13 @@ pub struct HashKey(u64);
 impl HashKey {
 
     pub fn set(self, color: Color, pos: Pos) -> Self {
-        self.set_idx(color, pos.idx() as usize)
+        self.set_idx(color, pos.idx_usize())
     }
 
     pub fn set_idx(self, color: Color, idx: usize) -> Self {
         HashKey(self.0 ^ hash_table::TABLE[match color {
             Color::Black => idx,
-            Color::White => rule::BOARD_SIZE as usize + idx,
+            Color::White => rule::BOARD_SIZE + idx,
         }])
     }
 
@@ -31,10 +32,10 @@ impl Default for HashKey {
 
 }
 
-impl Into<HashKey> for [Slice; rule::U_BOARD_WIDTH] {
+impl From<&[Slice; U_BOARD_WIDTH]> for HashKey {
 
-    fn into(self) -> HashKey {
-        self.iter()
+    fn from(value: &[Slice; U_BOARD_WIDTH]) -> Self {
+        value.iter()
             .enumerate()
             .fold(HashKey::default(), |mut key, (row, slice)| {
                 for col in 0 .. rule::BOARD_WIDTH {
@@ -48,13 +49,4 @@ impl Into<HashKey> for [Slice; rule::U_BOARD_WIDTH] {
                 key
             })
     }
-
-}
-
-impl Into<HashKey> for Slice {
-
-    fn into(self) -> HashKey {
-        HashKey(self.black_stones as u64 | (self.white_stones as u64 >> 16))
-    }
-
 }

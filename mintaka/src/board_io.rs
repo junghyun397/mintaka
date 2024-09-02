@@ -1,11 +1,15 @@
 use crate::board::Board;
+use crate::board_iter::BoardIterItem;
+use crate::formation::FormationUnit;
 use crate::game::Game;
 use crate::notation::color::Color;
+use crate::notation::forbidden_kind::ForbiddenKind;
 use crate::notation::history::History;
 use crate::notation::pos::Pos;
 use crate::notation::rule;
 use crate::notation::rule::U_BOARD_WIDTH;
 use crate::slice::Slice;
+use crate::utils::str_utils::join_str_horizontally;
 use regex_lite::Regex;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
@@ -21,6 +25,27 @@ const SYMBOL_FORBID_OVERLINE: char = '6';
 enum FieldSymbol {
     Stone(Color),
     Empty
+}
+
+impl Debug for FieldSymbol {
+
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", {
+            match self {
+                FieldSymbol::Stone(color) => char::from(*color).to_string(),
+                FieldSymbol::Empty => SYMBOL_EMPTY.to_string()
+            }
+        })
+    }
+
+}
+
+impl Display for FieldSymbol {
+
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(self, f)
+    }
+
 }
 
 fn match_symbol(c: char) -> Option<FieldSymbol> {
@@ -75,16 +100,17 @@ fn extract_color_stones(source: &Vec<FieldSymbol>, target_color: Color) -> Vec<P
 impl Board {
 
     pub fn render_attribute_board<F>(&self, transform: F) -> String
-    where F: Fn(&Board, Pos) -> String
+    where F: Fn(&BoardIterItem) -> String
     {
-        let content = Vec::from_iter(0 .. rule::BOARD_SIZE)
+        let content = self.iter_items()
+            .collect::<Vec<_>>()
             .chunks(U_BOARD_WIDTH)
             .enumerate()
-            .map(|(row_idx, row)| {
-                let content: String = row.into_iter()
+            .map(|(row_idx, item_row)| {
+                let content: String = item_row.into_iter()
                     .enumerate()
-                    .map(|(col_idx, _)|
-                        transform(self, Pos::from_cartesian(row_idx as u8, col_idx as u8))
+                    .map(|(col_idx, item)|
+                        transform(item)
                     )
                     .reduce(|head, tail| {
                         format!("{head} {tail}").to_string()
@@ -99,8 +125,9 @@ impl Board {
             )
             .unwrap();
 
-        let column_hint_content: String = (65u8 .. 65u8 + rule::BOARD_WIDTH)
-            .flat_map(|x| [x as char, ' '])
+        let column_hint_content: String = ('A' .. ('A' as u8 + rule::BOARD_WIDTH) as char)
+            .flat_map(|x| [x, ' '])
+            .take(U_BOARD_WIDTH * 2 - 1)
             .collect();
 
         let column_hint = format!("   {column_hint_content}");
@@ -108,24 +135,65 @@ impl Board {
         format!("{column_hint}\n{content}\n{column_hint}").into()
     }
 
+    pub fn render_debug_board(&self, split: bool) -> String {
+        fn render_single_side<const C: Color>(board: &Board, split: bool) -> String {
+            fn render_formation<const C: Color>(board: &Board, extract: fn(&FormationUnit) -> u32) -> String {
+                board.render_attribute_board(|item| {
+                    match item {
+                        BoardIterItem::Stone(color) => char::from(*color).to_string(),
+                        BoardIterItem::Formation(formation) => {
+                            let count = extract(formation.access_unit::<C>());
+
+                            if count > 0 {
+                                count.to_string()
+                            } else {
+                                SYMBOL_EMPTY.to_string()
+                            }
+                        }
+                    }
+                })
+            }
+
+            let open_three = format!("open_three\n{}", render_formation::<C>(board, FormationUnit::count_open_threes));
+            let core_three = format!("core_three\n{}", render_formation::<C>(board, FormationUnit::count_core_threes));
+            let close_three = format!("close_three\n{}", render_formation::<C>(board, FormationUnit::count_close_threes));
+
+            let closed_four = format!("closed_four\n{}", render_formation::<C>(board, FormationUnit::count_closed_fours));
+            let open_four = format!("open_four\n{}", render_formation::<C>(board, FormationUnit::count_open_fours));
+            let five = format!("five\n{}", render_formation::<C>(board, FormationUnit::count_fives));
+
+            if split {
+                format!(
+                    "{}\n{}",
+                    join_str_horizontally(&[&open_three, &core_three, &close_three]),
+                    join_str_horizontally(&[&closed_four, &open_four, &five])
+                )
+            } else {
+                join_str_horizontally(&[&open_three, &core_three, &close_three, &closed_four, &open_four, &five])
+            }
+        }
+
+        format!(
+            "{}\nblack\n{}\nwhite\n{}", self,
+            render_single_side::<{ Color::Black }>(self, split),
+            render_single_side::<{ Color::White }>(self, split)
+        )
+    }
+
 }
 
 impl Display for Board {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.render_attribute_board(|board, pos| {
-            let slice = board.slices.horizontal_slices[pos.row() as usize];
-
-            let char = if slice.black_stone_at(pos.col()) {
-                SYMBOL_BLACK
-            } else if slice.white_stone_at(pos.col()) {
-                SYMBOL_WHITE
-            } else {
-                SYMBOL_EMPTY
-            };
-
-            char.to_string()
-        }))
+        write!(f, "{}", self.render_attribute_board(|item|
+            match item {
+                BoardIterItem::Stone(color) => char::from(*color).to_string(),
+                BoardIterItem::Formation(formation) =>
+                    formation.forbidden_kind()
+                        .map(|kind| char::from(kind).to_string())
+                        .unwrap_or_else(|| SYMBOL_EMPTY.to_string())
+            }
+        ))
     }
 
 }
@@ -185,21 +253,18 @@ impl Display for Slice {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let content = (0 .. self.length).into_iter()
             .map(|idx| {
-                let symbol = if self.black_stone_at(idx) {
+                if self.black_stone_at(idx) {
                     SYMBOL_BLACK
                 } else if self.white_stone_at(idx) {
                     SYMBOL_WHITE
                 } else {
                     SYMBOL_EMPTY
-                };
-
-                symbol
+                }.to_string()
             })
-            .rfold(String::new(), |mut acc, symbol| {
-                acc.push(symbol);
-                acc.push(' ');
-                acc
-            });
+            .reduce(|head, tail|
+                format!("{} {}", head, tail)
+            )
+            .unwrap();
 
         write!(f, "{}", content)
     }
@@ -240,17 +305,17 @@ impl FromStr for History {
 
 }
 
-impl Into<Game> for History {
+impl From<History> for Game {
 
-    fn into(self) -> Game {
-        let blacks: Vec<Pos> = self.0.iter()
+    fn from(history: History) -> Self {
+        let blacks: Vec<Pos> = history.0.iter()
             .enumerate()
             .filter_map(|(idx, pos)| pos
                 .filter(|_| idx % 2 == 0)
             )
             .collect();
 
-        let whites: Vec<Pos> = self.0.iter()
+        let whites: Vec<Pos> = history.0.iter()
             .enumerate()
             .filter_map(|(idx, pos)| pos
                 .filter(|_| idx % 2 == 1)
@@ -259,7 +324,7 @@ impl Into<Game> for History {
 
         let mut game = Game {
             board: Board::default(),
-            history: self,
+            history,
             result: None
         };
 
@@ -291,7 +356,7 @@ impl FromStr for Pos {
 impl Debug for Pos {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", (self.col() + 97) as char, self.row() + 1)
+        write!(f, "{}{}", (self.col() + 'a' as u8) as char, self.row() + 1)
     }
 
 }
@@ -304,18 +369,25 @@ impl Display for Pos {
 
 }
 
-impl Debug for Color {
+impl From<Color> for char {
 
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", if self == &Color::Black { SYMBOL_BLACK } else { SYMBOL_WHITE })
+    fn from(value: Color) -> Self {
+        match value {
+            Color::Black => SYMBOL_BLACK,
+            Color::White => SYMBOL_WHITE
+        }
     }
 
 }
 
-impl Display for Color {
+impl From<ForbiddenKind> for char {
 
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self, f)
+    fn from(value: ForbiddenKind) -> Self {
+        match value {
+            ForbiddenKind::DoubleThree => SYMBOL_FORBID_DOUBLE_THREE,
+            ForbiddenKind::DoubleFour => SYMBOL_FORBID_DOUBLE_FOUR,
+            ForbiddenKind::Overline => SYMBOL_FORBID_OVERLINE
+        }
     }
 
 }

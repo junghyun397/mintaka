@@ -1,7 +1,7 @@
-use mintaka::board::Board;
 use crate::eval::score::Score;
+use mintaka::board::Board;
 
-pub trait Evaluator : Default {
+pub trait Evaluator {
 
     fn eval(&self, board: &Board) -> Score;
 

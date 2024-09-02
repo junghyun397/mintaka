@@ -2,7 +2,7 @@ use crate::cache::hash_key::HashKey;
 use crate::formation::Formations;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
-use crate::notation::pos::{cartesian_to_index, Pos};
+use crate::notation::pos::Pos;
 use crate::slice::{Slice, Slices};
 
 // 1344-Bytes
@@ -31,6 +31,10 @@ impl Board {
 
     pub fn opponent_color(&self) -> Color {
         self.player_color.reversed()
+    }
+
+    pub fn stone_kind(&self, pos: Pos) -> Option<Color> {
+        self.slices.vertical_slices[pos.row_usize()].stone_kind(pos.col())
     }
 
     pub fn set(&self, pos: Pos) -> Self {
@@ -82,59 +86,42 @@ impl Board {
         self.full_update_mut();
     }
 
-    //noinspection DuplicatedCode
+    #[inline(always)]
     fn incremental_update_mut(&mut self, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
-        let horizontal_slice = &mut self.slices.horizontal_slices[pos.row() as usize];
+        let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
         slice_mut_op(horizontal_slice, self.player_color, pos.col());
-        self.formations.update_with_slice_mut::<{ Direction::Horizontal }, _>(horizontal_slice, |offset, start_pos|
-            cartesian_to_index(start_pos.row(), start_pos.col() + offset as u8) as usize
-        );
+        self.formations.update_with_slice_mut::<{ Direction::Horizontal }>(horizontal_slice);
 
-        let vertical_slice = &mut self.slices.vertical_slices[pos.col() as usize];
+        let vertical_slice = &mut self.slices.vertical_slices[pos.col_usize()];
         slice_mut_op(vertical_slice, self.player_color, pos.row());
-        self.formations.update_with_slice_mut::<{ Direction::Vertical }, _>(vertical_slice, |offset, start_pos|
-            cartesian_to_index(start_pos.row() + offset as u8, start_pos.col()) as usize
-        );
+        self.formations.update_with_slice_mut::<{ Direction::Vertical }>(vertical_slice);
 
-        if let Some(ascending_slice) = self.slices.access_ascending_slice(pos) {
+        if let Some(ascending_slice) = self.slices.occupy_ascending_slice(pos) {
             slice_mut_op(ascending_slice, self.player_color, pos.col() - ascending_slice.start_pos.col());
-            self.formations.update_with_slice_mut::<{ Direction::Ascending }, _>(ascending_slice, |offset, start_pos|
-                cartesian_to_index(start_pos.row() + offset as u8, start_pos.col() + offset as u8) as usize
-            )
+            self.formations.update_with_slice_mut::<{ Direction::Ascending }>(ascending_slice);
         }
 
-        if let Some(descending_slice) = self.slices.access_descending_slice(pos) {
+        if let Some(descending_slice) = self.slices.occupy_descending_slice(pos) {
             slice_mut_op(descending_slice, self.player_color, pos.col() - descending_slice.start_pos.col());
-            self.formations.update_with_slice_mut::<{ Direction::Descending }, _>(descending_slice, |offset, start_pos|
-                cartesian_to_index(start_pos.row() - offset as u8, start_pos.col() + offset as u8) as usize
-            )
+            self.formations.update_with_slice_mut::<{ Direction::Descending }>(descending_slice);
         }
     }
 
-    //noinspection DuplicatedCode
     fn full_update_mut(&mut self) {
         for horizontal_slice in self.slices.horizontal_slices.iter() {
-            self.formations.update_with_slice_mut::<{ Direction::Horizontal }, _>(horizontal_slice, |offset, start_pos|
-                cartesian_to_index(start_pos.row(), start_pos.col() + offset as u8) as usize
-            );
+            self.formations.update_with_slice_mut::<{ Direction::Horizontal }>(horizontal_slice);
         }
 
         for vertical_slice in self.slices.vertical_slices.iter() {
-            self.formations.update_with_slice_mut::<{ Direction::Vertical }, _>(vertical_slice, |offset, start_pos|
-                cartesian_to_index(start_pos.row() + offset as u8, start_pos.col()) as usize
-            );
+            self.formations.update_with_slice_mut::<{ Direction::Vertical }>(vertical_slice);
         }
 
         for ascending_slice in self.slices.ascending_slices.iter() {
-            self.formations.update_with_slice_mut::<{ Direction::Ascending }, _>(ascending_slice, |offset, start_pos|
-                cartesian_to_index(start_pos.row() + offset as u8, start_pos.col() + offset as u8) as usize
-            )
+            self.formations.update_with_slice_mut::<{ Direction::Ascending }>(ascending_slice);
         }
 
         for descending_slice in self.slices.descending_slices.iter() {
-            self.formations.update_with_slice_mut::<{ Direction::Descending }, _>(descending_slice, |offset, start_pos|
-                cartesian_to_index(start_pos.row() - offset as u8, start_pos.col() + offset as u8) as usize
-            )
+            self.formations.update_with_slice_mut::<{ Direction::Descending }>(descending_slice);
         }
     }
 

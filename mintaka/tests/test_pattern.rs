@@ -1,5 +1,8 @@
 #[cfg(test)]
-mod test_slice {
+mod test_pattern {
+
+    // Convention:
+    // open-three = 3, close-three = $, open-four
 
     #[test]
     fn basic_test() {
@@ -13,6 +16,7 @@ mod test_slice {
 
     #[test]
     fn complex_three() {
+        // . O O O . . .
         todo!()
     }
 

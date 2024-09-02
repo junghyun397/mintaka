@@ -1,15 +1,14 @@
 #[cfg(test)]
 mod test_board {
-    use std::str::FromStr;
     use mintaka::board::Board;
     use mintaka::notation::pos::Pos;
+    use std::str::FromStr;
 
     #[test]
     fn test_play() {
         let mut board = Board::default();
         board.set_mut(Pos::from_str("h8").unwrap());
-        board.set_mut(Pos::from_str("h8").unwrap());
-        println!("{}", board)
+        println!("{}", board.render_debug_board(false))
     }
 
     #[test]

@@ -13,3 +13,4 @@ pub mod utils;
 pub mod opening;
 pub mod formation;
 pub mod pattern;
+mod board_iter;
