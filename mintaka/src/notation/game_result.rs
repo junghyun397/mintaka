@@ -1,5 +1,8 @@
+use crate::notation::color::Color;
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum GameResult {
-    FiveInARow = 0,
-    Full = 1
+    FiveInARow(Color),
+    Resign(Color),
+    Full,
 }

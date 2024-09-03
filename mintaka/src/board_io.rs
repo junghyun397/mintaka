@@ -22,6 +22,9 @@ const SYMBOL_FORBID_DOUBLE_THREE: char = '3';
 const SYMBOL_FORBID_DOUBLE_FOUR: char = '4';
 const SYMBOL_FORBID_OVERLINE: char = '6';
 
+const HISTORY_SYMBOL_SEPARATOR: &str = ",";
+const HISTORY_SYMBOL_PASS: &str = "PASS";
+
 enum FieldSymbol {
     Stone(Color),
     Empty
@@ -82,7 +85,7 @@ fn parse_board_elements(source: &str) -> Result<Vec<FieldSymbol>, &'static str> 
     Ok(elements)
 }
 
-fn extract_color_stones(source: &Vec<FieldSymbol>, target_color: Color) -> Vec<Pos> {
+fn extract_color_stones(source: &[FieldSymbol], target_color: Color) -> Vec<Pos> {
     source.iter()
         .enumerate()
         .filter_map(|(idx, symbol)| match symbol {
@@ -103,7 +106,7 @@ impl Board {
     where F: Fn(&BoardIterItem) -> String
     {
         let content = self.iter_items()
-            .collect::<Vec<_>>()
+            .collect::<Box<[_]>>()
             .chunks(U_BOARD_WIDTH)
             .enumerate()
             .map(|(row_idx, item_row)| {
@@ -112,9 +115,9 @@ impl Board {
                     .map(|(col_idx, item)|
                         transform(item)
                     )
-                    .reduce(|head, tail| {
+                    .reduce(|head, tail|
                         format!("{head} {tail}").to_string()
-                    })
+                    )
                     .unwrap();
 
                 format!("{:-2} {content} {}", row_idx + 1, row_idx + 1).to_string()
@@ -223,7 +226,7 @@ impl FromStr for Slice {
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        let fields: Vec<FieldSymbol> = source.chars()
+        let fields: Box<[FieldSymbol]> = source.chars()
             .filter_map(|x| match_symbol(x))
             .collect();
 
@@ -238,7 +241,7 @@ impl FromStr for Slice {
                 Slice::empty(field_len, Pos::from_index(0)),
                 |acc, (idx, field)| {
                     match field {
-                        FieldSymbol::Stone(color) => acc.set(color, idx as u8),
+                        FieldSymbol::Stone(color) => acc.set(*color, idx as u8),
                         _ => acc
                     }
                 }
@@ -252,17 +255,14 @@ impl Display for Slice {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let content = (0 .. self.length).into_iter()
-            .map(|idx| {
-                if self.black_stone_at(idx) {
-                    SYMBOL_BLACK
-                } else if self.white_stone_at(idx) {
-                    SYMBOL_WHITE
-                } else {
-                    SYMBOL_EMPTY
+            .map(|idx|
+                match self.stone_kind(idx) {
+                    Some(color) => char::from(color),
+                    None => SYMBOL_EMPTY
                 }.to_string()
-            })
+            )
             .reduce(|head, tail|
-                format!("{} {}", head, tail)
+                format!("{head} {tail}")
             )
             .unwrap();
 
@@ -274,7 +274,18 @@ impl Display for Slice {
 impl Display for History {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", todo!())
+        let history = self.0.iter()
+            .map(|mv|
+                match mv {
+                    Some(pos) => pos.to_string(),
+                    None => HISTORY_SYMBOL_PASS.to_string()
+                }
+            )
+            .reduce(|head, tail|
+                format!("{head}{HISTORY_SYMBOL_SEPARATOR} {tail}")
+            )
+            .unwrap();
+        write!(f, "{history}")
     }
 
 }
@@ -287,7 +298,7 @@ impl FromStr for History {
         // regex: [a-z][0-9][0-9]?
         let re: Regex = Regex::from_str(r"[a-z][0-9][0-9]?").unwrap();
 
-        let history: Vec<Result<Pos, &str>> = re.find_iter(source)
+        let history: Box<[Result<Pos, &str>]> = re.find_iter(source)
             .map(|m| Pos::from_str(m.as_str()))
             .collect();
 

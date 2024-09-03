@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use crate::game::Game;
 use crate::notation::pos::Pos;
+use std::collections::HashSet;
 
 struct OpeningGuide;
 
@@ -55,11 +55,12 @@ impl OpeningGuide {
 
         let black_symmetry_moves = Self::find_symmetry_moves(
             game.history.get(0).unwrap(),
-            game.history.get(0).unwrap(),
+            game.history.get(2).unwrap(),
             fifth_move
         );
+
         let white_symmetry_moves = Self::find_symmetry_moves(
-            game.history.get(0).unwrap(),
+            game.history.get(1).unwrap(),
             game.history.get(3).unwrap(),
             fifth_move
         );

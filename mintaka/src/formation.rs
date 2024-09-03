@@ -8,29 +8,28 @@ use crate::notation::rule;
 use crate::pattern::{FormationPatch, EMPTY_SLICE_PATH};
 use crate::slice::Slice;
 
-pub const CLOSED_FOUR_SINGLE_MASK: u8   = 0b1000_0000;
-pub const CLOSED_FOUR_DOUBLE_MASK: u8   = 0b1100_0000;
-pub const OPEN_FOUR_MASK: u8            = 0b0010_0000;
-pub const TOTAL_FOUR_MASK: u8           = 0b1110_0000;
-pub const FIVE_MASK: u8                 = 0b0001_0000;
+pub const CLOSED_FOUR_SINGLE_MASK: u8       = 0b1000_0000;
+pub const CLOSED_FOUR_DOUBLE_MASK: u8       = 0b1100_0000;
+pub const OPEN_FOUR_MASK: u8                = 0b0010_0000;
+pub const TOTAL_FOUR_MASK: u8               = 0b1110_0000;
+pub const FIVE_MASK: u8                     = 0b0001_0000;
 
-pub const OPEN_THREE_MASK: u8           = 0b0000_1000;
-pub const CLOSE_THREE_MASK: u8          = 0b0000_0100;
-pub const CORE_THREE_MASK: u8           = 0b0000_0010;
-pub const OVERLINE_MASK: u8             = 0b0000_0001;
+pub const OPEN_THREE_MASK: u8               = 0b0000_1000;
+pub const CORE_THREE_MASK: u8               = 0b0000_0100;
+pub const CLOSE_THREE_MASK: u8              = 0b0000_0010;
+pub const OVERLINE_MASK: u8                 = 0b0000_0001;
 
-const U32_CLOSED_FOUR_MASK: u32     = 0b1100_0000__1100_0000__1100_0000__1100_0000;
-const U32_OPEN_FOUR_MASK: u32     = 0b0010_0000__0010_0000__0010_0000__0010_0000;
-const U32_TOTAL_FOUR_MASK: u32     = 0b1110_0000__1110_0000__1110_0000__1110_0000;
-const U32_FIVE_MASK: u32           = 0b0001_0000__0001_0000__0001_0000__0001_0000;
+const U32_CLOSED_FOUR_MASK: u32             = 0b1100_0000__1100_0000__1100_0000__1100_0000;
+const U32_OPEN_FOUR_MASK: u32               = 0b0010_0000__0010_0000__0010_0000__0010_0000;
+const U32_TOTAL_FOUR_MASK: u32              = 0b1110_0000__1110_0000__1110_0000__1110_0000;
+const U32_FIVE_MASK: u32                    = 0b0001_0000__0001_0000__0001_0000__0001_0000;
 
-const U32_OPEN_THREE_MASK: u32     = 0b0000_1000__0000_1000__0000_1000__0000_1000;
-const U32_CLOSE_THREE_MASK: u32    = 0b0000_0100__0000_0100__0000_0100__0000_0100;
-const U32_CORE_THREE_MASK: u32    = 0b0000_0010__0000_0010__0000_0010__0000_0010;
+const U32_OPEN_THREE_MASK: u32              = 0b0000_1000__0000_1000__0000_1000__0000_1000;
+const U32_CORE_THREE_MASK: u32              = 0b0000_0100__0000_0100__0000_0100__0000_0100;
+const U32_CLOSE_THREE_MASK: u32             = 0b0000_0010__0000_0010__0000_0010__0000_0010;
+const U32_BLIND_THREE_OVERLINE_MASK: u32    = 0b0000_0001__0000_0001__0000_0001__0000_0001;
 
-const U32_OVERLINE_MASK: u32       = 0b0000_0001__0000_0001__0000_0001__0000_0001;
-
-// encoded in 8-bit: closed-4-1 closed-4-2 open-4 five _ open-3 close-3 core-3 overline
+// packed in 8-bit: closed-4-1 closed-4-2 open-4 five _ open-3 close-3 core-3 overline
 // total 32bit
 #[derive(Debug, Copy, Clone)]
 pub struct FormationUnit {
@@ -81,14 +80,14 @@ impl FormationUnit {
     }
 
     fn with_mask_at<const D: Direction>(&self, mask: u8) -> bool {
-        let encoded = match D {
+        let packed = match D {
             Direction::Horizontal => self.horizontal,
             Direction::Vertical => self.vertical,
             Direction::Ascending => self.ascending,
             Direction::Descending => self.descending
         };
 
-        encoded & mask == mask
+        packed & mask == mask
     }
 
     pub fn count_open_threes(&self) -> u32 {
@@ -124,7 +123,7 @@ impl FormationUnit {
     }
 
     pub fn has_overline(&self) -> bool {
-        self.with_mask(U32_OVERLINE_MASK) != 0
+        self.with_mask(U32_BLIND_THREE_OVERLINE_MASK) != 0
     }
 
     fn with_mask(&self, mask: u32) -> u32 {

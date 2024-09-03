@@ -26,7 +26,7 @@ impl Default for Game {
 impl Game {
 
     pub fn moves(&self) -> usize {
-        self.history.0.len()
+        self.history.len()
     }
 
     pub fn play(&self, pos: Pos) -> Self {

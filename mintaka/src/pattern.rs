@@ -33,8 +33,16 @@ fn find_bidirectional_patterns(acc: &mut SlicePatch, idx: usize, black_stones: u
     todo!()
 }
 
-fn increase_closed_four(encoded: u8) -> u8 {
-    encoded | (0b1000_000 >> (encoded >> 7))
+fn increase_closed_four(packed: u8) -> u8 {
+    packed | (0b1000_000 >> (packed >> 7))
+}
+
+fn mark_blind_three(packed: u8) -> u8 {
+    packed | 0b1
+}
+
+fn unmark_blind_three(packed: u8) -> u8 {
+    packed & !0b1
 }
 
 macro_rules! fp {

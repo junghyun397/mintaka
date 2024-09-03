@@ -13,6 +13,10 @@ impl Default for History {
 
 impl History {
 
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     pub fn get(&self, idx: usize) -> Option<Pos> {
         self.0.get(idx)
             .map(|x| *x)
