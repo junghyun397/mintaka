@@ -5,4 +5,4 @@ pub mod search;
 pub mod tablebase;
 pub mod worker;
 pub mod utils;
-pub mod solution;
+pub mod protocol;

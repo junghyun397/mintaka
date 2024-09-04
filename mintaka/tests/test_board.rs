@@ -6,9 +6,13 @@ mod test_board {
 
     #[test]
     fn test_play() {
-        let mut board = Board::default();
-        board.set_mut(Pos::from_str("h8").unwrap());
-        println!("{}", board.render_debug_board(false))
+        let board = Board::default();
+
+        let board = board
+            .set(Pos::from_str("h8").unwrap())
+            .set(Pos::from_str("g7").unwrap())
+            .set(Pos::from_str("g9").unwrap());
+        println!("{}", board.render_debug_board())
     }
 
     #[test]

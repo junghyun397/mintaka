@@ -17,17 +17,18 @@ pub const FIVE_MASK: u8                     = 0b0001_0000;
 pub const OPEN_THREE_MASK: u8               = 0b0000_1000;
 pub const CORE_THREE_MASK: u8               = 0b0000_0100;
 pub const CLOSE_THREE_MASK: u8              = 0b0000_0010;
-pub const OVERLINE_MASK: u8                 = 0b0000_0001;
+// invalid-3 for black, overline(black) for white
+pub const INV_THREE_OVERLINE_MASK: u8       = 0b0000_0001;
 
-const U32_CLOSED_FOUR_MASK: u32             = 0b1100_0000__1100_0000__1100_0000__1100_0000;
-const U32_OPEN_FOUR_MASK: u32               = 0b0010_0000__0010_0000__0010_0000__0010_0000;
-const U32_TOTAL_FOUR_MASK: u32              = 0b1110_0000__1110_0000__1110_0000__1110_0000;
-const U32_FIVE_MASK: u32                    = 0b0001_0000__0001_0000__0001_0000__0001_0000;
+const UNIT_CLOSED_FOUR_MASK: u32            = 0b1100_0000__1100_0000__1100_0000__1100_0000;
+const UNIT_OPEN_FOUR_MASK: u32              = 0b0010_0000__0010_0000__0010_0000__0010_0000;
+const UNIT_TOTAL_FOUR_MASK: u32             = 0b1110_0000__1110_0000__1110_0000__1110_0000;
+const UNIT_FIVE_MASK: u32                   = 0b0001_0000__0001_0000__0001_0000__0001_0000;
 
-const U32_OPEN_THREE_MASK: u32              = 0b0000_1000__0000_1000__0000_1000__0000_1000;
-const U32_CORE_THREE_MASK: u32              = 0b0000_0100__0000_0100__0000_0100__0000_0100;
-const U32_CLOSE_THREE_MASK: u32             = 0b0000_0010__0000_0010__0000_0010__0000_0010;
-const U32_BLIND_THREE_OVERLINE_MASK: u32    = 0b0000_0001__0000_0001__0000_0001__0000_0001;
+const UNIT_OPEN_THREE_MASK: u32             = 0b0000_1000__0000_1000__0000_1000__0000_1000;
+const UNIT_CORE_THREE_MASK: u32             = 0b0000_0100__0000_0100__0000_0100__0000_0100;
+const UNIT_CLOSE_THREE_MASK: u32            = 0b0000_0010__0000_0010__0000_0010__0000_0010;
+const UNIT_INV_3_OVERLINE_MASK: u32         = 0b0000_0001__0000_0001__0000_0001__0000_0001;
 
 // packed in 8-bit: closed-4-1 closed-4-2 open-4 five _ open-3 close-3 core-3 overline
 // total 32bit
@@ -91,42 +92,38 @@ impl FormationUnit {
     }
 
     pub fn count_open_threes(&self) -> u32 {
-        self.with_mask(U32_OPEN_THREE_MASK).count_ones()
+        self.apply_mask(UNIT_OPEN_THREE_MASK).count_ones()
     }
 
     pub fn count_close_threes(&self) -> u32 {
-        self.with_mask(U32_CLOSE_THREE_MASK).count_ones()
+        self.apply_mask(UNIT_CLOSE_THREE_MASK).count_ones()
     }
 
     pub fn count_core_threes(&self) -> u32 {
-        self.with_mask(U32_CORE_THREE_MASK).count_ones()
+        self.apply_mask(UNIT_CORE_THREE_MASK).count_ones()
     }
 
     pub fn count_closed_fours(&self) -> u32 {
-        self.with_mask(U32_CLOSED_FOUR_MASK).count_ones()
+        self.apply_mask(UNIT_CLOSED_FOUR_MASK).count_ones()
     }
 
     pub fn count_open_fours(&self) -> u32 {
-        self.with_mask(U32_OPEN_FOUR_MASK).count_ones()
+        self.apply_mask(UNIT_OPEN_FOUR_MASK).count_ones()
     }
 
     pub fn count_fours(&self) -> u32 {
-        self.with_mask(U32_TOTAL_FOUR_MASK).count_ones()
+        self.apply_mask(UNIT_TOTAL_FOUR_MASK).count_ones()
     }
 
     pub fn count_fives(&self) -> u32 {
-        self.with_mask(U32_FIVE_MASK).count_ones()
+        self.apply_mask(UNIT_FIVE_MASK).count_ones()
     }
 
     pub fn has_five(&self) -> bool {
-        self.with_mask(U32_FIVE_MASK) != 0
+        self.apply_mask(UNIT_FIVE_MASK) != 0
     }
 
-    pub fn has_overline(&self) -> bool {
-        self.with_mask(U32_BLIND_THREE_OVERLINE_MASK) != 0
-    }
-
-    fn with_mask(&self, mask: u32) -> u32 {
+    fn apply_mask(&self, mask: u32) -> u32 {
         unsafe { std::mem::transmute::<_, u32>(*self) & mask }
     }
 
@@ -151,9 +148,8 @@ impl Default for Formation {
 
 impl Formation {
 
-    #[inline(always)]
-    pub fn access_unit<const C: Color>(&self) -> &FormationUnit {
-        match C {
+    pub fn access_unit(&self, color: Color) -> &FormationUnit {
+        match color {
             Color::Black => &self.black_formation,
             Color::White => &self.white_formation
         }
@@ -168,7 +164,7 @@ impl Formation {
         self.is_empty() && (
             self.black_formation.count_open_threes() > 1
                 || self.black_formation.count_fours() > 1
-                || self.black_formation.has_overline()
+                || self.has_overline()
         ) && !self.black_formation.has_five()
     }
 
@@ -181,7 +177,7 @@ impl Formation {
             Some(ForbiddenKind::DoubleThree)
         } else if self.black_formation.count_fours() > 1 {
             Some(ForbiddenKind::DoubleFour)
-        } else if self.black_formation.has_overline() {
+        } else if self.has_overline() {
             Some(ForbiddenKind::Overline)
         } else {
             None
@@ -207,6 +203,12 @@ impl Formation {
                 self.white_formation.descending = patch.white_patch;
             }
         }
+    }
+
+    pub fn has_overline(&self) -> bool {
+        let raw: u32 = unsafe { std::mem::transmute(self.white_formation) };
+
+        raw & UNIT_INV_3_OVERLINE_MASK != 0
     }
 
 }

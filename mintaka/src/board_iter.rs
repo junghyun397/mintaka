@@ -2,15 +2,15 @@ use crate::board::Board;
 use crate::formation::Formation;
 use crate::notation::color::Color;
 use crate::notation::forbidden_kind::ForbiddenKind;
-use crate::notation::pos::Pos;
 use crate::notation::rule;
+use crate::slice::Slices;
 
 pub enum BoardIterItem {
     Stone(Color),
     Formation(Formation)
 }
 
-pub enum BoardIterTaggedItem {
+pub enum BoardIterVerboseItem {
     Stone(Color),
     Formation(Formation),
     Forbidden(ForbiddenKind),
@@ -19,49 +19,53 @@ pub enum BoardIterTaggedItem {
 
 impl Board {
 
-    pub fn iter_items(&self) -> impl Iterator<Item =BoardIterItem> + '_ {
-        self.slices.horizontal_slices.iter()
+    pub fn iter_items(&self) -> impl Iterator<Item=BoardIterItem> + '_ {
+        self.slices.iter()
             .enumerate()
-            .flat_map(move |(row_idx, row)|
-                (0 .. rule::BOARD_WIDTH).into_iter()
-                    .map(move |col_idx| {
-                        let pos = Pos::from_cartesian(row_idx as u8, col_idx);
-                        if row.black_stone_at(col_idx) {
-                            return BoardIterItem::Stone(Color::Black)
-                        } else if row.white_stone_at(col_idx) {
-                            return BoardIterItem::Stone(Color::White)
-                        } else {
-                            BoardIterItem::Formation(self.formations.0[pos.idx_usize()])
-                        }
-                    })
+            .map(|(idx, maybe_color)|
+                if let Some(color) = maybe_color {
+                    BoardIterItem::Stone(color)
+                } else {
+                    BoardIterItem::Formation(
+                        self.formations.0[idx]
+                    )
+                }
             )
     }
 
-    pub fn iter_tagged_items(&self) -> impl Iterator<Item =BoardIterTaggedItem> + '_ {
-        self.slices.horizontal_slices.iter()
+    pub fn iter_verbose_items(&self) -> impl Iterator<Item=BoardIterVerboseItem> + '_ {
+        self.slices.iter()
             .enumerate()
-            .flat_map(move |(row_idx, row)|
+            .map(|(idx, maybe_color)|
+                if let Some(color) = maybe_color {
+                    BoardIterVerboseItem::Stone(color)
+                } else {
+                    let formation = self.formations.0[idx];
+
+                    if formation.is_empty() {
+                        BoardIterVerboseItem::Empty
+                    } else {
+                        formation.forbidden_kind()
+                            .map(|kind| BoardIterVerboseItem::Forbidden(kind))
+                            .unwrap_or_else(||
+                                BoardIterVerboseItem::Formation(formation)
+                            )
+                    }
+                }
+            )
+    }
+
+}
+
+impl Slices {
+
+    pub fn iter(&self) -> impl Iterator<Item=Option<Color>> + '_ {
+        self.horizontal_slices.iter()
+            .flat_map(|slice|
                 (0 .. rule::BOARD_WIDTH).into_iter()
-                    .map(move |col_idx| {
-                        let pos = Pos::from_cartesian(row_idx as u8, col_idx);
-                        if row.black_stone_at(col_idx) {
-                            return BoardIterTaggedItem::Stone(Color::Black)
-                        } else if row.white_stone_at(col_idx) {
-                            return BoardIterTaggedItem::Stone(Color::White)
-                        }
-
-                        let formation = self.formations.0[pos.idx_usize()];
-
-                        if !formation.is_empty() {
-                            formation.forbidden_kind()
-                                .map(|kind| BoardIterTaggedItem::Forbidden(kind))
-                                .unwrap_or_else(||
-                                    BoardIterTaggedItem::Formation(formation)
-                                )
-                        } else {
-                            BoardIterTaggedItem::Empty
-                        }
-                    })
+                    .map(|col_idx|
+                        slice.stone_kind(col_idx)
+                    )
             )
     }
 

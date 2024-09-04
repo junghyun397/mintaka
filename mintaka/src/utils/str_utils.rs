@@ -14,15 +14,15 @@ pub fn join_str_horizontally(sources: &[&str]) -> String {
         .len();
 
     (0 .. split.first().unwrap().len()).into_iter()
-        .map(|idx|
+        .map(|row_idx|
             split.iter()
-                .map(|row| {
-                    let raw = row[idx].to_string();
+                .map(|rows| {
+                    let row = rows[row_idx].to_string();
                     let padding: String = std::iter::repeat(' ')
-                        .take(max_len - raw.len())
+                        .take(max_len - row.len())
                         .collect();
 
-                    format!("{raw}{padding}")
+                    format!("{row}{padding}")
                 })
                 .reduce(|head, tail|
                     format!("{head} {tail}")

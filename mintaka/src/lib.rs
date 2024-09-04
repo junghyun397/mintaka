@@ -1,4 +1,5 @@
 #![feature(adt_const_params)]
+#![feature(portable_simd)]
 #![allow(incomplete_features)]
 
 pub mod board;
@@ -13,4 +14,4 @@ pub mod utils;
 pub mod opening;
 pub mod formation;
 pub mod pattern;
-mod board_iter;
+pub mod board_iter;

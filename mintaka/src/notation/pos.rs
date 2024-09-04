@@ -11,6 +11,14 @@ pub fn cartesian_to_index_usize(row: usize, col: usize) -> usize {
     row * rule::U_BOARD_WIDTH + col
 }
 
+pub fn index_to_cartesian(idx: u8) -> (u8, u8) {
+    (idx / rule::BOARD_WIDTH, idx % rule::BOARD_WIDTH)
+}
+
+pub fn index_to_cartesian_usize(idx: usize) -> (usize, usize) {
+    (idx / rule::U_BOARD_WIDTH, idx % rule::U_BOARD_WIDTH)
+}
+
 impl Pos {
 
     pub fn from_index(index: u8) -> Self {

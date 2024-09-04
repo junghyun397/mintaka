@@ -37,16 +37,14 @@ impl Board {
         self.slices.vertical_slices[pos.row_usize()].stone_kind(pos.col())
     }
 
-    pub fn set(&self, pos: Pos) -> Self {
-        let mut board = self.clone();
-        board.set_mut(pos);
-        board
+    pub fn set(mut self, pos: Pos) -> Self {
+        self.set_mut(pos);
+        self
     }
 
-    pub fn unset(&self, pos: Pos) -> Self {
-        let mut board = self.clone();
-        board.unset_mut(pos);
-        board
+    pub fn unset(mut self, pos: Pos) -> Self {
+        self.unset_mut(pos);
+        self
     }
 
     pub fn pass(&self) -> Self {

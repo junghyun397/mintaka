@@ -1,10 +1,14 @@
 use crate::board::Board;
 use crate::notation::pos::Pos;
 
-pub trait MoveGenerator {
+pub fn generate_moves(board: &Board) -> Box<[Pos]> {
+    todo!()
+}
 
-    fn generate_moves(board: &Board) -> Vec<Pos> {
-        todo!()
-    }
+pub fn generate_threat_moves(board: &Board) -> Box<[Pos]> {
+    todo!()
+}
 
+pub fn generate_opening_moves(board: &Board) -> Box<[Pos]> {
+    todo!()
 }

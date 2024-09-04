@@ -31,18 +31,14 @@ impl Slice {
         }
     }
 
-    pub fn set(&self, color: Color, idx: u8) -> Self {
-        let mut slice = self.clone();
-        slice.set_mut(color, idx);
-
-        slice
+    pub fn set(mut self, color: Color, idx: u8) -> Self {
+        self.set_mut(color, idx);
+        self
     }
 
-    pub fn unset(&self, color: Color, idx: u8) -> Self {
-        let mut slice = self.clone();
-        slice.unset_mut(color, idx);
-
-        slice
+    pub fn unset(mut self, color: Color, idx: u8) -> Self {
+        self.unset_mut(color, idx);
+        self
     }
 
     pub fn set_mut(&mut self, color: Color, idx: u8) {

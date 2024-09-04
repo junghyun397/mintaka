@@ -1,3 +1,4 @@
+use crate::formation::INV_THREE_OVERLINE_MASK;
 use crate::notation::rule;
 use crate::slice::Slice;
 
@@ -38,11 +39,11 @@ fn increase_closed_four(packed: u8) -> u8 {
 }
 
 fn mark_blind_three(packed: u8) -> u8 {
-    packed | 0b1
+    packed | INV_THREE_OVERLINE_MASK
 }
 
 fn unmark_blind_three(packed: u8) -> u8 {
-    packed & !0b1
+    packed & !INV_THREE_OVERLINE_MASK
 }
 
 macro_rules! fp {

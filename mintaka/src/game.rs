@@ -29,22 +29,19 @@ impl Game {
         self.history.len()
     }
 
-    pub fn play(&self, pos: Pos) -> Self {
-        let mut game = self.clone();
-        game.play_mut(pos);
-        game
+    pub fn play(mut self, pos: Pos) -> Self {
+        self.play_mut(pos);
+        self
     }
 
-    pub fn undo(&self, pos: Pos) -> Self {
-        let mut game = self.clone();
-        game.undo_mut(pos);
-        game
+    pub fn undo(mut self, pos: Pos) -> Self {
+        self.undo_mut(pos);
+        self
     }
 
-    pub fn pass(&self) -> Self {
-        let mut game = self.clone();
-        game.pass_mut();
-        game
+    pub fn pass(mut self) -> Self {
+        self.pass_mut();
+        self
     }
 
     pub fn play_mut(&mut self, pos: Pos) {

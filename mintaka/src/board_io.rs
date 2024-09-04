@@ -22,41 +22,15 @@ const SYMBOL_FORBID_DOUBLE_THREE: char = '3';
 const SYMBOL_FORBID_DOUBLE_FOUR: char = '4';
 const SYMBOL_FORBID_OVERLINE: char = '6';
 
-const HISTORY_SYMBOL_SEPARATOR: &str = ",";
-const HISTORY_SYMBOL_PASS: &str = "PASS";
+const HISTORY_LITERAL_SEPARATOR: &str = ",";
+const HISTORY_LITERAL_PASS: &str = "PASS";
 
-enum FieldSymbol {
-    Stone(Color),
-    Empty
-}
-
-impl Debug for FieldSymbol {
-
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", {
-            match self {
-                FieldSymbol::Stone(color) => char::from(*color).to_string(),
-                FieldSymbol::Empty => SYMBOL_EMPTY.to_string()
-            }
-        })
-    }
-
-}
-
-impl Display for FieldSymbol {
-
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self, f)
-    }
-
-}
-
-fn match_symbol(c: char) -> Option<FieldSymbol> {
+fn match_symbol(c: char) -> Option<Option<Color>> {
     match c {
-        SYMBOL_BLACK => Some(FieldSymbol::Stone(Color::Black)),
-        SYMBOL_WHITE => Some(FieldSymbol::Stone(Color::White)),
+        SYMBOL_BLACK => Some(Some(Color::Black)),
+        SYMBOL_WHITE => Some(Some(Color::White)),
         SYMBOL_EMPTY | SYMBOL_FORBID_DOUBLE_THREE | SYMBOL_FORBID_DOUBLE_FOUR | SYMBOL_FORBID_OVERLINE =>
-            Some(FieldSymbol::Empty),
+            Some(None),
         _ => None
     }
 }
@@ -64,11 +38,11 @@ fn match_symbol(c: char) -> Option<FieldSymbol> {
 const SYMBOL_SET: [char; 6] =
     [SYMBOL_BLACK, SYMBOL_WHITE, SYMBOL_EMPTY, SYMBOL_FORBID_DOUBLE_THREE, SYMBOL_FORBID_DOUBLE_FOUR, SYMBOL_FORBID_OVERLINE];
 
-fn parse_board_elements(source: &str) -> Result<Vec<FieldSymbol>, &'static str> {
+fn parse_board_elements(source: &str) -> Result<Vec<Option<Color>>, &'static str> {
     // regex: \d[\s\[](\S[\s\[\]]){N}\d
     let re: Regex = Regex::from_str(format!(r"\d[\s\[](\S[\s\[\]]){U_BOARD_WIDTH}\d").as_str()).unwrap();
 
-    let elements: Vec<FieldSymbol> = re.find_iter(source)
+    let elements: Vec<Option<Color>> = re.find_iter(source)
         .flat_map(|m| m
             .as_str()
             .chars()
@@ -85,11 +59,11 @@ fn parse_board_elements(source: &str) -> Result<Vec<FieldSymbol>, &'static str> 
     Ok(elements)
 }
 
-fn extract_color_stones(source: &[FieldSymbol], target_color: Color) -> Vec<Pos> {
+fn extract_color_stones(source: &[Option<Color>], target_color: Color) -> Vec<Pos> {
     source.iter()
         .enumerate()
         .filter_map(|(idx, symbol)| match symbol {
-            FieldSymbol::Stone(color) =>
+            Some(color) =>
                 if *color == target_color {
                     Some(Pos::from_index(idx as u8))
                 } else {
@@ -138,14 +112,14 @@ impl Board {
         format!("{column_hint}\n{content}\n{column_hint}").into()
     }
 
-    pub fn render_debug_board(&self, split: bool) -> String {
-        fn render_single_side<const C: Color>(board: &Board, split: bool) -> String {
-            fn render_formation<const C: Color>(board: &Board, extract: fn(&FormationUnit) -> u32) -> String {
+    pub fn render_debug_board(&self) -> String {
+        fn render_single_side(board: &Board, color: Color) -> String {
+            fn render_formation(board: &Board, color: Color, extract: fn(&FormationUnit) -> u32) -> String {
                 board.render_attribute_board(|item| {
                     match item {
                         BoardIterItem::Stone(color) => char::from(*color).to_string(),
                         BoardIterItem::Formation(formation) => {
-                            let count = extract(formation.access_unit::<C>());
+                            let count = extract(formation.access_unit(color));
 
                             if count > 0 {
                                 count.to_string()
@@ -157,29 +131,21 @@ impl Board {
                 })
             }
 
-            let open_three = format!("open_three\n{}", render_formation::<C>(board, FormationUnit::count_open_threes));
-            let core_three = format!("core_three\n{}", render_formation::<C>(board, FormationUnit::count_core_threes));
-            let close_three = format!("close_three\n{}", render_formation::<C>(board, FormationUnit::count_close_threes));
+            let open_three = format!("open_three\n{}", render_formation(board, color, FormationUnit::count_open_threes));
+            let core_three = format!("core_three\n{}", render_formation(board, color, FormationUnit::count_core_threes));
+            let close_three = format!("close_three\n{}", render_formation(board, color, FormationUnit::count_close_threes));
 
-            let closed_four = format!("closed_four\n{}", render_formation::<C>(board, FormationUnit::count_closed_fours));
-            let open_four = format!("open_four\n{}", render_formation::<C>(board, FormationUnit::count_open_fours));
-            let five = format!("five\n{}", render_formation::<C>(board, FormationUnit::count_fives));
+            let closed_four = format!("closed_four\n{}", render_formation(board, color, FormationUnit::count_closed_fours));
+            let open_four = format!("open_four\n{}", render_formation(board, color, FormationUnit::count_open_fours));
+            let five = format!("five\n{}", render_formation(board, color, FormationUnit::count_fives));
 
-            if split {
-                format!(
-                    "{}\n{}",
-                    join_str_horizontally(&[&open_three, &core_three, &close_three]),
-                    join_str_horizontally(&[&closed_four, &open_four, &five])
-                )
-            } else {
-                join_str_horizontally(&[&open_three, &core_three, &close_three, &closed_four, &open_four, &five])
-            }
+            join_str_horizontally(&[&open_three, &core_three, &close_three, &closed_four, &open_four, &five])
         }
 
         format!(
             "{}\nblack\n{}\nwhite\n{}", self,
-            render_single_side::<{ Color::Black }>(self, split),
-            render_single_side::<{ Color::White }>(self, split)
+            render_single_side(self, Color::Black),
+            render_single_side(self, Color::White)
         )
     }
 
@@ -226,7 +192,7 @@ impl FromStr for Slice {
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        let fields: Box<[FieldSymbol]> = source.chars()
+        let fields: Box<[Option<Color>]> = source.chars()
             .filter_map(|x| match_symbol(x))
             .collect();
 
@@ -241,7 +207,7 @@ impl FromStr for Slice {
                 Slice::empty(field_len, Pos::from_index(0)),
                 |acc, (idx, field)| {
                     match field {
-                        FieldSymbol::Stone(color) => acc.set(*color, idx as u8),
+                        Some(color) => acc.set(*color, idx as u8),
                         _ => acc
                     }
                 }
@@ -278,11 +244,11 @@ impl Display for History {
             .map(|mv|
                 match mv {
                     Some(pos) => pos.to_string(),
-                    None => HISTORY_SYMBOL_PASS.to_string()
+                    None => HISTORY_LITERAL_PASS.to_string()
                 }
             )
             .reduce(|head, tail|
-                format!("{head}{HISTORY_SYMBOL_SEPARATOR} {tail}")
+                format!("{head}{HISTORY_LITERAL_SEPARATOR} {tail}")
             )
             .unwrap();
         write!(f, "{history}")
