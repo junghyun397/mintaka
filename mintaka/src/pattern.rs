@@ -15,6 +15,7 @@ pub const EMPTY_SLICE_PATH: SlicePatch = [FormationPatch { black_patch: 0, white
 impl Slice {
 
     pub fn calculate_slice_patch(&self) -> SlicePatch {
+        let wall: u16 = !(!0 << (16 - self.length));
         EMPTY_SLICE_PATCH
     }
 

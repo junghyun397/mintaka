@@ -1,9 +1,10 @@
 use mintaka::notation::pos::Pos;
 use std::iter::Map;
+use std::rc::Rc;
 
 pub struct Solution {
     pub solution: Pos,
-    pub child: Option<Map<Pos, Solution>>
+    pub child: Option<Map<Pos, Rc<Solution>>>
 }
 
 impl Solution {

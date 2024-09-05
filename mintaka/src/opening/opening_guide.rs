@@ -46,7 +46,7 @@ fn find_symmetry_moves(ref1: Pos, ref2: Pos, m: Pos) -> HashSet<Pos> {
     }
 }
 
-pub fn find_forbidden_symmetry_moves(game: &Game) -> HashSet<Pos> {
+pub fn find_forbidden_symmetry_moves(game: &Game) -> Box<[Pos]> {
     let fifth_move = game.history.get(4).unwrap();
 
     let black_symmetry_moves = find_symmetry_moves(
