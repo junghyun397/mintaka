@@ -1,4 +1,5 @@
 use std::marker::ConstParamTy;
+use std::ops::Rem;
 
 //noinspection RsUnresolvedPath
 #[derive(ConstParamTy, PartialEq, Eq, Clone, Copy, Debug)]
@@ -13,6 +14,14 @@ impl Color {
         match self {
             Color::Black => Color::White,
             Color::White => Color::Black
+        }
+    }
+
+    pub fn color_by_moves(moves: usize) -> Self {
+        if moves % 2 == 1 {
+            Color::Black
+        } else {
+            Color::White
         }
     }
 

@@ -1,4 +1,6 @@
-use crate::game::Game;
+use crate::board_width;
+use crate::check_cartesian_bound;
+use crate::notation::history::History;
 use crate::notation::pos::Pos;
 use std::collections::HashSet;
 
@@ -46,23 +48,22 @@ fn find_symmetry_moves(ref1: Pos, ref2: Pos, m: Pos) -> HashSet<Pos> {
     }
 }
 
-pub fn find_forbidden_symmetry_moves(game: &Game) -> Box<[Pos]> {
-    let fifth_move = game.history.get(4).unwrap();
-
+pub fn find_forbidden_symmetry_moves(history: &History, fifth_move: Pos) -> HashSet<Pos> {
     let black_symmetry_moves = find_symmetry_moves(
-        game.history.get(0).unwrap(),
-        game.history.get(2).unwrap(),
+        history.get(0).unwrap(),
+        history.get(2).unwrap(),
         fifth_move
     );
 
     let white_symmetry_moves = find_symmetry_moves(
-        game.history.get(1).unwrap(),
-        game.history.get(3).unwrap(),
+        history.get(1).unwrap(),
+        history.get(3).unwrap(),
         fifth_move
     );
 
     black_symmetry_moves
         .intersection(&white_symmetry_moves)
+        .filter(|pos| check_cartesian_bound!(pos.row(), pos.col()))
         .copied()
         .collect()
 }

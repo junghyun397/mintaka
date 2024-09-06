@@ -1,5 +1,7 @@
+use crate::board_width;
 use crate::cache::hash_table;
 use crate::cache::hash_table::EMPTY_HASH;
+use crate::cartesian_to_index;
 use crate::notation::color::Color;
 use crate::notation::pos::Pos;
 use crate::notation::rule;
@@ -40,9 +42,9 @@ impl From<&[Slice; U_BOARD_WIDTH]> for HashKey {
             .fold(HashKey::default(), |mut key, (row, slice)| {
                 for col in 0 .. rule::BOARD_WIDTH {
                     if slice.black_stone_at(col) {
-                        key = key.set(Color::Black, Pos::from_cartesian(row as u8, col))
+                        key = key.set_idx(Color::Black, cartesian_to_index!(row, col as usize))
                     } else if slice.white_stone_at(col) {
-                        key = key.set(Color::White, Pos::from_cartesian(row as u8, col))
+                        key = key.set_idx(Color::White, cartesian_to_index!(row, col as usize))
                     }
                 }
 

@@ -1,22 +1,25 @@
+use crate::board_width;
 use crate::notation::rule;
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub struct Pos(u8);
 
-pub fn cartesian_to_index(row: u8, col: u8) -> u8 {
-    row * rule::BOARD_WIDTH + col
+#[macro_export] macro_rules! cartesian_to_index {
+    ($row:expr,$col:expr) => {
+        $row * board_width!() + $col
+    };
 }
 
-pub fn cartesian_to_index_usize(row: usize, col: usize) -> usize {
-    row * rule::U_BOARD_WIDTH + col
+#[macro_export] macro_rules! index_to_cartesian {
+    ($idx:expr) => {
+        ($idx / board_width!(), $idx % board_width!())
+    };
 }
 
-pub fn index_to_cartesian(idx: u8) -> (u8, u8) {
-    (idx / rule::BOARD_WIDTH, idx % rule::BOARD_WIDTH)
-}
-
-pub fn index_to_cartesian_usize(idx: usize) -> (usize, usize) {
-    (idx / rule::U_BOARD_WIDTH, idx % rule::U_BOARD_WIDTH)
+#[macro_export] macro_rules! check_cartesian_bound {
+    ($row:expr,$col:expr) => {
+        $row < board_width!() && $col < board_width!()
+    };
 }
 
 impl Pos {
@@ -30,11 +33,7 @@ impl Pos {
     }
 
     pub fn from_cartesian(row: u8, col: u8) -> Self {
-        Pos(cartesian_to_index(row, col))
-    }
-
-    pub fn from_cartesian_usize(row: usize, col: usize) -> Self {
-        Pos(cartesian_to_index_usize(row, col) as u8)
+        Pos(cartesian_to_index!(row, col))
     }
 
     pub fn to_cartesian(&self) -> (u8, u8) {
@@ -65,11 +64,11 @@ impl Pos {
         self.col() as usize
     }
 
-    fn mask_col(&self) -> u8 {
+    pub fn mask_col(&self) -> u8 {
         0b1 >> self.col()
     }
 
-    fn reverse_mask_col(&self) -> u8 {
+    pub fn reverse_mask_col(&self) -> u8 {
         !self.mask_col()
     }
 

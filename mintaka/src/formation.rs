@@ -1,34 +1,35 @@
+use crate::board_width;
 use crate::cache::dummy_patch_cache::DummyPatchCache;
 use crate::cache::patch_cache::PatchCache;
+use crate::cartesian_to_index;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::forbidden_kind::ForbiddenKind;
-use crate::notation::pos::cartesian_to_index;
 use crate::notation::rule;
 use crate::pattern::{FormationPatch, EMPTY_SLICE_PATH};
 use crate::slice::Slice;
 
-pub const CLOSED_FOUR_SINGLE_MASK: u8       = 0b1000_0000;
-pub const CLOSED_FOUR_DOUBLE_MASK: u8       = 0b1100_0000;
-pub const OPEN_FOUR_MASK: u8                = 0b0010_0000;
-pub const TOTAL_FOUR_MASK: u8               = 0b1110_0000;
-pub const FIVE_MASK: u8                     = 0b0001_0000;
+pub const CLOSED_FOUR_SINGLE: u8    = 0b1000_0000;
+pub const CLOSED_FOUR_DOUBLE: u8    = 0b1100_0000;
+pub const OPEN_FOUR: u8             = 0b0010_0000;
+pub const TOTAL_FOUR: u8            = 0b1110_0000;
+pub const FIVE: u8                  = 0b0001_0000;
 
-pub const OPEN_THREE_MASK: u8               = 0b0000_1000;
-pub const CORE_THREE_MASK: u8               = 0b0000_0100;
-pub const CLOSE_THREE_MASK: u8              = 0b0000_0010;
+pub const OPEN_THREE: u8            = 0b0000_1000;
+pub const CORE_THREE: u8            = 0b0000_0100;
+pub const CLOSE_THREE: u8           = 0b0000_0010;
 // invalid-3 for black, overline(black) for white
-pub const INV_THREE_OVERLINE_MASK: u8       = 0b0000_0001;
+pub const INV_THREE_OVERLINE: u8    = 0b0000_0001;
 
-const UNIT_CLOSED_FOUR_MASK: u32            = 0b1100_0000__1100_0000__1100_0000__1100_0000;
-const UNIT_OPEN_FOUR_MASK: u32              = 0b0010_0000__0010_0000__0010_0000__0010_0000;
-const UNIT_TOTAL_FOUR_MASK: u32             = 0b1110_0000__1110_0000__1110_0000__1110_0000;
-const UNIT_FIVE_MASK: u32                   = 0b0001_0000__0001_0000__0001_0000__0001_0000;
+const UNIT_CLOSED_FOUR_MASK: u32    = 0b1100_0000__1100_0000__1100_0000__1100_0000;
+const UNIT_OPEN_FOUR_MASK: u32      = 0b0010_0000__0010_0000__0010_0000__0010_0000;
+const UNIT_TOTAL_FOUR_MASK: u32     = 0b1110_0000__1110_0000__1110_0000__1110_0000;
+const UNIT_FIVE_MASK: u32           = 0b0001_0000__0001_0000__0001_0000__0001_0000;
 
-const UNIT_OPEN_THREE_MASK: u32             = 0b0000_1000__0000_1000__0000_1000__0000_1000;
-const UNIT_CORE_THREE_MASK: u32             = 0b0000_0100__0000_0100__0000_0100__0000_0100;
-const UNIT_CLOSE_THREE_MASK: u32            = 0b0000_0010__0000_0010__0000_0010__0000_0010;
-const UNIT_INV_3_OVERLINE_MASK: u32         = 0b0000_0001__0000_0001__0000_0001__0000_0001;
+const UNIT_OPEN_THREE_MASK: u32     = 0b0000_1000__0000_1000__0000_1000__0000_1000;
+const UNIT_CORE_THREE_MASK: u32     = 0b0000_0100__0000_0100__0000_0100__0000_0100;
+const UNIT_CLOSE_THREE_MASK: u32    = 0b0000_0010__0000_0010__0000_0010__0000_0010;
+const UNIT_INV_3_OVERLINE_MASK: u32 = 0b0000_0001__0000_0001__0000_0001__0000_0001;
 
 // packed in 8-bit: closed-4-1 closed-4-2 open-4 five _ open-3 close-3 core-3 overline
 // total 32bit
@@ -61,23 +62,23 @@ impl FormationUnit {
     }
 
     pub fn open_three_at<const D: Direction>(&self) -> bool {
-        self.with_mask_at::<D>(OPEN_THREE_MASK)
+        self.with_mask_at::<D>(OPEN_THREE)
     }
 
     pub fn close_three_at<const D: Direction>(&self) -> bool {
-        self.with_mask_at::<D>(CLOSE_THREE_MASK)
+        self.with_mask_at::<D>(CLOSE_THREE)
     }
 
     pub fn closed_four_at<const D: Direction>(&self) -> bool {
-        self.with_mask_at::<D>(CLOSED_FOUR_SINGLE_MASK)
+        self.with_mask_at::<D>(CLOSED_FOUR_SINGLE)
     }
 
     pub fn open_four_at<const D: Direction>(&self) -> bool {
-        self.with_mask_at::<D>(OPEN_FOUR_MASK)
+        self.with_mask_at::<D>(OPEN_FOUR)
     }
 
     pub fn five_at<const D: Direction>(&self) -> bool {
-        self.with_mask_at::<D>(FIVE_MASK)
+        self.with_mask_at::<D>(FIVE)
     }
 
     fn with_mask_at<const D: Direction>(&self, mask: u8) -> bool {
@@ -244,13 +245,13 @@ impl Formations {
         for offset in 0 .. slice.length {
             let idx = match D {
                 Direction::Horizontal =>
-                    cartesian_to_index(slice.start_pos.row(), slice.start_pos.col() + offset) as usize,
+                    cartesian_to_index!(slice.start_pos.row(), slice.start_pos.col() + offset) as usize,
                 Direction::Vertical =>
-                    cartesian_to_index(slice.start_pos.row() + offset, slice.start_pos.col()) as usize,
+                    cartesian_to_index!(slice.start_pos.row() + offset, slice.start_pos.col()) as usize,
                 Direction::Ascending =>
-                    cartesian_to_index(slice.start_pos.row() + offset, slice.start_pos.col() + offset) as usize,
+                    cartesian_to_index!(slice.start_pos.row() + offset, slice.start_pos.col() + offset) as usize,
                 Direction::Descending =>
-                    cartesian_to_index(slice.start_pos.row() - offset, slice.start_pos.col() + offset) as usize,
+                    cartesian_to_index!(slice.start_pos.row() - offset, slice.start_pos.col() + offset) as usize,
             };
 
             self.0[idx].apply_mask_mut::<D>(slice_patch[offset as usize])

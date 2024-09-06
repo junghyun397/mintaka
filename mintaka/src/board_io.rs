@@ -2,6 +2,7 @@ use crate::board::Board;
 use crate::board_iter::BoardIterItem;
 use crate::formation::FormationUnit;
 use crate::game::Game;
+use crate::impl_debug_by_display;
 use crate::notation::color::Color;
 use crate::notation::forbidden_kind::ForbiddenKind;
 use crate::notation::history::History;
@@ -167,6 +168,8 @@ impl Display for Board {
 
 }
 
+impl_debug_by_display!(Board);
+
 impl FromStr for Board {
 
     type Err = &'static str;
@@ -330,7 +333,7 @@ impl FromStr for Pos {
 
 }
 
-impl Debug for Pos {
+impl Display for Pos {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}", (self.col() + 'a' as u8) as char, self.row() + 1)
@@ -338,13 +341,7 @@ impl Debug for Pos {
 
 }
 
-impl Display for Pos {
-
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self, f)
-    }
-
-}
+impl_debug_by_display!(Pos);
 
 impl From<Color> for char {
 
@@ -368,3 +365,4 @@ impl From<ForbiddenKind> for char {
     }
 
 }
+

@@ -1,5 +1,5 @@
-use crate::formation::INV_THREE_OVERLINE_MASK;
-use crate::notation::rule;
+use crate::formation::INV_THREE_OVERLINE;
+use crate::notation::rule::U_BOARD_WIDTH;
 use crate::slice::Slice;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -8,9 +8,10 @@ pub struct FormationPatch {
     pub white_patch: u8
 }
 
-pub type SlicePatch = [FormationPatch; rule::U_BOARD_WIDTH];
+pub type SlicePatch = [FormationPatch; U_BOARD_WIDTH];
 
-pub const EMPTY_SLICE_PATH: SlicePatch = [FormationPatch { black_patch: 0, white_patch: 0}; rule::U_BOARD_WIDTH];
+// 240-bit
+pub const EMPTY_SLICE_PATH: SlicePatch = [FormationPatch { black_patch: 0, white_patch: 0}; U_BOARD_WIDTH];
 
 impl Slice {
 
@@ -40,11 +41,11 @@ fn increase_closed_four(packed: u8) -> u8 {
 }
 
 fn mark_blind_three(packed: u8) -> u8 {
-    packed | INV_THREE_OVERLINE_MASK
+    packed | INV_THREE_OVERLINE
 }
 
 fn unmark_blind_three(packed: u8) -> u8 {
-    packed & !INV_THREE_OVERLINE_MASK
+    packed & !INV_THREE_OVERLINE
 }
 
 macro_rules! fp {

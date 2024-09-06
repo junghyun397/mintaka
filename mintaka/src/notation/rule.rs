@@ -4,7 +4,9 @@ pub const BOARD_SIZE: usize = U_BOARD_WIDTH * U_BOARD_WIDTH;
 pub const U_BOARD_WIDTH: usize = BOARD_WIDTH as usize;
 pub const I_BOARD_WIDTH: isize = BOARD_WIDTH as isize;
 
-#[derive(Eq, PartialEq)]
+#[macro_export] macro_rules! board_width {() => (15);}
+
+#[derive(Eq, PartialEq, Copy, Clone)]
 pub enum RuleKind {
     FiveInARow = 0,
     SimplifiedRenju = 1,
