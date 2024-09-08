@@ -91,11 +91,11 @@ impl Board {
                         transform(item)
                     )
                     .reduce(|head, tail|
-                        format!("{head} {tail}").to_string()
+                        format!("{head} {tail}")
                     )
                     .unwrap();
 
-                format!("{:-2} {content} {}", row_idx + 1, row_idx + 1).to_string()
+                format!("{:-2} {content} {}", row_idx + 1, row_idx + 1)
             })
             .rev()
             .reduce(|head, tail|
@@ -157,12 +157,12 @@ impl Display for Board {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.render_attribute_board(|item|
             match item {
-                BoardIterItem::Stone(color) => char::from(*color).to_string(),
+                BoardIterItem::Stone(color) => char::from(*color),
                 BoardIterItem::Formation(formation) =>
                     formation.forbidden_kind()
-                        .map(|kind| char::from(kind).to_string())
-                        .unwrap_or_else(|| SYMBOL_EMPTY.to_string())
-            }
+                        .map(|kind| char::from(kind))
+                        .unwrap_or_else(|| SYMBOL_EMPTY)
+            }.to_string()
         ))
     }
 

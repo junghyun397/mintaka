@@ -1,6 +1,7 @@
 #![feature(adt_const_params)]
 #![feature(portable_simd)]
 #![allow(incomplete_features)]
+extern crate core;
 
 pub mod board;
 pub mod board_io;

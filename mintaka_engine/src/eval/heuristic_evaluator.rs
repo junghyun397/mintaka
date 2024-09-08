@@ -1,6 +1,5 @@
 use mintaka::board::Board;
 use crate::eval::evaluator::Evaluator;
-use crate::eval::score::Score;
 
 pub struct HeuristicEvaluator;
 
@@ -14,7 +13,7 @@ impl Default for HeuristicEvaluator {
 
 impl Evaluator for HeuristicEvaluator {
 
-    fn eval(&self, board: &Board) -> Score {
+    fn eval(&self, board: &Board) -> i16 {
         todo!()
     }
 

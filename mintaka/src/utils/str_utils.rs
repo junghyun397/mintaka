@@ -34,3 +34,26 @@ pub fn join_str_horizontally(sources: &[&str]) -> String {
         )
         .unwrap()
 }
+
+pub fn trim_indent(source: &str) -> String {
+    let split: Box<[&str]> = source.split("\n")
+        .collect();
+
+    let min_whitespace_len = split.iter()
+        .map(|row|
+            row.len() - row.trim_start().len()
+        )
+        .min()
+        .unwrap();
+
+    split.into_iter()
+        .map(|row|
+            row.chars()
+                .skip(min_whitespace_len)
+                .collect::<String>()
+        )
+        .reduce(|head, tail|
+            format!("{head}\n{tail}")
+        )
+        .unwrap()
+}

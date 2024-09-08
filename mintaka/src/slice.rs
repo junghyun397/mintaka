@@ -14,8 +14,8 @@ const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
 pub struct Slice {
     pub length: u8,
     pub start_pos: Pos,
-    black_stones: u16,
-    white_stones: u16
+    pub black_stones: u16,
+    pub white_stones: u16
 }
 
 pub type SliceKey = u32;

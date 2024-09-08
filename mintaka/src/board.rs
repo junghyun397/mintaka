@@ -5,7 +5,7 @@ use crate::notation::direction::Direction;
 use crate::notation::pos::Pos;
 use crate::slice::{Slice, Slices};
 
-// 1344-Bytes
+// 2248-bytes
 #[derive(Copy, Clone)]
 pub struct Board {
     pub player_color: Color,

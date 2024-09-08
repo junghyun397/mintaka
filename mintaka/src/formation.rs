@@ -1,13 +1,12 @@
-use crate::board_width;
 use crate::cache::dummy_patch_cache::DummyPatchCache;
 use crate::cache::patch_cache::PatchCache;
-use crate::cartesian_to_index;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::forbidden_kind::ForbiddenKind;
 use crate::notation::rule;
-use crate::pattern::{FormationPatch, EMPTY_SLICE_PATH};
+use crate::pattern::{FormationPatch, EMPTY_SLICE_PATCH};
 use crate::slice::Slice;
+use crate::{board_width, cartesian_to_index, pop_count_less_then_two, pop_count_less_then_two_unchecked};
 
 pub const CLOSED_FOUR_SINGLE: u8    = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8    = 0b1100_0000;
@@ -31,7 +30,28 @@ const UNIT_CORE_THREE_MASK: u32     = 0b0000_0100__0000_0100__0000_0100__0000_01
 const UNIT_CLOSE_THREE_MASK: u32    = 0b0000_0010__0000_0010__0000_0010__0000_0010;
 const UNIT_INV_3_OVERLINE_MASK: u32 = 0b0000_0001__0000_0001__0000_0001__0000_0001;
 
-// packed in 8-bit: closed-4-1 closed-4-2 open-4 five _ open-3 close-3 core-3 overline
+#[derive(Eq, PartialEq, Copy, Clone)]
+pub enum FormationCount {
+    Cold,
+    Single,
+    Multiple
+}
+
+impl FormationCount {
+
+    fn from_masked_unit(packed: u32) -> Self {
+        if packed == 0 {
+            FormationCount::Cold
+        } else if pop_count_less_then_two_unchecked!(packed) {
+            FormationCount::Single
+        } else {
+            FormationCount::Multiple
+        }
+    }
+
+}
+
+// packed in 8-bit: closed-4-1 closed-4-2 open-4 five _ open-3 close-3 core-3 etc.
 // total 32bit
 #[derive(Debug, Copy, Clone)]
 pub struct FormationUnit {
@@ -54,11 +74,38 @@ impl Default for FormationUnit {
 
 }
 
+impl From<FormationUnit> for u32 {
+
+    fn from(value: FormationUnit) -> Self {
+        unsafe { std::mem::transmute(value) }
+    }
+
+}
+
 impl FormationUnit {
 
     pub fn is_empty(&self) -> bool {
-        let raw: u32 = unsafe { std::mem::transmute(*self) };
-        raw == 0
+        u32::from(*self) == 0
+    }
+
+    pub fn has_threes(&self) -> bool {
+        !pop_count_less_then_two!(self.apply_mask(UNIT_OPEN_THREE_MASK))
+    }
+
+    pub fn has_fours(&self) -> bool {
+        !pop_count_less_then_two!(self.apply_mask(UNIT_TOTAL_FOUR_MASK))
+    }
+
+    pub fn has_five(&self) -> bool {
+        self.apply_mask(UNIT_FIVE_MASK) != 0
+    }
+
+    pub fn count_threes(&self) -> FormationCount {
+        FormationCount::from_masked_unit(self.apply_mask(UNIT_OPEN_THREE_MASK))
+    }
+
+    pub fn count_fours(&self) -> FormationCount {
+        FormationCount::from_masked_unit(self.apply_mask(UNIT_TOTAL_FOUR_MASK))
     }
 
     pub fn open_three_at<const D: Direction>(&self) -> bool {
@@ -112,7 +159,7 @@ impl FormationUnit {
         self.apply_mask(UNIT_OPEN_FOUR_MASK).count_ones()
     }
 
-    pub fn count_fours(&self) -> u32 {
+    pub fn count_total_fours(&self) -> u32 {
         self.apply_mask(UNIT_TOTAL_FOUR_MASK).count_ones()
     }
 
@@ -120,12 +167,8 @@ impl FormationUnit {
         self.apply_mask(UNIT_FIVE_MASK).count_ones()
     }
 
-    pub fn has_five(&self) -> bool {
-        self.apply_mask(UNIT_FIVE_MASK) != 0
-    }
-
     fn apply_mask(&self, mask: u32) -> u32 {
-        unsafe { std::mem::transmute::<_, u32>(*self) & mask }
+        u32::from(*self) & mask
     }
 
 }
@@ -147,6 +190,14 @@ impl Default for Formation {
 
 }
 
+impl From<Formation> for u64 {
+
+    fn from(value: Formation) -> Self {
+        unsafe { std::mem::transmute(value) }
+    }
+
+}
+
 impl Formation {
 
     pub fn access_unit(&self, color: Color) -> &FormationUnit {
@@ -157,32 +208,31 @@ impl Formation {
     }
 
     pub fn is_empty(&self) -> bool {
-        let raw: u64 = unsafe { std::mem::transmute::<_, u64>(*self) };
-        raw == 0
+        u64::from(*self) == 0
     }
 
     pub fn is_forbidden(&self) -> bool {
-        self.is_empty() && (
-            self.black_formation.count_open_threes() > 1
-                || self.black_formation.count_fours() > 1
-                || self.has_overline()
-        ) && !self.black_formation.has_five()
+        self.is_empty()
+            && (
+                self.black_formation.has_fours()
+                    || self.black_formation.has_threes()
+                    || self.has_overline()
+            )
+            && !self.black_formation.has_five()
     }
 
     pub fn forbidden_kind(&self) -> Option<ForbiddenKind> {
-        let raw: u32 = unsafe { std::mem::transmute(self.black_formation) };
-
-        if raw == 0 || self.black_formation.has_five() {
-            None
-        } else if self.black_formation.count_open_threes() > 1 {
-            Some(ForbiddenKind::DoubleThree)
-        } else if self.black_formation.count_fours() > 1 {
-            Some(ForbiddenKind::DoubleFour)
-        } else if self.has_overline() {
-            Some(ForbiddenKind::Overline)
-        } else {
-            None
-        }
+        self.is_empty()
+            .then(||
+                if self.black_formation.has_threes() {
+                    ForbiddenKind::DoubleThree
+                } else if self.black_formation.has_fours() {
+                    ForbiddenKind::DoubleFour
+                } else {
+                    ForbiddenKind::Overline
+                }
+            )
+            .filter(|_| !self.has_overline())
     }
 
     pub fn apply_mask_mut<const D: Direction>(mut self, patch: FormationPatch) {
@@ -207,9 +257,7 @@ impl Formation {
     }
 
     pub fn has_overline(&self) -> bool {
-        let raw: u32 = unsafe { std::mem::transmute(self.white_formation) };
-
-        raw & UNIT_INV_3_OVERLINE_MASK != 0
+        false // TODO
     }
 
 }
@@ -238,7 +286,7 @@ impl Formations {
             patch
         };
 
-        if slice_patch == EMPTY_SLICE_PATH {
+        if slice_patch == EMPTY_SLICE_PATCH {
             return
         }
 
@@ -256,6 +304,10 @@ impl Formations {
 
             self.0[idx].apply_mask_mut::<D>(slice_patch[offset as usize])
         }
+    }
+
+    pub fn validate_double_three_mut(&mut self) {
+        todo!()
     }
 
 }
