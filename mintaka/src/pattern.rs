@@ -1,7 +1,8 @@
 use crate::formation::{FIVE, INV_THREE_OVERLINE};
+use crate::notation::color::Color;
 use crate::notation::rule::U_BOARD_WIDTH;
-use crate::slice::Slice;
 use crate::pop_count_less_then_two;
+use crate::slice::Slice;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub struct FormationPatch {
@@ -9,33 +10,35 @@ pub struct FormationPatch {
     pub white_patch: u8
 }
 
-// 240-bit
-pub type SlicePatch = [FormationPatch; U_BOARD_WIDTH];
+#[derive(Eq, PartialEq, Copy, Clone)]
+pub struct SlicePatch {
+    pub patch: [FormationPatch; U_BOARD_WIDTH],
+    pub winner: Option<Color>
+}
 
-pub const EMPTY_SLICE_PATCH: SlicePatch = [FormationPatch { black_patch: 0, white_patch: 0 }; U_BOARD_WIDTH];
+pub const EMPTY_SLICE_PATCH: SlicePatch = SlicePatch {
+    patch: [FormationPatch { black_patch: 0, white_patch: 0 }; U_BOARD_WIDTH],
+    winner: None,
+};
 
 impl Slice {
 
     pub fn calculate_slice_patch(&self) -> SlicePatch {
-        if pop_count_less_then_two!(self.black_stones) || pop_count_less_then_two!(self.white_stones) {
+        if pop_count_less_then_two!(self.black_stones) && pop_count_less_then_two!(self.white_stones) {
             return EMPTY_SLICE_PATCH
         }
 
-        let wall: u16 = !(!0 << (16 - self.length));
+        let wall: u32 = !(!0 << (16 - self.length));
+        let bw = self.black_stones as u32 | wall;
+        let ww = self.white_stones as u32 | wall;
 
-        let mut acc: SlicePatch = [FormationPatch { black_patch: 0, white_patch: 0 }; U_BOARD_WIDTH];
+        let mut acc: SlicePatch = EMPTY_SLICE_PATCH.clone();
 
         for offset in 0 .. self.length as usize - 5 {
-            let b = (self.black_stones >> offset) as u8;
-            let w = (self.white_stones >> offset) as u8;
-
-            let bw = b;
-            let ww = w;
-
             find_patterns(
                 &mut acc, offset,
-                b, w,
-                bw, ww,
+                (self.black_stones >> offset) as u8, (self.white_stones >> offset) as u8,
+                (bw >> offset) as u8, (ww >> offset) as u8,
             )
         }
 
@@ -67,24 +70,24 @@ fn find_patterns(acc: &mut SlicePatch, offset: usize, b: u8, w: u8, bw: u8, ww:u
 
     macro_rules! apply_patch_b {
         ($p1:expr,$k1:expr) => {
-            acc[offset + $p1] = FormationPatch { black_patch: $k1, white_patch: 0 };
+            acc.patch[offset + $p1] = FormationPatch { black_patch: $k1, white_patch: 0 };
             return
         };
         ($p1:expr,$k1:expr,$p2:expr,$k2:expr) => {
-            acc[offset + $p1] = FormationPatch { black_patch: $k1, white_patch: 0 };
-            acc[offset + $p2] = FormationPatch { black_patch: $k2, white_patch: 0 };
+            acc.patch[offset + $p1] = FormationPatch { black_patch: $k1, white_patch: 0 };
+            acc.patch[offset + $p2] = FormationPatch { black_patch: $k2, white_patch: 0 };
             return
         };
     }
 
     macro_rules! apply_patch_w {
         ($p1:expr,$k1:expr) => {
-            acc[offset + $p1] = FormationPatch { black_patch: 0, white_patch:$k1 };
+            acc.patch[offset + $p1] = FormationPatch { black_patch: 0, white_patch:$k1 };
             return
         };
         ($p1:expr,$k1:expr,$p2:expr,$k2:expr) => {
-            acc[offset + $p1] = FormationPatch { black_patch: 0, white_patch:$k1 };
-            acc[offset + $p2] = FormationPatch { black_patch: 0, white_patch:$k2 };
+            acc.patch[offset + $p1] = FormationPatch { black_patch: 0, white_patch:$k1 };
+            acc.patch[offset + $p2] = FormationPatch { black_patch: 0, white_patch:$k2 };
             return
         };
     }
@@ -105,6 +108,14 @@ fn find_patterns(acc: &mut SlicePatch, offset: usize, b: u8, w: u8, bw: u8, ww:u
         apply_patch_b!(3, FIVE);
     } else if match_pattern!(w, bw, 0b1111_0000, 0b0000_1000) { // XXXX_
     } else if match_pattern!(w, bw, 0b0000_1111, 0b0001_0000) { // _XXXX
+    }
+
+    // WIN
+
+    if b & 0b1111_1000 == 0b1111_1000 {
+        acc.winner = Some(Color::Black)
+    } else if w & 0b1111_1000 == 0b1111_1000 {
+        acc.winner = Some(Color::White)
     }
 }
 

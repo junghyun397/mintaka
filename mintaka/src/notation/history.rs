@@ -23,27 +23,6 @@ impl History {
             .flatten()
     }
 
-    pub fn play(&self, pos: Option<Pos>) -> Self {
-        let mut history = self.0.clone();
-        history.push(pos);
-
-        Self(history)
-    }
-
-    pub fn undo(&self) -> Self {
-        let mut history = self.0.clone();
-        history.pop();
-
-        Self(history)
-    }
-
-    pub fn pass(&self) -> Self {
-        let mut history = self.0.clone();
-        history.push(None);
-
-        Self(history)
-    }
-
     pub fn play_mut(&mut self, pos: Pos) {
         self.0.push(Some(pos));
     }

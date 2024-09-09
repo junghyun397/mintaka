@@ -276,18 +276,17 @@ impl Default for Formations {
 impl Formations {
 
     #[inline(always)]
-    pub fn update_with_slice_mut<const D: Direction>(&mut self, slice: &Slice) {
+    pub fn update_with_slice_mut<const D: Direction>(&mut self, slice: &Slice) -> Option<Color> {
         let mut patch_cache = DummyPatchCache {}; // TODO: DEBUG
-        let slice_patch = if let Some(slice_patch) = patch_cache.probe_mut(slice.slice_key()) {
-            slice_patch
-        } else {
-            let patch = slice.calculate_slice_patch();
-            patch_cache.put_mut(slice.slice_key(), patch);
-            patch
-        };
+        let slice_patch = patch_cache.probe_mut(slice.slice_key())
+            .unwrap_or_else(|| {
+                let patch = slice.calculate_slice_patch();
+                patch_cache.put_mut(slice.slice_key(), patch);
+                patch
+            });
 
         if slice_patch == EMPTY_SLICE_PATCH {
-            return
+            return None
         }
 
         for offset in 0 .. slice.length {
@@ -302,8 +301,10 @@ impl Formations {
                     cartesian_to_index!(slice.start_pos.row() - offset, slice.start_pos.col() + offset) as usize,
             };
 
-            self.0[idx].apply_mask_mut::<D>(slice_patch[offset as usize])
+            self.0[idx].apply_mask_mut::<D>(slice_patch.patch[offset as usize])
         }
+
+        slice_patch.winner
     }
 
     pub fn validate_double_three_mut(&mut self) {

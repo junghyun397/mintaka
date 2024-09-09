@@ -5,21 +5,15 @@ use crate::notation::rule;
 pub struct Pos(u8);
 
 #[macro_export] macro_rules! cartesian_to_index {
-    ($row:expr,$col:expr) => {
-        $row * board_width!() + $col
-    };
+    ($row:expr,$col:expr) => ($row * board_width!() + $col);
 }
 
 #[macro_export] macro_rules! index_to_cartesian {
-    ($idx:expr) => {
-        ($idx / board_width!(), $idx % board_width!())
-    };
+    ($idx:expr) => (($idx / board_width!(), $idx % board_width!()));
 }
 
 #[macro_export] macro_rules! check_cartesian_bound {
-    ($row:expr,$col:expr) => {
-        $row < board_width!() && $col < board_width!()
-    };
+    ($row:expr,$col:expr) => ($row < board_width!() && $col < board_width!());
 }
 
 impl Pos {

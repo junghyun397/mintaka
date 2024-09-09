@@ -1,5 +1,4 @@
 use std::marker::ConstParamTy;
-use std::ops::Rem;
 
 //noinspection RsUnresolvedPath
 #[derive(ConstParamTy, PartialEq, Eq, Clone, Copy, Debug)]

@@ -46,7 +46,10 @@ impl Game {
 
     pub fn play_mut(&mut self, pos: Pos) {
         self.board.set_mut(pos);
-        self.result = None;
+        self.result = match self.board.winner {
+            Some(color) => Some(GameResult::FiveInARow(color)),
+            None => self.result
+        };
         self.history.play_mut(pos);
     }
 
@@ -61,7 +64,7 @@ impl Game {
         self.history.pass_mut();
     }
 
-    pub fn batch_set_mut(&mut self, blacks: Vec<Pos>, whites: Vec<Pos>) {
+    pub fn batch_set_mut(&mut self, blacks: Box<[Pos]>, whites: Box<[Pos]>) {
         let color = Color::player_color_by_moves(blacks.len(), whites.len());
         self.board.batch_set_mut(blacks, whites, color);
     }

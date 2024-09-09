@@ -39,18 +39,18 @@ fn match_symbol(c: char) -> Option<Option<Color>> {
 const SYMBOL_SET: [char; 6] =
     [SYMBOL_BLACK, SYMBOL_WHITE, SYMBOL_EMPTY, SYMBOL_FORBID_DOUBLE_THREE, SYMBOL_FORBID_DOUBLE_FOUR, SYMBOL_FORBID_OVERLINE];
 
-fn parse_board_elements(source: &str) -> Result<Vec<Option<Color>>, &'static str> {
+fn parse_board_elements(source: &str) -> Result<Box<[Option<Color>]>, &'static str> {
     // regex: \d[\s\[](\S[\s\[\]]){N}\d
-    let re: Regex = Regex::from_str(format!(r"\d[\s\[](\S[\s\[\]]){U_BOARD_WIDTH}\d").as_str()).unwrap();
+    let re: Regex = Regex::from_str(format!(r"\d[\s\[](\S[\s\[\]]){}{U_BOARD_WIDTH}{}\d", "{", "}").as_str()).unwrap();
 
-    let elements: Vec<Option<Color>> = re.find_iter(source)
+    let elements: Box<[Option<Color>]> = re.find_iter(source)
         .flat_map(|m| m
             .as_str()
             .chars()
             .skip(1) // 1> . . . . . 1
             .take(rule::BOARD_WIDTH as usize * 2) // 1 . . . . .< 1
         )
-        .flat_map(|x| match_symbol(x))
+        .filter_map(|x| match_symbol(x))
         .collect();
 
     if elements.len() != rule::BOARD_SIZE {
@@ -60,18 +60,18 @@ fn parse_board_elements(source: &str) -> Result<Vec<Option<Color>>, &'static str
     Ok(elements)
 }
 
-fn extract_color_stones(source: &[Option<Color>], target_color: Color) -> Vec<Pos> {
+fn extract_color_stones(source: &[Option<Color>], target_color: Color) -> Box<[Pos]> {
     source.iter()
         .enumerate()
-        .filter_map(|(idx, symbol)| match symbol {
-            Some(color) =>
-                if *color == target_color {
-                    Some(Pos::from_index(idx as u8))
-                } else {
-                    None
-                },
-            _ => None
-        })
+        .filter_map(|(idx, symbol)|
+            symbol
+                .and_then(|color|
+                    (color == target_color)
+                        .then(||
+                            Pos::from_index(idx as u8)
+                        )
+                )
+        )
         .collect()
 }
 
@@ -86,8 +86,7 @@ impl Board {
             .enumerate()
             .map(|(row_idx, item_row)| {
                 let content: String = item_row.into_iter()
-                    .enumerate()
-                    .map(|(col_idx, item)|
+                    .map(|item|
                         transform(item)
                     )
                     .reduce(|head, tail|
@@ -288,14 +287,14 @@ impl FromStr for History {
 impl From<History> for Game {
 
     fn from(history: History) -> Self {
-        let blacks: Vec<Pos> = history.0.iter()
+        let blacks: Box<[Pos]> = history.0.iter()
             .enumerate()
             .filter_map(|(idx, pos)| pos
                 .filter(|_| idx % 2 == 0)
             )
             .collect();
 
-        let whites: Vec<Pos> = history.0.iter()
+        let whites: Box<[Pos]> = history.0.iter()
             .enumerate()
             .filter_map(|(idx, pos)| pos
                 .filter(|_| idx % 2 == 1)

@@ -42,7 +42,7 @@ impl Slice {
     }
 
     pub fn set_mut(&mut self, color: Color, idx: u8) {
-        let mask = 0b1000_0000_0000_0000 >> idx;
+        let mask = 0b1 << idx;
         match color {
             Color::Black => self.black_stones = self.black_stones | mask,
             Color::White => self.white_stones = self.white_stones | mask
@@ -50,7 +50,7 @@ impl Slice {
     }
 
     pub fn unset_mut(&mut self, color: Color, idx: u8) {
-        let mask = !(0b1000_0000_0000_0000 >> idx);
+        let mask = !(0b1 << idx);
         match color {
             Color::Black => self.black_stones = self.black_stones & mask,
             Color::White => self.white_stones = self.white_stones & mask
@@ -58,16 +58,16 @@ impl Slice {
     }
 
     pub fn black_stone_at(&self, idx: u8) -> bool {
-        let mask = 0b1000_0000_0000_0000 >> idx;
+        let mask = 0b1 << idx;
         self.black_stones & mask == mask
     }
 
     pub fn white_stone_at(&self, idx: u8) -> bool {
-        let mask = 0b1000_0000_0000_0000 >> idx;
+        let mask = 0b1 << idx;
         self.white_stones & mask == mask
     }
 
-    pub fn stone_at(&self, color: &Color, idx: u8) -> bool {
+    pub fn stone_at(&self, color: Color, idx: u8) -> bool {
         match color {
             Color::Black => self.black_stone_at(idx),
             Color::White => self.white_stone_at(idx)
