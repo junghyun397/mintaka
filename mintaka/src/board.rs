@@ -92,45 +92,45 @@ impl Board {
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
         slice_mut_op(horizontal_slice, self.player_color, pos.col());
         let winner = self.formations.update_with_slice_mut::<{ Direction::Horizontal }>(horizontal_slice);
-        self.winner.or_else(|| winner);
+        self.winner = self.winner.or_else(|| winner);
 
         let vertical_slice = &mut self.slices.vertical_slices[pos.col_usize()];
         slice_mut_op(vertical_slice, self.player_color, pos.row());
         let winner = self.formations.update_with_slice_mut::<{ Direction::Vertical }>(vertical_slice);
-        self.winner.or_else(|| winner);
+        self.winner = self.winner.or_else(|| winner);
 
         if let Some(ascending_slice) = self.slices.occupy_ascending_slice(pos) {
             slice_mut_op(ascending_slice, self.player_color, pos.col() - ascending_slice.start_pos.col());
             let winner = self.formations.update_with_slice_mut::<{ Direction::Ascending }>(ascending_slice);
-            self.winner.or_else(|| winner);
+            self.winner = self.winner.or_else(|| winner);
         }
 
         if let Some(descending_slice) = self.slices.occupy_descending_slice(pos) {
             slice_mut_op(descending_slice, self.player_color, pos.col() - descending_slice.start_pos.col());
             let winner = self.formations.update_with_slice_mut::<{ Direction::Descending }>(descending_slice);
-            self.winner.or_else(|| winner);
+            self.winner = self.winner.or_else(|| winner);
         }
     }
 
     fn full_update_mut(&mut self) {
         for horizontal_slice in self.slices.horizontal_slices.iter() {
             let winner = self.formations.update_with_slice_mut::<{ Direction::Horizontal }>(horizontal_slice);
-            self.winner.or_else(|| winner);
+            self.winner = self.winner.or_else(|| winner);
         }
 
         for vertical_slice in self.slices.vertical_slices.iter() {
             let winner = self.formations.update_with_slice_mut::<{ Direction::Vertical }>(vertical_slice);
-            self.winner.or_else(|| winner);
+            self.winner = self.winner.or_else(|| winner);
         }
 
         for ascending_slice in self.slices.ascending_slices.iter() {
             let winner = self.formations.update_with_slice_mut::<{ Direction::Ascending }>(ascending_slice);
-            self.winner.or_else(|| winner);
+            self.winner = self.winner.or_else(|| winner);
         }
 
         for descending_slice in self.slices.descending_slices.iter() {
             let winner = self.formations.update_with_slice_mut::<{ Direction::Descending }>(descending_slice);
-            self.winner.or_else(|| winner);
+            self.winner = self.winner.or_else(|| winner);
         }
     }
 

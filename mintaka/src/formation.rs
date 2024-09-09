@@ -211,8 +211,12 @@ impl Formation {
         u64::from(*self) == 0
     }
 
+    pub fn is_not_empty(&self) -> bool {
+        u64::from(*self) != 0
+    }
+
     pub fn is_forbidden(&self) -> bool {
-        self.is_empty()
+        self.is_not_empty()
             && (
                 self.black_formation.has_fours()
                     || self.black_formation.has_threes()
@@ -222,7 +226,7 @@ impl Formation {
     }
 
     pub fn forbidden_kind(&self) -> Option<ForbiddenKind> {
-        self.is_empty()
+        self.is_not_empty()
             .then(||
                 if self.black_formation.has_threes() {
                     ForbiddenKind::DoubleThree
@@ -232,7 +236,7 @@ impl Formation {
                     ForbiddenKind::Overline
                 }
             )
-            .filter(|_| !self.has_overline())
+            .filter(|_| !self.black_formation.has_five())
     }
 
     pub fn apply_mask_mut<const D: Direction>(mut self, patch: FormationPatch) {

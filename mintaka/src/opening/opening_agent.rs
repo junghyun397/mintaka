@@ -3,7 +3,7 @@ use crate::notation::color::Color;
 use crate::notation::history::History;
 use crate::notation::pos::Pos;
 use crate::notation::rule;
-use crate::opening::opening_guide::find_forbidden_symmetry_moves;
+use crate::opening::opening_utils::find_forbidden_symmetry_moves;
 use crate::opening::opening_kind::OpeningKind;
 use std::collections::HashSet;
 

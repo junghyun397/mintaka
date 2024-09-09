@@ -28,7 +28,7 @@ impl Slice {
             return EMPTY_SLICE_PATCH
         }
 
-        let wall: u32 = !(!0 << (16 - self.length));
+        let wall: u32 = !(!0 << (16 - self.length as u32));
         let bw = self.black_stones as u32 | wall;
         let ww = self.white_stones as u32 | wall;
 
@@ -39,7 +39,7 @@ impl Slice {
                 &mut acc, offset,
                 (self.black_stones >> offset) as u8, (self.white_stones >> offset) as u8,
                 (bw >> offset) as u8, (ww >> offset) as u8,
-            )
+            );
         }
 
         acc
@@ -102,19 +102,11 @@ fn find_patterns(acc: &mut SlicePatch, offset: usize, b: u8, w: u8, bw: u8, ww:u
 
     // FIVE
 
-    if match_pattern!(b, ww, 0b1111_0000, 0b0000_1000, 0b0000_0100) { // OOOO_^
-        apply_patch_b!(4, FIVE);
-    } else if match_pattern!(b, ww, 0b0000_1111, 0b0001_0000, 0b0010_0000) { // ^_OOOO
-        apply_patch_b!(3, FIVE);
-    } else if match_pattern!(w, bw, 0b1111_0000, 0b0000_1000) { // XXXX_
-    } else if match_pattern!(w, bw, 0b0000_1111, 0b0001_0000) { // _XXXX
-    }
-
     // WIN
 
-    if b & 0b1111_1000 == 0b1111_1000 {
+    if b & 0b11111 == 0b11111 {
         acc.winner = Some(Color::Black)
-    } else if w & 0b1111_1000 == 0b1111_1000 {
+    } else if w & 0b11111 == 0b11111 {
         acc.winner = Some(Color::White)
     }
 }

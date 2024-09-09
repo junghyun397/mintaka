@@ -1,3 +1,3 @@
-pub mod opening_guide;
+pub mod opening_utils;
 pub mod opening_agent;
-mod opening_kind;
+pub mod opening_kind;
