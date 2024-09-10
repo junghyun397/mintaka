@@ -1,4 +1,4 @@
-use crate::formation::{FIVE, INV_THREE_OVERLINE};
+use crate::formation::{FIVE, INV_THREE_OVERLINE, OPEN_FOUR};
 use crate::notation::color::Color;
 use crate::notation::rule::U_BOARD_WIDTH;
 use crate::pop_count_less_then_two;
@@ -47,26 +47,29 @@ impl Slice {
 
 }
 
-macro_rules! match_pattern {
-    ($packed:expr,$wall:expr,$equal_to:expr,$empty:expr,$not_equal_to:expr) => {
-        ($packed & $equal_to) == $equal_to
-            && (($packed | $wall) & $empty) != $empty
-            && ($packed & $not_equal_to) == $not_equal_to
-    };
-    ($packed:expr,$wall:expr,$equal_to:expr,$empty:expr) => {
-        ($packed & $equal_to) == $equal_to
-            && (($packed | $wall) & $empty) != $empty
-    };
-}
-
-// O|X = equal_to, ^ = not_equal_to, _ = patch, . = non-patch empty
+// O|X = equal_to, ! = not_equal_to, _ = patch, . = non-patch empty
+#[allow(unused_variables)]
 fn find_patterns(acc: &mut SlicePatch, offset: usize, b: u8, w: u8, bw: u8, ww:u8) {
     if pop_count_less_then_two!(b) && pop_count_less_then_two!(w) {
         return
     }
 
+    let cold: u8 = !(bw | ww);
+
     let b_pop_count = b.count_ones();
     let w_pop_count = w.count_ones();
+
+    macro_rules! match_pattern {
+        ($packed:expr,$wall:expr,$equal_to:expr,$empty:expr,$not_equal_to:expr) => {
+            ($packed & $equal_to) == $equal_to
+                && (cold & $empty) == $empty
+                && ($packed & $not_equal_to) == $not_equal_to
+        };
+        ($packed:expr,$equal_to:expr,$empty:expr) => {
+            ($packed & $equal_to) == $equal_to
+                && (cold & $empty) == $empty
+        };
+    }
 
     macro_rules! apply_patch_b {
         ($p1:expr,$k1:expr) => {
@@ -96,17 +99,59 @@ fn find_patterns(acc: &mut SlicePatch, offset: usize, b: u8, w: u8, bw: u8, ww:u
 
     // THREE
 
+    // OO
+
+    // !.OO._.!
+    // !.OO_.!
+
+    // O.O
+
+    // .O_O_.!
+
     // FOUR
+
+    // !OO_O_!
+    // !O.OO_!
+    // !OOO._!
+    // !O_O_O!
 
     // OPEN-FOUR
 
+    // !.OOO_.!
+    if match_pattern!(b, ww, 0b0_00111000, 0b0_01000110, 0b0_10000001) {
+        apply_patch_b!(5, OPEN_FOUR)
+    }
+    // !.OO_O.!
+
     // FIVE
+
+    // !OO_OO!
+    if match_pattern!(b, ww, 0b0_0110110, 0b0_0001000, 0b0_1000001) {
+        apply_patch_b!(3, FIVE);
+    }
+    // !OOO_O!
+    else if match_pattern!(b, ww, 0b0_0111010, 0b0_0000100, 0b0_1000001) {
+        apply_patch_b!(4, FIVE);
+    }
+    // !O_OOO!
+    else if match_pattern!(b, ww, 0b0_0101110, 0b0_0010000, 0b0_1000001){
+        apply_patch_b!(3, FIVE);
+    }
+    // !OOOO_!
+    else if match_pattern!(b, ww, 0b0_0111100, 0b0_0000010, 0b0_1000001) {
+        apply_patch_b!(5, FIVE);
+    }
+
+    // XX_XX
+    // XXX_X
+    // XXXX__
 
     // WIN
 
-    if b & 0b11111 == 0b11111 {
+    else if b & 0b11111 == 0b11111 {
         acc.winner = Some(Color::Black)
-    } else if w & 0b11111 == 0b11111 {
+    }
+    else if w & 0b11111 == 0b11111 {
         acc.winner = Some(Color::White)
     }
 }

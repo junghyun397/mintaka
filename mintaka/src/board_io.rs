@@ -44,18 +44,15 @@ fn parse_board_elements(source: &str) -> Result<Box<[Option<Color>]>, &'static s
     let re: Regex = Regex::from_str(format!(r"\d[\s\[](\S[\s\[\]]){}{U_BOARD_WIDTH}{}\d", "{", "}").as_str()).unwrap();
 
     let elements: Box<[Option<Color>]> = re.find_iter(source)
-        .map(|m| m
-            .as_str()
+        .map(|m| m.as_str())
+        .collect::<Box<[&str]>>()
+        .iter().rev()
+        .flat_map(|m| m
             .chars()
             .skip(1) // 1> . . . . . 1
             .take(rule::BOARD_WIDTH as usize * 2) // 1 . . . . .< 1
-            .collect::<Box<[char]>>()
         )
-        .collect::<Box<[Box<[char]>]>>()
-        .iter()
-        .rev()
-        .flatten()
-        .filter_map(|x| match_symbol(*x))
+        .filter_map(|x| match_symbol(x))
         .collect();
 
     if elements.len() != rule::BOARD_SIZE {

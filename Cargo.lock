@@ -54,6 +54,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "mintaka_cli"
+version = "0.1.0"
+
+[[package]]
 name = "mintaka_engine"
 version = "0.1.0"
 dependencies = [
