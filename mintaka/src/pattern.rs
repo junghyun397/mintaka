@@ -119,7 +119,7 @@ fn find_patterns(acc: &mut SlicePatch, offset: usize, b: u8, w: u8, bw: u8, ww:u
 
     // !.OOO_.!
     if match_pattern!(b, ww, 0b0_00111000, 0b0_01000110, 0b0_10000001) {
-        apply_patch_b!(5, OPEN_FOUR)
+        apply_patch_b!(5, OPEN_FOUR);
     }
     // !.OO_O.!
 
@@ -143,8 +143,11 @@ fn find_patterns(acc: &mut SlicePatch, offset: usize, b: u8, w: u8, bw: u8, ww:u
     }
 
     // XX_XX
+    // XX.XX_
     // XXX_X
-    // XXXX__
+    // XXX.X_
+    // X.XXX_
+    // XXXX._
 
     // WIN
 

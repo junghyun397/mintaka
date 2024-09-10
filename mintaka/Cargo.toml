@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+indoc = "2.0.5"
 lru = "0.12.4"
 regex-lite = "0.1.6"

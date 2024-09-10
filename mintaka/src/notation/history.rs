@@ -27,8 +27,8 @@ impl History {
         self.0.push(Some(pos));
     }
 
-    pub fn undo_mut(&mut self) {
-        self.0.pop();
+    pub fn undo_mut(&mut self) -> Option<Pos> {
+        self.0.pop().unwrap_or(None)
     }
 
     pub fn pass_mut(&mut self) {

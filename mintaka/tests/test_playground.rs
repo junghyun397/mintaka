@@ -7,7 +7,7 @@ mod playground {
     fn playground() {
         let board = Board::default();
 
-        println!("{:?}", board.slices.ascending_slices.iter().map(|x| x.start_pos).collect::<Box<[Pos]>>())
+        println!("{:?}", board.slices.descending_slices.iter().map(|x| x.start_pos).collect::<Box<[Pos]>>())
     }
 
 }

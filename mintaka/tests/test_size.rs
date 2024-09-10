@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod test_performance {
+mod test_size {
     use mintaka::board::Board;
     use mintaka::formation::{Formation, Formations};
     use mintaka::pattern::{FormationPatch, SlicePatch};

@@ -16,8 +16,8 @@ use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 use std::u8;
 
-const SYMBOL_BLACK: char = 'O';
-const SYMBOL_WHITE: char = 'X';
+const SYMBOL_BLACK: char = 'X';
+const SYMBOL_WHITE: char = 'O';
 const SYMBOL_EMPTY: char = '.';
 const SYMBOL_FORBID_DOUBLE_THREE: char = '3';
 const SYMBOL_FORBID_DOUBLE_FOUR: char = '4';
@@ -306,7 +306,8 @@ impl From<History> for Game {
         let mut game = Game {
             board: Board::default(),
             history,
-            result: None
+            result: None,
+            stones: blacks.len() + whites.len()
         };
 
         game.batch_set_mut(blacks, whites);

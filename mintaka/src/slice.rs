@@ -170,8 +170,7 @@ impl Slices {
             .map(|idx| &mut self.descending_slices[idx])
     }
 
-    #[inline(always)]
-    pub fn ascending_slice_idx(pos: Pos) -> Option<usize> {
+    fn ascending_slice_idx(pos: Pos) -> Option<usize> {
         // y = x + b, b = y - x (reversed row sequence)
         let idx = I_DIAGONAL_SLICE_AMOUNT - (pos.row() as isize - pos.col() as isize + rule::I_BOARD_WIDTH - 4);
         if 0 <= idx && idx < I_DIAGONAL_SLICE_AMOUNT {
@@ -181,8 +180,7 @@ impl Slices {
         }
     }
 
-    #[inline(always)]
-    pub fn descending_slice_idx(pos: Pos) -> Option<usize> {
+    fn descending_slice_idx(pos: Pos) -> Option<usize> {
         // y = -x + 15 + b, b = y + x - 15
         let idx = pos.row() as isize + pos.col() as isize - 4;
         if 0 <= idx && idx < I_DIAGONAL_SLICE_AMOUNT {
