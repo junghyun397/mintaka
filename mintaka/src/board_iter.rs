@@ -1,15 +1,17 @@
 use crate::board::Board;
 use crate::formation::Formation;
 use crate::notation::color::Color;
-use crate::notation::forbidden_kind::ForbiddenKind;
 use crate::notation::rule;
+use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slices;
 
+#[repr(u32)]
 pub enum BoardIterItem {
     Stone(Color),
     Formation(Formation)
 }
 
+#[repr(u64)]
 pub enum BoardIterVerboseItem {
     Stone(Color),
     Formation(Formation),

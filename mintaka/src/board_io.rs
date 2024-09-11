@@ -4,10 +4,10 @@ use crate::formation::FormationUnit;
 use crate::game::Game;
 use crate::impl_debug_by_display;
 use crate::notation::color::Color;
-use crate::notation::forbidden_kind::ForbiddenKind;
 use crate::notation::history::History;
 use crate::notation::pos::Pos;
 use crate::notation::rule;
+use crate::notation::rule::ForbiddenKind;
 use crate::notation::rule::U_BOARD_WIDTH;
 use crate::slice::Slice;
 use crate::utils::str_utils::join_str_horizontally;
@@ -367,4 +367,3 @@ impl From<ForbiddenKind> for char {
     }
 
 }
-

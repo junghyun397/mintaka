@@ -6,9 +6,16 @@ pub const I_BOARD_WIDTH: isize = BOARD_WIDTH as isize;
 
 #[macro_export] macro_rules! board_width {() => (15);}
 
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum RuleKind {
     FiveInARow = 0,
     SimplifiedRenju = 1,
     Renju = 2
+}
+
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+pub enum ForbiddenKind {
+    DoubleThree,
+    DoubleFour,
+    Overline,
 }

@@ -114,6 +114,7 @@ fn find_patterns(acc: &mut SlicePatch, offset: usize, b: u8, w: u8, bw: u8, ww:u
     // !O.OO_!
     // !OOO._!
     // !O_O_O!
+    // !OO__O!
 
     // OPEN-FOUR
 
@@ -151,10 +152,10 @@ fn find_patterns(acc: &mut SlicePatch, offset: usize, b: u8, w: u8, bw: u8, ww:u
 
     // WIN
 
-    else if b & 0b11111 == 0b11111 {
+    else if b & 0b00_11111 == 0b00_11111 {
         acc.winner = Some(Color::Black)
     }
-    else if w & 0b11111 == 0b11111 {
+    else if w & 0b00_11111 == 0b00_11111 {
         acc.winner = Some(Color::White)
     }
 }
