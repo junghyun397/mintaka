@@ -5,10 +5,10 @@ use crate::game::Game;
 use crate::impl_debug_by_display;
 use crate::notation::color::Color;
 use crate::notation::history::History;
+use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::notation::rule;
+use crate::notation::pos::U_BOARD_WIDTH;
 use crate::notation::rule::ForbiddenKind;
-use crate::notation::rule::U_BOARD_WIDTH;
 use crate::slice::Slice;
 use crate::utils::str_utils::join_str_horizontally;
 use regex_lite::Regex;
@@ -50,12 +50,12 @@ fn parse_board_elements(source: &str) -> Result<Box<[Option<Color>]>, &'static s
         .flat_map(|m| m
             .chars()
             .skip(1) // 1> . . . . . 1
-            .take(rule::BOARD_WIDTH as usize * 2) // 1 . . . . .< 1
+            .take(pos::BOARD_WIDTH as usize * 2) // 1 . . . . .< 1
         )
         .filter_map(|x| match_symbol(x))
         .collect();
 
-    if elements.len() != rule::BOARD_SIZE {
+    if elements.len() != pos::BOARD_SIZE {
         return Err("Invalid elements size.");
     }
 
@@ -104,7 +104,7 @@ impl Board {
             )
             .unwrap();
 
-        let column_hint_content: String = ('A' .. ('A' as u8 + rule::BOARD_WIDTH) as char)
+        let column_hint_content: String = ('A' .. ('A' as u8 + pos::BOARD_WIDTH) as char)
             .flat_map(|x| [x, ' '])
             .take(U_BOARD_WIDTH * 2 - 1)
             .collect();
@@ -201,7 +201,7 @@ impl FromStr for Slice {
             .collect();
 
         let field_len = fields.len() as u8;
-        if 5 > field_len || field_len > rule::BOARD_WIDTH {
+        if 5 > field_len || field_len > pos::BOARD_WIDTH {
             return Err("Invalid size.");
         }
 
@@ -327,7 +327,7 @@ impl FromStr for Pos {
             .and_then(|row| {
                 let col = source.chars().next().unwrap() as u8 - 'a' as u8;
                 let pos = Pos::from_cartesian(row - 1 , col);
-                if pos.col() < rule::BOARD_WIDTH && pos.row() < rule::BOARD_WIDTH {
+                if pos.col() < pos::BOARD_WIDTH && pos.row() < pos::BOARD_WIDTH {
                     Ok(pos)
                 } else { Err("Invalid range") }
             })

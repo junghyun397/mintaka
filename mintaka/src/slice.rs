@@ -1,12 +1,12 @@
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
+use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::notation::rule;
 use std::cmp::max;
 use std::ops::Neg;
 
-const DIAGONAL_SLICE_AMOUNT: usize = rule::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
-const SLICE_AMOUNT: usize = rule::U_BOARD_WIDTH * 2 + DIAGONAL_SLICE_AMOUNT * 2;
+const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
+const SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 + DIAGONAL_SLICE_AMOUNT * 2;
 
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
 
@@ -67,7 +67,7 @@ impl Slice {
         self.white_stones & mask == mask
     }
 
-    pub fn stone_at(&self, color: Color, idx: u8) -> bool {
+    pub fn stone_exists(&self, color: Color, idx: u8) -> bool {
         match color {
             Color::Black => self.black_stone_at(idx),
             Color::White => self.white_stone_at(idx)
@@ -85,15 +85,15 @@ impl Slice {
     }
 
     pub fn slice_key(&self) -> SliceKey {
-        self.black_stones as u32 | self.white_stones as u32 >> rule::BOARD_WIDTH
+        self.black_stones as u32 | self.white_stones as u32 >> pos::BOARD_WIDTH
     }
 
 }
 
 #[derive(Copy, Clone)]
 pub struct Slices {
-    pub horizontal_slices: [Slice; rule::U_BOARD_WIDTH],
-    pub vertical_slices: [Slice; rule::U_BOARD_WIDTH],
+    pub horizontal_slices: [Slice; pos::U_BOARD_WIDTH],
+    pub vertical_slices: [Slice; pos::U_BOARD_WIDTH],
     pub ascending_slices: [Slice; DIAGONAL_SLICE_AMOUNT],
     pub descending_slices: [Slice; DIAGONAL_SLICE_AMOUNT],
 }
@@ -103,24 +103,24 @@ impl Default for Slices {
     fn default() -> Self {
         Self {
             horizontal_slices: std::array::from_fn(|idx|
-                Slice::empty(rule::BOARD_WIDTH, Pos::from_cartesian(idx as u8, 0))
+                Slice::empty(pos::BOARD_WIDTH, Pos::from_cartesian(idx as u8, 0))
             ),
             vertical_slices: std::array::from_fn(|idx|
-                Slice::empty(rule::BOARD_WIDTH, Pos::from_cartesian(0, idx as u8))
+                Slice::empty(pos::BOARD_WIDTH, Pos::from_cartesian(0, idx as u8))
             ),
             ascending_slices: std::array::from_fn(|idx| {
-                let seq_num = idx as isize + 5 - rule::I_BOARD_WIDTH;
+                let seq_num = idx as isize + 5 - pos::I_BOARD_WIDTH;
                 Slice::empty(
-                    (seq_num.abs() - rule::I_BOARD_WIDTH).abs() as u8,
+                    (seq_num.abs() - pos::I_BOARD_WIDTH).abs() as u8,
                     Pos::from_cartesian(max(0, seq_num.neg()) as u8, max(0, seq_num) as u8)
                 )
             }),
             descending_slices: std::array::from_fn(|idx| {
-                let seq_num = idx as isize + 5 - rule::I_BOARD_WIDTH;
+                let seq_num = idx as isize + 5 - pos::I_BOARD_WIDTH;
                 Slice::empty(
-                    (seq_num.abs() - rule::I_BOARD_WIDTH).abs() as u8,
+                    (seq_num.abs() - pos::I_BOARD_WIDTH).abs() as u8,
                     Pos::from_cartesian(
-                        rule::BOARD_WIDTH-1 - max(0, seq_num.neg()) as u8,
+                        pos::BOARD_WIDTH-1 - max(0, seq_num.neg()) as u8,
                         max(0, seq_num) as u8
                     )
                 )
@@ -172,7 +172,7 @@ impl Slices {
 
     fn ascending_slice_idx(pos: Pos) -> Option<usize> {
         // y = x + b, b = y - x (reversed row sequence)
-        let idx = I_DIAGONAL_SLICE_AMOUNT - (pos.row() as isize - pos.col() as isize + rule::I_BOARD_WIDTH - 4);
+        let idx = I_DIAGONAL_SLICE_AMOUNT - (pos.row() as isize - pos.col() as isize + pos::I_BOARD_WIDTH - 4);
         if 0 <= idx && idx < I_DIAGONAL_SLICE_AMOUNT {
             Some(idx as usize)
         } else {

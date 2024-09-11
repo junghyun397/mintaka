@@ -1,7 +1,7 @@
 use crate::board::Board;
 use crate::formation::Formation;
 use crate::notation::color::Color;
-use crate::notation::rule;
+use crate::notation::pos;
 use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slices;
 
@@ -64,7 +64,7 @@ impl Slices {
     pub fn iter(&self) -> impl Iterator<Item=Option<Color>> + '_ {
         self.horizontal_slices.iter()
             .flat_map(|slice|
-                (0 .. rule::BOARD_WIDTH).into_iter()
+                (0 .. pos::BOARD_WIDTH).into_iter()
                     .map(|col_idx|
                         slice.stone_kind(col_idx)
                     )

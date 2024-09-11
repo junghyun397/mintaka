@@ -3,7 +3,7 @@ use crate::notation::color::Color;
 use crate::notation::game_result::GameResult;
 use crate::notation::history::History;
 use crate::notation::pos::Pos;
-use crate::notation::rule;
+use crate::notation::pos;
 
 #[derive(Clone)]
 pub struct Game {
@@ -33,10 +33,10 @@ impl Game {
     }
 
     pub fn validate_move(&self, pos: Pos) -> bool {
-        self.result.is_none()
-            || !(self.board.slices.horizontal_slices[pos.row_usize()].stone_at(self.board.player_color, pos.col())
+        !(self.result.is_none()
+            || !self.board.slices.horizontal_slices[pos.row_usize()].stone_exists(self.board.player_color, pos.col())
             || (self.board.player_color == Color::Black && self.board.formations.0[pos.idx_usize()].is_forbidden())
-            || self.moves() == rule::BOARD_SIZE)
+            || self.moves() == pos::BOARD_SIZE)
     }
 
     pub fn play(mut self, pos: Pos) -> Self {
@@ -44,7 +44,7 @@ impl Game {
         self
     }
 
-    pub fn undo(mut self, pos: Pos) -> Self {
+    pub fn undo(mut self) -> Self {
         self.undo_mut();
         self
     }
@@ -64,7 +64,7 @@ impl Game {
                 GameResult::FiveInARow(color)
             )
             .or_else(||
-                 (self.stones == rule::BOARD_SIZE).then(|| GameResult::Full)
+                 (self.stones == pos::BOARD_SIZE).then(|| GameResult::Full)
             );
     }
 

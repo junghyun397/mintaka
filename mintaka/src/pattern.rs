@@ -1,6 +1,6 @@
 use crate::formation::{FIVE, INV_THREE_OVERLINE, OPEN_FOUR};
 use crate::notation::color::Color;
-use crate::notation::rule::U_BOARD_WIDTH;
+use crate::notation::pos::U_BOARD_WIDTH;
 use crate::pop_count_less_then_two;
 use crate::slice::Slice;
 
@@ -34,7 +34,7 @@ impl Slice {
 
         let mut acc: SlicePatch = EMPTY_SLICE_PATCH.clone();
 
-        for offset in 0 .. self.length as usize - 5 {
+        for offset in 0 ..= self.length as usize - 5 {
             find_patterns(
                 &mut acc, offset,
                 (self.black_stones >> offset) as u8, (self.white_stones >> offset) as u8,
@@ -152,7 +152,7 @@ fn find_patterns(acc: &mut SlicePatch, offset: usize, b: u8, w: u8, bw: u8, ww:u
 
     // WIN
 
-    else if b & 0b00_11111 == 0b00_11111 {
+    if b & 0b00_11111 == 0b00_11111 {
         acc.winner = Some(Color::Black)
     }
     else if w & 0b00_11111 == 0b00_11111 {

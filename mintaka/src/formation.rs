@@ -2,11 +2,11 @@ use crate::cache::dummy_patch_cache::DummyPatchCache;
 use crate::cache::patch_cache::PatchCache;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
-use crate::notation::rule;
+use crate::notation::pos;
 use crate::notation::rule::ForbiddenKind;
 use crate::pattern::{FormationPatch, EMPTY_SLICE_PATCH};
 use crate::slice::Slice;
-use crate::{board_width, cartesian_to_index, pop_count_less_then_two, pop_count_less_then_two_unchecked};
+use crate::{cartesian_to_index, pop_count_less_then_two, pop_count_less_then_two_unchecked};
 
 pub const CLOSED_FOUR_SINGLE: u8    = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8    = 0b1100_0000;
@@ -267,12 +267,12 @@ impl Formation {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct Formations(pub [Formation; rule::BOARD_SIZE]);
+pub struct Formations(pub [Formation; pos::BOARD_SIZE]);
 
 impl Default for Formations {
 
     fn default() -> Self {
-        Self([Formation::default(); rule::BOARD_SIZE])
+        Self([Formation::default(); pos::BOARD_SIZE])
     }
 
 }

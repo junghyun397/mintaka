@@ -1,10 +1,10 @@
 use crate::game::Game;
 use crate::notation::color::Color;
 use crate::notation::history::History;
+use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::notation::rule;
-use crate::opening::opening_utils::find_forbidden_symmetry_moves;
 use crate::opening::opening_kind::OpeningKind;
+use crate::opening::opening_utils::find_forbidden_symmetry_moves;
 use std::collections::HashSet;
 
 pub enum OpeningStage {
@@ -82,7 +82,7 @@ impl_opening_agent!(OpeningMove);
 impl MoveStageOpeningAgent for OpeningMove {
 
     fn validate_move(&self, pos: Pos) -> bool {
-        let pole: u8 = rule::BOARD_WIDTH / 2 - self.move_window_width / 2;
+        let pole: u8 = pos::BOARD_WIDTH / 2 - self.move_window_width / 2;
         let (row, col) = pos.to_cartesian();
 
         (pole <= row && row < pole + self.move_window_width)
@@ -164,7 +164,7 @@ impl OpeningSwap {
                     moves: self.moves,
                     opening_kind: self.opening_kind,
                     opener_color,
-                    move_window_width: rule::BOARD_WIDTH,
+                    move_window_width: pos::BOARD_WIDTH,
                 }),
                 Some(offer_count) => OpeningStage::Offer(OpeningOffer {
                     moves: self.moves,

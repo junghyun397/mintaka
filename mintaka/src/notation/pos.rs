@@ -1,20 +1,23 @@
-use crate::board_width;
-use crate::notation::rule;
+pub const BOARD_WIDTH: u8 = 15;
+pub const BOARD_SIZE: usize = U_BOARD_WIDTH * U_BOARD_WIDTH;
 
-#[derive(Hash, PartialEq, Eq, Copy, Clone)]
-pub struct Pos(u8);
+pub const U_BOARD_WIDTH: usize = BOARD_WIDTH as usize;
+pub const I_BOARD_WIDTH: isize = BOARD_WIDTH as isize;
 
 #[macro_export] macro_rules! cartesian_to_index {
-    ($row:expr,$col:expr) => ($row * board_width!() + $col);
+    ($row:expr,$col:expr) => ($row * 15 + $col);
 }
 
 #[macro_export] macro_rules! index_to_cartesian {
-    ($idx:expr) => (($idx / board_width!(), $idx % board_width!()));
+    ($idx:expr) => (($idx / 15, $idx % 15));
 }
 
 #[macro_export] macro_rules! check_cartesian_bound {
-    ($row:expr,$col:expr) => ($row < board_width!() && $col < board_width!());
+    ($row:expr,$col:expr) => ($row < 15 && $col < 15);
 }
+
+#[derive(Hash, PartialEq, Eq, Copy, Clone)]
+pub struct Pos(u8);
 
 impl Pos {
 
@@ -43,7 +46,7 @@ impl Pos {
     }
 
     pub fn row(&self) -> u8 {
-        self.0 / rule::BOARD_WIDTH
+        self.0 / BOARD_WIDTH
     }
 
     pub fn row_usize(&self) -> usize {
@@ -51,7 +54,7 @@ impl Pos {
     }
 
     pub fn col(&self) -> u8 {
-        self.0 % rule::BOARD_WIDTH
+        self.0 % BOARD_WIDTH
     }
 
     pub fn col_usize(&self) -> usize {

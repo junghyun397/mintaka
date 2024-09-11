@@ -1,4 +1,3 @@
-use crate::board_width;
 use crate::check_cartesian_bound;
 use crate::notation::history::History;
 use crate::notation::pos::Pos;
