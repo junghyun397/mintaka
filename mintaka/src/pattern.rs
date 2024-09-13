@@ -1,4 +1,4 @@
-use crate::formation::{FIVE, INV_THREE_OVERLINE, OPEN_FOUR};
+use crate::formation::{CLOSE_THREE, FIVE, INV_THREE_OVERLINE, OPEN_FOUR};
 use crate::notation::color::Color;
 use crate::notation::pos::U_BOARD_WIDTH;
 use crate::pop_count_less_then_two;
@@ -72,32 +72,48 @@ fn find_patterns(acc: &mut SlicePatch, offset: usize, b: u8, w: u8, bw: u8, ww:u
     }
 
     macro_rules! apply_patch_b {
-        ($p1:expr,$k1:expr) => {
-            acc.patch[offset + $p1] = FormationPatch { black_patch: $k1, white_patch: 0 };
-            return
+        ($pos:expr,$patch:expr,$($rest:tt)*) => {
+            acc.patch[offset + $pos] = FormationPatch { black_patch: $patch, white_patch: 0 };
+            apply_patch_b!($($rest)*);
         };
-        ($p1:expr,$k1:expr,$p2:expr,$k2:expr) => {
-            acc.patch[offset + $p1] = FormationPatch { black_patch: $k1, white_patch: 0 };
-            acc.patch[offset + $p2] = FormationPatch { black_patch: $k2, white_patch: 0 };
-            return
+        ($pos:expr, INC_CLOSED_FOUR,$($rest:tt)*) => {
+            let original = acc.patch[offset + $p1];
+            acc.patch[offset + $p1] = FormationPatch {
+                black_patch: increase_closed_four(original.black_patch)
+                white_patch: 0,
+            };
+            apply_patch_b!($($rest)*);
         };
+        () => {
+            return
+        }
     }
 
     macro_rules! apply_patch_w {
-        ($p1:expr,$k1:expr) => {
-            acc.patch[offset + $p1] = FormationPatch { black_patch: 0, white_patch:$k1 };
-            return
+        ($pos:expr,$patch:expr,$($rest:tt)*) => {
+            acc.patch[offset + $pos] = FormationPatch { black_patch: $patch, white_patch: 0 };
+            apply_patch_b!($($rest)*);
         };
-        ($p1:expr,$k1:expr,$p2:expr,$k2:expr) => {
-            acc.patch[offset + $p1] = FormationPatch { black_patch: 0, white_patch:$k1 };
-            acc.patch[offset + $p2] = FormationPatch { black_patch: 0, white_patch:$k2 };
-            return
+        ($pos:expr,INC_CLOSED_FOUR,$($rest:tt)*) => {
+            let original = acc.patch[offset + $p1];
+            acc.patch[offset + $p1] = FormationPatch {
+                black_patch: increase_closed_four(original.black_patch)
+                white_patch: 0,
+            };
+            apply_patch_b!($($rest)*);
         };
+        () => {
+            return
+        }
     }
 
-    // TODO: STRONG control hazard, needs optimization
+    // TODO: STRONG control hazard
 
     // THREE
+
+    if b_pop_count < 2 {
+        return
+    }
 
     // OO
 
@@ -108,47 +124,73 @@ fn find_patterns(acc: &mut SlicePatch, offset: usize, b: u8, w: u8, bw: u8, ww:u
 
     // .O_O_.!
 
+    if w_pop_count < 2 {
+        return
+    }
+
     // FOUR
 
-    // !OO_O_!
-    // !O.OO_!
-    // !OOO._!
-    // !O_O_O!
-    // !OO__O!
+    if b_pop_count < 3 {
+        return
+    }
+
+    // !XX_X_!
+    // !X.XX_!
+    // !XXX._!
+    // !X_X_X!
+    if match_pattern!(b, ww, 0b0_0101010, 0b0_0010100, 0b0_1000001) {
+        apply_patch_w!(2, OPEN_FOUR, 4, OPEN_FOUR,);
+    }
+    // !XX__X!
+
+    if w_pop_count < 3 {
+        return
+    }
 
     // OPEN-FOUR
 
-    // !.OOO_.!
-    if match_pattern!(b, ww, 0b0_00111000, 0b0_01000110, 0b0_10000001) {
-        apply_patch_b!(5, OPEN_FOUR);
+    // !.XXX_.!
+    if match_pattern!(b, ww, 0b0_00111000, 0b0_01000110, 0b_10000001) {
+        apply_patch_b!(5, OPEN_FOUR, 5, CLOSE_THREE,);
     }
-    // !.OO_O.!
+    // !.XX_X.!
+    // !_XX.X_!
+    if match_pattern!(b, ww, 0b0_00110100, 0b0_01001010, 0b_1000001) {
+        apply_patch_b!(4, OPEN_FOUR,);
+        apply_patch_b!(1, CLOSE_THREE, 5, CLOSE_THREE,);
+    }
+
+    // CLOSE-THREE
+
+    // O.XXX._!
 
     // FIVE
 
-    // !OO_OO!
-    if match_pattern!(b, ww, 0b0_0110110, 0b0_0001000, 0b0_1000001) {
-        apply_patch_b!(3, FIVE);
-    }
-    // !OOO_O!
-    else if match_pattern!(b, ww, 0b0_0111010, 0b0_0000100, 0b0_1000001) {
-        apply_patch_b!(4, FIVE);
-    }
-    // !O_OOO!
-    else if match_pattern!(b, ww, 0b0_0101110, 0b0_0010000, 0b0_1000001){
-        apply_patch_b!(3, FIVE);
-    }
-    // !OOOO_!
-    else if match_pattern!(b, ww, 0b0_0111100, 0b0_0000010, 0b0_1000001) {
-        apply_patch_b!(5, FIVE);
+    if b_pop_count < 4 {
+        return
     }
 
-    // XX_XX
-    // XX.XX_
-    // XXX_X
-    // XXX.X_
-    // X.XXX_
-    // XXXX._
+    // !XX_XX!
+    else if match_pattern!(b, ww, 0b0_0110110, 0b0_0001000, 0b0_1000001) {
+        apply_patch_b!(3, FIVE,);
+    }
+    // !XXX_X!
+    else if match_pattern!(b, ww, 0b0_0111010, 0b0_0000100, 0b0_1000001) {
+        apply_patch_b!(4, FIVE,);
+    }
+    // !XXXX_!
+    else if match_pattern!(b, ww, 0b0_0111100, 0b0_0000010, 0b0_1000001) {
+        apply_patch_b!(5, FIVE,);
+    }
+
+    if w_pop_count < 4 {
+        return
+    }
+
+    // OO_OO
+    // OOO_O
+    // OOO.O_
+    // O.OOO_
 
     // WIN
 
@@ -158,6 +200,16 @@ fn find_patterns(acc: &mut SlicePatch, offset: usize, b: u8, w: u8, bw: u8, ww:u
     else if w & 0b00_11111 == 0b00_11111 {
         acc.winner = Some(Color::White)
     }
+}
+
+fn has_overline(packed: u16) -> bool {
+    let mut packed = packed;
+
+    packed &= packed >> 1; // make space for shift
+    packed &= packed >> 1; // make space for shift
+    packed &= packed >> 3; // 6 - 1 - 1 - 3 = 1
+
+    packed != 0
 }
 
 fn increase_closed_four(packed: u8) -> u8 {
