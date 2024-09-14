@@ -1,7 +1,8 @@
 [package]
-name = "mintaka_cli"
+name = "mintaka_webui"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ratatui = "0.28.1"
+time = "0.3.36"
+tiny_http = "0.12.0"
