@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "lib": ["ES6", "DOM"],
+    "rootDir": "src",
+    "strict": true,
+    "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true
+  },
+}

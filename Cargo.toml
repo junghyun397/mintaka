@@ -1,5 +1,5 @@
 [workspace]
-members = ["mintaka", "mintaka_engine", "mintaka_webui"]
+members = ["mintaka", "mintaka_engine", "mintaka_server"]
 default-members = ["mintaka", "mintaka_engine"]
 workspace.resolver = "2"
 

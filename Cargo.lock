@@ -101,7 +101,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mintaka_webui"
+name = "mintaka_server"
 version = "0.1.0"
 dependencies = [
  "time",
