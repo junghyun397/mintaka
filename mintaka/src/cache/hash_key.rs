@@ -38,10 +38,8 @@ impl From<&[Slice; pos::U_BOARD_WIDTH]> for HashKey {
             .enumerate()
             .fold(HashKey::default(), |mut key, (row, slice)| {
                 for col in 0 .. pos::BOARD_WIDTH {
-                    if slice.black_stone_at(col) {
-                        key = key.set_idx(Color::Black, cartesian_to_index!(row, col as usize))
-                    } else if slice.white_stone_at(col) {
-                        key = key.set_idx(Color::White, cartesian_to_index!(row, col as usize))
+                    if let Some(color) = slice.stone_kind(col) {
+                        key = key.set_idx(color, cartesian_to_index!(row, col as usize))
                     }
                 }
 

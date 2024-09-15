@@ -25,10 +25,6 @@ impl Pos {
         Pos(index)
     }
 
-    pub fn from_index_usize(index: usize) -> Self {
-        Pos(index as u8)
-    }
-
     pub fn from_cartesian(row: u8, col: u8) -> Self {
         Pos(cartesian_to_index!(row, col))
     }

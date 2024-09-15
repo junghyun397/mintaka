@@ -1,11 +1,7 @@
 #[cfg(test)]
 mod test_pattern {
-
-    // Convention:
-    // open-three = 3, close-three = $, Open-four
-
-    use mintaka::formation::{CLOSED_FOUR_DOUBLE, CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, INV_THREE_OVERLINE, OPEN_THREE};
     use mintaka::notation::color::Color;
+    use mintaka::pattern::{CLOSED_FOUR_DOUBLE, CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, INV_THREE_OVERLINE, OPEN_THREE};
     use mintaka::slice::Slice;
     use std::str::FromStr;
 
@@ -17,10 +13,10 @@ mod test_pattern {
 
         let content_patch = patch.patch.iter()
             .take(slice.length as usize)
-            .map(|formation_patch| {
+            .map(|pattern_patch| {
                 let unit = match color {
-                    Color::Black => formation_patch.black_patch,
-                    Color::White => formation_patch.white_patch
+                    Color::Black => pattern_patch.black_patch,
+                    Color::White => pattern_patch.white_patch
                 };
 
                 if unit & mask_kind == mask_kind {
@@ -131,25 +127,49 @@ mod test_pattern {
             ". . . . . . . V . . . .",
             CLOSED_FOUR_DOUBLE,
         );
+
+        test_patch_both_color(
+            ". . O O O . . . O O O . .",
+            ". . . . . . V . . . . . .",
+            CLOSED_FOUR_DOUBLE
+        );
     }
 
     #[test]
     fn basic_five() {
-        test_patch_both_color(
+        // TODO: basic test
+        test_patch(
             ". . X X X X . .",
+            ". . . . . . V .",
+            Color::Black,
+            FIVE
+        );
+
+        test_patch_both_color(
+            ". . O O O O . .",
             ". V . . . . V .",
             FIVE
         );
 
         test_patch_both_color(
-            ". . X X X . X . .",
+            ". . O O O . O . .",
             ". . . . . V . . .",
             FIVE
         );
 
         test_patch_both_color(
-            ". . X X . X X . .",
+            ". . O O . O O . .",
             ". . . . V . . . .",
+            FIVE
+        );
+    }
+
+    #[test]
+    fn complex_five() {
+        test_patch_both_flow(
+            ". X . X X X X . .",
+            ". . . . . . . V .",
+            Color::Black,
             FIVE
         );
     }

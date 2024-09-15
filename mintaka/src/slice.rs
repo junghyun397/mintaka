@@ -57,27 +57,17 @@ impl Slice {
         }
     }
 
-    pub fn black_stone_at(&self, idx: u8) -> bool {
+    pub fn stone_exists(&self, idx: u8) -> bool {
         let mask = 0b1 << idx;
-        self.black_stones & mask == mask
-    }
-
-    pub fn white_stone_at(&self, idx: u8) -> bool {
-        let mask = 0b1 << idx;
-        self.white_stones & mask == mask
-    }
-
-    pub fn stone_exists(&self, color: Color, idx: u8) -> bool {
-        match color {
-            Color::Black => self.black_stone_at(idx),
-            Color::White => self.white_stone_at(idx)
-        }
+        (self.black_stones | self.white_stones) & mask == mask
     }
 
     pub fn stone_kind(&self, idx: u8) -> Option<Color> {
-        if self.black_stone_at(idx) {
+        let mask = 0b1 << idx;
+
+        if self.black_stones & mask == mask {
             Some(Color::Black)
-        } else if self.white_stone_at(idx) {
+        } else if self.white_stones & mask == mask {
             Some(Color::White)
         } else {
             None

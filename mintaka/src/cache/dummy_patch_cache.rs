@@ -1,8 +1,8 @@
 #![allow(unused_variables)]
 
 use crate::cache::patch_cache::PatchCache;
-use crate::pattern::SlicePatch;
 use crate::slice::SliceKey;
+use crate::slice_pattern::SlicePatch;
 
 pub struct DummyPatchCache;
 

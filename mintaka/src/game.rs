@@ -2,15 +2,14 @@ use crate::board::Board;
 use crate::notation::color::Color;
 use crate::notation::game_result::GameResult;
 use crate::notation::history::History;
-use crate::notation::pos::Pos;
 use crate::notation::pos;
+use crate::notation::pos::Pos;
 
 #[derive(Clone)]
 pub struct Game {
     pub board: Board,
     pub history: History,
     pub result: Option<GameResult>,
-    pub stones: usize,
 }
 
 impl Default for Game {
@@ -20,7 +19,6 @@ impl Default for Game {
             board: Board::default(),
             history: History::default(),
             result: None,
-            stones: 0,
         }
     }
 
@@ -34,8 +32,8 @@ impl Game {
 
     pub fn validate_move(&self, pos: Pos) -> bool {
         !(self.result.is_none()
-            || !self.board.slices.horizontal_slices[pos.row_usize()].stone_exists(self.board.player_color, pos.col())
-            || (self.board.player_color == Color::Black && self.board.formations.0[pos.idx_usize()].is_forbidden())
+            || !self.board.slices.horizontal_slices[pos.row_usize()].stone_exists(pos.col())
+            || (self.board.player_color == Color::Black && self.board.patterns.field[pos.idx_usize()].is_forbidden())
             || self.moves() == pos::BOARD_SIZE)
     }
 
@@ -56,7 +54,6 @@ impl Game {
 
     pub fn play_mut(&mut self, pos: Pos) {
         self.board.set_mut(pos);
-        self.stones += 1;
 
         self.history.play_mut(pos);
         self.result = self.board.winner
@@ -64,7 +61,7 @@ impl Game {
                 GameResult::FiveInARow(color)
             )
             .or_else(||
-                 (self.stones == pos::BOARD_SIZE).then(|| GameResult::Full)
+                 (self.board.stones == pos::BOARD_SIZE).then(|| GameResult::Full)
             );
     }
 

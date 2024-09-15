@@ -1,20 +1,20 @@
 use crate::board::Board;
-use crate::formation::Formation;
 use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::rule::ForbiddenKind;
+use crate::pattern::Pattern;
 use crate::slice::Slices;
 
-#[repr(u32)]
+#[repr(u64)]
 pub enum BoardIterItem {
     Stone(Color),
-    Formation(Formation)
+    Pattern(Pattern)
 }
 
 #[repr(u64)]
 pub enum BoardIterVerboseItem {
     Stone(Color),
-    Formation(Formation),
+    Pattern(Pattern),
     Forbidden(ForbiddenKind),
     Empty
 }
@@ -28,8 +28,8 @@ impl Board {
                 if let Some(color) = maybe_color {
                     BoardIterItem::Stone(color)
                 } else {
-                    BoardIterItem::Formation(
-                        self.formations.0[idx]
+                    BoardIterItem::Pattern(
+                        self.patterns.field[idx]
                     )
                 }
             )
@@ -42,15 +42,15 @@ impl Board {
                 if let Some(color) = maybe_color {
                     BoardIterVerboseItem::Stone(color)
                 } else {
-                    let formation = self.formations.0[idx];
+                    let pattern = self.patterns.field[idx];
 
-                    if formation.is_empty() {
+                    if pattern.is_empty() {
                         BoardIterVerboseItem::Empty
                     } else {
-                        formation.forbidden_kind()
+                        pattern.forbidden_kind()
                             .map(|kind| BoardIterVerboseItem::Forbidden(kind))
                             .unwrap_or_else(||
-                                BoardIterVerboseItem::Formation(formation)
+                                BoardIterVerboseItem::Pattern(pattern)
                             )
                     }
                 }

@@ -14,7 +14,7 @@ fn main() {
 
     let server = tiny_http::Server::http(format!("0.0.0.0:{}", pref.port)).unwrap();
 
-    println!("mintaka web-ui backend not listening on port {}.", pref.port);
+    println!("mintaka web-ui backend now listening on port {}.", pref.port);
 
     loop {
         let request = match server.recv() {

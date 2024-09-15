@@ -1,4 +1,4 @@
-use crate::pattern::SlicePatch;
+use crate::slice_pattern::SlicePatch;
 
 pub trait PatchCache {
 

@@ -1,8 +1,8 @@
 use crate::cache::hash_key::HashKey;
-use crate::formation::Formations;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::Pos;
+use crate::pattern::Patterns;
 use crate::slice::{Slice, Slices};
 
 // 2248-bytes
@@ -10,8 +10,9 @@ use crate::slice::{Slice, Slices};
 pub struct Board {
     pub player_color: Color,
     pub slices: Slices,
-    pub formations: Formations,
+    pub patterns: Patterns,
     pub winner: Option<Color>,
+    pub stones: usize,
     pub hash_key: HashKey,
 }
 
@@ -21,8 +22,9 @@ impl Default for Board {
         Self {
             player_color: Color::Black,
             slices: Slices::default(),
-            formations: Formations::default(),
+            patterns: Patterns::default(),
             winner: None,
+            stones: 0,
             hash_key: HashKey::default()
         }
     }
@@ -58,6 +60,7 @@ impl Board {
     pub fn set_mut(&mut self, pos: Pos) {
         self.incremental_update_mut(pos, Slice::set_mut);
 
+        self.stones += 1;
         self.switch_player_mut();
         self.hash_key = self.hash_key.set(self.player_color, pos);
     }
@@ -66,6 +69,7 @@ impl Board {
         self.winner = None;
         self.incremental_update_mut(pos, Slice::unset_mut);
 
+        self.stones -= 1;
         self.switch_player_mut();
         self.hash_key = self.hash_key.set(self.player_color, pos);
     }
@@ -75,6 +79,8 @@ impl Board {
     }
 
     pub fn batch_set_mut(&mut self, blacks: Box<[Pos]>, whites: Box<[Pos]>, player: Color) {
+        self.stones += blacks.len() + whites.len();
+
         for pos in blacks {
             self.slices.set_mut(Color::Black, pos);
         }
@@ -91,47 +97,51 @@ impl Board {
     fn incremental_update_mut(&mut self, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
         slice_mut_op(horizontal_slice, self.player_color, pos.col());
-        let winner = self.formations.update_with_slice_mut::<{ Direction::Horizontal }>(horizontal_slice);
+        let winner = self.patterns.update_with_slice_mut::<{ Direction::Horizontal }>(horizontal_slice);
         self.winner = self.winner.or_else(|| winner);
 
         let vertical_slice = &mut self.slices.vertical_slices[pos.col_usize()];
         slice_mut_op(vertical_slice, self.player_color, pos.row());
-        let winner = self.formations.update_with_slice_mut::<{ Direction::Vertical }>(vertical_slice);
+        let winner = self.patterns.update_with_slice_mut::<{ Direction::Vertical }>(vertical_slice);
         self.winner = self.winner.or_else(|| winner);
 
         if let Some(ascending_slice) = self.slices.occupy_ascending_slice(pos) {
             slice_mut_op(ascending_slice, self.player_color, pos.col() - ascending_slice.start_pos.col());
-            let winner = self.formations.update_with_slice_mut::<{ Direction::Ascending }>(ascending_slice);
+            let winner = self.patterns.update_with_slice_mut::<{ Direction::Ascending }>(ascending_slice);
             self.winner = self.winner.or_else(|| winner);
         }
 
         if let Some(descending_slice) = self.slices.occupy_descending_slice(pos) {
             slice_mut_op(descending_slice, self.player_color, pos.col() - descending_slice.start_pos.col());
-            let winner = self.formations.update_with_slice_mut::<{ Direction::Descending }>(descending_slice);
+            let winner = self.patterns.update_with_slice_mut::<{ Direction::Descending }>(descending_slice);
             self.winner = self.winner.or_else(|| winner);
         }
+
+        self.patterns.validate_double_three_mut();
     }
 
     fn full_update_mut(&mut self) {
         for horizontal_slice in self.slices.horizontal_slices.iter() {
-            let winner = self.formations.update_with_slice_mut::<{ Direction::Horizontal }>(horizontal_slice);
+            let winner = self.patterns.update_with_slice_mut::<{ Direction::Horizontal }>(horizontal_slice);
             self.winner = self.winner.or_else(|| winner);
         }
 
         for vertical_slice in self.slices.vertical_slices.iter() {
-            let winner = self.formations.update_with_slice_mut::<{ Direction::Vertical }>(vertical_slice);
+            let winner = self.patterns.update_with_slice_mut::<{ Direction::Vertical }>(vertical_slice);
             self.winner = self.winner.or_else(|| winner);
         }
 
         for ascending_slice in self.slices.ascending_slices.iter() {
-            let winner = self.formations.update_with_slice_mut::<{ Direction::Ascending }>(ascending_slice);
+            let winner = self.patterns.update_with_slice_mut::<{ Direction::Ascending }>(ascending_slice);
             self.winner = self.winner.or_else(|| winner);
         }
 
         for descending_slice in self.slices.descending_slices.iter() {
-            let winner = self.formations.update_with_slice_mut::<{ Direction::Descending }>(descending_slice);
+            let winner = self.patterns.update_with_slice_mut::<{ Direction::Descending }>(descending_slice);
             self.winner = self.winner.or_else(|| winner);
         }
+
+        self.patterns.validate_double_three_mut();
     }
 
     fn switch_player_mut(&mut self) {

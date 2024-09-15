@@ -1,6 +1,5 @@
 use crate::board::Board;
 use crate::board_iter::BoardIterItem;
-use crate::formation::FormationUnit;
 use crate::game::Game;
 use crate::impl_debug_by_display;
 use crate::notation::color::Color;
@@ -9,6 +8,7 @@ use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::notation::pos::U_BOARD_WIDTH;
 use crate::notation::rule::ForbiddenKind;
+use crate::pattern::PatternUnit;
 use crate::slice::Slice;
 use crate::utils::str_utils::join_str_horizontally;
 use regex_lite::Regex;
@@ -66,13 +66,7 @@ fn extract_color_stones(source: &[Option<Color>], target_color: Color) -> Box<[P
     source.iter()
         .enumerate()
         .filter_map(|(idx, symbol)|
-            symbol
-                .and_then(|color|
-                    (color == target_color)
-                        .then(||
-                            Pos::from_index(idx as u8)
-                        )
-                )
+            symbol.and_then(|color| (color == target_color).then(|| Pos::from_index(idx as u8)))
         )
         .collect()
 }
@@ -116,12 +110,12 @@ impl Board {
 
     pub fn render_debug_board(&self) -> String {
         fn render_single_side(board: &Board, color: Color) -> String {
-            fn render_formation(board: &Board, color: Color, extract: fn(&FormationUnit) -> u32) -> String {
+            fn render_pattern(board: &Board, color: Color, extract: fn(&PatternUnit) -> u32) -> String {
                 board.render_attribute_board(|item| {
                     match item {
                         BoardIterItem::Stone(color) => char::from(*color).to_string(),
-                        BoardIterItem::Formation(formation) => {
-                            let count = extract(formation.access_unit(color));
+                        BoardIterItem::Pattern(pattern) => {
+                            let count = extract(pattern.access_unit(color));
 
                             if count > 0 {
                                 count.to_string()
@@ -133,13 +127,13 @@ impl Board {
                 })
             }
 
-            let open_three = format!("open_three\n{}", render_formation(board, color, FormationUnit::count_open_threes));
-            let core_three = format!("core_three\n{}", render_formation(board, color, FormationUnit::count_core_threes));
-            let close_three = format!("close_three\n{}", render_formation(board, color, FormationUnit::count_close_threes));
+            let open_three = format!("open_three\n{}", render_pattern(board, color, PatternUnit::count_open_threes));
+            let core_three = format!("core_three\n{}", render_pattern(board, color, PatternUnit::count_core_threes));
+            let close_three = format!("close_three\n{}", render_pattern(board, color, PatternUnit::count_close_threes));
 
-            let closed_four = format!("closed_four\n{}", render_formation(board, color, FormationUnit::count_closed_fours));
-            let open_four = format!("open_four\n{}", render_formation(board, color, FormationUnit::count_open_fours));
-            let five = format!("five\n{}", render_formation(board, color, FormationUnit::count_fives));
+            let closed_four = format!("closed_four\n{}", render_pattern(board, color, PatternUnit::count_closed_fours));
+            let open_four = format!("open_four\n{}", render_pattern(board, color, PatternUnit::count_open_fours));
+            let five = format!("five\n{}", render_pattern(board, color, PatternUnit::count_fives));
 
             join_str_horizontally(&[&open_three, &core_three, &close_three, &closed_four, &open_four, &five])
         }
@@ -159,8 +153,8 @@ impl Display for Board {
         write!(f, "{}", self.render_attribute_board(|item|
             match item {
                 BoardIterItem::Stone(color) => char::from(*color),
-                BoardIterItem::Formation(formation) =>
-                    formation.forbidden_kind()
+                BoardIterItem::Pattern(pattern) =>
+                    pattern.forbidden_kind()
                         .map(|kind| char::from(kind))
                         .unwrap_or_else(|| SYMBOL_EMPTY)
             }.to_string()
@@ -307,7 +301,6 @@ impl From<History> for Game {
             board: Board::default(),
             history,
             result: None,
-            stones: blacks.len() + whites.len()
         };
 
         game.batch_set_mut(blacks, whites);
