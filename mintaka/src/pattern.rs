@@ -20,15 +20,15 @@ pub const CLOSE_THREE: u8           = 0b0000_0010;
 // invalid-3 for black, overline(black) for white
 pub const INV_THREE_OVERLINE: u8    = 0b0000_0001;
 
-const UNIT_CLOSED_FOUR_MASK: u32    = 0b1100_0000__1100_0000__1100_0000__1100_0000;
-const UNIT_OPEN_FOUR_MASK: u32      = 0b0010_0000__0010_0000__0010_0000__0010_0000;
-const UNIT_TOTAL_FOUR_MASK: u32     = 0b1110_0000__1110_0000__1110_0000__1110_0000;
-const UNIT_FIVE_MASK: u32           = 0b0001_0000__0001_0000__0001_0000__0001_0000;
+const UNIT_CLOSED_FOUR_MASK: u32    = 0b1100_0000_1100_0000_1100_0000_1100_0000;
+const UNIT_OPEN_FOUR_MASK: u32      = 0b0010_0000_0010_0000_0010_0000_0010_0000;
+const UNIT_TOTAL_FOUR_MASK: u32     = 0b1110_0000_1110_0000_1110_0000_1110_0000;
+const UNIT_FIVE_MASK: u32           = 0b0001_0000_0001_0000_0001_0000_0001_0000;
 
-const UNIT_OPEN_THREE_MASK: u32     = 0b0000_1000__0000_1000__0000_1000__0000_1000;
-const UNIT_CORE_THREE_MASK: u32     = 0b0000_0100__0000_0100__0000_0100__0000_0100;
-const UNIT_CLOSE_THREE_MASK: u32    = 0b0000_0010__0000_0010__0000_0010__0000_0010;
-const UNIT_INV_3_OVERLINE_MASK: u32 = 0b0000_0001__0000_0001__0000_0001__0000_0001;
+const UNIT_OPEN_THREE_MASK: u32     = 0b0000_1000_0000_1000_0000_1000_0000_1000;
+const UNIT_CORE_THREE_MASK: u32     = 0b0000_0100_0000_0100_0000_0100_0000_0100;
+const UNIT_CLOSE_THREE_MASK: u32    = 0b0000_0010_0000_0010_0000_0010_0000_0010;
+const UNIT_INV_3_OVERLINE_MASK: u32 = 0b0000_0001_0000_0001_0000_0001_0000_0001;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub enum PatternCount {
@@ -53,25 +53,12 @@ impl PatternCount {
 
 // packed in 8-bit: closed-4-1 closed-4-2 open-4 five _ open-3 close-3 core-3 etc.
 // total 32bit
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct PatternUnit {
     horizontal: u8,
     vertical: u8,
     ascending: u8,
     descending: u8
-}
-
-impl Default for PatternUnit {
-
-    fn default() -> Self {
-        Self {
-            horizontal: 0,
-            vertical: 0,
-            ascending: 0,
-            descending: 0
-        }
-    }
-
 }
 
 impl From<PatternUnit> for u32 {
@@ -173,21 +160,10 @@ impl PatternUnit {
 
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct Pattern {
     pub black_unit: PatternUnit,
     pub white_unit: PatternUnit
-}
-
-impl Default for Pattern {
-
-    fn default() -> Self {
-        Self {
-            black_unit: PatternUnit::default(),
-            white_unit: PatternUnit::default()
-        }
-    }
-
 }
 
 impl From<Pattern> for u64 {
@@ -217,11 +193,9 @@ impl Pattern {
 
     pub fn is_forbidden(&self) -> bool {
         self.is_not_empty()
-            && (
-                self.black_unit.has_fours()
-                    || self.black_unit.has_threes()
-                    || self.has_overline()
-            )
+            && (self.black_unit.has_fours()
+                || self.black_unit.has_threes()
+                || self.has_overline())
             && !self.black_unit.has_five()
     }
 
@@ -269,13 +243,15 @@ impl Pattern {
 #[derive(Debug, Copy, Clone)]
 pub struct Patterns {
     pub field: [Pattern; pos::BOARD_SIZE],
+    pub winner: Option<Color>,
 }
 
 impl Default for Patterns {
 
     fn default() -> Self {
         Self {
-            field: [Pattern::default(); pos::BOARD_SIZE]
+            field: [Pattern::default(); pos::BOARD_SIZE],
+            winner: None,
         }
     }
 
@@ -283,8 +259,11 @@ impl Default for Patterns {
 
 impl Patterns {
 
-    #[inline(always)]
-    pub fn update_with_slice_mut<const D: Direction>(&mut self, slice: &Slice) -> Option<Color> {
+    pub fn update_with_slice_mut<const D: Direction>(&mut self, slice: &Slice) {
+        if slice.is_no_joy() {
+            return
+        }
+
         let mut patch_cache = DummyPatchCache {}; // TODO: DEBUG
         let slice_patch = patch_cache.probe_mut(slice.slice_key())
             .unwrap_or_else(|| {
@@ -294,7 +273,7 @@ impl Patterns {
             });
 
         if slice_patch == EMPTY_SLICE_PATCH {
-            return None
+            return
         }
 
         for offset in 0 .. slice.length {
@@ -313,7 +292,7 @@ impl Patterns {
             self.field[idx].black_unit.has_threes();
         }
 
-        slice_patch.winner
+        self.winner = self.winner.or(slice_patch.winner)
     }
 
     pub fn validate_double_three_mut(&mut self) {

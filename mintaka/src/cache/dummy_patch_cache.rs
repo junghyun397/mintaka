@@ -1,29 +1,20 @@
-#![allow(unused_variables)]
-
 use crate::cache::patch_cache::PatchCache;
 use crate::slice::SliceKey;
-use crate::slice_pattern::SlicePatch;
+use crate::slice_pattern::SlicePattern;
 
+#[derive(Default)]
 pub struct DummyPatchCache;
-
-impl Default for DummyPatchCache {
-
-    fn default() -> Self {
-        DummyPatchCache
-    }
-
-}
 
 impl PatchCache for DummyPatchCache {
 
-    fn probe(&self, key: SliceKey) -> Option<SlicePatch> {
+    fn probe(&self, _key: SliceKey) -> Option<SlicePattern> {
         None
     }
 
-    fn probe_mut(&mut self, key: SliceKey) -> Option<SlicePatch> {
+    fn probe_mut(&mut self, _key: SliceKey) -> Option<SlicePattern> {
         None
     }
 
-    fn put_mut(&mut self, key: SliceKey, _value: SlicePatch) {}
+    fn put_mut(&mut self, _key: SliceKey, _value: SlicePattern) {}
 
 }

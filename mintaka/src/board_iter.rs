@@ -48,7 +48,7 @@ impl Board {
                         BoardIterVerboseItem::Empty
                     } else {
                         pattern.forbidden_kind()
-                            .map(|kind| BoardIterVerboseItem::Forbidden(kind))
+                            .map(BoardIterVerboseItem::Forbidden)
                             .unwrap_or_else(||
                                 BoardIterVerboseItem::Pattern(pattern)
                             )
@@ -64,7 +64,7 @@ impl Slices {
     pub fn iter(&self) -> impl Iterator<Item=Option<Color>> + '_ {
         self.horizontal_slices.iter()
             .flat_map(|slice|
-                (0 .. pos::BOARD_WIDTH).into_iter()
+                (0 .. pos::BOARD_WIDTH)
                     .map(|col_idx|
                         slice.stone_kind(col_idx)
                     )

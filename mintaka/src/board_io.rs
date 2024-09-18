@@ -14,7 +14,6 @@ use crate::utils::str_utils::join_str_horizontally;
 use regex_lite::Regex;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
-use std::u8;
 
 const SYMBOL_BLACK: char = 'X';
 const SYMBOL_WHITE: char = 'O';
@@ -36,9 +35,6 @@ fn match_symbol(c: char) -> Option<Option<Color>> {
     }
 }
 
-const SYMBOL_SET: [char; 6] =
-    [SYMBOL_BLACK, SYMBOL_WHITE, SYMBOL_EMPTY, SYMBOL_FORBID_DOUBLE_THREE, SYMBOL_FORBID_DOUBLE_FOUR, SYMBOL_FORBID_OVERLINE];
-
 fn parse_board_elements(source: &str) -> Result<Box<[Option<Color>]>, &'static str> {
     // regex: \d[\s\[](\S[\s\[\]]){N}\d
     let re: Regex = Regex::from_str(format!(r"\d[\s\[](\S[\s\[\]]){}{U_BOARD_WIDTH}{}\d", "{", "}").as_str()).unwrap();
@@ -52,7 +48,7 @@ fn parse_board_elements(source: &str) -> Result<Box<[Option<Color>]>, &'static s
             .skip(1) // 1> . . . . . 1
             .take(pos::BOARD_WIDTH as usize * 2) // 1 . . . . .< 1
         )
-        .filter_map(|x| match_symbol(x))
+        .filter_map(match_symbol)
         .collect();
 
     if elements.len() != pos::BOARD_SIZE {
@@ -81,10 +77,8 @@ impl Board {
             .chunks(U_BOARD_WIDTH)
             .enumerate()
             .map(|(row_idx, item_row)| {
-                let content: String = item_row.into_iter()
-                    .map(|item|
-                        transform(item)
-                    )
+                let content: String = item_row.iter()
+                    .map(&transform)
                     .reduce(|head, tail|
                         format!("{head} {tail}")
                     )
@@ -98,14 +92,14 @@ impl Board {
             )
             .unwrap();
 
-        let column_hint_content: String = ('A' .. ('A' as u8 + pos::BOARD_WIDTH) as char)
+        let column_hint_content: String = ('A' .. (b'A' + pos::BOARD_WIDTH) as char)
             .flat_map(|x| [x, ' '])
             .take(U_BOARD_WIDTH * 2 - 1)
             .collect();
 
         let column_hint = format!("   {column_hint_content}");
 
-        format!("{column_hint}\n{content}\n{column_hint}").into()
+        format!("{column_hint}\n{content}\n{column_hint}")
     }
 
     pub fn render_debug_board(&self) -> String {
@@ -155,8 +149,8 @@ impl Display for Board {
                 BoardIterItem::Stone(color) => char::from(*color),
                 BoardIterItem::Pattern(pattern) =>
                     pattern.forbidden_kind()
-                        .map(|kind| char::from(kind))
-                        .unwrap_or_else(|| SYMBOL_EMPTY)
+                        .map(char::from)
+                        .unwrap_or(SYMBOL_EMPTY)
             }.to_string()
         ))
     }
@@ -191,21 +185,21 @@ impl FromStr for Slice {
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
         let fields: Box<[Option<Color>]> = source.chars()
-            .filter_map(|x| match_symbol(x))
+            .filter_map(match_symbol)
             .collect();
 
         let field_len = fields.len() as u8;
-        if 5 > field_len || field_len > pos::BOARD_WIDTH {
+        if !(5 ..= pos::BOARD_WIDTH).contains(&field_len) {
             return Err("Invalid size.");
         }
 
-        Ok(fields.into_iter()
+        Ok(IntoIterator::into_iter(fields)
             .enumerate()
             .fold(
                 Slice::empty(field_len, Pos::from_index(0)),
                 |acc, (idx, field)| {
                     match field {
-                        Some(color) => acc.set(*color, idx as u8),
+                        Some(color) => acc.set(color, idx as u8),
                         _ => acc
                     }
                 }
@@ -218,7 +212,7 @@ impl FromStr for Slice {
 impl Display for Slice {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let content = (0 .. self.length).into_iter()
+        let content = (0 .. self.length)
             .map(|idx|
                 match self.stone_kind(idx) {
                     Some(color) => char::from(color),
@@ -270,9 +264,9 @@ impl FromStr for History {
             return Err(result.unwrap_err());
         }
 
-        Ok(History(history.into_iter()
+        Ok(History(IntoIterator::into_iter(history)
             .filter_map(|r| r.ok()
-                .map(|pos| Some(pos))
+                .map(Some)
             )
             .collect()
         ))
@@ -318,7 +312,7 @@ impl FromStr for Pos {
         u8::from_str(&source[1..])
             .map_err(|_| "Invalid row charter")
             .and_then(|row| {
-                let col = source.chars().next().unwrap() as u8 - 'a' as u8;
+                let col = source.chars().next().unwrap() as u8 - b'a';
                 let pos = Pos::from_cartesian(row - 1 , col);
                 if pos.col() < pos::BOARD_WIDTH && pos.row() < pos::BOARD_WIDTH {
                     Ok(pos)
@@ -331,7 +325,7 @@ impl FromStr for Pos {
 impl Display for Pos {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", (self.col() + 'a' as u8) as char, self.row() + 1)
+        write!(f, "{}{}", (self.col() + b'a') as char, self.row() + 1)
     }
 
 }
@@ -357,6 +351,16 @@ impl From<ForbiddenKind> for char {
             ForbiddenKind::DoubleFour => SYMBOL_FORBID_DOUBLE_FOUR,
             ForbiddenKind::Overline => SYMBOL_FORBID_OVERLINE
         }
+    }
+
+}
+
+impl_debug_by_display!(ForbiddenKind);
+
+impl Display for ForbiddenKind {
+
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", char::from(*self))
     }
 
 }

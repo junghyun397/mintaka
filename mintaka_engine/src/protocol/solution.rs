@@ -7,11 +7,17 @@ pub struct Solution {
     pub child: Option<Map<Pos, Rc<Solution>>>
 }
 
-impl Solution {
+impl TryFrom<Box<[u8]>> for Solution {
 
-    pub fn from_bson_binary(source: Box<[u8]>) -> Self {
+    type Error = ();
+
+    fn try_from(value: Box<[u8]>) -> Result<Self, Self::Error> {
         todo!()
     }
+
+}
+
+impl Solution {
 
     pub fn to_bson_binary(&self) -> Box<[u8]> {
         todo!()

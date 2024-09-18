@@ -5,7 +5,7 @@ pub enum RuleKind {
     Renju = 2
 }
 
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 pub enum ForbiddenKind {
     DoubleThree,
     DoubleFour,

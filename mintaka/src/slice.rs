@@ -2,12 +2,11 @@ use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
+use crate::pop_count_less_then_two;
 use std::cmp::max;
 use std::ops::Neg;
 
 const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
-const SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 + DIAGONAL_SLICE_AMOUNT * 2;
-
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
 
 #[derive(Debug, Copy, Clone)]
@@ -44,17 +43,21 @@ impl Slice {
     pub fn set_mut(&mut self, color: Color, idx: u8) {
         let mask = 0b1 << idx;
         match color {
-            Color::Black => self.black_stones = self.black_stones | mask,
-            Color::White => self.white_stones = self.white_stones | mask
+            Color::Black => self.black_stones |= mask,
+            Color::White => self.white_stones |= mask
         }
     }
 
     pub fn unset_mut(&mut self, color: Color, idx: u8) {
         let mask = !(0b1 << idx);
         match color {
-            Color::Black => self.black_stones = self.black_stones & mask,
-            Color::White => self.white_stones = self.white_stones & mask
+            Color::Black => self.black_stones &= mask,
+            Color::White => self.white_stones &= mask
         }
+    }
+
+    pub fn is_no_joy(&self) -> bool {
+        pop_count_less_then_two!(self.black_stones) && pop_count_less_then_two!(self.white_stones)
     }
 
     pub fn stone_exists(&self, idx: u8) -> bool {
@@ -101,14 +104,14 @@ impl Default for Slices {
             ascending_slices: std::array::from_fn(|idx| {
                 let seq_num = idx as isize + 5 - pos::I_BOARD_WIDTH;
                 Slice::empty(
-                    (seq_num.abs() - pos::I_BOARD_WIDTH).abs() as u8,
+                    (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
                     Pos::from_cartesian(max(0, seq_num.neg()) as u8, max(0, seq_num) as u8)
                 )
             }),
             descending_slices: std::array::from_fn(|idx| {
                 let seq_num = idx as isize + 5 - pos::I_BOARD_WIDTH;
                 Slice::empty(
-                    (seq_num.abs() - pos::I_BOARD_WIDTH).abs() as u8,
+                    (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
                     Pos::from_cartesian(
                         pos::BOARD_WIDTH-1 - max(0, seq_num.neg()) as u8,
                         max(0, seq_num) as u8
@@ -163,21 +166,15 @@ impl Slices {
     fn ascending_slice_idx(pos: Pos) -> Option<usize> {
         // y = x + b, b = y - x (reversed row sequence)
         let idx = I_DIAGONAL_SLICE_AMOUNT - (pos.row() as isize - pos.col() as isize + pos::I_BOARD_WIDTH - 4);
-        if 0 <= idx && idx < I_DIAGONAL_SLICE_AMOUNT {
-            Some(idx as usize)
-        } else {
-            None
-        }
+        (0 .. I_DIAGONAL_SLICE_AMOUNT).contains(&idx)
+            .then_some(idx as usize)
     }
 
     fn descending_slice_idx(pos: Pos) -> Option<usize> {
         // y = -x + 15 + b, b = y + x - 15
         let idx = pos.row() as isize + pos.col() as isize - 4;
-        if 0 <= idx && idx < I_DIAGONAL_SLICE_AMOUNT {
-            Some(idx as usize)
-        } else {
-            None
-        }
+        (0 .. I_DIAGONAL_SLICE_AMOUNT).contains(&idx)
+            .then_some(idx as usize)
     }
 
 }

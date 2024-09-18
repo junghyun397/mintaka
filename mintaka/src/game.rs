@@ -5,23 +5,11 @@ use crate::notation::history::History;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Game {
     pub board: Board,
     pub history: History,
     pub result: Option<GameResult>,
-}
-
-impl Default for Game {
-
-    fn default() -> Self {
-        Self {
-            board: Board::default(),
-            history: History::default(),
-            result: None,
-        }
-    }
-
 }
 
 impl Game {
@@ -31,8 +19,8 @@ impl Game {
     }
 
     pub fn validate_move(&self, pos: Pos) -> bool {
-        !(self.result.is_none()
-            || !self.board.slices.horizontal_slices[pos.row_usize()].stone_exists(pos.col())
+        !(self.result.is_some()
+            || self.board.slices.horizontal_slices[pos.row_usize()].stone_exists(pos.col())
             || (self.board.player_color == Color::Black && self.board.patterns.field[pos.idx_usize()].is_forbidden())
             || self.moves() == pos::BOARD_SIZE)
     }
@@ -56,12 +44,10 @@ impl Game {
         self.board.set_mut(pos);
 
         self.history.play_mut(pos);
-        self.result = self.board.winner
-            .map(|color|
-                GameResult::FiveInARow(color)
-            )
+        self.result = self.board.patterns.winner
+            .map(GameResult::FiveInARow)
             .or_else(||
-                 (self.board.stones == pos::BOARD_SIZE).then(|| GameResult::Full)
+                 (self.board.stones == pos::BOARD_SIZE).then_some(GameResult::Full)
             );
     }
 

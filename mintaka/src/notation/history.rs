@@ -1,15 +1,7 @@
 use crate::notation::pos::Pos;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct History(pub Vec<Option<Pos>>);
-
-impl Default for History {
-
-    fn default() -> Self {
-        Self(Vec::new())
-    }
-
-}
 
 impl History {
 
@@ -17,9 +9,13 @@ impl History {
         self.0.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub fn get(&self, idx: usize) -> Option<Pos> {
         self.0.get(idx)
-            .map(|x| *x)
+            .copied()
             .flatten()
     }
 
