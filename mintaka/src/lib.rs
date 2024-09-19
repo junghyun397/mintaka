@@ -17,3 +17,4 @@ pub mod opening;
 pub mod pattern;
 pub mod slice_pattern;
 pub mod board_iter;
+pub mod bitfield;

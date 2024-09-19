@@ -5,7 +5,7 @@ use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slice;
-use crate::slice_pattern::{PatternPatch, EMPTY_SLICE_PATCH};
+use crate::slice_pattern::EMPTY_SLICE_PATCH;
 use crate::{cartesian_to_index, pop_count_less_then_two, pop_count_less_then_two_unchecked};
 
 pub const CLOSED_FOUR_SINGLE: u8    = 0b1000_0000;
@@ -213,24 +213,33 @@ impl Pattern {
             .filter(|_| !self.black_unit.has_five())
     }
 
-    pub fn apply_mask_mut<const D: Direction>(mut self, patch: PatternPatch) {
-        match D {
-            Direction::Horizontal => {
-                self.black_unit.vertical = patch.black_patch;
-                self.white_unit.vertical = patch.white_patch;
+    #[inline(always)]
+    pub fn apply_mask_mut<const C: Color, const D: Direction>(mut self, patch: u8) {
+        match (C, D) {
+            (Color::Black, Direction::Horizontal) => {
+                self.black_unit.horizontal = patch
             },
-            Direction::Vertical => {
-                self.black_unit.horizontal = patch.black_patch;
-                self.white_unit.horizontal = patch.white_patch;
+            (Color::Black, Direction::Vertical) => {
+                self.black_unit.vertical = patch
             },
-            Direction::Ascending => {
-                self.black_unit.ascending = patch.black_patch;
-                self.white_unit.ascending = patch.white_patch;
+            (Color::Black, Direction::Ascending) => {
+                self.black_unit.ascending = patch
             },
-            Direction::Descending => {
-                self.black_unit.descending = patch.black_patch;
-                self.white_unit.descending = patch.white_patch;
-            }
+            (Color::Black, Direction::Descending) => {
+                self.black_unit.descending = patch
+            },
+            (Color::White, Direction::Horizontal) => {
+                self.white_unit.horizontal = patch
+            },
+            (Color::White, Direction::Vertical) => {
+                self.white_unit.vertical = patch
+            },
+            (Color::White, Direction::Ascending) => {
+                self.white_unit.ascending = patch
+            },
+            (Color::White, Direction::Descending) => {
+                self.white_unit.descending = patch
+            },
         }
     }
 
@@ -243,7 +252,7 @@ impl Pattern {
 #[derive(Debug, Copy, Clone)]
 pub struct Patterns {
     pub field: [Pattern; pos::BOARD_SIZE],
-    pub winner: Option<Color>,
+    pub five_in_a_row: Option<(Direction, u8, Color)>,
 }
 
 impl Default for Patterns {
@@ -251,7 +260,7 @@ impl Default for Patterns {
     fn default() -> Self {
         Self {
             field: [Pattern::default(); pos::BOARD_SIZE],
-            winner: None,
+            five_in_a_row: None,
         }
     }
 
@@ -288,11 +297,14 @@ impl Patterns {
                     cartesian_to_index!(slice.start_pos.row() - offset, slice.start_pos.col() + offset),
             } as usize;
 
-            self.field[idx].apply_mask_mut::<D>(slice_patch.patch[offset as usize]);
-            self.field[idx].black_unit.has_threes();
+            self.field[idx].apply_mask_mut::<{ Color::Black }, D>(slice_patch.black_patch[offset as usize]);
+            self.field[idx].apply_mask_mut::<{ Color::White }, D>(slice_patch.white_patch[offset as usize]);
         }
 
-        self.winner = self.winner.or(slice_patch.winner)
+        self.five_in_a_row = self.five_in_a_row.or_else(||
+            slice_patch.five_in_a_row
+                .map(|(idx, color)| (D, idx, color))
+        );
     }
 
     pub fn validate_double_three_mut(&mut self) {

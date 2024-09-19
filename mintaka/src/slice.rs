@@ -1,8 +1,10 @@
+use crate::bitfield::Bitfield;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::pop_count_less_then_two;
+use ethnum::{uint, U256};
 use std::cmp::max;
 use std::ops::Neg;
 
@@ -175,6 +177,19 @@ impl Slices {
         let idx = pos.row() as isize + pos.col() as isize - 4;
         (0 .. I_DIAGONAL_SLICE_AMOUNT).contains(&idx)
             .then_some(idx as usize)
+    }
+
+    pub fn non_empties(&self) -> Bitfield {
+        self.horizontal_slices.iter()
+            .enumerate()
+            .fold(uint!("0"), |mut acc, (row_idx, row)| {
+                acc |= U256::from((row.black_stones | row.white_stones) << row_idx * 16);
+                acc
+            })
+    }
+
+    pub fn empties(&self) -> Bitfield {
+        !self.non_empties()
     }
 
 }

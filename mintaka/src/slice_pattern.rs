@@ -1,33 +1,24 @@
 use crate::notation::color::Color;
-use crate::notation::pos::U_BOARD_WIDTH;
 use crate::pattern::{CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, INV_THREE_OVERLINE, OPEN_FOUR, OPEN_THREE};
 use crate::pop_count_less_then_two;
 use crate::slice::Slice;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
-pub struct PatternPatch {
-    pub black_patch: u8,
-    pub white_patch: u8
-}
-
-#[derive(Eq, PartialEq, Copy, Clone)]
 pub struct SlicePattern {
-    pub patch: [PatternPatch; U_BOARD_WIDTH],
-    pub winner: Option<Color>
+    pub black_patch: [u8; 16], // 128-bits
+    pub white_patch: [u8; 16],
+    pub five_in_a_row: Option<(u8, Color)>
 }
 
 pub const EMPTY_SLICE_PATCH: SlicePattern = SlicePattern {
-    patch: [PatternPatch { black_patch: 0, white_patch: 0 }; U_BOARD_WIDTH],
-    winner: None,
+    black_patch: [0; 16],
+    white_patch: [0; 16],
+    five_in_a_row: None,
 };
 
 impl Slice {
 
     pub fn calculate_slice_patch(&self) -> SlicePattern {
-        if pop_count_less_then_two!(self.black_stones) && pop_count_less_then_two!(self.white_stones) {
-            return EMPTY_SLICE_PATCH
-        }
-
         // padding = 3
         let wall: u32 = !(!(u32::MAX << self.length as u32) << 3);
         let b: u32 = (self.black_stones as u32) << 3;
@@ -56,6 +47,7 @@ impl Slice {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[inline]
 fn find_patterns(acc: &mut SlicePattern, offset: isize, ob: u32, b: u8, w: u8, bw: u8, ww: u8, cold: u8) {
     /*
     # PATTERN-DSL
@@ -86,10 +78,10 @@ fn find_patterns(acc: &mut SlicePattern, offset: isize, ob: u32, b: u8, w: u8, b
         (left, rev) => (match_long_pattern_for_black!(right));
         (right, rev) => (match_long_pattern_for_black!(left));
         (left) => {(
-            ob & 0b1 << offset + 1 == 0 // offset + 3 - 1
+            ob & 0b1 << offset + 1 == 0 // offset + 3 - 1 - 1
         )};
         (right) => {(
-            ob & 0b1 << offset + 11 == 0 // offset + 3 + 8 + 1
+            ob & 0b1 << offset + 11 == 0 // offset + 3 + 8 + 1 - 1
         )};
     }
 
@@ -110,37 +102,30 @@ fn find_patterns(acc: &mut SlicePattern, offset: isize, ob: u32, b: u8, w: u8, b
         (black,rev=$rev:expr,$patch:literal) => {{
             const POS_KIND_TUPLE: (isize, u8) = parse_patch_literal($patch, $rev);
 
-            let original = acc.patch[(offset + POS_KIND_TUPLE.0) as usize].black_patch;
             // branch removed at compile time
             if (POS_KIND_TUPLE.1 == CLOSED_FOUR_SINGLE) {
-                acc.patch[(offset + POS_KIND_TUPLE.0) as usize] = PatternPatch {
-                    black_patch: increase_closed_four(original),
-                    white_patch: 0
-                };
+                let original = acc.black_patch[(offset + POS_KIND_TUPLE.0) as usize];
+                acc.black_patch[(offset + POS_KIND_TUPLE.0) as usize] = increase_closed_four(original);
             } else {
-                acc.patch[(offset + POS_KIND_TUPLE.0) as usize] = PatternPatch {
-                    black_patch: original | POS_KIND_TUPLE.1,
-                    white_patch: 0
-                };
+                acc.black_patch[(offset + POS_KIND_TUPLE.0) as usize] |= POS_KIND_TUPLE.1;
             }
         }};
         (white,rev=$rev:expr,$patch:literal) => {{
             const POS_KIND_TUPLE: (isize, u8) = parse_patch_literal($patch, $rev);
 
-            let original = acc.patch[(offset + POS_KIND_TUPLE.0) as usize].white_patch;
             // branch removed at compile time
             if (POS_KIND_TUPLE.1 == CLOSED_FOUR_SINGLE) {
-                acc.patch[(offset + POS_KIND_TUPLE.0) as usize] = PatternPatch {
-                    black_patch: 0,
-                    white_patch: increase_closed_four(original)
-                };
+                let original = acc.white_patch[(offset + POS_KIND_TUPLE.0) as usize];
+                acc.white_patch[(offset + POS_KIND_TUPLE.0) as usize] = increase_closed_four(original);
             } else {
-                acc.patch[(offset + POS_KIND_TUPLE.0) as usize] = PatternPatch {
-                    black_patch: 0,
-                    white_patch: original | POS_KIND_TUPLE.1
-                };
+                acc.white_patch[(offset + POS_KIND_TUPLE.0) as usize] |= POS_KIND_TUPLE.1;
             }
         }}
+    }
+
+    macro_rules! build_patch {
+        ($($patch:literal),+) => {
+        };
     }
 
     macro_rules! process_pattern {
@@ -173,6 +158,7 @@ fn find_patterns(acc: &mut SlicePattern, offset: isize, ob: u32, b: u8, w: u8, b
     }
 
     // TODO: STRONG control hazard, needs optimization.
+    // try binary search for optimization?
 
     // THREE
 
@@ -235,12 +221,13 @@ fn find_patterns(acc: &mut SlicePattern, offset: isize, ob: u32, b: u8, w: u8, b
 
     // WIN
 
-    if b & 0b000_11111 == 0b000_11111 {
-        acc.winner = Some(Color::Black);
-        return;
-    }
-    if w & 0b000_11111 == 0b000_11111 {
-        acc.winner = Some(Color::White);
+    const FIVE_MASK: u8 = 0b_11111;
+
+    if b & FIVE_MASK == FIVE_MASK {
+        acc.five_in_a_row = Some((offset as u8, Color::Black));
+        return
+    } else if w & FIVE_MASK == FIVE_MASK {
+        acc.five_in_a_row = Some((offset as u8, Color::White));
     }
 
 }
@@ -275,6 +262,31 @@ const fn parse_pattern_literal(kind: char, source: &str, reversed: bool) -> u8 {
     }
 
     acc
+}
+
+fn inc_closed_four(original: u128, patch: u128) -> u128 {
+    const CLOSED_FOUR_MASK: u128 = 0b11000000_11000000_11000000_11000000_11000000_11000000_11000000_11000000_11000000_11000000_11000000_11000000_11000000_11000000_11000000_11000000;
+    let mut masked = original & CLOSED_FOUR_MASK;   // 0 0 | 0 1 | 1 1
+    masked <<= 1;                                         // 0 0 | 1 0 | 1 0
+    masked |= patch;                                      // 0 1 | 1 1 | 1 1
+    masked &= CLOSED_FOUR_MASK;                           // 0 1 | 1 1 | 1 1
+    original | masked
+}
+
+struct SlicePatchBlock {
+    patch_mask: u128,
+    closed_four_mask: u128,
+    include_closed_four: bool,
+}
+
+const fn build_slice_patch(sources: [&str; 5], reversed: bool) -> SlicePatchBlock {
+    let mut idx: usize = 0;
+    while idx < 5 {
+        let (pos, kind) = parse_patch_literal(sources[idx], reversed);
+        idx += 1;
+    }
+
+    todo!()
 }
 
 const fn parse_patch_literal(source: &str, reversed: bool) -> (isize, u8) {

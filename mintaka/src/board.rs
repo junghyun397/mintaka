@@ -63,6 +63,8 @@ impl Board {
     }
 
     pub fn unset_mut(&mut self, pos: Pos) {
+        self.patterns.five_in_a_row = None;
+
         self.incremental_update_mut(pos, Slice::unset_mut);
 
         self.stones -= 1;

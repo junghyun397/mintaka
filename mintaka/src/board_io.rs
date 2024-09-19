@@ -322,6 +322,10 @@ impl FromStr for Pos {
 
 }
 
+pub fn pos_unchecked(source: &str) -> Pos {
+    Pos::from_str(source).unwrap()
+}
+
 impl Display for Pos {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

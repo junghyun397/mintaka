@@ -40,12 +40,17 @@ impl Game {
         self
     }
 
+    pub fn resign(mut self, resigned_player: Color) -> Self {
+        self.resign_mut(resigned_player);
+        self
+    }
+
     pub fn play_mut(&mut self, pos: Pos) {
         self.board.set_mut(pos);
 
         self.history.play_mut(pos);
-        self.result = self.board.patterns.winner
-            .map(GameResult::FiveInARow)
+        self.result = self.board.patterns.five_in_a_row
+            .map(|(_, _, color)| GameResult::FiveInARow(color))
             .or_else(||
                  (self.board.stones == pos::BOARD_SIZE).then_some(GameResult::Full)
             );
@@ -61,6 +66,10 @@ impl Game {
     pub fn pass_mut(&mut self) {
         self.board.pass_mut();
         self.history.pass_mut();
+    }
+
+    pub fn resign_mut(&mut self, resigned_player: Color) {
+        self.result = Some(GameResult::Resign(resigned_player.reversed()));
     }
 
     pub fn batch_set_mut(&mut self, blacks: Box<[Pos]>, whites: Box<[Pos]>) {
