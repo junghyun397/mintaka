@@ -11,13 +11,14 @@ mod test_pattern {
         let slice = Slice::from_str(case).unwrap();
         let patch = slice.calculate_slice_patch();
 
-        let content_patch = patch.patch.iter()
+        let content_patch = patch.black_patch_as_u8_array().iter()
+            .zip(patch.white_patch_as_u8_array().iter())
             .take(slice.length as usize)
             .enumerate()
-            .map(|(idx, pattern_patch)| {
+            .map(|(idx, (black, white))| {
                 let unit = match color {
-                    Color::Black => pattern_patch.black_patch,
-                    Color::White => pattern_patch.white_patch
+                    Color::Black => black,
+                    Color::White => white
                 };
 
                 if unit & mask_kind == mask_kind {
@@ -225,7 +226,7 @@ mod test_pattern {
 
     #[test]
     fn overline() {
-        test_both_flow(
+        test(
             "X X X . X X",
             "X X X V X X",
             Color::Black,

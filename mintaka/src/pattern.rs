@@ -284,6 +284,9 @@ impl Patterns {
         if slice_patch == EMPTY_SLICE_PATCH {
             return
         }
+        
+        let black_patch = slice_patch.black_patch_as_u8_array();
+        let white_patch = slice_patch.white_patch_as_u8_array();
 
         for offset in 0 .. slice.length {
             let idx = match D {
@@ -297,8 +300,8 @@ impl Patterns {
                     cartesian_to_index!(slice.start_pos.row() - offset, slice.start_pos.col() + offset),
             } as usize;
 
-            self.field[idx].apply_mask_mut::<{ Color::Black }, D>(slice_patch.black_patch[offset as usize]);
-            self.field[idx].apply_mask_mut::<{ Color::White }, D>(slice_patch.white_patch[offset as usize]);
+            self.field[idx].apply_mask_mut::<{ Color::Black }, D>(black_patch[offset as usize]);
+            self.field[idx].apply_mask_mut::<{ Color::White }, D>(white_patch[offset as usize]);
         }
 
         self.five_in_a_row = self.five_in_a_row.or_else(||
