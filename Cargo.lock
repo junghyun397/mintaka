@@ -96,6 +96,7 @@ version = "0.1.0"
 dependencies = [
  "ethnum",
  "indoc",
+ "log",
  "lru",
  "regex-lite",
 ]

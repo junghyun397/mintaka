@@ -11,8 +11,8 @@ mod test_pattern {
         let slice = Slice::from_str(case).unwrap();
         let patch = slice.calculate_slice_patch();
 
-        let content_patch = patch.black_patch_as_u8_array().iter()
-            .zip(patch.white_patch_as_u8_array().iter())
+        let content_patch = patch.black_patch.iter()
+            .zip(patch.white_patch.iter())
             .take(slice.length as usize)
             .enumerate()
             .map(|(idx, (black, white))| {

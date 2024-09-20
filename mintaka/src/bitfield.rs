@@ -1,11 +1,11 @@
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use ethnum::{uint, U256};
+use ethnum::{u256, uint};
 
-pub type Bitfield = U256;
+pub type Bitfield = u256;
 
 pub fn is_cold(bit_field: Bitfield, pos: Pos) -> bool {
-    let mask: U256 = uint!("0b1") << pos.idx();
+    let mask: u256 = uint!("0b1") << pos.idx();
     bit_field & mask == 0
 }
 
@@ -14,13 +14,13 @@ pub fn is_hot(bit_field: Bitfield, pos: Pos) -> bool {
 }
 
 struct BitfieldIterator {
-    value: U256,
+    value: u256,
     position: u8,
 }
 
-impl From<U256> for BitfieldIterator {
+impl From<u256> for BitfieldIterator {
 
-    fn from(value: U256) -> Self {
+    fn from(value: u256) -> Self {
         Self {
             value,
             position: 0,
@@ -47,13 +47,13 @@ impl Iterator for BitfieldIterator {
 }
 
 struct BitfieldPosIterator {
-    value: U256,
+    value: u256,
     position: u8,
 }
 
-impl From<U256> for BitfieldPosIterator {
+impl From<u256> for BitfieldPosIterator {
 
-    fn from(value: U256) -> Self {
+    fn from(value: u256) -> Self {
         Self {
             value,
             position: 0,
