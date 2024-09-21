@@ -1,11 +1,11 @@
-use crate::cache::dummy_patch_cache::DummyPatchCache;
-use crate::cache::patch_cache::PatchCache;
+use crate::cache::dummy_pattern_cache::DummyPatternCache;
+use crate::cache::pattern_cache::PatternCache;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slice;
-use crate::slice_pattern::EMPTY_SLICE_PATCH;
+use crate::slice_pattern::EMPTY_SLICE_PATTERN;
 use crate::{cartesian_to_index, pop_count_less_then_two, pop_count_less_then_two_unchecked};
 
 pub const CLOSED_FOUR_SINGLE: u8    = 0b1000_0000;
@@ -214,31 +214,31 @@ impl Pattern {
     }
 
     #[inline(always)]
-    pub fn apply_mask_mut<const C: Color, const D: Direction>(mut self, patch: u8) {
+    pub fn apply_mask_mut<const C: Color, const D: Direction>(mut self, pattern: u8) {
         match (C, D) {
             (Color::Black, Direction::Horizontal) => {
-                self.black_unit.horizontal = patch
+                self.black_unit.horizontal = pattern
             },
             (Color::Black, Direction::Vertical) => {
-                self.black_unit.vertical = patch
+                self.black_unit.vertical = pattern
             },
             (Color::Black, Direction::Ascending) => {
-                self.black_unit.ascending = patch
+                self.black_unit.ascending = pattern
             },
             (Color::Black, Direction::Descending) => {
-                self.black_unit.descending = patch
+                self.black_unit.descending = pattern
             },
             (Color::White, Direction::Horizontal) => {
-                self.white_unit.horizontal = patch
+                self.white_unit.horizontal = pattern
             },
             (Color::White, Direction::Vertical) => {
-                self.white_unit.vertical = patch
+                self.white_unit.vertical = pattern
             },
             (Color::White, Direction::Ascending) => {
-                self.white_unit.ascending = patch
+                self.white_unit.ascending = pattern
             },
             (Color::White, Direction::Descending) => {
-                self.white_unit.descending = patch
+                self.white_unit.descending = pattern
             },
         }
     }
@@ -273,15 +273,15 @@ impl Patterns {
             return
         }
 
-        let mut patch_cache = DummyPatchCache {}; // TODO: DEBUG
-        let slice_patch = patch_cache.probe_mut(slice.slice_key())
+        let mut pattern_cache = DummyPatternCache {}; // TODO: DEBUG
+        let slice_pattern = pattern_cache.probe_mut(slice.slice_key())
             .unwrap_or_else(|| {
-                let patch = slice.calculate_slice_patch();
-                patch_cache.put_mut(slice.slice_key(), patch);
-                patch
+                let slice_pattern = slice.calculate_slice_pattern();
+                pattern_cache.put_mut(slice.slice_key(), slice_pattern);
+                slice_pattern
             });
 
-        if slice_patch == EMPTY_SLICE_PATCH {
+        if slice_pattern == EMPTY_SLICE_PATTERN {
             return
         }
         
@@ -297,12 +297,12 @@ impl Patterns {
                     cartesian_to_index!(slice.start_pos.row() - offset, slice.start_pos.col() + offset),
             } as usize;
 
-            self.field[idx].apply_mask_mut::<{ Color::Black }, D>(slice_patch.black_patch[offset as usize]);
-            self.field[idx].apply_mask_mut::<{ Color::White }, D>(slice_patch.white_patch[offset as usize]);
+            self.field[idx].apply_mask_mut::<{ Color::Black }, D>(slice_pattern.black_patterns[offset as usize]);
+            self.field[idx].apply_mask_mut::<{ Color::White }, D>(slice_pattern.white_patterns[offset as usize]);
         }
 
         self.five_in_a_row = self.five_in_a_row.or_else(||
-            slice_patch.five_in_a_row
+            slice_pattern.five_in_a_row
                 .map(|(idx, color)| (D, idx, color))
         );
     }

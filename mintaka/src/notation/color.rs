@@ -16,15 +16,15 @@ impl Color {
         }
     }
 
-    pub fn color_by_moves(moves: usize) -> Self {
-        if moves % 2 == 1 {
+    pub fn player_color_from_moves(moves: usize) -> Self {
+        if moves % 2 == 0 {
             Color::Black
         } else {
             Color::White
         }
     }
 
-    pub fn player_color_by_moves<T: Ord>(black_moves: T, white_moves: T) -> Self {
+    pub fn player_color_from_batch_moves<T: Ord>(black_moves: T, white_moves: T) -> Self {
         if black_moves > white_moves {
             Color::Black
         } else {

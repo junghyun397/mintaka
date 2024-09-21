@@ -170,7 +170,7 @@ impl FromStr for Board {
         let whites = extract_color_stones(&elements, Color::White);
 
         let mut board = Board::default();
-        let player_color = Color::player_color_by_moves(blacks.len(), whites.len());
+        let player_color = Color::player_color_from_batch_moves(blacks.len(), whites.len());
 
         board.batch_set_mut(blacks, whites, player_color);
 

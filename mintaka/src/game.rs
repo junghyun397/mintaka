@@ -73,7 +73,7 @@ impl Game {
     }
 
     pub fn batch_set_mut(&mut self, blacks: Box<[Pos]>, whites: Box<[Pos]>) {
-        let color = Color::player_color_by_moves(blacks.len(), whites.len());
+        let color = Color::player_color_from_batch_moves(blacks.len(), whites.len());
         self.board.batch_set_mut(blacks, whites, color);
     }
 

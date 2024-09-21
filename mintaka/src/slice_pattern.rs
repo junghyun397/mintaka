@@ -5,20 +5,20 @@ use crate::slice::Slice;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub struct SlicePattern {
-    pub black_patch: [u8; 16], // 128-bits
-    pub white_patch: [u8; 16],
+    pub black_patterns: [u8; 16], // 128-bits
+    pub white_patterns: [u8; 16],
     pub five_in_a_row: Option<(u8, Color)>
 }
 
-pub const EMPTY_SLICE_PATCH: SlicePattern = SlicePattern {
-    black_patch: [0; 16],
-    white_patch: [0; 16],
+pub const EMPTY_SLICE_PATTERN: SlicePattern = SlicePattern {
+    black_patterns: [0; 16],
+    white_patterns: [0; 16],
     five_in_a_row: None,
 };
 
 impl Slice {
 
-    pub fn calculate_slice_patch(&self) -> SlicePattern {
+    pub fn calculate_slice_pattern(&self) -> SlicePattern {
         // padding = 3
         let wall: u32 = !(!(u32::MAX << self.length as u32) << 3);
         let b: u32 = (self.black_stones as u32) << 3;
@@ -27,7 +27,7 @@ impl Slice {
         let ww = w | wall;
         let cold = !(bw | ww);
 
-        let mut acc: SlicePattern = EMPTY_SLICE_PATCH;
+        let mut acc: SlicePattern = EMPTY_SLICE_PATTERN;
         for shift in 0 ..= self.length as usize + 1 { // length - 5 + 3 * 2
             let cold_frag = (cold >> shift) as u8;
             if !(pop_count_less_then_two!(b) && pop_count_less_then_two!(w)) && cold != 0 {
@@ -46,6 +46,7 @@ impl Slice {
 
 }
 
+// big endian system is NOT supported
 #[allow(clippy::too_many_arguments)]
 #[inline]
 fn find_patterns(
@@ -64,7 +65,7 @@ fn find_patterns(
 
     > EX: match black's closed-four = "!OOO..!"
 
-    ## PATTERN-PATCH_LITERAL
+    ## PATTERN-PATTERN-LITERAL
     * 3 = open-three
     * C = close-three
     * 4 = open-four
@@ -103,65 +104,71 @@ fn find_patterns(
 
     macro_rules! apply_single_patch {
         (black,rev=$rev:expr,$patch:literal) => {{
-             const POS_KIND_TUPLE: (isize, u8) = parse_patch_literal($patch, $rev).unwrap();
+             const POS_KIND_TUPLE: (isize, u8) = parse_patch_literal($patch, $rev);
 
             // branch removed at compile time
             if (POS_KIND_TUPLE.1 == CLOSED_FOUR_SINGLE) {
-                let original = acc.black_patch[(offset + POS_KIND_TUPLE.0) as usize];
-                acc.black_patch[(offset + POS_KIND_TUPLE.0) as usize] = increase_closed_four_single(original);
+                let original = acc.black_patterns[(offset + POS_KIND_TUPLE.0) as usize];
+                acc.black_patterns[(offset + POS_KIND_TUPLE.0) as usize] = increase_closed_four_single(original);
             } else {
-                acc.black_patch[(offset + POS_KIND_TUPLE.0) as usize] |= POS_KIND_TUPLE.1;
+                acc.black_patterns[(offset + POS_KIND_TUPLE.0) as usize] |= POS_KIND_TUPLE.1;
             }
         }};
         (white,rev=$rev:expr,$patch:literal) => {{
-            const POS_KIND_TUPLE: (isize, u8) = parse_patch_literal($patch, $rev).unwrap();
+            const POS_KIND_TUPLE: (isize, u8) = parse_patch_literal($patch, $rev);
 
             // branch removed at compile time
             if (POS_KIND_TUPLE.1 == CLOSED_FOUR_SINGLE) {
-                let original = acc.white_patch[(offset + POS_KIND_TUPLE.0) as usize];
-                acc.white_patch[(offset + POS_KIND_TUPLE.0) as usize] = increase_closed_four_single(original);
+                let original = acc.white_patterns[(offset + POS_KIND_TUPLE.0) as usize];
+                acc.white_patterns[(offset + POS_KIND_TUPLE.0) as usize] = increase_closed_four_single(original);
             } else {
-                acc.white_patch[(offset + POS_KIND_TUPLE.0) as usize] |= POS_KIND_TUPLE.1;
+                acc.white_patterns[(offset + POS_KIND_TUPLE.0) as usize] |= POS_KIND_TUPLE.1;
             }
         }};
     }
-
+    
     macro_rules! apply_multiple_patch {
         (black,rev=$rev:expr,$($patch:literal),+) => {{
-            const PATCH_MASK: SlicePatchMask = build_slice_patch([$($patch),*], $rev);
+            const PATCH_MASK: SlicePatchMask = build_slice_patch_mask([$($patch),*], $rev);
 
-            let mut original: u128 = unsafe { std::mem::transmute(acc.black_patch) };
+            let mut original: u128 = unsafe { std::mem::transmute::<[u8; 16], u128>(acc.black_patterns) };
 
-            let shr = std::cmp::min(0, offset).abs();
-            let shl = std::cmp::max(0, offset);
-
-            original |= (PATCH_MASK.patch_mask >> shr) << shl;
-            // branch removed at compile time
+            // compiled to CMOVE instruction on x84-64 (NO branching)
+            let shl = std::cmp::min(0, offset).abs() * 8;
+            let shr = std::cmp::max(0, offset) * 8;
+            
+            // branches removed at compile time (NO branching)
+            if PATCH_MASK.include_non_closed_four {
+                original |= (PATCH_MASK.patch_mask << shr) >> shl; // little-endian shift
+            }
             if PATCH_MASK.include_closed_four {
                 original = increase_closed_four_multiple(original,
-                    (PATCH_MASK.closed_four_clear_mask >> shr) << shl,
-                    (PATCH_MASK.closed_four_mask >> shr) << shl
+                    (PATCH_MASK.closed_four_clear_mask << shr) >> shl,
+                    (PATCH_MASK.closed_four_mask << shr) >> shl
                 );
             }
 
-            acc.black_patch = unsafe { std::mem::transmute(original) };
-            println!("{:?}", acc.black_patch);
+            acc.black_patterns = unsafe { std::mem::transmute::<u128, [u8; 16]>(original) };
         }};
         (white,rev=$rev:expr,$($patch:literal),+) => {{
-            const PATCH_MASK: SlicePatchMask = build_slice_patch([$($patch),*], $rev);
+            const PATCH_MASK: SlicePatchMask = build_slice_patch_mask([$($patch),*], $rev);
 
-            let mut original: u128 = unsafe { std::mem::transmute(acc.white_patch) };
+            let mut original: u128 = unsafe { std::mem::transmute::<[u8; 16], u128>(acc.white_patterns) };
 
-            original |= PATCH_MASK.patch_mask;
-            // branch removed at compile time
+            let shl = std::cmp::min(0, offset).abs() * 8;
+            let shr = std::cmp::max(0, offset) * 8;
+            
+            if PATCH_MASK.include_non_closed_four {
+                original |= (PATCH_MASK.patch_mask << shr) >> shl;
+            }
             if PATCH_MASK.include_closed_four {
                 original = increase_closed_four_multiple(original,
-                    PATCH_MASK.closed_four_clear_mask,
-                    PATCH_MASK.closed_four_mask
+                    (PATCH_MASK.closed_four_clear_mask << shr) >> shl,
+                    (PATCH_MASK.closed_four_mask << shr) >> shl
                 );
             }
 
-            acc.white_patch = unsafe { std::mem::transmute(original) };
+            acc.white_patterns = unsafe { std::mem::transmute::<u128, [u8; 16]>(original) };
         }}
     }
 
@@ -267,7 +274,6 @@ fn find_patterns(
 
     if b & FIVE_MASK == FIVE_MASK {
         acc.five_in_a_row = Some((offset as u8, Color::Black));
-        return
     } else if w & FIVE_MASK == FIVE_MASK {
         acc.five_in_a_row = Some((offset as u8, Color::White));
     }
@@ -302,42 +308,48 @@ const fn parse_pattern_literal(kind: char, source: &str, reversed: bool) -> u8 {
     acc
 }
 
+#[derive(Debug)]
 struct SlicePatchMask {
     pub patch_mask: u128,
     pub closed_four_clear_mask: u128,
     pub closed_four_mask: u128,
+    pub include_non_closed_four: bool,
     pub include_closed_four: bool,
 }
 
 // big-endian not supported
-const fn build_slice_patch(sources: [&str; 4], reversed: bool) -> SlicePatchMask {
-    const SHIFT_N: u32 = 128 - 8;
-    const FOUR_CLEAR_MASK: u128 = 1100_0000 << SHIFT_N;
-    const CLOSED_FOUR_SINGLE_MASK: u128 = (CLOSED_FOUR_SINGLE as u128) << SHIFT_N;
-
-    let mut patch_mask: u128 = 0;
-    let mut closed_four_clear_mask: u128 = 0;
-    let mut closed_four_mask: u128 = 0;
+const fn build_slice_patch_mask(sources: [&str; 4], reversed: bool) -> SlicePatchMask {
+    let mut patch_mask: [u8; 16] = [0; 16];
+    let mut closed_four_clear_mask: [u8; 16] = [0; 16];
+    let mut closed_four_mask: [u8; 16] = [0; 16];
 
     let mut idx: usize = 0;
     while idx < 4 {
-        if let Some((pos, kind)) = parse_patch_literal(sources[idx], reversed) {
+        if sources[idx].len() > 1 {
+            let (pos, kind) = parse_patch_literal(sources[idx], reversed);
+
             if kind == CLOSED_FOUR_SINGLE {
-                closed_four_clear_mask |= FOUR_CLEAR_MASK >> pos * 8;
-                closed_four_mask |= CLOSED_FOUR_SINGLE_MASK >> pos * 8;
+                closed_four_clear_mask[pos as usize] = 0b1100_0000;
+                closed_four_mask[pos as usize] = CLOSED_FOUR_SINGLE;
             } else {
-                patch_mask |= ((kind as u128) << SHIFT_N) >> pos * 8;
+                patch_mask[pos as usize] |= kind;
             }
         }
-
         idx += 1;
     }
-
-    SlicePatchMask {
-        patch_mask,
-        closed_four_clear_mask,
-        closed_four_mask,
-        include_closed_four: closed_four_mask != 0,
+    
+    unsafe {
+        let patch_mask: u128 = std::mem::transmute(patch_mask);
+        let closed_four_clear_mask: u128 = std::mem::transmute(closed_four_clear_mask);
+        let closed_four_mask: u128 = std::mem::transmute(closed_four_mask);
+        
+        SlicePatchMask {
+            patch_mask,
+            closed_four_clear_mask,
+            closed_four_mask,
+            include_non_closed_four: patch_mask != 0,
+            include_closed_four: closed_four_mask != 0,
+        }
     }
 }
 
@@ -348,27 +360,27 @@ fn increase_closed_four_single(packed: u8) -> u8 {
 // big-endian not supported
 fn increase_closed_four_multiple(original: u128, clear_mask: u128, mask: u128) -> u128 {
     let mut masked: u128 = original & clear_mask;   // 0 0 0 | 1 0 0 | 1 1 0
-    masked <<= 1;                                   // 0 0 0 | 0 1 0 | 0 1 1
+    masked >>= 1;                                   // 0 0 0 | 0 1 0 | 0 1 1
     masked |= mask;                                 // 1 0 0 | 1 1 0 | 1 1 1
     masked &= clear_mask;                           // 1 0 0 | 1 1 0 | 1 1 0
     original | masked                               // empty, four*1, four*2
 }
 
-const fn parse_patch_literal(source: &str, reversed: bool) -> Option<(isize, u8)> {
+const fn parse_patch_literal(source: &str, reversed: bool) -> (isize, u8) {
     let mut idx: isize = 0;
     while idx < source.len() as isize {
         let pos = if reversed { 7 - idx } else { idx };
         match source.as_bytes()[idx as usize] as char {
-            '3' => return Some((pos, OPEN_THREE)),
-            'C' => return Some((pos, CLOSE_THREE)),
-            '4' => return Some((pos, OPEN_FOUR)),
-            'F' => return Some((pos, CLOSED_FOUR_SINGLE)),
-            '5' => return Some((pos, FIVE)),
-            '6' => return Some((pos, INV_THREE_OVERLINE)),
+            '3' => return (pos, OPEN_THREE),
+            'C' => return (pos, CLOSE_THREE),
+            '4' => return (pos, OPEN_FOUR),
+            'F' => return (pos, CLOSED_FOUR_SINGLE),
+            '5' => return (pos, FIVE),
+            '6' => return (pos, INV_THREE_OVERLINE),
             _ => {}
         }
         idx += 1;
     }
 
-    None
+    unreachable!()
 }

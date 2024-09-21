@@ -1,6 +1,6 @@
 use crate::slice_pattern::SlicePattern;
 
-pub trait PatchCache {
+pub trait PatternCache {
 
     fn probe(&self, key: u32) -> Option<SlicePattern>;
 

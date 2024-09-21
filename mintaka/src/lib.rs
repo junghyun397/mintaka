@@ -1,8 +1,6 @@
-#![feature(portable_simd)]
-
 #![allow(incomplete_features)]
+#![feature(portable_simd)]
 #![feature(adt_const_params)]
-#![feature(const_option)]
 
 extern crate core;
 

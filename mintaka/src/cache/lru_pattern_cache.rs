@@ -1,19 +1,19 @@
-use crate::cache::patch_cache::PatchCache;
+use crate::cache::pattern_cache::PatternCache;
 use crate::slice_pattern::SlicePattern;
 
-pub struct LruPatchCache {
+pub struct LruPatternCache {
 
 }
 
-impl Default for LruPatchCache {
+impl Default for LruPatternCache {
 
     fn default() -> Self {
-        LruPatchCache {}
+        LruPatternCache {}
     }
 
 }
 
-impl PatchCache for LruPatchCache {
+impl PatternCache for LruPatternCache {
 
     fn probe(&self, key: u32) -> Option<SlicePattern> {
         todo!()

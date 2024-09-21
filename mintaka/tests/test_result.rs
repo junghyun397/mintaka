@@ -1,10 +1,9 @@
 #[cfg(test)]
 mod test_result {
-    use mintaka::board::Board;
-    use mintaka::notation::color::Color;
-    use std::str::FromStr;
     use indoc::indoc;
+    use mintaka::board::Board;
     use mintaka::notation::pos::Pos;
+    use std::str::FromStr;
 
     #[test]
     fn five_in_a_row() {
@@ -30,7 +29,7 @@ mod test_result {
         let board = Board::from_str(case).unwrap()
             .set(Pos::from_str("o6").unwrap());
 
-        assert_eq!(board.winner, Some(Color::Black));
+        assert_eq!(board.patterns.five_in_a_row.is_some(), true);
     }
 
     #[test]

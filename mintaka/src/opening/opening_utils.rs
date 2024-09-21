@@ -1,5 +1,5 @@
-use crate::check_cartesian_bound;
 use crate::notation::history::History;
+use crate::notation::pos;
 use crate::notation::pos::Pos;
 use std::collections::HashSet;
 
@@ -48,21 +48,21 @@ fn find_symmetry_moves(ref1: Pos, ref2: Pos, m: Pos) -> HashSet<Pos> {
 }
 
 pub fn find_forbidden_symmetry_moves(history: &History, fifth_move: Pos) -> HashSet<Pos> {
-    let black_symmetry_moves = find_symmetry_moves(
+    let black_side_symmetry_moves = find_symmetry_moves(
         history.get(0).unwrap(),
         history.get(2).unwrap(),
         fifth_move
     );
 
-    let white_symmetry_moves = find_symmetry_moves(
+    let white_side_symmetry_moves = find_symmetry_moves(
         history.get(1).unwrap(),
         history.get(3).unwrap(),
         fifth_move
     );
 
-    black_symmetry_moves
-        .intersection(&white_symmetry_moves)
-        .filter(|pos| check_cartesian_bound!(pos.row(), pos.col()))
+    black_side_symmetry_moves
+        .intersection(&white_side_symmetry_moves)
+        .filter(|pos| pos.idx() < pos::BOARD_SIZE as u8)
         .copied()
         .collect()
 }

@@ -9,10 +9,10 @@ mod test_pattern {
         assert_eq!(case.len(), expected.len());
 
         let slice = Slice::from_str(case).unwrap();
-        let patch = slice.calculate_slice_patch();
+        let slice_pattern = slice.calculate_slice_pattern();
 
-        let content_patch = patch.black_patch.iter()
-            .zip(patch.white_patch.iter())
+        let content_pattern = slice_pattern.black_patterns.iter()
+            .zip(slice_pattern.white_patterns.iter())
             .take(slice.length as usize)
             .enumerate()
             .map(|(idx, (black, white))| {
@@ -34,7 +34,7 @@ mod test_pattern {
             )
             .unwrap();
 
-        assert_eq!(expected, content_patch);
+        assert_eq!(expected, content_pattern);
     }
 
     fn test_both_flow(case: &str, expected: &str, color: Color, mask_kind: u8) {
@@ -104,15 +104,22 @@ mod test_pattern {
 
     #[test]
     fn basic_closed_four() {
-        test_both_color_both_flow(
-            ". . O O O . .",
-            "V . O O O . V",
+        test_both_flow(
+            "X X X . .",
+            "X X X V V",
+            Color::Black,
             CLOSED_FOUR_SINGLE
         );
 
         test_both_color_both_flow(
             "O O O . .",
             "O O O V V",
+            CLOSED_FOUR_SINGLE
+        );
+
+        test_both_color_both_flow(
+            ". . O O O . .",
+            "V . O O O . V",
             CLOSED_FOUR_SINGLE
         );
 

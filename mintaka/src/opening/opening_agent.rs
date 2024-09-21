@@ -3,9 +3,14 @@ use crate::notation::color::Color;
 use crate::notation::history::History;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::opening::opening_kind::OpeningKind;
 use crate::opening::opening_utils::find_forbidden_symmetry_moves;
 use std::collections::HashSet;
+
+#[derive(Eq, PartialEq, Copy, Clone)]
+pub enum OpeningKind {
+    Soosyrv8,
+    Taraguchi10
+}
 
 pub enum OpeningStage {
     Move(OpeningMove),
@@ -38,8 +43,8 @@ pub trait OpeningAgent {
         self.opener_color().reversed()
     }
 
-    fn opener_turn(&self) -> bool {
-        todo!()
+    fn openers_turn(&self) -> bool {
+        self.opener_color() == Color::player_color_from_moves(self.moves())
     }
 
 }

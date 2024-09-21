@@ -1,11 +1,11 @@
-use crate::cache::patch_cache::PatchCache;
+use crate::cache::pattern_cache::PatternCache;
 use crate::slice::SliceKey;
 use crate::slice_pattern::SlicePattern;
 
 #[derive(Default)]
-pub struct DummyPatchCache;
+pub struct DummyPatternCache {}
 
-impl PatchCache for DummyPatchCache {
+impl PatternCache for DummyPatternCache {
 
     fn probe(&self, _key: SliceKey) -> Option<SlicePattern> {
         None
