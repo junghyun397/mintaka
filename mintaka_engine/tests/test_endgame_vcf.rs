@@ -7,12 +7,12 @@ mod test_endgame_vcf {
     }
 
     #[test]
-    fn complex_vcf() {
+    fn trap_vcf() {
         todo!()
     }
 
     #[test]
-    fn forbidden_point_vcf() {
+    fn long_vcf() {
         todo!()
     }
 

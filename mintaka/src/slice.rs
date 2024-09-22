@@ -183,7 +183,7 @@ impl Slices {
         self.horizontal_slices.iter()
             .enumerate()
             .fold(uint!("0"), |mut acc, (row_idx, row)| {
-                acc |= U256::from((row.black_stones | row.white_stones) << row_idx * 16);
+                acc |= U256::from((row.black_stones | row.white_stones) << (row_idx * pos::U_BOARD_WIDTH));
                 acc
             })
     }

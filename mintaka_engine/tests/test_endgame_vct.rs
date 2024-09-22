@@ -7,12 +7,12 @@ mod test_endgame_vct {
     }
 
     #[test]
-    fn complex_vct() {
+    fn trap_vct() {
         todo!()
     }
 
     #[test]
-    fn forbidden_point_vct() {
+    fn long_vct() {
         todo!()
     }
 

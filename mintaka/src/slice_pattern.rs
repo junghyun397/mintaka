@@ -55,8 +55,6 @@ fn find_patterns(
     ob: u32, b: u8, w: u8, bw: u8, ww: u8, cold: u8
 ) {
     /*
-    # PATTERN-DSL
-
     ## PATTERN-MATCH-LITERAL
     * O = self-color-hot
     * X = reversed-color-hot
@@ -73,7 +71,7 @@ fn find_patterns(
     * 5 = five
     * 6 = overline
 
-    EX: match black's closed-four = "!OOO.F"
+    > EX: match black's closed-four = "!OOO.F"
     */
 
     let b_u32_vector: u32 = b as u32 | (b as u32) << 8 | (cold as u32) << 16 | (ww as u32) << 24;
@@ -103,35 +101,28 @@ fn find_patterns(
     }
 
     macro_rules! apply_single_patch {
-        (black,rev=$rev:expr,$patch:literal) => {{
+        (black,rev=$rev:expr,$patch:literal) => (apply_single_patch!(acc.black_patterns,rev=$rev,$patch));
+        (white,rev=$rev:expr,$patch:literal) => (apply_single_patch!(acc.white_patterns,rev=$rev,$patch));
+        ($patterns_expr:expr,rev=$rev:expr,$patch:literal) => {{
              const POS_KIND_TUPLE: (isize, u8) = parse_patch_literal($patch, $rev);
 
             // branch removed at compile time
             if (POS_KIND_TUPLE.1 == CLOSED_FOUR_SINGLE) {
-                let original = acc.black_patterns[(offset + POS_KIND_TUPLE.0) as usize];
-                acc.black_patterns[(offset + POS_KIND_TUPLE.0) as usize] = increase_closed_four_single(original);
+                let original = $patterns_expr[(offset + POS_KIND_TUPLE.0) as usize];
+                $patterns_expr[(offset + POS_KIND_TUPLE.0) as usize] = increase_closed_four_single(original);
             } else {
-                acc.black_patterns[(offset + POS_KIND_TUPLE.0) as usize] |= POS_KIND_TUPLE.1;
-            }
-        }};
-        (white,rev=$rev:expr,$patch:literal) => {{
-            const POS_KIND_TUPLE: (isize, u8) = parse_patch_literal($patch, $rev);
-
-            // branch removed at compile time
-            if (POS_KIND_TUPLE.1 == CLOSED_FOUR_SINGLE) {
-                let original = acc.white_patterns[(offset + POS_KIND_TUPLE.0) as usize];
-                acc.white_patterns[(offset + POS_KIND_TUPLE.0) as usize] = increase_closed_four_single(original);
-            } else {
-                acc.white_patterns[(offset + POS_KIND_TUPLE.0) as usize] |= POS_KIND_TUPLE.1;
+                $patterns_expr[(offset + POS_KIND_TUPLE.0) as usize] |= POS_KIND_TUPLE.1;
             }
         }};
     }
     
     macro_rules! apply_multiple_patch {
-        (black,rev=$rev:expr,$($patch:literal),+) => {{
+        (black,rev=$rev:expr,$($patch:literal),+) => (apply_multiple_patch!(acc.black_patterns,rev=$rev, $($patch),+));
+        (white,rev=$rev:expr,$($patch:literal),+) => (apply_multiple_patch!(acc.white_patterns,rev=$rev, $($patch),+));
+        ($patterns_expr:expr,rev=$rev:expr,$($patch:literal),+) => {{
             const PATCH_MASK: SlicePatchMask = build_slice_patch_mask([$($patch),*], $rev);
 
-            let mut original: u128 = unsafe { std::mem::transmute::<[u8; 16], u128>(acc.black_patterns) };
+            let mut original: u128 = unsafe { std::mem::transmute::<[u8; 16], u128>($patterns_expr) };
 
             // compiled to CMOVE instruction on x84-64 (NO branching)
             let shl = std::cmp::min(0, offset).abs() * 8;
@@ -148,28 +139,8 @@ fn find_patterns(
                 );
             }
 
-            acc.black_patterns = unsafe { std::mem::transmute::<u128, [u8; 16]>(original) };
+            $patterns_expr = unsafe { std::mem::transmute::<u128, [u8; 16]>(original) };
         }};
-        (white,rev=$rev:expr,$($patch:literal),+) => {{
-            const PATCH_MASK: SlicePatchMask = build_slice_patch_mask([$($patch),*], $rev);
-
-            let mut original: u128 = unsafe { std::mem::transmute::<[u8; 16], u128>(acc.white_patterns) };
-
-            let shl = std::cmp::min(0, offset).abs() * 8;
-            let shr = std::cmp::max(0, offset) * 8;
-            
-            if PATCH_MASK.include_non_closed_four {
-                original |= (PATCH_MASK.patch_mask << shr) >> shl;
-            }
-            if PATCH_MASK.include_closed_four {
-                original = increase_closed_four_multiple(original,
-                    (PATCH_MASK.closed_four_clear_mask << shr) >> shl,
-                    (PATCH_MASK.closed_four_mask << shr) >> shl
-                );
-            }
-
-            acc.white_patterns = unsafe { std::mem::transmute::<u128, [u8; 16]>(original) };
-        }}
     }
 
     macro_rules! apply_patch_matcher {
