@@ -31,3 +31,22 @@ pub fn join_str_horizontally(sources: &[&str]) -> String {
         )
         .unwrap()
 }
+
+pub const fn u8_from_str(source: &str, skip: usize) -> u8 {
+    let bytes = source.as_bytes();
+    let mut result = 0u8;
+    let mut i = skip;
+
+    while i < bytes.len() {
+        let byte = bytes[i];
+        if byte >= b'0' && byte <= b'9' {
+            result = result * 10 + (byte - b'0');
+        } else {
+            panic!("Invalid character in source");
+        }
+
+        i += 1;
+    }
+
+    result
+}

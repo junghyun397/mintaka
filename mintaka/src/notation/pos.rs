@@ -1,3 +1,5 @@
+use crate::utils::str_utils::u8_from_str;
+
 pub const BOARD_WIDTH: u8 = 15;
 pub const BOARD_SIZE: usize = U_BOARD_WIDTH * U_BOARD_WIDTH;
 
@@ -21,11 +23,11 @@ pub struct Pos(u8);
 
 impl Pos {
 
-    pub fn from_index(index: u8) -> Self {
+    pub const fn from_index(index: u8) -> Self {
         Pos(index)
     }
 
-    pub fn from_cartesian(row: u8, col: u8) -> Self {
+    pub const fn from_cartesian(row: u8, col: u8) -> Self {
         Pos(cartesian_to_index!(row, col))
     }
 
@@ -65,4 +67,11 @@ impl Pos {
         !self.mask_col()
     }
 
+}
+
+pub const fn pos_unchecked(source: &str) -> Pos {
+    let row = u8_from_str(source, 1);
+    let col = source.as_bytes()[0] - b'a' as u8;
+
+    Pos::from_cartesian(row, col)
 }

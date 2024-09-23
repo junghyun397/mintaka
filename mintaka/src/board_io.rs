@@ -62,7 +62,10 @@ fn extract_color_stones(source: &[Option<Color>], target_color: Color) -> Box<[P
     source.iter()
         .enumerate()
         .filter_map(|(idx, symbol)|
-            symbol.and_then(|color| (color == target_color).then(|| Pos::from_index(idx as u8)))
+            symbol.and_then(|color|
+                (color == target_color)
+                    .then(|| Pos::from_index(idx as u8))
+            )
         )
         .collect()
 }
@@ -320,10 +323,6 @@ impl FromStr for Pos {
             })
     }
 
-}
-
-pub fn pos_unchecked(source: &str) -> Pos {
-    Pos::from_str(source).unwrap()
 }
 
 impl Display for Pos {

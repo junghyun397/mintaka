@@ -1,6 +1,7 @@
+use crate::board::Board;
 use crate::notation::history::History;
 use crate::notation::pos;
-use crate::notation::pos::Pos;
+use crate::notation::pos::{pos_unchecked, Pos};
 use std::collections::HashSet;
 
 fn find_symmetry_moves(ref1: Pos, ref2: Pos, m: Pos) -> HashSet<Pos> {
@@ -65,4 +66,9 @@ pub fn find_forbidden_symmetry_moves(history: &History, fifth_move: Pos) -> Hash
         .filter(|pos| pos.idx() < pos::BOARD_SIZE as u8)
         .copied()
         .collect()
+}
+
+pub fn generate_random_three_moves() -> Board {
+    Board::default()
+        .set(pos_unchecked("h8"))
 }

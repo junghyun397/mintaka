@@ -83,6 +83,10 @@ impl PatternUnit {
         !pop_count_less_then_two!(self.apply_mask(UNIT_TOTAL_FOUR_MASK))
     }
 
+    pub fn has_close_three(&self) -> bool {
+        self.apply_mask(UNIT_CLOSE_THREE_MASK) != 0
+    }
+
     pub fn has_five(&self) -> bool {
         self.apply_mask(UNIT_FIVE_MASK) != 0
     }
@@ -197,6 +201,13 @@ impl Pattern {
                 || self.black_unit.has_threes()
                 || self.has_overline())
             && !self.black_unit.has_five()
+    }
+
+    pub fn unit_by_color(&self, color: Color) -> PatternUnit {
+        match color {
+            Color::Black => self.black_unit,
+            Color::White => self.white_unit,
+        }
     }
 
     pub fn forbidden_kind(&self) -> Option<ForbiddenKind> {
