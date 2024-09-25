@@ -6,6 +6,10 @@ pub const BOARD_SIZE: usize = U_BOARD_WIDTH * U_BOARD_WIDTH;
 pub const U_BOARD_WIDTH: usize = BOARD_WIDTH as usize;
 pub const I_BOARD_WIDTH: isize = BOARD_WIDTH as isize;
 
+pub const U8_BOARD_SIZE: u8 = BOARD_SIZE as u8;
+
+pub const CENTER: Pos = Pos::from_index(U8_BOARD_SIZE / 2);
+
 #[macro_export] macro_rules! cartesian_to_index {
     ($row:expr,$col:expr) => ($row * 15 + $col);
 }

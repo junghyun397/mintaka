@@ -1,9 +1,11 @@
+use crate::bitfield::Bitfield;
 use crate::cache::hash_key::HashKey;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::Pos;
 use crate::pattern::Patterns;
 use crate::slice::{Slice, Slices};
+use ethnum::{uint, U256};
 
 // 2256-bytes
 #[derive(Copy, Clone)]
@@ -11,6 +13,7 @@ pub struct Board {
     pub player_color: Color,
     pub slices: Slices,
     pub patterns: Patterns,
+    pub hot_field: Bitfield,
     pub stones: usize,
     pub hash_key: HashKey,
 }
@@ -22,6 +25,7 @@ impl Default for Board {
             player_color: Color::Black,
             slices: Slices::default(),
             patterns: Patterns::default(),
+            hot_field: U256::MIN,
             stones: 0,
             hash_key: HashKey::default()
         }
@@ -57,6 +61,8 @@ impl Board {
     pub fn set_mut(&mut self, pos: Pos) {
         self.incremental_update_mut(pos, Slice::set_mut);
 
+        self.hot_field |= uint!("0b1") << pos.idx();
+
         self.stones += 1;
         self.switch_player_mut();
         self.hash_key = self.hash_key.set(self.player_color, pos);
@@ -66,6 +72,8 @@ impl Board {
         self.patterns.five_in_a_row = None;
 
         self.incremental_update_mut(pos, Slice::unset_mut);
+
+        self.hot_field &= uint!("0b1") << pos.idx();
 
         self.stones -= 1;
         self.switch_player_mut();

@@ -1,8 +1,8 @@
 use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::pattern::{CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, INV_THREE_OVERLINE, OPEN_FOUR, OPEN_THREE};
-use crate::pop_count_less_then_two;
 use crate::slice::Slice;
+use crate::{max, min, pop_count_less_then_two};
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub struct SlicePattern {
@@ -125,14 +125,15 @@ fn find_patterns(
 
             let mut original: u128 = unsafe { std::mem::transmute::<[u8; 16], u128>($patterns_expr) };
 
+            let slice_patch_mask = PATCH_MASK_LUT.look_up_table[shift];
             // branches removed at compile time (NO branching)
             if PATCH_MASK_LUT.include_non_closed_four {
-                original |= PATCH_MASK_LUT.patch_mask[shift]; // little-endian shift
+                original |= slice_patch_mask.patch_mask;
             }
             if PATCH_MASK_LUT.include_closed_four {
                 original = increase_closed_four_multiple(original,
-                    PATCH_MASK_LUT.closed_four_clear_mask[shift],
-                    PATCH_MASK_LUT.closed_four_mask[shift]
+                    slice_patch_mask.closed_four_clear_mask,
+                    slice_patch_mask.closed_four_mask
                 );
             }
 
@@ -276,67 +277,74 @@ const fn parse_pattern_literal(kind: char, source: &str, reversed: bool) -> u8 {
     acc
 }
 
-const MASK_LUT_SIZE: usize = pos::U_BOARD_WIDTH + 6;
-type MaskLUT = [u128; MASK_LUT_SIZE];
+#[derive(Copy, Clone)]
+struct SlicePatchMask {
+    pub patch_mask: u128,
+    pub closed_four_clear_mask: u128,
+    pub closed_four_mask: u128,
+}
 
-#[derive(Debug)]
+const MASK_LUT_SIZE: usize = pos::U_BOARD_WIDTH + 1;
+
 struct SlicePatchMaskLUT {
-    pub patch_mask: MaskLUT,
-    pub closed_four_clear_mask: MaskLUT,
-    pub closed_four_mask: MaskLUT,
+    pub look_up_table: [SlicePatchMask; MASK_LUT_SIZE],
     pub include_non_closed_four: bool,
-    pub include_closed_four: bool,
+    pub include_closed_four: bool
 }
 
 // big-endian not supported
 const fn build_slice_patch_mask_lut(sources: [&str; 4], reversed: bool) -> SlicePatchMaskLUT {
-    let mut patch_mask: [u8; 16] = [0; 16];
-    let mut closed_four_clear_mask: [u8; 16] = [0; 16];
-    let mut closed_four_mask: [u8; 16] = [0; 16];
-
-    let mut idx: usize = 0;
-    while idx < 4 {
-        if sources[idx].len() > 1 {
-            let (pos, kind) = parse_patch_literal(sources[idx], reversed);
-
-            if kind == CLOSED_FOUR_SINGLE {
-                closed_four_clear_mask[pos as usize] = 0b1100_0000;
-                closed_four_mask[pos as usize] = CLOSED_FOUR_SINGLE;
-            } else {
-                patch_mask[pos as usize] |= kind;
-            }
-        }
-        idx += 1;
-    }
-
-    const fn build_lut(source: u128) -> MaskLUT {
-        let mut lut: MaskLUT = [0; MASK_LUT_SIZE];
+    const fn build_slice_patch_mask(sources: [&str; 4], reversed: bool) -> SlicePatchMask{
+        let mut patch_mask: [u8; 16] = [0; 16];
+        let mut closed_four_clear_mask: [u8; 16] = [0; 16];
+        let mut closed_four_mask: [u8; 16] = [0; 16];
 
         let mut idx: usize = 0;
-        while idx < MASK_LUT_SIZE {
-            let shl = (pos::U_BOARD_WIDTH - 3) * 8;
-            let shr = (pos::U_BOARD_WIDTH - 3) * 8;
+        while idx < 4 {
+            if sources[idx].len() > 1 {
+                let (pos, kind) = parse_patch_literal(sources[idx], reversed);
 
-            lut[idx] = (source << shr) >> shl;
-
+                if kind == CLOSED_FOUR_SINGLE {
+                    closed_four_clear_mask[pos as usize] = 0b1100_0000;
+                    closed_four_mask[pos as usize] = CLOSED_FOUR_SINGLE;
+                } else {
+                    patch_mask[pos as usize] |= kind;
+                }
+            }
             idx += 1;
         }
 
-        lut
+        unsafe { SlicePatchMask {
+            patch_mask: std::mem::transmute::<[u8; 16], u128>(patch_mask),
+            closed_four_clear_mask: std::mem::transmute::<[u8; 16], u128>(closed_four_clear_mask),
+            closed_four_mask: std::mem::transmute::<[u8; 16], u128>(closed_four_mask),
+        } }
     }
 
-    unsafe {
-        let patch_mask: MaskLUT = build_lut(std::mem::transmute::<[u8; 16], u128>(patch_mask));
-        let closed_four_clear_mask: MaskLUT = build_lut(std::mem::transmute::<[u8; 16], u128>(closed_four_clear_mask));
-        let closed_four_mask: MaskLUT = build_lut(std::mem::transmute::<[u8; 16], u128>(closed_four_mask));
+    let original = build_slice_patch_mask(sources, reversed);
 
-        SlicePatchMaskLUT {
-            patch_mask,
-            closed_four_clear_mask,
-            closed_four_mask,
-            include_non_closed_four: patch_mask[0] != 0,
-            include_closed_four: closed_four_mask[0] != 0,
-        }
+    let mut look_up_table = [SlicePatchMask {
+        patch_mask: 0, closed_four_clear_mask: 0, closed_four_mask: 0,
+    }; MASK_LUT_SIZE];
+
+    let mut idx: isize = 0;
+    while idx < MASK_LUT_SIZE as isize {
+        let shl = min!(0, idx - 3).abs() * 8;
+        let shr = max!(0, idx - 3) * 8;
+
+        look_up_table[idx as usize] = SlicePatchMask {
+            patch_mask: (original.patch_mask << shr) >> shl,
+            closed_four_clear_mask: (original.closed_four_clear_mask << shr) >> shl,
+            closed_four_mask: (original.closed_four_mask << shr) >> shl,
+        };
+
+        idx += 1;
+    }
+
+    SlicePatchMaskLUT {
+        look_up_table,
+        include_non_closed_four: original.patch_mask != 0,
+        include_closed_four: original.closed_four_mask != 0,
     }
 }
 

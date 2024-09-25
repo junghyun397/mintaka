@@ -1,7 +1,8 @@
 use crate::board::Board;
 use crate::notation::history::History;
 use crate::notation::pos;
-use crate::notation::pos::{pos_unchecked, Pos};
+use crate::notation::pos::Pos;
+use rand::Rng;
 use std::collections::HashSet;
 
 fn find_symmetry_moves(ref1: Pos, ref2: Pos, m: Pos) -> HashSet<Pos> {
@@ -68,7 +69,40 @@ pub fn find_forbidden_symmetry_moves(history: &History, fifth_move: Pos) -> Hash
         .collect()
 }
 
-pub fn generate_random_three_moves() -> Board {
+fn move_to_opening_grid(grid_width: u8, pos: Pos) -> Pos {
+    let half = grid_width / 2;
+    Pos::from_cartesian(
+        pos.row() + pos::CENTER.row() - half,
+        pos.col() + pos::CENTER.col() - half,
+    )
+}
+
+fn generate_move_in_grid_bound(grid_width: u8) -> Pos {
+    let half = grid_width / 2;
+    let mut row: u8 = rand::thread_rng().gen_range(0 .. grid_width);
+    let mut col: u8 = rand::thread_rng().gen_range(0 .. grid_width);
+
+    row = if row < half {
+        row
+    } else {
+        row + 1
+    };
+
+    col = if col < half {
+        col
+    } else {
+        col + 1
+    };
+
+    Pos::from_cartesian(row, col)
+}
+
+pub fn generate_random_opening() -> Board {
+    let move_2 = generate_move_in_grid_bound(3);
+    let move_3 = generate_move_in_grid_bound(5);
+
     Board::default()
-        .set(pos_unchecked("h8"))
+        .set(pos::CENTER)
+        .set(move_to_opening_grid(3, move_2))
+        .set(move_to_opening_grid(5, move_3))
 }
