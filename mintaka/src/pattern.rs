@@ -6,6 +6,7 @@ use crate::notation::pos;
 use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slice;
 use crate::slice_pattern::EMPTY_SLICE_PATTERN;
+use crate::utils::lang_utils::repeat_4x;
 use crate::{cartesian_to_index, pop_count_less_then_two, pop_count_less_then_two_unchecked};
 
 pub const CLOSED_FOUR_SINGLE: u8    = 0b1000_0000;
@@ -15,20 +16,19 @@ pub const TOTAL_FOUR: u8            = 0b1110_0000;
 pub const FIVE: u8                  = 0b0001_0000;
 
 pub const OPEN_THREE: u8            = 0b0000_1000;
-pub const CORE_THREE: u8            = 0b0000_0100;
-pub const CLOSE_THREE: u8           = 0b0000_0010;
+pub const CLOSE_THREE: u8           = 0b0000_0100;
 // invalid-3 for black, overline(black) for white
-pub const INV_THREE_OVERLINE: u8    = 0b0000_0001;
+pub const INV_THREE_OVERLINE: u8    = 0b0000_0010;
+pub const PADDING: u8               = 0b0000_0001;
 
-const UNIT_CLOSED_FOUR_MASK: u32    = 0b1100_0000_1100_0000_1100_0000_1100_0000;
-const UNIT_OPEN_FOUR_MASK: u32      = 0b0010_0000_0010_0000_0010_0000_0010_0000;
-const UNIT_TOTAL_FOUR_MASK: u32     = 0b1110_0000_1110_0000_1110_0000_1110_0000;
-const UNIT_FIVE_MASK: u32           = 0b0001_0000_0001_0000_0001_0000_0001_0000;
+const UNIT_CLOSED_FOUR_MASK: u32    = repeat_4x(CLOSED_FOUR_DOUBLE);
+const UNIT_OPEN_FOUR_MASK: u32      = repeat_4x(OPEN_FOUR);
+const UNIT_TOTAL_FOUR_MASK: u32     = repeat_4x(TOTAL_FOUR);
+const UNIT_FIVE_MASK: u32           = repeat_4x(FIVE);
 
-const UNIT_OPEN_THREE_MASK: u32     = 0b0000_1000_0000_1000_0000_1000_0000_1000;
-const UNIT_CORE_THREE_MASK: u32     = 0b0000_0100_0000_0100_0000_0100_0000_0100;
-const UNIT_CLOSE_THREE_MASK: u32    = 0b0000_0010_0000_0010_0000_0010_0000_0010;
-const UNIT_INV_3_OVERLINE_MASK: u32 = 0b0000_0001_0000_0001_0000_0001_0000_0001;
+const UNIT_OPEN_THREE_MASK: u32     = repeat_4x(OPEN_THREE);
+const UNIT_CLOSE_THREE_MASK: u32    = repeat_4x(CLOSE_THREE);
+const UNIT_INV_3_OVERLINE_MASK: u32 = repeat_4x(INV_THREE_OVERLINE);
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub enum PatternCount {
@@ -138,10 +138,6 @@ impl PatternUnit {
         self.apply_mask(UNIT_CLOSE_THREE_MASK).count_ones()
     }
 
-    pub fn count_core_threes(&self) -> u32 {
-        self.apply_mask(UNIT_CORE_THREE_MASK).count_ones()
-    }
-
     pub fn count_closed_fours(&self) -> u32 {
         self.apply_mask(UNIT_CLOSED_FOUR_MASK).count_ones()
     }
@@ -227,30 +223,14 @@ impl Pattern {
     #[inline(always)]
     pub fn apply_mask_mut<const C: Color, const D: Direction>(mut self, pattern: u8) {
         match (C, D) {
-            (Color::Black, Direction::Horizontal) => {
-                self.black_unit.horizontal = pattern
-            },
-            (Color::Black, Direction::Vertical) => {
-                self.black_unit.vertical = pattern
-            },
-            (Color::Black, Direction::Ascending) => {
-                self.black_unit.ascending = pattern
-            },
-            (Color::Black, Direction::Descending) => {
-                self.black_unit.descending = pattern
-            },
-            (Color::White, Direction::Horizontal) => {
-                self.white_unit.horizontal = pattern
-            },
-            (Color::White, Direction::Vertical) => {
-                self.white_unit.vertical = pattern
-            },
-            (Color::White, Direction::Ascending) => {
-                self.white_unit.ascending = pattern
-            },
-            (Color::White, Direction::Descending) => {
-                self.white_unit.descending = pattern
-            },
+            (Color::Black, Direction::Horizontal) => self.black_unit.horizontal = pattern,
+            (Color::Black, Direction::Vertical) => self.black_unit.vertical = pattern,
+            (Color::Black, Direction::Ascending) => self.black_unit.ascending = pattern,
+            (Color::Black, Direction::Descending) => self.black_unit.descending = pattern,
+            (Color::White, Direction::Horizontal) => self.white_unit.horizontal = pattern,
+            (Color::White, Direction::Vertical) => self.white_unit.vertical = pattern,
+            (Color::White, Direction::Ascending) => self.white_unit.ascending = pattern,
+            (Color::White, Direction::Descending) => self.white_unit.descending = pattern,
         }
     }
 

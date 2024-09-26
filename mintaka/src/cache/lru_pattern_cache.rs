@@ -1,15 +1,8 @@
 use crate::cache::pattern_cache::PatternCache;
 use crate::slice_pattern::SlicePattern;
 
+#[derive(Default)]
 pub struct LruPatternCache {
-
-}
-
-impl Default for LruPatternCache {
-
-    fn default() -> Self {
-        LruPatternCache {}
-    }
 
 }
 

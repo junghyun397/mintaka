@@ -125,14 +125,13 @@ impl Board {
             }
 
             let open_three = format!("open_three\n{}", render_pattern(board, color, PatternUnit::count_open_threes));
-            let core_three = format!("core_three\n{}", render_pattern(board, color, PatternUnit::count_core_threes));
             let close_three = format!("close_three\n{}", render_pattern(board, color, PatternUnit::count_close_threes));
 
             let closed_four = format!("closed_four\n{}", render_pattern(board, color, PatternUnit::count_closed_fours));
             let open_four = format!("open_four\n{}", render_pattern(board, color, PatternUnit::count_open_fours));
             let five = format!("five\n{}", render_pattern(board, color, PatternUnit::count_fives));
 
-            join_str_horizontally(&[&open_three, &core_three, &close_three, &closed_four, &open_four, &five])
+            join_str_horizontally(&[&open_three, &close_three, &closed_four, &open_four, &five])
         }
 
         format!(

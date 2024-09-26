@@ -1,3 +1,4 @@
+use crate::bitfield::BitfieldOps;
 use crate::board::Board;
 use crate::notation::color::Color;
 use crate::notation::game_result::GameResult;
@@ -20,9 +21,10 @@ impl Game {
 
     pub fn validate_move(&self, pos: Pos) -> bool {
         !(self.result.is_some()
-            || self.board.slices.horizontal_slices[pos.row_usize()].stone_exists(pos.col())
+            || self.board.hot_field.is_hot(pos)
             || (self.board.player_color == Color::Black && self.board.patterns.field[pos.idx_usize()].is_forbidden())
-            || self.moves() == pos::BOARD_SIZE)
+            || self.moves() == pos::BOARD_SIZE
+        )
     }
 
     pub fn play(mut self, pos: Pos) -> Self {

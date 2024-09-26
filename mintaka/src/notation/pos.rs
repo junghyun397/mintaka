@@ -18,6 +18,14 @@ pub const CENTER: Pos = Pos::from_index(U8_BOARD_SIZE / 2);
     ($idx:expr) => (($idx / 15, $idx % 15));
 }
 
+#[macro_export] macro_rules! index_to_row {
+    ($idx:expr) => ($idx / 15)
+}
+
+#[macro_export] macro_rules! index_to_col {
+     ($idx:expr) => ($idx % 15);
+ }
+
 #[macro_export] macro_rules! check_cartesian_bound {
     ($row:expr,$col:expr) => ($row < 15 && $col < 15);
 }
@@ -36,7 +44,7 @@ impl Pos {
     }
 
     pub fn to_cartesian(&self) -> (u8, u8) {
-        (self.row(), self.col())
+        index_to_cartesian!(self.0)
     }
 
     pub fn idx(&self) -> u8 {
@@ -48,7 +56,7 @@ impl Pos {
     }
 
     pub fn row(&self) -> u8 {
-        self.0 / BOARD_WIDTH
+        index_to_row!(self.0)
     }
 
     pub fn row_usize(&self) -> usize {
@@ -56,25 +64,17 @@ impl Pos {
     }
 
     pub fn col(&self) -> u8 {
-        self.0 % BOARD_WIDTH
+        index_to_col!(self.0)
     }
 
     pub fn col_usize(&self) -> usize {
         self.col() as usize
     }
 
-    pub fn mask_col(&self) -> u8 {
-        0b1 >> self.col()
-    }
-
-    pub fn reverse_mask_col(&self) -> u8 {
-        !self.mask_col()
-    }
-
 }
 
 pub const fn pos_unchecked(source: &str) -> Pos {
-    let row = u8_from_str(source, 1);
+    let row = u8_from_str(source, 1) - 1;
     let col = source.as_bytes()[0] - b'a' as u8;
 
     Pos::from_cartesian(row, col)

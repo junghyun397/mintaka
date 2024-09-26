@@ -123,7 +123,7 @@ fn find_patterns(
         ($patterns_expr:expr,rev=$rev:expr,$($patch:literal),+) => {{
             const PATCH_MASK_LUT: SlicePatchMaskLUT = build_slice_patch_mask_lut([$($patch),*], $rev);
 
-            let mut original: u128 = unsafe { std::mem::transmute::<[u8; 16], u128>($patterns_expr) };
+            let mut original = u128::from_ne_bytes($patterns_expr);
 
             let slice_patch_mask = PATCH_MASK_LUT.look_up_table[shift];
             // branches removed at compile time (NO branching)
@@ -137,7 +137,7 @@ fn find_patterns(
                 );
             }
 
-            $patterns_expr = unsafe { std::mem::transmute::<u128, [u8; 16]>(original) };
+            $patterns_expr = original.to_ne_bytes();
         }};
     }
 
@@ -294,7 +294,7 @@ struct SlicePatchMaskLUT {
 
 // big-endian not supported
 const fn build_slice_patch_mask_lut(sources: [&str; 4], reversed: bool) -> SlicePatchMaskLUT {
-    const fn build_slice_patch_mask(sources: [&str; 4], reversed: bool) -> SlicePatchMask{
+    let original = unsafe {
         let mut patch_mask: [u8; 16] = [0; 16];
         let mut closed_four_clear_mask: [u8; 16] = [0; 16];
         let mut closed_four_mask: [u8; 16] = [0; 16];
@@ -314,32 +314,32 @@ const fn build_slice_patch_mask_lut(sources: [&str; 4], reversed: bool) -> Slice
             idx += 1;
         }
 
-        unsafe { SlicePatchMask {
-            patch_mask: std::mem::transmute::<[u8; 16], u128>(patch_mask),
-            closed_four_clear_mask: std::mem::transmute::<[u8; 16], u128>(closed_four_clear_mask),
-            closed_four_mask: std::mem::transmute::<[u8; 16], u128>(closed_four_mask),
-        } }
-    }
+        SlicePatchMask {
+            patch_mask: u128::from_ne_bytes(patch_mask),
+            closed_four_clear_mask: u128::from_ne_bytes(closed_four_clear_mask),
+            closed_four_mask: u128::from_ne_bytes(closed_four_mask),
+        }
+    };
 
-    let original = build_slice_patch_mask(sources, reversed);
+    let look_up_table = {
+        let mut lut = [SlicePatchMask { patch_mask: 0, closed_four_clear_mask: 0, closed_four_mask: 0 }; MASK_LUT_SIZE];
 
-    let mut look_up_table = [SlicePatchMask {
-        patch_mask: 0, closed_four_clear_mask: 0, closed_four_mask: 0,
-    }; MASK_LUT_SIZE];
+        let mut idx: isize = 0;
+        while idx < MASK_LUT_SIZE as isize {
+            let shl = min!(0, idx - 3).abs() * 8;
+            let shr = max!(0, idx - 3) * 8;
 
-    let mut idx: isize = 0;
-    while idx < MASK_LUT_SIZE as isize {
-        let shl = min!(0, idx - 3).abs() * 8;
-        let shr = max!(0, idx - 3) * 8;
+            lut[idx as usize] = SlicePatchMask {
+                patch_mask: (original.patch_mask << shr) >> shl,
+                closed_four_clear_mask: (original.closed_four_clear_mask << shr) >> shl,
+                closed_four_mask: (original.closed_four_mask << shr) >> shl,
+            };
 
-        look_up_table[idx as usize] = SlicePatchMask {
-            patch_mask: (original.patch_mask << shr) >> shl,
-            closed_four_clear_mask: (original.closed_four_clear_mask << shr) >> shl,
-            closed_four_mask: (original.closed_four_mask << shr) >> shl,
-        };
+            idx += 1;
+        }
 
-        idx += 1;
-    }
+        lut
+    };
 
     SlicePatchMaskLUT {
         look_up_table,
@@ -354,11 +354,11 @@ fn increase_closed_four_single(packed: u8) -> u8 {
 
 // big-endian not supported
 fn increase_closed_four_multiple(original: u128, clear_mask: u128, mask: u128) -> u128 {
-    let mut masked: u128 = original & clear_mask;   // 0 0 0 | 1 0 0 | 1 1 0
-    masked >>= 1;                                   // 0 0 0 | 0 1 0 | 0 1 1
-    masked |= mask;                                 // 1 0 0 | 1 1 0 | 1 1 1
-    masked &= clear_mask;                           // 1 0 0 | 1 1 0 | 1 1 0
-    original | masked                               // empty, four*1, four*2
+    let mut copid: u128 = original;     // 0 0 0 | 1 0 0 | 1 1 0
+    copid >>= 1;                        // 0 0 0 | 0 1 0 | 0 1 1
+    copid |= mask;                      // 1 0 0 | 1 1 0 | 1 1 1
+    copid &= clear_mask;                // 1 0 0 | 1 1 0 | 1 1 0
+    original | copid                    // empty, four*1, four*2
 }
 
 const fn parse_patch_literal(source: &str, reversed: bool) -> (isize, u8) {

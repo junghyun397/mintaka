@@ -1,9 +1,9 @@
+use crate::bitfield::BitfieldOps;
 use crate::board::Board;
 use crate::notation::color::Color;
-use crate::notation::pos;
 use crate::notation::rule::ForbiddenKind;
 use crate::pattern::Pattern;
-use crate::slice::Slices;
+use crate::{index_to_col, index_to_row};
 
 #[repr(u64)]
 pub enum BoardIterItem {
@@ -22,25 +22,31 @@ pub enum BoardIterVerboseItem {
 impl Board {
 
     pub fn iter_items(&self) -> impl Iterator<Item=BoardIterItem> + '_ {
-        self.slices.iter()
+        self.hot_field.iter_hot()
             .enumerate()
-            .map(|(idx, maybe_color)|
-                if let Some(color) = maybe_color {
-                    BoardIterItem::Stone(color)
-                } else {
-                    BoardIterItem::Pattern(
-                        self.patterns.field[idx]
+            .map(|(idx, is_hot)|
+                if is_hot {
+                    BoardIterItem::Stone(
+                        self.slices.horizontal_slices[index_to_row!(idx)]
+                            .stone_kind(index_to_col!(idx) as u8)
+                            .unwrap()
                     )
+                } else {
+                    BoardIterItem::Pattern(self.patterns.field[idx])
                 }
             )
     }
 
     pub fn iter_verbose_items(&self) -> impl Iterator<Item=BoardIterVerboseItem> + '_ {
-        self.slices.iter()
+        self.hot_field.iter_hot()
             .enumerate()
-            .map(|(idx, maybe_color)|
-                if let Some(color) = maybe_color {
-                    BoardIterVerboseItem::Stone(color)
+            .map(|(idx, is_hot)|
+                if is_hot {
+                    BoardIterVerboseItem::Stone(
+                        self.slices.horizontal_slices[index_to_row!(idx)]
+                            .stone_kind(index_to_col!(idx) as u8)
+                            .unwrap()
+                    )
                 } else {
                     let pattern = self.patterns.field[idx];
 
@@ -54,20 +60,6 @@ impl Board {
                             )
                     }
                 }
-            )
-    }
-
-}
-
-impl Slices {
-
-    pub fn iter(&self) -> impl Iterator<Item=Option<Color>> + '_ {
-        self.horizontal_slices.iter()
-            .flat_map(|slice|
-                (0 .. pos::BOARD_WIDTH)
-                    .map(|col_idx|
-                        slice.stone_kind(col_idx)
-                    )
             )
     }
 

@@ -4,7 +4,7 @@ use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::pop_count_less_then_two;
-use ethnum::{uint, U256};
+use ethnum::{u256, U256};
 use std::cmp::max;
 use std::ops::Neg;
 
@@ -60,11 +60,6 @@ impl Slice {
 
     pub fn is_no_joy(&self) -> bool {
         pop_count_less_then_two!(self.black_stones) && pop_count_less_then_two!(self.white_stones)
-    }
-
-    pub fn stone_exists(&self, idx: u8) -> bool {
-        let mask = 0b1 << idx;
-        (self.black_stones | self.white_stones) & mask == mask
     }
 
     pub fn stone_kind(&self, idx: u8) -> Option<Color> {
@@ -182,7 +177,7 @@ impl Slices {
     pub fn non_empties(&self) -> Bitfield {
         self.horizontal_slices.iter()
             .enumerate()
-            .fold(uint!("0"), |mut acc, (row_idx, row)| {
+            .fold(u256::MIN, |mut acc, (row_idx, row)| {
                 acc |= U256::from((row.black_stones | row.white_stones) << (row_idx * pos::U_BOARD_WIDTH));
                 acc
             })

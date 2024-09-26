@@ -19,11 +19,11 @@ pub trait BitfieldOps {
 impl BitfieldOps for Bitfield {
 
     fn is_cold(&self, pos: Pos) -> bool {
-        self & uint!("0b1") << pos.idx() == 0
+        self & (uint!("0b1") << pos.idx()) == 0
     }
 
     fn is_hot(&self, pos: Pos) -> bool {
-        self & uint!("0b1") << pos.idx() == 1
+        self & (uint!("0b1") << pos.idx()) != 0
     }
 
     fn iter_hot(&self) -> impl Iterator<Item=bool> + '_ {
