@@ -75,7 +75,7 @@ impl Pos {
 
 pub const fn pos_unchecked(source: &str) -> Pos {
     let row = u8_from_str(source, 1) - 1;
-    let col = source.as_bytes()[0] - b'a' as u8;
+    let col = source.as_bytes()[0] - b'a';
 
     Pos::from_cartesian(row, col)
 }

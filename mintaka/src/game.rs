@@ -54,7 +54,7 @@ impl Game {
         self.result = self.board.patterns.five_in_a_row
             .map(|(_, _, color)| GameResult::FiveInARow(color))
             .or_else(||
-                 (self.board.stones == pos::BOARD_SIZE).then_some(GameResult::Full)
+                 (self.board.stones == pos::U8_BOARD_SIZE).then_some(GameResult::Full)
             );
     }
 

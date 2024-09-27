@@ -1,11 +1,10 @@
-use crate::cache::dummy_pattern_cache::DummyPatternCache;
-use crate::cache::pattern_cache::PatternCache;
+use crate::memo::buffered_pattern_memo::BufferedSlicePatternMemo;
+use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slice;
-use crate::slice_pattern::EMPTY_SLICE_PATTERN;
 use crate::utils::lang_utils::repeat_4x;
 use crate::{cartesian_to_index, pop_count_less_then_two, pop_count_less_then_two_unchecked};
 
@@ -221,7 +220,7 @@ impl Pattern {
     }
 
     #[inline(always)]
-    pub fn apply_mask_mut<const C: Color, const D: Direction>(mut self, pattern: u8) {
+    pub fn apply_mask_mut<const C: Color, const D: Direction>(&mut self, pattern: u8) {
         match (C, D) {
             (Color::Black, Direction::Horizontal) => self.black_unit.horizontal = pattern,
             (Color::Black, Direction::Vertical) => self.black_unit.vertical = pattern,
@@ -264,15 +263,12 @@ impl Patterns {
             return
         }
 
-        let mut pattern_cache = DummyPatternCache {}; // TODO: DEBUG
-        let slice_pattern = pattern_cache.probe_mut(slice.slice_key())
-            .unwrap_or_else(|| {
-                let slice_pattern = slice.calculate_slice_pattern();
-                pattern_cache.put_mut(slice.slice_key(), slice_pattern);
-                slice_pattern
-            });
+        let mut pattern_memo = BufferedSlicePatternMemo::default(); // TODO: DEBUG
+        let slice_pattern = pattern_memo.probe_or_put_mut(slice.slice_key(), ||
+            slice.calculate_slice_pattern()
+        );
 
-        if slice_pattern == EMPTY_SLICE_PATTERN {
+        if slice_pattern.is_empty() {
             return
         }
         

@@ -11,6 +11,14 @@ pub struct SlicePattern {
     pub five_in_a_row: Option<(u8, Color)>
 }
 
+impl SlicePattern {
+
+    pub fn is_empty(&self) -> bool {
+        u128::from_ne_bytes(self.black_patterns) == 0 && u128::from_ne_bytes(self.white_patterns) == 0
+    }
+
+}
+
 pub const EMPTY_SLICE_PATTERN: SlicePattern = SlicePattern {
     black_patterns: [0; 16],
     white_patterns: [0; 16],
@@ -105,14 +113,14 @@ fn find_patterns(
         (black,rev=$rev:expr,$patch:literal) => (apply_single_patch!(acc.black_patterns,rev=$rev,$patch));
         (white,rev=$rev:expr,$patch:literal) => (apply_single_patch!(acc.white_patterns,rev=$rev,$patch));
         ($patterns_expr:expr,rev=$rev:expr,$patch:literal) => {{
-             const POS_KIND_TUPLE: (isize, u8) = parse_patch_literal($patch, $rev);
+             const POS_KIND_TUPLE: (u8, u8) = parse_patch_literal($patch, $rev);
 
             // branch removed at compile time
             if (POS_KIND_TUPLE.1 == CLOSED_FOUR_SINGLE) {
-                let original = $patterns_expr[(offset + POS_KIND_TUPLE.0) as usize];
-                $patterns_expr[(offset + POS_KIND_TUPLE.0) as usize] = increase_closed_four_single(original);
+                let original = $patterns_expr[(offset + POS_KIND_TUPLE.0 as isize) as usize];
+                $patterns_expr[(offset + POS_KIND_TUPLE.0 as isize) as usize] = increase_closed_four_single(original);
             } else {
-                $patterns_expr[(offset + POS_KIND_TUPLE.0) as usize] |= POS_KIND_TUPLE.1;
+                $patterns_expr[(offset + POS_KIND_TUPLE.0 as isize) as usize] |= POS_KIND_TUPLE.1;
             }
         }};
     }
@@ -322,7 +330,9 @@ const fn build_slice_patch_mask_lut(sources: [&str; 4], reversed: bool) -> Slice
     };
 
     let look_up_table = {
-        let mut lut = [SlicePatchMask { patch_mask: 0, closed_four_clear_mask: 0, closed_four_mask: 0 }; MASK_LUT_SIZE];
+        let mut lut = [SlicePatchMask {
+            patch_mask: 0, closed_four_clear_mask: 0, closed_four_mask: 0
+        }; MASK_LUT_SIZE];
 
         let mut idx: isize = 0;
         while idx < MASK_LUT_SIZE as isize {
@@ -361,9 +371,9 @@ fn increase_closed_four_multiple(original: u128, clear_mask: u128, mask: u128) -
     original | copid                    // empty, four*1, four*2
 }
 
-const fn parse_patch_literal(source: &str, reversed: bool) -> (isize, u8) {
-    let mut idx: isize = 0;
-    while idx < source.len() as isize {
+const fn parse_patch_literal(source: &str, reversed: bool) -> (u8, u8) {
+    let mut idx: u8 = 0;
+    while idx < source.len() as u8 {
         let pos = if reversed { 7 - idx } else { idx };
         match source.as_bytes()[idx as usize] as char {
             '3' => return (pos, OPEN_THREE),

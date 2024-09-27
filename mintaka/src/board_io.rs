@@ -72,7 +72,7 @@ fn extract_color_stones(source: &[Option<Color>], target_color: Color) -> Box<[P
 
 impl Board {
 
-    pub fn render_attribute_board<F>(&self, transform: F) -> String
+    pub fn build_attribute_string<F>(&self, transform: F) -> String
     where F: Fn(&BoardIterItem) -> String
     {
         let content = self.iter_items()
@@ -105,10 +105,10 @@ impl Board {
         format!("{column_hint}\n{content}\n{column_hint}")
     }
 
-    pub fn render_debug_board(&self) -> String {
-        fn render_single_side(board: &Board, color: Color) -> String {
+    pub fn build_debug_string(&self) -> String {
+        fn build_single_side_string(board: &Board, color: Color) -> String {
             fn render_pattern(board: &Board, color: Color, extract: fn(&PatternUnit) -> u32) -> String {
-                board.render_attribute_board(|item| {
+                board.build_attribute_string(|item| {
                     match item {
                         BoardIterItem::Stone(color) => char::from(*color).to_string(),
                         BoardIterItem::Pattern(pattern) => {
@@ -136,8 +136,8 @@ impl Board {
 
         format!(
             "{}\nblack\n{}\nwhite\n{}", self,
-            render_single_side(self, Color::Black),
-            render_single_side(self, Color::White)
+            build_single_side_string(self, Color::Black),
+            build_single_side_string(self, Color::White)
         )
     }
 
@@ -146,7 +146,7 @@ impl Board {
 impl Display for Board {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.render_attribute_board(|item|
+        write!(f, "{}", self.build_attribute_string(|item|
             match item {
                 BoardIterItem::Stone(color) => char::from(*color),
                 BoardIterItem::Pattern(pattern) =>

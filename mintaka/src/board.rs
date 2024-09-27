@@ -1,5 +1,5 @@
 use crate::bitfield::Bitfield;
-use crate::cache::hash_key::HashKey;
+use crate::memo::hash_key::HashKey;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::Pos;
@@ -14,7 +14,7 @@ pub struct Board {
     pub slices: Slices,
     pub patterns: Patterns,
     pub hot_field: Bitfield,
-    pub stones: usize,
+    pub stones: u8,
     pub hash_key: HashKey,
 }
 
@@ -85,7 +85,7 @@ impl Board {
     }
 
     pub fn batch_set_mut(&mut self, blacks: Box<[Pos]>, whites: Box<[Pos]>, player: Color) {
-        self.stones += blacks.len() + whites.len();
+        self.stones += blacks.len() as u8 + whites.len() as u8;
 
         for pos in blacks {
             self.slices.set_mut(Color::Black, pos);

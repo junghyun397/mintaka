@@ -1,5 +1,5 @@
-use crate::cache::hash_table;
 use crate::cartesian_to_index;
+use crate::memo::hash_table;
 use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
@@ -15,10 +15,10 @@ impl HashKey {
     }
 
     pub fn set_idx(self, color: Color, idx: usize) -> Self {
-        HashKey(self.0 ^ hash_table::TABLE[match color {
-            Color::Black => idx,
-            Color::White => pos::BOARD_SIZE + idx,
-        }])
+        HashKey(self.0 ^ match color {
+            Color::Black => hash_table::HASH_TABLE[0][idx],
+            Color::White => hash_table::HASH_TABLE[1][idx],
+        })
     }
 
 }

@@ -1,14 +1,13 @@
 #![allow(incomplete_features)]
 #![feature(portable_simd)]
 #![feature(adt_const_params)]
-#![feature(const_trait_impl)]
 
 extern crate core;
 
 pub mod board;
 pub mod board_io;
 pub mod slice;
-pub mod cache;
+pub mod memo;
 pub mod movegen;
 pub mod notation;
 pub mod game;
