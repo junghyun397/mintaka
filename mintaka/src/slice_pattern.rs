@@ -2,7 +2,7 @@ use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::pattern::{CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, INV_THREE_OVERLINE, OPEN_FOUR, OPEN_THREE};
 use crate::slice::Slice;
-use crate::{max, min, pop_count_less_then_two};
+use crate::{max, min};
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub struct SlicePattern {
@@ -39,7 +39,7 @@ impl Slice {
         let mut acc: SlicePattern = EMPTY_SLICE_PATTERN;
         for shift in 0 ..= self.length as usize + 1 { // length - 5 + 3 * 2
             let cold_frag = (cold >> shift) as u8;
-            if !(pop_count_less_then_two!(b) && pop_count_less_then_two!(w)) && cold != 0 {
+            if !(b.count_ones() < 2 && w.count_ones() < 2) && cold != 0 {
                 find_patterns(
                     &mut acc, shift, shift as isize - 3,
                     b,

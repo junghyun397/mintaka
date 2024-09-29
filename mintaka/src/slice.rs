@@ -3,7 +3,6 @@ use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::pop_count_less_then_two;
 use ethnum::{u256, U256};
 use std::cmp::max;
 use std::ops::Neg;
@@ -59,7 +58,7 @@ impl Slice {
     }
 
     pub fn is_no_joy(&self) -> bool {
-        pop_count_less_then_two!(self.black_stones) && pop_count_less_then_two!(self.white_stones)
+        self.black_stones.count_ones() < 2 && self.white_stones.count_ones() < 2
     }
 
     pub fn stone_kind(&self, idx: u8) -> Option<Color> {
@@ -75,7 +74,7 @@ impl Slice {
     }
 
     pub fn slice_key(&self) -> SliceKey {
-        self.black_stones as u32 | self.white_stones as u32 >> pos::BOARD_WIDTH
+        self.black_stones as u32 | (self.white_stones as u32) << pos::BOARD_WIDTH
     }
 
 }

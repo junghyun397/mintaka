@@ -1,3 +1,4 @@
+use crate::cartesian_to_index;
 use crate::memo::buffered_pattern_memo::BufferedSlicePatternMemo;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
@@ -6,7 +7,6 @@ use crate::notation::pos;
 use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slice;
 use crate::utils::lang_utils::repeat_4x;
-use crate::{cartesian_to_index, pop_count_less_then_two, pop_count_less_then_two_unchecked};
 
 pub const CLOSED_FOUR_SINGLE: u8    = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8    = 0b1100_0000;
@@ -41,7 +41,7 @@ impl PatternCount {
     fn from_masked_unit(packed: u32) -> Self {
         if packed == 0 {
             PatternCount::Cold
-        } else if pop_count_less_then_two_unchecked!(packed) {
+        } else if packed.count_ones() < 2 {
             PatternCount::Single
         } else {
             PatternCount::Multiple
@@ -75,11 +75,11 @@ impl PatternUnit {
     }
 
     pub fn has_threes(&self) -> bool {
-        !pop_count_less_then_two!(self.apply_mask(UNIT_OPEN_THREE_MASK))
+        self.apply_mask(UNIT_OPEN_THREE_MASK).count_ones() > 1
     }
 
     pub fn has_fours(&self) -> bool {
-        !pop_count_less_then_two!(self.apply_mask(UNIT_TOTAL_FOUR_MASK))
+        self.apply_mask(UNIT_TOTAL_FOUR_MASK) > 1
     }
 
     pub fn has_close_three(&self) -> bool {
