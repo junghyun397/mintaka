@@ -13,7 +13,8 @@ const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
 #[derive(Debug, Copy, Clone)]
 pub struct Slice {
     pub length: u8,
-    pub start_pos: Pos,
+    pub start_row: u8,
+    pub start_col: u8,
     pub black_stones: u16,
     pub white_stones: u16
 }
@@ -22,10 +23,11 @@ pub type SliceKey = u32;
 
 impl Slice {
 
-    pub fn empty(length: u8, start_pos: Pos) -> Self {
+    pub fn empty(length: u8, start_row: u8, start_col: u8) -> Self {
         Slice {
             length,
-            start_pos,
+            start_row,
+            start_col,
             black_stones: 0,
             white_stones: 0
         }
@@ -92,26 +94,25 @@ impl Default for Slices {
     fn default() -> Self {
         Self {
             horizontal_slices: std::array::from_fn(|idx|
-                Slice::empty(pos::BOARD_WIDTH, Pos::from_cartesian(idx as u8, 0))
+                Slice::empty(pos::BOARD_WIDTH, idx as u8, 0)
             ),
             vertical_slices: std::array::from_fn(|idx|
-                Slice::empty(pos::BOARD_WIDTH, Pos::from_cartesian(0, idx as u8))
+                Slice::empty(pos::BOARD_WIDTH, 0, idx as u8)
             ),
             ascending_slices: std::array::from_fn(|idx| {
                 let seq_num = idx as isize + 5 - pos::I_BOARD_WIDTH;
                 Slice::empty(
                     (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
-                    Pos::from_cartesian(max(0, seq_num.neg()) as u8, max(0, seq_num) as u8)
+                    max(0, seq_num.neg()) as u8,
+                    max(0, seq_num) as u8
                 )
             }),
             descending_slices: std::array::from_fn(|idx| {
                 let seq_num = idx as isize + 5 - pos::I_BOARD_WIDTH;
                 Slice::empty(
                     (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
-                    Pos::from_cartesian(
-                        pos::BOARD_WIDTH-1 - max(0, seq_num.neg()) as u8,
-                        max(0, seq_num) as u8
-                    )
+                    pos::BOARD_WIDTH-1 - max(0, seq_num.neg()) as u8,
+                    max(0, seq_num) as u8
                 )
             })
         }
@@ -126,11 +127,11 @@ impl Slices {
         self.vertical_slices[pos.col_usize()].set_mut(color, pos.row());
 
         if let Some(ascending_slice) = self.occupy_ascending_slice(pos) {
-            ascending_slice.set_mut(color, pos.col() - ascending_slice.start_pos.col())
+            ascending_slice.set_mut(color, pos.col() - ascending_slice.start_col)
         }
 
         if let Some(descending_slice) = self.occupy_descending_slice(pos) {
-            descending_slice.set_mut(color, pos.col() - descending_slice.start_pos.col())
+            descending_slice.set_mut(color, pos.col() - descending_slice.start_col)
         }
     }
 

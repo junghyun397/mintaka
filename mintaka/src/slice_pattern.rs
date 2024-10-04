@@ -13,17 +13,17 @@ pub struct SlicePattern {
 
 impl SlicePattern {
 
+    pub const EMPTY: Self = Self {
+        black_patterns: [0; 16],
+        white_patterns: [0; 16],
+        five_in_a_row: None,
+    };
+
     pub fn is_empty(&self) -> bool {
         u128::from_ne_bytes(self.black_patterns) == 0 && u128::from_ne_bytes(self.white_patterns) == 0
     }
 
 }
-
-pub const EMPTY_SLICE_PATTERN: SlicePattern = SlicePattern {
-    black_patterns: [0; 16],
-    white_patterns: [0; 16],
-    five_in_a_row: None,
-};
 
 impl Slice {
 
@@ -36,7 +36,7 @@ impl Slice {
         let ww = w | wall;
         let cold = !(bw | ww);
 
-        let mut acc: SlicePattern = EMPTY_SLICE_PATTERN;
+        let mut acc: SlicePattern = SlicePattern::EMPTY;
         for shift in 0 ..= self.length as usize + 1 { // length - 5 + 3 * 2
             let cold_frag = (cold >> shift) as u8;
             if !(b.count_ones() < 2 && w.count_ones() < 2) && cold != 0 {
@@ -364,11 +364,11 @@ fn increase_closed_four_single(packed: u8) -> u8 {
 
 // big-endian not supported
 fn increase_closed_four_multiple(original: u128, clear_mask: u128, mask: u128) -> u128 {
-    let mut copid: u128 = original;     // 0 0 0 | 1 0 0 | 1 1 0
-    copid >>= 1;                        // 0 0 0 | 0 1 0 | 0 1 1
-    copid |= mask;                      // 1 0 0 | 1 1 0 | 1 1 1
-    copid &= clear_mask;                // 1 0 0 | 1 1 0 | 1 1 0
-    original | copid                    // empty, four*1, four*2
+    let mut copied: u128 = original;     // 0 0 0 | 1 0 0 | 1 1 0
+    copied >>= 1;                        // 0 0 0 | 0 1 0 | 0 1 1
+    copied |= mask;                      // 1 0 0 | 1 1 0 | 1 1 1
+    copied &= clear_mask;                // 1 0 0 | 1 1 0 | 1 1 0
+    original | copied                    // empty, four*1, four*2
 }
 
 const fn parse_patch_literal(source: &str, reversed: bool) -> (u8, u8) {

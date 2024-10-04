@@ -22,7 +22,7 @@ pub enum BoardIterVerboseItem {
 impl Board {
 
     pub fn iter_items(&self) -> impl Iterator<Item=BoardIterItem> + '_ {
-        self.hot_field.iter_hot()
+        self.hot_field.iter()
             .enumerate()
             .map(|(idx, is_hot)|
                 if is_hot {
@@ -38,7 +38,7 @@ impl Board {
     }
 
     pub fn iter_verbose_items(&self) -> impl Iterator<Item=BoardIterVerboseItem> + '_ {
-        self.hot_field.iter_hot()
+        self.hot_field.iter()
             .enumerate()
             .map(|(idx, is_hot)|
                 if is_hot {

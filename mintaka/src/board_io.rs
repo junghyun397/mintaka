@@ -198,7 +198,7 @@ impl FromStr for Slice {
         Ok(IntoIterator::into_iter(fields)
             .enumerate()
             .fold(
-                Slice::empty(field_len, Pos::from_index(0)),
+                Slice::empty(field_len, 0, 0),
                 |acc, (idx, field)| {
                     match field {
                         Some(color) => acc.set(color, idx as u8),

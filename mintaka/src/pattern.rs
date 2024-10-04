@@ -1,5 +1,6 @@
+use crate::bitfield::{Bitfield, BitfieldOps};
 use crate::cartesian_to_index;
-use crate::memo::buffered_pattern_memo::BufferedSlicePatternMemo;
+use crate::memo::memory_leak_pattern_memo::MemoryLeakSlicePatternMemo;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
@@ -7,6 +8,7 @@ use crate::notation::pos;
 use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slice;
 use crate::utils::lang_utils::repeat_4x;
+use ethnum::u256;
 
 pub const CLOSED_FOUR_SINGLE: u8    = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8    = 0b1100_0000;
@@ -63,7 +65,7 @@ pub struct PatternUnit {
 impl From<PatternUnit> for u32 {
 
     fn from(value: PatternUnit) -> Self {
-        unsafe { std::mem::transmute(value) }
+        unsafe { std::mem::transmute::<PatternUnit, u32>(value) }
     }
 
 }
@@ -168,7 +170,7 @@ pub struct Pattern {
 impl From<Pattern> for u64 {
 
     fn from(value: Pattern) -> Self {
-        unsafe { std::mem::transmute(value) }
+        unsafe { std::mem::transmute::<Pattern, u64>(value) }
     }
 
 }
@@ -206,7 +208,7 @@ impl Pattern {
     }
 
     pub fn forbidden_kind(&self) -> Option<ForbiddenKind> {
-        self.is_not_empty()
+        (self.is_not_empty() && self.is_forbidden())
             .then(||
                 if self.black_unit.has_threes() {
                     ForbiddenKind::DoubleThree
@@ -243,6 +245,7 @@ impl Pattern {
 pub struct Patterns {
     pub field: [Pattern; pos::BOARD_SIZE],
     pub five_in_a_row: Option<(Direction, u8, Color)>,
+    double_three_field: Bitfield,
 }
 
 impl Default for Patterns {
@@ -251,6 +254,7 @@ impl Default for Patterns {
         Self {
             field: [Pattern::default(); pos::BOARD_SIZE],
             five_in_a_row: None,
+            double_three_field: u256::MIN,
         }
     }
 
@@ -258,12 +262,12 @@ impl Default for Patterns {
 
 impl Patterns {
 
-    pub fn update_with_slice_mut<const D: Direction>(&mut self, slice: &Slice) {
+    pub fn update_by_slice_mut<const D: Direction>(&mut self, slice: &Slice) {
         if slice.is_no_joy() {
             return
         }
 
-        let mut pattern_memo = BufferedSlicePatternMemo::default(); // TODO: DEBUG
+        let mut pattern_memo = MemoryLeakSlicePatternMemo {}; // TODO: DEBUG
         let slice_pattern = pattern_memo.probe_or_put_mut(slice.slice_key(), ||
             slice.calculate_slice_pattern()
         );
@@ -275,17 +279,20 @@ impl Patterns {
         for offset in 0 .. slice.length {
             let idx = match D {
                 Direction::Horizontal =>
-                    cartesian_to_index!(slice.start_pos.row(), slice.start_pos.col() + offset),
+                    cartesian_to_index!(slice.start_row, slice.start_col + offset),
                 Direction::Vertical =>
-                    cartesian_to_index!(slice.start_pos.row() + offset, slice.start_pos.col()),
+                    cartesian_to_index!(slice.start_row + offset, slice.start_col),
                 Direction::Ascending =>
-                    cartesian_to_index!(slice.start_pos.row() + offset, slice.start_pos.col() + offset),
+                    cartesian_to_index!(slice.start_row + offset, slice.start_col + offset),
                 Direction::Descending =>
-                    cartesian_to_index!(slice.start_pos.row() - offset, slice.start_pos.col() + offset),
+                    cartesian_to_index!(slice.start_row - offset, slice.start_col + offset),
             } as usize;
 
             self.field[idx].apply_mask_mut::<{ Color::Black }, D>(slice_pattern.black_patterns[offset as usize]);
             self.field[idx].apply_mask_mut::<{ Color::White }, D>(slice_pattern.white_patterns[offset as usize]);
+
+            if self.field[idx].black_unit.has_threes() {
+            }
         }
 
         self.five_in_a_row = self.five_in_a_row.or_else(||
@@ -295,6 +302,8 @@ impl Patterns {
     }
 
     pub fn validate_double_three_mut(&mut self) {
+        for double_three_pos in self.double_three_field.iter_hot_pos() {
+        }
     }
 
 }

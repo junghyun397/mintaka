@@ -1,6 +1,7 @@
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use ethnum::{u256, uint, U256};
+use std::ops::{BitAndAssign, BitOrAssign};
 
 pub type Bitfield = U256;
 
@@ -10,9 +11,15 @@ pub trait BitfieldOps {
 
     fn is_hot(&self, pos: Pos) -> bool;
 
-    fn iter_hot(&self) -> impl Iterator<Item=bool> + '_;
+    fn set(&mut self, pos: Pos);
 
-    fn iter_pos(&self) -> impl Iterator<Item=Pos> + '_;
+    fn unset(&mut self, pos: Pos);
+
+    fn iter(&self) -> impl Iterator<Item=bool> + '_;
+
+    fn iter_hot_pos(&self) -> impl Iterator<Item=Pos> + '_;
+
+    fn iter_cold_pos(&self) -> impl Iterator<Item=Pos> + '_;
 
 }
 
@@ -26,12 +33,24 @@ impl BitfieldOps for Bitfield {
         self & (uint!("0b1") << pos.idx()) != 0
     }
 
-    fn iter_hot(&self) -> impl Iterator<Item=bool> + '_ {
+    fn set(&mut self, pos: Pos) {
+        self.bitor_assign(uint!("0b1") << pos.idx())
+    }
+
+    fn unset(&mut self, pos: Pos) {
+        self.bitand_assign(!(uint!("0b1") << pos.idx()))
+    }
+
+    fn iter(&self) -> impl Iterator<Item=bool> + '_ {
         BitfieldIterator::from(*self)
     }
 
-    fn iter_pos(&self) -> impl Iterator<Item=Pos> + '_ {
+    fn iter_hot_pos(&self) -> impl Iterator<Item=Pos> + '_ {
         BitfieldPosIterator::from(*self)
+    }
+
+    fn iter_cold_pos(&self) -> impl Iterator<Item=Pos> + '_ {
+        BitfieldPosIterator::from(!*self)
     }
 
 }
