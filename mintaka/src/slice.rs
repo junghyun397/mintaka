@@ -1,4 +1,5 @@
 use crate::bitfield::Bitfield;
+use crate::memo::hash_key::HashKey;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
@@ -16,10 +17,8 @@ pub struct Slice {
     pub start_row: u8,
     pub start_col: u8,
     pub black_stones: u16,
-    pub white_stones: u16
+    pub white_stones: u16,
 }
-
-pub type SliceKey = u32;
 
 impl Slice {
 
@@ -29,7 +28,7 @@ impl Slice {
             start_row,
             start_col,
             black_stones: 0,
-            white_stones: 0
+            white_stones: 0,
         }
     }
 
@@ -48,7 +47,7 @@ impl Slice {
         match color {
             Color::Black => self.black_stones |= mask,
             Color::White => self.white_stones |= mask
-        }
+        };
     }
 
     pub fn unset_mut(&mut self, color: Color, idx: u8) {
@@ -56,7 +55,7 @@ impl Slice {
         match color {
             Color::Black => self.black_stones &= mask,
             Color::White => self.white_stones &= mask
-        }
+        };
     }
 
     pub fn is_no_joy(&self) -> bool {
@@ -75,8 +74,12 @@ impl Slice {
         }
     }
 
-    pub fn slice_key(&self) -> SliceKey {
-        self.black_stones as u32 | (self.white_stones as u32) << pos::BOARD_WIDTH
+    pub fn slice_key(&self) -> HashKey {
+        let concat_slice = self.concat_slice() as u64;
+    }
+
+    pub fn concat_slice(&self) -> u32 {
+        self.black_stones as u32 | (self.white_stones as u32) << 32
     }
 
 }

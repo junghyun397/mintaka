@@ -5,8 +5,8 @@ use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::slice::Slice;
 
-#[derive(Copy, Clone)]
-pub struct HashKey(u64);
+#[derive(Copy, Clone, Debug)]
+pub struct HashKey(pub u64);
 
 impl HashKey {
 

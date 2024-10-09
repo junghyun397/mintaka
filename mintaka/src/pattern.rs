@@ -268,7 +268,7 @@ impl Patterns {
         }
 
         let mut pattern_memo = MemoryLeakSlicePatternMemo {}; // TODO: DEBUG
-        let slice_pattern = pattern_memo.probe_or_put_mut(slice.slice_key(), ||
+        let slice_pattern = pattern_memo.probe_or_put_mut(slice.hash_key, ||
             slice.calculate_slice_pattern()
         );
 
