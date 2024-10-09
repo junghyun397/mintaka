@@ -1,5 +1,4 @@
 use crate::bitfield::Bitfield;
-use crate::memo::hash_key::HashKey;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
@@ -74,12 +73,8 @@ impl Slice {
         }
     }
 
-    pub fn slice_key(&self) -> HashKey {
-        let concat_slice = self.concat_slice() as u64;
-    }
-
-    pub fn concat_slice(&self) -> u32 {
-        self.black_stones as u32 | (self.white_stones as u32) << 32
+    pub fn raw_slice(&self) -> u64 {
+        self.black_stones as u64 | (self.white_stones as u64) << 32
     }
 
 }

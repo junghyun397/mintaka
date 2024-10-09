@@ -1,6 +1,6 @@
 use crate::bitfield::{Bitfield, BitfieldOps};
 use crate::cartesian_to_index;
-use crate::memo::memory_leak_pattern_memo::MemoryLeakSlicePatternMemo;
+use crate::memo::dummy_pattern_memo::DummySlicePatternMemo;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
@@ -267,8 +267,8 @@ impl Patterns {
             return
         }
 
-        let mut pattern_memo = MemoryLeakSlicePatternMemo {}; // TODO: DEBUG
-        let slice_pattern = pattern_memo.probe_or_put_mut(slice.hash_key, ||
+        let mut pattern_memo = DummySlicePatternMemo {}; // TODO: DEBUG
+        let slice_pattern = pattern_memo.probe_or_put_mut(slice.raw_slice(), ||
             slice.calculate_slice_pattern()
         );
 

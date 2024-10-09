@@ -22,6 +22,10 @@ impl AbstractTranspositionTable<TTEntryBucket> for TranspositionTable {
 }
 
 impl TranspositionTable {
+    
+    fn calculate_index(&self, key: HashKey) -> usize {
+        self.calculate_index_u128(key.0 as u128)
+    }
 
     #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
     pub fn probe(&self, key: HashKey) -> Option<TTEntry> {
