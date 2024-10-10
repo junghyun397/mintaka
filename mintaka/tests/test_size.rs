@@ -7,12 +7,12 @@ mod test_size {
 
     #[test]
     fn test_size() {
-        assert_eq!(size_of::<Slice>(), 16);
-        assert_eq!(size_of::<Slices>(), 1152);
+        assert_eq!(size_of::<Slice>(), 8);
+        assert_eq!(size_of::<Slices>(), 576);
         assert_eq!(size_of::<Pattern>(), 8);
         assert_eq!(size_of::<Patterns>(), 1840);
         assert_eq!(size_of::<SlicePattern>(), 34);
-        assert_eq!(size_of::<Board>(), 3040);
+        assert_eq!(size_of::<Board>(), 2464);
     }
 
 }

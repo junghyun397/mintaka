@@ -73,7 +73,7 @@ impl Slice {
         }
     }
 
-    pub fn raw_slice(&self) -> u64 {
+    pub fn packed_slice(&self) -> u64 {
         self.black_stones as u64 | (self.white_stones as u64) << 32
     }
 

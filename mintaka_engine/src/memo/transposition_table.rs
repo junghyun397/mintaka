@@ -2,11 +2,11 @@ use crate::memo::tt_entry::{TTEntry, TTEntryBucket, TTFlag};
 use mintaka::memo::hash_key::HashKey;
 use mintaka::notation::pos::Pos;
 use mintaka::utils::abstract_transposition_table::AbstractTranspositionTable;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::AtomicU8;
 
 pub struct TranspositionTable {
     table: Vec<TTEntryBucket>,
-    age: AtomicUsize
+    age: AtomicU8
 }
 
 impl AbstractTranspositionTable<TTEntryBucket> for TranspositionTable {
@@ -22,12 +22,14 @@ impl AbstractTranspositionTable<TTEntryBucket> for TranspositionTable {
 }
 
 impl TranspositionTable {
-    
-    fn calculate_index(&self, key: HashKey) -> usize {
-        self.calculate_index_u128(key.0 as u128)
+
+    pub fn new() -> Self {
+        Self {
+            table: Vec::new(),
+            age: AtomicU8::new(0)
+        }
     }
 
-    #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
     pub fn probe(&self, key: HashKey) -> Option<TTEntry> {
         let idx = self.calculate_index(key);
         let compact_key = key.0 as u32;
@@ -45,7 +47,7 @@ impl TranspositionTable {
         eval: i16,
     ) {
         let idx = self.calculate_index(key);
-        let compact_key = key.0 as u32;
+        let lower_half_key = key.0 as u32;
         let bucket = &self.table[idx];
     }
 

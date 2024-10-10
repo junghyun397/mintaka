@@ -268,7 +268,7 @@ impl Patterns {
         }
 
         let mut pattern_memo = DummySlicePatternMemo {}; // TODO: DEBUG
-        let slice_pattern = pattern_memo.probe_or_put_mut(slice.raw_slice(), ||
+        let slice_pattern = pattern_memo.probe_or_put_mut(slice.packed_slice(), ||
             slice.calculate_slice_pattern()
         );
 
