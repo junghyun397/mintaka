@@ -9,14 +9,14 @@ pub enum Color {
 
 impl Color {
 
-    pub fn reversed(&self) -> Color {
+    pub const fn reversed(&self) -> Color {
         match self {
             Color::Black => Color::White,
             Color::White => Color::Black
         }
     }
 
-    pub fn player_color_from_moves(moves: usize) -> Self {
+    pub const fn player_color_from_moves(moves: usize) -> Self {
         if moves % 2 == 0 {
             Color::Black
         } else {

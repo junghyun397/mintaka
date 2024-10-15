@@ -1,4 +1,4 @@
-use crate::memo::tt_entry::{TTEntry, TTEntryBucket, TTFlag};
+use crate::memo::tt_entry::{TTEntry, TTEntryBucket, TTEntryBucketPosition, TTFlag};
 use mintaka::memo::hash_key::HashKey;
 use mintaka::notation::pos::Pos;
 use mintaka::utils::abstract_transposition_table::AbstractTranspositionTable;
@@ -13,6 +13,10 @@ impl AbstractTranspositionTable<TTEntryBucket> for TranspositionTable {
 
     fn internal_table(&self) -> &Vec<TTEntryBucket> {
         &self.table
+    }
+
+    fn internal_table_mut(&mut self) -> &mut Vec<TTEntryBucket> {
+        &mut self.table
     }
 
     fn assign_internal_table_mut(&mut self, table: Vec<TTEntryBucket>) {
@@ -48,7 +52,21 @@ impl TranspositionTable {
     ) {
         let idx = self.calculate_index(key);
         let lower_half_key = key.0 as u32;
-        let bucket = &self.table[idx];
+        let mut bucket = &self.table[idx];
+
+        if let Some(entry) = bucket.probe(lower_half_key) {
+            // replace entry
+        } else {
+            let entry = TTEntry {
+                best_move,
+                depth,
+                flag,
+                score,
+                eval,
+            };
+
+            bucket.store(lower_half_key, entry, TTEntryBucketPosition::HI)
+        }
     }
 
     pub fn hash_usage(&self) -> usize {

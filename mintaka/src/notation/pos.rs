@@ -9,6 +9,7 @@ pub const I_BOARD_WIDTH: isize = BOARD_WIDTH as isize;
 pub const U8_BOARD_SIZE: u8 = BOARD_SIZE as u8;
 
 pub const CENTER: Pos = Pos::from_index(U8_BOARD_SIZE / 2);
+pub const CENTER_ROW_COL: u8 = CENTER.col();
 
 #[macro_export] macro_rules! cartesian_to_index {
     ($row:expr,$col:expr) => ($row * 15 + $col);
@@ -36,46 +37,50 @@ pub struct Pos(u8);
 impl Pos {
 
     pub const fn from_index(index: u8) -> Self {
-        Pos(index)
+        Self(index)
     }
 
     pub const fn from_cartesian(row: u8, col: u8) -> Self {
-        Pos(cartesian_to_index!(row, col))
+        Self(cartesian_to_index!(row, col))
     }
 
-    pub fn to_cartesian(&self) -> (u8, u8) {
+    pub const fn from_str_unchecked(source: &str) -> Pos {
+        let row = u8_from_str(source, 1) - 1;
+        let col = source.as_bytes()[0] - b'a';
+
+        Self::from_cartesian(row, col)
+    }
+
+    pub const fn to_cartesian(&self) -> (u8, u8) {
         index_to_cartesian!(self.0)
     }
 
-    pub fn idx(&self) -> u8 {
+    pub const fn idx(&self) -> u8 {
         self.0
     }
 
-    pub fn idx_usize(&self) -> usize {
+    pub const fn idx_usize(&self) -> usize {
         self.0 as usize
     }
 
-    pub fn row(&self) -> u8 {
+    pub const fn row(&self) -> u8 {
         index_to_row!(self.0)
     }
 
-    pub fn row_usize(&self) -> usize {
+    pub const fn row_usize(&self) -> usize {
         self.row() as usize
     }
 
-    pub fn col(&self) -> u8 {
+    pub const fn col(&self) -> u8 {
         index_to_col!(self.0)
     }
 
-    pub fn col_usize(&self) -> usize {
+    pub const fn col_usize(&self) -> usize {
         self.col() as usize
     }
 
-}
+    pub const fn offset(&self, row: u8, col: u8) -> Pos {
+        Self::from_cartesian(self.row() + row, self.col() + col)
+    }
 
-pub const fn pos_unchecked(source: &str) -> Pos {
-    let row = u8_from_str(source, 1) - 1;
-    let col = source.as_bytes()[0] - b'a';
-
-    Pos::from_cartesian(row, col)
 }

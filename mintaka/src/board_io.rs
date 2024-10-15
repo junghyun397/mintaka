@@ -1,9 +1,9 @@
 use crate::board::Board;
 use crate::board_iter::BoardIterItem;
 use crate::game::Game;
+use crate::history::History;
 use crate::impl_debug_by_display;
 use crate::notation::color::Color;
-use crate::notation::history::History;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::notation::pos::U_BOARD_WIDTH;
@@ -174,7 +174,7 @@ impl FromStr for Board {
         let mut board = Board::default();
         let player_color = Color::player_color_from_batch_moves(blacks.len(), whites.len());
 
-        board.batch_set_mut(blacks, whites, player_color);
+        board.batch_set_each_color_mut(blacks, whites, player_color);
 
         Ok(board)
     }
@@ -299,7 +299,7 @@ impl From<History> for Game {
             result: None,
         };
 
-        game.batch_set_mut(blacks, whites);
+        game.batch_set_each_mut(blacks, whites);
 
         game
     }

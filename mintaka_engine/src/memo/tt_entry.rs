@@ -1,4 +1,5 @@
 use mintaka::notation::pos::Pos;
+use mintaka::utils::abstract_transposition_table::Clearable;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(Eq, PartialEq, Default)]
@@ -7,7 +8,7 @@ pub enum TTFlag {
     #[default] PV,
     LOWER,
     UPPER,
-    Exact,
+    EXACT,
 }
 
 // 64 bit
@@ -44,6 +45,16 @@ pub struct TTEntryBucket {
 pub enum TTEntryBucketPosition {
     HI,
     LO
+}
+
+impl Clearable for TTEntryBucket {
+
+    fn clear_mut(&mut self) {
+        self.key_pair.store(0, Ordering::Relaxed);
+        self.hi_body.store(0, Ordering::Relaxed);
+        self.lo_body.store(0, Ordering::Relaxed);
+    }
+
 }
 
 impl TTEntryBucket {

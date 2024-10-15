@@ -1,10 +1,16 @@
 use crate::bitfield::BitfieldOps;
 use crate::board::Board;
+use crate::history::History;
 use crate::notation::color::Color;
-use crate::notation::game_result::GameResult;
-use crate::notation::history::History;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum GameResult {
+    FiveInARow(Color),
+    Resign(Color),
+    Full,
+}
 
 #[derive(Clone, Default)]
 pub struct Game {
@@ -74,9 +80,9 @@ impl Game {
         self.result = Some(GameResult::Resign(resigned_player.reversed()));
     }
 
-    pub fn batch_set_mut(&mut self, blacks: Box<[Pos]>, whites: Box<[Pos]>) {
+    pub fn batch_set_each_mut(&mut self, blacks: Box<[Pos]>, whites: Box<[Pos]>) {
         let color = Color::player_color_from_batch_moves(blacks.len(), whites.len());
-        self.board.batch_set_mut(blacks, whites, color);
+        self.board.batch_set_each_color_mut(blacks, whites, color);
     }
 
 }

@@ -82,7 +82,25 @@ impl Board {
         self.switch_player_mut();
     }
 
-    pub fn batch_set_mut(&mut self, blacks: Box<[Pos]>, whites: Box<[Pos]>, player: Color) {
+    pub fn batch_set_mut(&mut self, moves: Box<[Pos]>) {
+        let (black_moves, white_moves): (Vec<Pos>, Vec<Pos>) = moves.iter()
+            .enumerate()
+            .fold((Vec::new(), Vec::new()), |(mut even, mut odd), (idx, pos)| {
+                if idx % 2 == 0 {
+                    even.push(*pos);
+                } else {
+                    odd.push(*pos);
+                }
+
+                (even, odd)
+            });
+
+        let player = Color::player_color_from_batch_moves(black_moves.len(), white_moves.len());
+
+        self.batch_set_each_color_mut(black_moves.into_boxed_slice(), white_moves.into_boxed_slice(), player)
+    }
+
+    pub fn batch_set_each_color_mut(&mut self, blacks: Box<[Pos]>, whites: Box<[Pos]>, player: Color) {
         self.stones += blacks.len() as u8 + whites.len() as u8;
 
         for pos in blacks {
@@ -94,6 +112,7 @@ impl Board {
         }
 
         self.player_color = player;
+
         self.full_update_mut();
     }
 

@@ -109,7 +109,7 @@ impl Default for Slices {
                 let seq_num = idx as isize + 5 - pos::I_BOARD_WIDTH;
                 Slice::empty(
                     (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
-                    pos::BOARD_WIDTH-1 - max(0, seq_num.neg()) as u8,
+                    pos::BOARD_WIDTH - 1 - max(0, seq_num.neg()) as u8,
                     max(0, seq_num) as u8
                 )
             })

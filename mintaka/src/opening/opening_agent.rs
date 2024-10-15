@@ -1,6 +1,6 @@
 use crate::game::Game;
+use crate::history::History;
 use crate::notation::color::Color;
-use crate::notation::history::History;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::opening::opening_utils::find_forbidden_symmetry_moves;
