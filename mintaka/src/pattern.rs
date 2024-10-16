@@ -5,6 +5,7 @@ use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
+use crate::notation::pos::Pos;
 use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slice;
 use crate::utils::lang_utils::repeat_4x;
@@ -292,6 +293,7 @@ impl Patterns {
             self.field[idx].apply_mask_mut::<{ Color::White }, D>(slice_pattern.white_patterns[offset as usize]);
 
             if self.field[idx].black_unit.has_threes() {
+                self.double_three_field.set(Pos::from_index(idx as u8));
             }
         }
 

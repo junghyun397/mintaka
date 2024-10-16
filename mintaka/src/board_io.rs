@@ -172,7 +172,7 @@ impl FromStr for Board {
         let whites = extract_color_stones(&elements, Color::White);
 
         let mut board = Board::default();
-        let player_color = Color::player_color_from_batch_moves(blacks.len(), whites.len());
+        let player_color = Color::player_color_from_each_moves(blacks.len(), whites.len());
 
         board.batch_set_each_color_mut(blacks, whites, player_color);
 
@@ -191,22 +191,23 @@ impl FromStr for Slice {
             .collect();
 
         let field_len = fields.len() as u8;
-        if !(5 ..= pos::BOARD_WIDTH).contains(&field_len) {
-            return Err("Invalid size.");
-        }
 
-        Ok(IntoIterator::into_iter(fields)
-            .enumerate()
-            .fold(
-                Slice::empty(field_len, 0, 0),
-                |acc, (idx, field)| {
-                    match field {
-                        Some(color) => acc.set(color, idx as u8),
-                        _ => acc
+        if !(5 ..= pos::BOARD_WIDTH).contains(&field_len) {
+            Err("Invalid size.")
+        } else {
+            Ok(IntoIterator::into_iter(fields)
+                .enumerate()
+                .fold(
+                    Slice::empty(field_len, 0, 0),
+                    |acc, (idx, field)| {
+                        match field {
+                            Some(color) => acc.set(color, idx as u8),
+                            _ => acc
+                        }
                     }
-                }
+                )
             )
-        )
+        }
     }
 
 }

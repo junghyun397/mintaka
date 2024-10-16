@@ -2,6 +2,7 @@ use std::marker::ConstParamTy;
 
 //noinspection RsUnresolvedPath
 #[derive(ConstParamTy, PartialEq, Eq, Clone, Copy, Debug)]
+#[repr(u8)]
 pub enum Color {
     Black,
     White
@@ -24,7 +25,7 @@ impl Color {
         }
     }
 
-    pub fn player_color_from_batch_moves<T: Ord>(black_moves: T, white_moves: T) -> Self {
+    pub fn player_color_from_each_moves<T: Ord>(black_moves: T, white_moves: T) -> Self {
         if black_moves > white_moves {
             Color::Black
         } else {

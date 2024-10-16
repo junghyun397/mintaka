@@ -95,7 +95,7 @@ impl Board {
                 (even, odd)
             });
 
-        let player = Color::player_color_from_batch_moves(black_moves.len(), white_moves.len());
+        let player = Color::player_color_from_each_moves(black_moves.len(), white_moves.len());
 
         self.batch_set_each_color_mut(black_moves.into_boxed_slice(), white_moves.into_boxed_slice(), player)
     }
@@ -105,15 +105,18 @@ impl Board {
 
         for pos in blacks {
             self.slices.set_mut(Color::Black, pos);
+            self.hot_field.set(pos);
         }
 
         for pos in whites {
             self.slices.set_mut(Color::White, pos);
+            self.hot_field.set(pos);
         }
 
         self.player_color = player;
 
         self.full_update_mut();
+        self.hash_key = HashKey::from(&self.slices.horizontal_slices);
     }
 
     #[inline(always)]

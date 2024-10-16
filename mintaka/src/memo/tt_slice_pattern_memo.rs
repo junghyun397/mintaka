@@ -33,7 +33,7 @@ impl AtomicTTSlicePatternEntry {
             let block_3 = u64::from_ne_bytes(pattern.white_patterns[0 ..8].try_into().unwrap());
             let block_4 = u64::from_ne_bytes(pattern.white_patterns[8 .. 16].try_into().unwrap());
 
-            AtomicTTSlicePatternEntry(
+            Self(
                 AtomicU64::from(block_0),
                 AtomicU64::from(block_1),
                 AtomicU64::from(block_2),
@@ -55,8 +55,8 @@ impl AtomicTTSlicePatternEntry {
         black_patterns[8 .. 16].copy_from_slice(&self.2.load(Ordering::Relaxed).to_ne_bytes());
 
         let mut white_patterns = [0u8; 16];
-        white_patterns[0 .. 8].copy_from_slice(&self.1.load(Ordering::Relaxed).to_ne_bytes());
-        white_patterns[8 .. 16].copy_from_slice(&self.2.load(Ordering::Relaxed).to_ne_bytes());
+        white_patterns[0 .. 8].copy_from_slice(&self.3.load(Ordering::Relaxed).to_ne_bytes());
+        white_patterns[8 .. 16].copy_from_slice(&self.4.load(Ordering::Relaxed).to_ne_bytes());
 
         SlicePattern {
             black_patterns,
