@@ -113,7 +113,7 @@ fn find_patterns(
         (black,rev=$rev:expr,$patch:literal) => (apply_single_patch!(acc.black_patterns,rev=$rev,$patch));
         (white,rev=$rev:expr,$patch:literal) => (apply_single_patch!(acc.white_patterns,rev=$rev,$patch));
         ($patterns_expr:expr,rev=$rev:expr,$patch:literal) => {{
-             const POS_KIND_TUPLE: (u8, u8) = parse_patch_literal($patch, $rev);
+            const POS_KIND_TUPLE: (u8, u8) = parse_patch_literal($patch, $rev);
 
             // branch removed at compile time
             if (POS_KIND_TUPLE.1 == CLOSED_FOUR_SINGLE) {
@@ -207,6 +207,8 @@ fn find_patterns(
     process_pattern!(black, asymmetry, "XOO.O.!", "XOOFO.!", "XOO.O.F!");
     process_pattern!(black, asymmetry, "XOOO..!", "XOOOF.!", "XOOO.F!");
     process_pattern!(black, asymmetry, "!..OOO.X", "!..OOOFX");
+    process_pattern!(black, asymmetry, "!.OO.O.O", "!.OOFO.O");
+    process_pattern!(black, asymmetry, "!.O.OO.O", "!.OFOO.O");
 
     process_pattern!(white, symmetry, "O.O.O", "OFO.O", "O.OFO");
     process_pattern!(white, asymmetry, "OO.O.", "OOFO.", "OO.OF");

@@ -6,6 +6,15 @@
     ($a:expr,$b:expr) => ({ if $a > $b { $a } else { $b } });
 }
 
+#[macro_export] macro_rules! boxed_slice {
+    () => {
+        Box::from([])
+    };
+    ($($elem:expr),+ $(,)?) => {
+        Box::from([$($elem),*])
+    };
+}
+
 pub const fn repeat_4x(source: u8) -> u32 {
     u32::from_ne_bytes([source, source, source, source])
 }

@@ -70,11 +70,11 @@ pub fn find_forbidden_symmetry_moves(history: &History, fifth_move: Pos) -> Hash
 
 pub fn generate_random_opening_moves() -> [Pos; 3] {
     let mut move_1: u8 = rand::thread_rng().gen_range(0 .. 3 * 3 - 1);
-    move_1 += if move_1 > (3 * 3) / 2 { 1 } else { 0 };
+    move_1 += if move_1 < (3 * 3) / 2 { 0 } else { 1 };
 
     let mut move_2: u8 = rand::thread_rng().gen_range(0 .. 5 * 5 - 2);
-    move_2 += if move_2 > (move_1 / 3) * 5 + (move_1 % 3) + 1 { 1 } else { 0 };
-    move_2 += if move_2 > (5 * 5) / 2 { 1 } else { 0 };
+    move_2 += if move_2 < (move_1 / 3) * 5 + (move_1 % 3) + 1 { 0 } else { 1 };
+    move_2 += if move_2 < (5 * 5) / 2 { 0 } else { 1 };
 
     [
         CENTER,
