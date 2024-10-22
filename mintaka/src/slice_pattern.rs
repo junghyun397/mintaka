@@ -113,14 +113,14 @@ fn find_patterns(
         (black,rev=$rev:expr,$patch:literal) => (apply_single_patch!(acc.black_patterns,rev=$rev,$patch));
         (white,rev=$rev:expr,$patch:literal) => (apply_single_patch!(acc.white_patterns,rev=$rev,$patch));
         ($patterns_expr:expr,rev=$rev:expr,$patch:literal) => {{
-            const POS_KIND_TUPLE: (u8, u8) = parse_patch_literal($patch, $rev);
+            const POS_KIND_TUPLE: (isize, u8) = parse_patch_literal($patch, $rev);
 
             // branch removed at compile time
             if (POS_KIND_TUPLE.1 == CLOSED_FOUR_SINGLE) {
-                let original = $patterns_expr[(offset + POS_KIND_TUPLE.0 as isize) as usize];
-                $patterns_expr[(offset + POS_KIND_TUPLE.0 as isize) as usize] = increase_closed_four_single(original);
+                let original = $patterns_expr[(offset + POS_KIND_TUPLE.0) as usize];
+                $patterns_expr[(offset + POS_KIND_TUPLE.0) as usize] = increase_closed_four_single(original);
             } else {
-                $patterns_expr[(offset + POS_KIND_TUPLE.0 as isize) as usize] |= POS_KIND_TUPLE.1;
+                $patterns_expr[(offset + POS_KIND_TUPLE.0) as usize] |= POS_KIND_TUPLE.1;
             }
         }};
     }
@@ -184,13 +184,12 @@ fn find_patterns(
     }
 
     // TODO: STRONG control hazard, needs optimization.
-    // try binary search for optimization?
+    // branchless binary search for optimization?
 
     // THREE
 
     process_pattern!(black, asymmetry, "!.OO...!", "!.OO3..!", "!.OO.3.!");
     process_pattern!(black, asymmetry, "!..OO..X", "!..OO3.X");
-    process_pattern!(black, asymmetry, long-pattern, left, "..OO...O", "..OO3..O");
     process_pattern!(black, asymmetry, "!.O.O..!", "!.O3O..!", "!.O.O3.!");
 
     process_pattern!(white, asymmetry, ".OO...", ".OO3..", ".OO.3.");
@@ -200,10 +199,10 @@ fn find_patterns(
     // CLOSED-FOUR
 
     process_pattern!(black, symmetry, "!O.O.O!", "!OFO.O!", "!O.OFO!");
-    process_pattern!(black, asymmetry, "!OO.O.!", "!OOFO.!", "!OO.OF!");
+    process_pattern!(black, asymmetry, "!OO.O.!", "!OO.OF!");
     process_pattern!(black, asymmetry, "!O.OO.!", "!O.OOF!");
     process_pattern!(black, asymmetry, "!OO..O!", "!OOF.O!", "!OO.FO!");
-
+    
     process_pattern!(black, asymmetry, "XOO.O.!", "XOOFO.!", "XOO.O.F!");
     process_pattern!(black, asymmetry, "XOOO..!", "XOOOF.!", "XOOO.F!");
     process_pattern!(black, asymmetry, "!..OOO.X", "!..OOOFX");
@@ -211,7 +210,7 @@ fn find_patterns(
     process_pattern!(black, asymmetry, "!.O.OO.O", "!.OFOO.O");
 
     process_pattern!(white, symmetry, "O.O.O", "OFO.O", "O.OFO");
-    process_pattern!(white, asymmetry, "OO.O.", "OOFO.", "OO.OF");
+    process_pattern!(white, asymmetry, "OO.O.", "OO.OF");
     process_pattern!(white, asymmetry, "O.OO.", "O.OOF");
     process_pattern!(white, asymmetry, "OO..O", "OOF.O", "OO.FO");
 
@@ -373,9 +372,9 @@ fn increase_closed_four_multiple(original: u128, clear_mask: u128, mask: u128) -
     original | copied                    // empty, four*1, four*2
 }
 
-const fn parse_patch_literal(source: &str, reversed: bool) -> (u8, u8) {
-    let mut idx: u8 = 0;
-    while idx < source.len() as u8 {
+const fn parse_patch_literal(source: &str, reversed: bool) -> (isize, u8) {
+    let mut idx: isize = 0;
+    while idx < source.len() as isize {
         let pos = if reversed { 7 - idx } else { idx };
         match source.as_bytes()[idx as usize] as char {
             '3' => return (pos, OPEN_THREE),

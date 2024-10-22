@@ -82,7 +82,7 @@ impl PatternUnit {
     }
 
     pub fn has_fours(&self) -> bool {
-        self.apply_mask(UNIT_TOTAL_FOUR_MASK) > 1
+        self.apply_mask(UNIT_TOTAL_FOUR_MASK).count_ones() > 1
     }
 
     pub fn has_close_three(&self) -> bool {
@@ -209,7 +209,7 @@ impl Pattern {
     }
 
     pub fn forbidden_kind(&self) -> Option<ForbiddenKind> {
-        (self.is_not_empty() && self.is_forbidden())
+        self.is_forbidden()
             .then(||
                 if self.black_unit.has_threes() {
                     ForbiddenKind::DoubleThree
@@ -219,7 +219,6 @@ impl Pattern {
                     ForbiddenKind::Overline
                 }
             )
-            .filter(|_| !self.black_unit.has_five())
     }
 
     #[inline(always)]
