@@ -57,8 +57,8 @@ impl Slice {
         };
     }
 
-    pub fn is_no_joy(&self) -> bool {
-        self.black_stones.count_ones() < 2 && self.white_stones.count_ones() < 2
+    pub fn is_valid_pattern(&self) -> bool {
+        self.black_stones.count_ones() > 1 || self.white_stones.count_ones() > 1
     }
 
     pub fn stone_kind(&self, idx: u8) -> Option<Color> {
@@ -124,11 +124,15 @@ impl Slices {
         self.horizontal_slices[pos.row_usize()].set_mut(color, pos.col());
         self.vertical_slices[pos.col_usize()].set_mut(color, pos.row());
 
-        if let Some(ascending_slice) = self.occupy_ascending_slice(pos) {
+        if let Some(ascending_slice) = Self::ascending_slice_idx(pos).map(|idx|
+            &mut self.ascending_slices[idx]
+        ) {
             ascending_slice.set_mut(color, pos.col() - ascending_slice.start_col)
         }
 
-        if let Some(descending_slice) = self.occupy_descending_slice(pos) {
+        if let Some(descending_slice) = Self::descending_slice_idx(pos).map(|idx|
+            &mut self.descending_slices[idx]
+        ) {
             descending_slice.set_mut(color, pos.col() - descending_slice.start_col)
         }
     }
@@ -148,24 +152,14 @@ impl Slices {
         }
     }
 
-    pub fn occupy_ascending_slice(&mut self, pos: Pos) -> Option<&mut Slice> {
-        Self::ascending_slice_idx(pos)
-            .map(|idx| &mut self.ascending_slices[idx])
-    }
-
-    pub fn occupy_descending_slice(&mut self, pos: Pos) -> Option<&mut Slice> {
-        Self::descending_slice_idx(pos)
-            .map(|idx| &mut self.descending_slices[idx])
-    }
-
-    fn ascending_slice_idx(pos: Pos) -> Option<usize> {
+    pub fn ascending_slice_idx(pos: Pos) -> Option<usize> {
         // y = x + b, b = y - x (reversed row sequence)
         let idx = I_DIAGONAL_SLICE_AMOUNT - (pos.row() as isize - pos.col() as isize + pos::I_BOARD_WIDTH - 4);
         (0 .. I_DIAGONAL_SLICE_AMOUNT).contains(&idx)
             .then_some(idx as usize)
     }
 
-    fn descending_slice_idx(pos: Pos) -> Option<usize> {
+    pub fn descending_slice_idx(pos: Pos) -> Option<usize> {
         // y = -x + 15 + b, b = y + x - 15
         let idx = pos.row() as isize + pos.col() as isize - 4;
         (0 .. I_DIAGONAL_SLICE_AMOUNT).contains(&idx)

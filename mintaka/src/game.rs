@@ -1,6 +1,8 @@
 use crate::bitfield::BitfieldOps;
 use crate::board::Board;
 use crate::history::History;
+use crate::memo::dummy_pattern_memo::DummySlicePatternMemo;
+use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
@@ -34,12 +36,12 @@ impl Game {
     }
 
     pub fn play(mut self, pos: Pos) -> Self {
-        self.play_mut(pos);
+        self.play_mut(&mut DummySlicePatternMemo, pos);
         self
     }
 
     pub fn undo(mut self) -> Self {
-        self.undo_mut();
+        self.undo_mut(&mut DummySlicePatternMemo);
         self
     }
 
@@ -53,8 +55,8 @@ impl Game {
         self
     }
 
-    pub fn play_mut(&mut self, pos: Pos) {
-        self.board.set_mut(pos);
+    pub fn play_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos) {
+        self.board.set_mut(memo, pos);
 
         self.history.play_mut(pos);
         self.result = self.board.patterns.five_in_a_row
@@ -64,9 +66,9 @@ impl Game {
             );
     }
 
-    pub fn undo_mut(&mut self) {
+    pub fn undo_mut(&mut self, memo: &mut impl SlicePatternMemo) {
         if let Some(pos) = self.history.undo_mut() {
-            self.board.unset_mut(pos);
+            self.board.unset_mut(memo, pos);
         }
         self.result = None;
     }

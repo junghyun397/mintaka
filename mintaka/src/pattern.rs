@@ -1,6 +1,5 @@
 use crate::bitfield::{Bitfield, BitfieldOps};
 use crate::cartesian_to_index;
-use crate::memo::dummy_pattern_memo::DummySlicePatternMemo;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
@@ -262,13 +261,8 @@ impl Default for Patterns {
 
 impl Patterns {
 
-    pub fn update_by_slice_mut<const D: Direction>(&mut self, slice: &Slice) {
-        if slice.is_no_joy() {
-            return
-        }
-
-        let mut pattern_memo = DummySlicePatternMemo {}; // TODO: DEBUG
-        let slice_pattern = pattern_memo.probe_or_put_mut(slice.packed_slice(), ||
+    pub fn update_by_slice_mut<const D: Direction>(&mut self, memo: &mut impl SlicePatternMemo, slice: &Slice) {
+        let slice_pattern = memo.probe_or_put_mut(slice.packed_slice(), ||
             slice.calculate_slice_pattern()
         );
 

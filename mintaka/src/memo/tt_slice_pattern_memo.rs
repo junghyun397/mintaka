@@ -103,6 +103,10 @@ impl AbstractTranspositionTable<AtomicTTSlicePatternEntry> for TTSlicePatternMem
 
 impl SlicePatternMemo for TTSlicePatternMemo {
 
+    fn prefetch_memo(&self, packed_slice: u64) {
+        self.prefetch(HashKey(packed_slice));
+    }
+
     fn probe_or_put_mut<F>(&mut self, packed_slice: u64, produce: F) -> SlicePattern
     where F: FnOnce() -> SlicePattern
     {
