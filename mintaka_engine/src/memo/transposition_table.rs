@@ -56,6 +56,7 @@ impl TranspositionTable {
 
         if let Some(entry) = bucket.probe(lower_half_key) {
             // replace entry
+            bucket.store(lower_half_key, )
         } else {
             let entry = TTEntry {
                 best_move,
@@ -72,7 +73,7 @@ impl TranspositionTable {
     pub fn hash_usage(&self) -> usize {
         self.table.iter()
             .take(1000)
-            .filter(|bucket| false)
+            .filter(|bucket| bucket.is_filled())
             .count()
     }
 

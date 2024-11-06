@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod test_pattern {
-    use mintaka::notation::color::Color;
-    use mintaka::pattern::{CLOSED_FOUR_DOUBLE, CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, INV_THREE_OVERLINE, OPEN_FOUR, OPEN_THREE};
-    use mintaka::slice::Slice;
+    use mintaka::notation::color::*;
+    use mintaka::pattern::*;
+    use mintaka::slice::*;
     use std::str::FromStr;
 
     fn test(case: &str, expected: &str, color: Color, mask_kind: u8) {
@@ -34,7 +34,7 @@ mod test_pattern {
             )
             .unwrap();
 
-        assert_eq!(expected, content_pattern);
+        assert_eq!(content_pattern, expected);
     }
 
     fn test_both_flow(case: &str, expected: &str, color: Color, mask_kind: u8) {
@@ -42,209 +42,235 @@ mod test_pattern {
         test(&case.chars().rev().collect::<String>(), &expected.chars().rev().collect::<String>(), color, mask_kind);
     }
 
-    fn test_both_color_both_flow(case: &str, expected: &str, mask_kind: u8) {
-        test_both_flow(case, expected, Color::White, mask_kind);
-        let case = &case.replace("O", "@").replace("X", "O").replace("@", "X");
-        let expected = &expected.replace("O", "@").replace("X", "O").replace("@", "X");
-        test_both_flow(case, expected, Color::Black, mask_kind);
+    fn invert_color(case: &str) -> String {
+        case.replace("O", "@").replace("X", "O").replace("@", "X")
+    }
+
+    macro_rules! test_pattern {
+        (
+            color = both,
+            case = $case:expr,
+            $(open_three = $open_three:expr,)?
+            $(close_three = $close_three:expr,)?
+            $(closed_four_single = $closed_four_single:expr,)?
+            $(closed_four_double = $closed_four_double:expr,)?
+            $(open_four = $open_four:expr,)?
+            $(five = $five:expr,)?
+            $(overline = $overline:expr,)?
+        ) => {
+            test_pattern!(
+                color = Color::White,
+                case = $case,
+                $(open_three = $open_three,)?
+                $(close_three = $close_three,)?
+                $(closed_four_single = $closed_four_single,)?
+                $(closed_four_double = $closed_four_double,)?
+                $(open_four = $open_four,)?
+                $(five = $five,)?
+                $(overline = $overline,)?
+            );
+
+            test_pattern!(
+                color = Color::Black,
+                case = &invert_color($case),
+                $(open_three = &invert_color($open_three),)?
+                $(close_three = &invert_color($close_three),)?
+                $(closed_four_single = &invert_color($closed_four_single),)?
+                $(closed_four_double = &invert_color($closed_four_double),)?
+                $(open_four = &invert_color($open_four),)?
+                $(five = &invert_color($five),)?
+                $(overline = &invert_color($overline),)?
+            );
+        };
+        (
+            color = $color:expr,
+            case = $case:expr,
+            $(open_three = $open_three:expr,)?
+            $(close_three = $close_three:expr,)?
+            $(closed_four_single = $closed_four_single:expr,)?
+            $(closed_four_double = $closed_four_double:expr,)?
+            $(open_four = $open_four:expr,)?
+            $(five = $five:expr,)?
+            $(overline = $overline:expr,)?
+        ) => {
+            $(test_both_flow($case, $open_three, $color, OPEN_THREE);)?
+
+            $(test_both_flow($case, $close_three, $color, CLOSE_THREE);)?
+
+            $(test_both_flow($case, $closed_four_single, $color, CLOSED_FOUR_SINGLE);)?
+
+            $(test_both_flow($case, $closed_four_double, $color, CLOSED_FOUR_DOUBLE);)?
+
+            $(test_both_flow($case, $five, $color, FIVE);)?
+
+            $(test_both_flow($case, $overline, $color, INV_THREE_OVERLINE);)?
+        };
     }
 
     #[test]
-    fn basic_open_three() {
-        test_both_color_both_flow(
-            ". . . O O . . .",
-            ". V V O O V V .",
-            OPEN_THREE
+    fn three() {
+        test_pattern!(
+            color = both,
+            case                = ". . . O O . . .",
+            open_three          = ". V V O O V V .",
+            close_three         = ". . V O O V . .",
         );
 
-        test_both_color_both_flow(
-            ". . O . O . .",
-            ". V O V O V .",
-            OPEN_THREE
-        );
-    }
-
-    #[test]
-    fn complex_open_three() {
-        test_both_flow(
-            "X . . X X . . .",
-            "X . . X X V V .",
-            Color::Black,
-            OPEN_THREE
+        test_pattern!(
+            color = both,
+            case                = "X . O O . . .",
+            open_three          = "X . O O V V .",
+            close_three         = "X V O O V V .",
         );
 
-        test_both_flow(
-            "X . . . X X . . .",
-            "X . . V X X V V .",
-            Color::Black,
-            OPEN_THREE
-        );
-    }
-
-    #[test]
-    fn basic_close_three() {
-        test_both_flow(
-            "X . . X X X . . .",
-            "X . V X X X V V .",
-            Color::Black,
-            CLOSE_THREE
+        test_pattern!(
+            color = both,
+            case                = "X . . O O . . .",
+            open_three          = "X . V O O V V .",
+            close_three         = "X . V O O V V .",
         );
 
-        test_both_flow(
-            "X . . X X X . . .",
-            "X . V X X X V V .",
-            Color::Black,
-            CLOSE_THREE
-        );
-    }
-    
-    #[test]
-    fn complex_close_three() { 
-    }
-
-    #[test]
-    fn basic_closed_four() {
-        test_both_flow(
-            "X X X . .",
-            "X X X V V",
-            Color::Black,
-            CLOSED_FOUR_SINGLE
+        test_pattern!(
+            color = both,
+            case                = ". . O . O . .",
+            open_three          = ". V O V O V .",
+            close_three         = ". V O V O V .",
         );
 
-        test_both_color_both_flow(
-            "O O O . .",
-            "O O O V V",
-            CLOSED_FOUR_SINGLE
-        );
-
-        test_both_color_both_flow(
-            ". . O O O . .",
-            "V . O O O . V",
-            CLOSED_FOUR_SINGLE
-        );
-
-        test_both_color_both_flow(
-            "X . O O O . .",
-            "X V O O O . V",
-            CLOSED_FOUR_SINGLE
+        test_pattern!(
+            color = both,
+            case                = "X . O . O . .",
+            open_three          = "X . O V O V .",
+            close_three         = "X V O V O V .",
         );
     }
 
     #[test]
-    fn complex_closed_four() {
-    }
-
-    #[test]
-    fn basic_open_four() {
-        test_both_color_both_flow(
-            ". . O O O . .",
-            ". V O O O V .",
-            OPEN_FOUR
+    fn complex_three() {
+        test_pattern!(
+            color = Color::Black,
+            case                = "X . . X X . . .",
+            open_three          = "X . . X X V V .",
+            close_three         = "X . V X X V V .",
+            closed_four_single  = "X . V X X . . .",
         );
 
-        test_both_color_both_flow(
-            ". O O . O .",
-            ". O O V O .",
-            OPEN_FOUR
-        )
+        test_pattern!(
+            color = Color::Black,
+            case                = "X . . . X X . . .",
+            open_three          = "X . . V X X V V .",
+            close_three         = "X . . V X X V V .",
+        );
     }
 
     #[test]
-    fn complex_open_four() {
-        test_both_flow(
-            "X . . X X X . .",
-            "X . . X X X V .",
-            Color::Black,
-            OPEN_FOUR
+    fn four() {
+        test_pattern!(
+            color = both,
+            case                = "O O O . .",
+            closed_four_single  = "O O O V V",
+        );
+
+        test_pattern!(
+            color = both,
+            case                = ". . O O O . .",
+            closed_four_single  = "V . O O O . V",
+            open_four           = ". V O O O V .",
+        );
+
+        test_pattern!(
+            color = both,
+            case                = "X . O O O . .",
+            closed_four_single  = "X V O O O . V",
+            open_four           = "X . O O O V .",
+        );
+
+        test_pattern!(
+            color = both,
+            case = ". . O O O . .",
+            closed_four_single = "V . O O O . V",
+            open_four = ". V O O O V .",
+        );
+
+        test_pattern!(
+            color = both,
+            case = ". O O . O .",
+            closed_four_single = "V O O . O V",
+            open_four = ". O O V O .",
         );
     }
 
     #[test]
     fn double_four() {
-        test_both_color_both_flow(
-            ". O . O . O . O .",
-            ". O . O V O . O .",
-            CLOSED_FOUR_DOUBLE,
+        test_pattern!(
+            color = both,
+            case                = ". O . O . O . O .",
+            closed_four_single  = ". O V O . O V O .",
+            closed_four_double  = ". O . O V O . O .",
         );
 
-        test_both_color_both_flow(
-            ". . O O O . . . O O O . .",
-            ". . O O O . V . O O O . .",
-            CLOSED_FOUR_DOUBLE
+        test_pattern!(
+            color = both,
+            case                = ". . O O O . . . O O O . .",
+            closed_four_single  = "V . O O O . . . O O O . V",
+            closed_four_double  = ". . O O O . V . O O O . .",
+            open_four           = ". V O O O V . V O O O V .",
         );
 
-        test_both_color_both_flow(
-            "O . O O . . O",
-            "O . O O V . O",
-            CLOSED_FOUR_DOUBLE,
-        );
-    }
-
-    #[test]
-    fn basic_five() {
-        test_both_color_both_flow(
-            ". O O O O .",
-            "V O O O O V",
-            FIVE
-        );
-
-        test_both_color_both_flow(
-            "O O O O .",
-            "O O O O V",
-            FIVE
-        );
-
-        test_both_color_both_flow(
-            "O O O . O",
-            "O O O V O",
-            FIVE
-        );
-
-        test_both_color_both_flow(
-            "O O . O O",
-            "O O V O O",
-            FIVE
+        test_pattern!(
+            color = both,
+            case                = ". O . O O . . O .",
+            closed_four_single  = "V O V O O . V O .",
+            closed_four_double  = ". O . O O V . O .",
         );
     }
 
     #[test]
-    fn complex_five() {
-        test_both_flow(
-            "X . X X X X .",
-            "X . X X X X V",
-            Color::Black,
-            FIVE
+    fn complex_four() {
+    }
+
+    #[test]
+    fn five() {
+        test_pattern!(
+            color = both,
+            case                = ". O O O O .",
+            five                = "V O O O O V",
         );
 
-        test_both_flow(
-            "X X X . X X",
-            "X X X . X X",
-            Color::Black,
-            FIVE
+        test_pattern!(
+            color = both,
+            case                = "O O O . O",
+            five                = "O O O V O",
         );
 
-        test_both_flow(
-            "O . O O O O .",
-            "O V O O O O V",
-            Color::White,
-            FIVE
+        test_pattern!(
+            color = both,
+            case                = "O O . O O",
+            five                = "O O V O O",
         );
     }
 
     #[test]
     fn overline() {
-        test(
-            "X X X . X X",
-            "X X X V X X",
-            Color::Black,
-            INV_THREE_OVERLINE
+        test_pattern!(
+            color = Color::Black,
+            case                = "X . X X X X .",
+            five                = "X . X X X X V",
+            overline            = "X V X X X X .",
         );
 
-        test_both_flow(
-            "X X X X . X",
-            "X X X X V X",
-            Color::Black,
-            INV_THREE_OVERLINE
+        test_pattern!(
+            color = Color::Black,
+            case                = "X X X . X X",
+            five                = "X X X . X X",
+            overline            = "X X X V X X",
+        );
+
+        test_pattern!(
+            color = Color::Black,
+            case                = "X X X X . X",
+            five                = "X X X X . X",
+            overline            = "X X X X V X",
         );
     }
 

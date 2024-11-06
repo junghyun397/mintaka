@@ -115,7 +115,6 @@ fn find_patterns(
         ($patterns_expr:expr,rev=$rev:expr,$patch:literal) => {{
             const POS_KIND_TUPLE: (isize, u8) = parse_patch_literal($patch, $rev);
 
-            // branch removed at compile time
             if (POS_KIND_TUPLE.1 == CLOSED_FOUR_SINGLE) {
                 let original = $patterns_expr[(offset + POS_KIND_TUPLE.0) as usize];
                 $patterns_expr[(offset + POS_KIND_TUPLE.0) as usize] = increase_closed_four_single(original);
@@ -134,7 +133,6 @@ fn find_patterns(
             let mut original = u128::from_ne_bytes($patterns_expr);
 
             let slice_patch_mask = PATCH_MASK_LUT.look_up_table[shift];
-            // branches removed at compile time (NO branching)
             if PATCH_MASK_LUT.include_non_closed_four {
                 original |= slice_patch_mask.patch_mask;
             }
@@ -184,7 +182,7 @@ fn find_patterns(
     }
 
     // TODO: STRONG control hazard, needs optimization.
-    // branchless binary search for optimization?
+    // branch-less binary search for optimization?
 
     // THREE
 

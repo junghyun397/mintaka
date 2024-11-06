@@ -59,13 +59,17 @@ impl Clearable for TTEntryBucket {
 
 impl TTEntryBucket {
 
-    pub fn probe(&self, compact_key: u32) -> Option<TTEntry> {
+    pub fn is_filled(&self) -> bool {
+        self.key_pair.load(Ordering::Relaxed) != 0
+    }
+
+    pub fn probe(&self, compact_key: u32) -> Option<(TTEntryBucketPosition, TTEntry)> {
         let key_pair = self.key_pair.load(Ordering::Relaxed);
 
         if key_pair & compact_key as u64 == 0x00000000_FFFFFFFF {
-            Some(TTEntry::from(self.hi_body.load(Ordering::Relaxed)))
-        } else if key_pair & (compact_key as u64) << 32 == 0xFFFFFFFF_00000000 {
-            Some(TTEntry::from(self.lo_body.load(Ordering::Relaxed)))
+            Some((TTEntryBucketPosition::HI, TTEntry::from(self.hi_body.load(Ordering::Relaxed))))
+        } else if ((key_pair & (compact_key as u64)) << 32) == 0xFFFFFFFF_00000000 {
+            Some((TTEntryBucketPosition::LO, TTEntry::from(self.lo_body.load(Ordering::Relaxed))))
         } else { None }
     }
 
