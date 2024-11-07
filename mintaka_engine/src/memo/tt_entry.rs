@@ -13,11 +13,11 @@ pub enum TTFlag {
 
 // 64 bit
 pub struct TTEntry {
-    pub best_move: Pos,
-    pub depth: u8,
-    pub flag: TTFlag,
-    pub score: i16,
-    pub eval: i16,
+    pub best_move: Pos, // 8
+    pub depth: u8, // 8
+    pub flag: TTFlag, // 8
+    pub score: i16, // 16
+    pub eval: i16, // 16
 }
 
 impl From<TTEntry> for u64 {
@@ -59,21 +59,22 @@ impl Clearable for TTEntryBucket {
 
 impl TTEntryBucket {
 
-    pub fn is_filled(&self) -> bool {
-        self.key_pair.load(Ordering::Relaxed) != 0
+    pub fn next_position(&self) -> TTEntryBucketPosition {
+        let key_pair = self.key_pair.load(Ordering::Relaxed);
+        todo!()
     }
 
     pub fn probe(&self, compact_key: u32) -> Option<(TTEntryBucketPosition, TTEntry)> {
         let key_pair = self.key_pair.load(Ordering::Relaxed);
 
-        if key_pair & compact_key as u64 == 0x00000000_FFFFFFFF {
+        if key_pair & 0x00000000_FFFFFFFF == compact_key as u64 {
             Some((TTEntryBucketPosition::HI, TTEntry::from(self.hi_body.load(Ordering::Relaxed))))
-        } else if ((key_pair & (compact_key as u64)) << 32) == 0xFFFFFFFF_00000000 {
+        } else if ((key_pair & compact_key as u64) << 32) == 0xFFFFFFFF_00000000 {
             Some((TTEntryBucketPosition::LO, TTEntry::from(self.lo_body.load(Ordering::Relaxed))))
         } else { None }
     }
 
-    pub fn store(&mut self, compact_key: u32, entry: TTEntry, pos: TTEntryBucketPosition) {
+    pub fn store(&mut self, compact_key: u32, pos: TTEntryBucketPosition, entry: TTEntry) {
         match pos {
             TTEntryBucketPosition::HI => {
                 self.key_pair.store((compact_key as u64) << 32, Ordering::Relaxed);

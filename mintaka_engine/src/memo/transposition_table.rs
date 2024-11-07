@@ -4,6 +4,7 @@ use mintaka::notation::pos::Pos;
 use mintaka::utils::abstract_transposition_table::AbstractTranspositionTable;
 use std::sync::atomic::AtomicU8;
 
+#[derive(Default)]
 pub struct TranspositionTable {
     table: Vec<TTEntryBucket>,
     age: AtomicU8
@@ -27,18 +28,11 @@ impl AbstractTranspositionTable<TTEntryBucket> for TranspositionTable {
 
 impl TranspositionTable {
 
-    pub fn new() -> Self {
-        Self {
-            table: Vec::new(),
-            age: AtomicU8::new(0)
-        }
-    }
-
     pub fn probe(&self, key: HashKey) -> Option<TTEntry> {
         let idx = self.calculate_index(key);
         let compact_key = key.0 as u32;
 
-        self.table[idx].probe(compact_key)
+        self.table[idx].probe(compact_key).map(|(_, entry)| entry)
     }
 
     pub fn store_mut(
@@ -52,13 +46,21 @@ impl TranspositionTable {
     ) {
         let idx = self.calculate_index(key);
         let lower_half_key = key.0 as u32;
-        let mut bucket = &self.table[idx];
+        let bucket = &mut self.table[idx];
 
-        if let Some(entry) = bucket.probe(lower_half_key) {
+        if let Some((position, entry)) = bucket.probe(lower_half_key) {
             // replace entry
-            bucket.store(lower_half_key, )
+            let new_entry = TTEntry {
+                best_move,
+                depth,
+                flag,
+                score,
+                eval
+            };
+
+            bucket.store(lower_half_key, position, new_entry);
         } else {
-            let entry = TTEntry {
+            let new_entry = TTEntry {
                 best_move,
                 depth,
                 flag,
@@ -66,14 +68,14 @@ impl TranspositionTable {
                 eval,
             };
 
-            bucket.store(lower_half_key, entry, TTEntryBucketPosition::HI)
+            bucket.store(lower_half_key, TTEntryBucketPosition::LO, new_entry);
         }
     }
 
     pub fn hash_usage(&self) -> usize {
         self.table.iter()
             .take(1000)
-            .filter(|bucket| bucket.is_filled())
+            .filter(|bucket| true)
             .count()
     }
 

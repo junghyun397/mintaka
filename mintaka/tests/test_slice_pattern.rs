@@ -23,7 +23,7 @@ mod test_pattern {
 
                 if unit & mask_kind == mask_kind {
                     'V'
-                } else if case.as_bytes()[idx * 2] != '.' as u8 {
+                } else if case.as_bytes()[idx * 2] != b'.' {
                     case.as_bytes()[idx * 2] as char
                 } else {
                     '.'
@@ -151,7 +151,7 @@ mod test_pattern {
             color = Color::Black,
             case                = "X . . X X . . .",
             open_three          = "X . . X X V V .",
-            close_three         = "X . V X X V V .",
+            close_three         = "X . V X X V V V",
             closed_four_single  = "X . V X X . . .",
         );
 
@@ -160,6 +160,34 @@ mod test_pattern {
             case                = "X . . . X X . . .",
             open_three          = "X . . V X X V V .",
             close_three         = "X . . V X X V V .",
+        );
+
+        test_pattern!(
+            color = Color::Black,
+            case                = "X . . . X X . . . X",
+            open_three          = "X . . V X X V . . X",
+            close_three         = "X . V V X X V V . X",
+        );
+
+        test_pattern!(
+            color = Color::Black,
+            case                = "X . . . X X . . X",
+            open_three          = "X . . . X X . . X",
+            close_three         = "X . . . X X . . X",
+        );
+
+        test_pattern!(
+            color = Color::Black,
+            case                = "X . . X . X . .",
+            open_three          = "X . . X V X V .",
+            close_three         = "X . V X V X V V",
+        );
+
+        test_pattern!(
+            color = Color::Black,
+            case                = "X . . X . X . . X",
+            open_three          = "X . . X . X . . X",
+            close_three         = "X . . X . X . . X",
         );
     }
 
@@ -187,16 +215,16 @@ mod test_pattern {
 
         test_pattern!(
             color = both,
-            case = ". . O O O . .",
-            closed_four_single = "V . O O O . V",
-            open_four = ". V O O O V .",
+            case                = ". . O O O . .",
+            closed_four_single  = "V . O O O . V",
+            open_four           = ". V O O O V .",
         );
 
         test_pattern!(
             color = both,
-            case = ". O O . O .",
-            closed_four_single = "V O O . O V",
-            open_four = ". O O V O .",
+            case                = ". O O . O .",
+            closed_four_single  = "V O O . O V",
+            open_four           = ". O O V O .",
         );
     }
 
@@ -211,6 +239,13 @@ mod test_pattern {
 
         test_pattern!(
             color = both,
+            case                = ". O . O . O . O . O . O .",
+            closed_four_single  = ". O V O . O . O . O V O .",
+            closed_four_double  = ". O . O V O V O V O . O .",
+        );
+
+        test_pattern!(
+            color = both,
             case                = ". . O O O . . . O O O . .",
             closed_four_single  = "V . O O O . . . O O O . V",
             closed_four_double  = ". . O O O . V . O O O . .",
@@ -220,13 +255,18 @@ mod test_pattern {
         test_pattern!(
             color = both,
             case                = ". O . O O . . O .",
-            closed_four_single  = "V O V O O . V O .",
+            closed_four_single  = "V O . O O . V O .",
             closed_four_double  = ". O . O O V . O .",
+            open_four           = ". O V O O . . O .",
         );
-    }
 
-    #[test]
-    fn complex_four() {
+        test_pattern!(
+            color = both,
+            case                = ". O O . O . . O O .",
+            closed_four_single  = "V O O . O . V O O V",
+            closed_four_double  = ". O O . O V . O O .",
+            open_four           = ". O O V O . . O O .",
+        );
     }
 
     #[test]
