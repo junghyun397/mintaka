@@ -160,12 +160,16 @@ impl Board {
             prefetch_idx += 1;
         }
 
-        if valid_ascending_slice.as_ref().unwrap().is_valid_pattern() {
+        if valid_ascending_slice.as_ref()
+            .map_or(false, |slice| slice.is_valid_pattern())
+        {
             packed_slices[prefetch_idx] = valid_ascending_slice.as_ref().unwrap().packed_slice();
             prefetch_idx += 1;
         }
 
-        if valid_descending_slice.as_ref().unwrap().is_valid_pattern() {
+        if valid_descending_slice.as_ref()
+            .map_or(false, |slice| slice.is_valid_pattern())
+        {
             packed_slices[prefetch_idx] = valid_descending_slice.as_ref().unwrap().packed_slice();
         }
 
@@ -206,19 +210,27 @@ impl Board {
 
     fn full_update_mut(&mut self) {
         for horizontal_slice in self.slices.horizontal_slices.iter() {
-            self.patterns.update_by_slice_mut::<{ Direction::Horizontal }>(&mut DummySlicePatternMemo, horizontal_slice);
+            if horizontal_slice.is_valid_pattern() {
+                self.patterns.update_by_slice_mut::<{ Direction::Horizontal }>(&mut DummySlicePatternMemo, horizontal_slice);
+            }
         }
 
         for vertical_slice in self.slices.vertical_slices.iter() {
-            self.patterns.update_by_slice_mut::<{ Direction::Vertical }>(&mut DummySlicePatternMemo, vertical_slice);
+            if vertical_slice.is_valid_pattern() {
+                self.patterns.update_by_slice_mut::<{ Direction::Vertical }>(&mut DummySlicePatternMemo, vertical_slice);
+            }
         }
 
         for ascending_slice in self.slices.ascending_slices.iter() {
-            self.patterns.update_by_slice_mut::<{ Direction::Ascending }>(&mut DummySlicePatternMemo, ascending_slice);
+            if ascending_slice.is_valid_pattern() {
+                self.patterns.update_by_slice_mut::<{ Direction::Ascending }>(&mut DummySlicePatternMemo, ascending_slice);
+            }
         }
 
         for descending_slice in self.slices.descending_slices.iter() {
-            self.patterns.update_by_slice_mut::<{ Direction::Descending }>(&mut DummySlicePatternMemo, descending_slice);
+            if descending_slice.is_valid_pattern() {
+                self.patterns.update_by_slice_mut::<{ Direction::Descending }>(&mut DummySlicePatternMemo, descending_slice);
+            }
         }
 
         self.patterns.validate_double_three_mut();

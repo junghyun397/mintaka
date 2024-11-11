@@ -51,10 +51,10 @@ mod test_pattern {
             color = both,
             case = $case:expr,
             $(open_three = $open_three:expr,)?
-            $(close_three = $close_three:expr,)?
             $(closed_four_single = $closed_four_single:expr,)?
             $(closed_four_double = $closed_four_double:expr,)?
             $(open_four = $open_four:expr,)?
+            $(close_three = $close_three:expr,)?
             $(five = $five:expr,)?
             $(overline = $overline:expr,)?
         ) => {
@@ -62,10 +62,10 @@ mod test_pattern {
                 color = Color::White,
                 case = $case,
                 $(open_three = $open_three,)?
-                $(close_three = $close_three,)?
                 $(closed_four_single = $closed_four_single,)?
                 $(closed_four_double = $closed_four_double,)?
                 $(open_four = $open_four,)?
+                $(close_three = $close_three,)?
                 $(five = $five,)?
                 $(overline = $overline,)?
             );
@@ -74,10 +74,10 @@ mod test_pattern {
                 color = Color::Black,
                 case = &invert_color($case),
                 $(open_three = &invert_color($open_three),)?
-                $(close_three = &invert_color($close_three),)?
                 $(closed_four_single = &invert_color($closed_four_single),)?
                 $(closed_four_double = &invert_color($closed_four_double),)?
                 $(open_four = &invert_color($open_four),)?
+                $(close_three = &invert_color($close_three),)?
                 $(five = &invert_color($five),)?
                 $(overline = &invert_color($overline),)?
             );
@@ -86,20 +86,22 @@ mod test_pattern {
             color = $color:expr,
             case = $case:expr,
             $(open_three = $open_three:expr,)?
-            $(close_three = $close_three:expr,)?
             $(closed_four_single = $closed_four_single:expr,)?
             $(closed_four_double = $closed_four_double:expr,)?
             $(open_four = $open_four:expr,)?
+            $(close_three = $close_three:expr,)?
             $(five = $five:expr,)?
             $(overline = $overline:expr,)?
         ) => {
             $(test_both_flow($case, $open_three, $color, OPEN_THREE);)?
 
-            $(test_both_flow($case, $close_three, $color, CLOSE_THREE);)?
-
             $(test_both_flow($case, $closed_four_single, $color, CLOSED_FOUR_SINGLE);)?
 
             $(test_both_flow($case, $closed_four_double, $color, CLOSED_FOUR_DOUBLE);)?
+
+            $(test_both_flow($case, $open_four, $color, OPEN_FOUR);)?
+
+            $(test_both_flow($case, $close_three, $color, CLOSE_THREE);)?
 
             $(test_both_flow($case, $five, $color, FIVE);)?
 
@@ -113,35 +115,30 @@ mod test_pattern {
             color = both,
             case                = ". . . O O . . .",
             open_three          = ". V V O O V V .",
-            close_three         = ". . V O O V . .",
         );
 
         test_pattern!(
             color = both,
             case                = "X . O O . . .",
             open_three          = "X . O O V V .",
-            close_three         = "X V O O V V .",
         );
 
         test_pattern!(
             color = both,
             case                = "X . . O O . . .",
             open_three          = "X . V O O V V .",
-            close_three         = "X . V O O V V .",
         );
 
         test_pattern!(
             color = both,
             case                = ". . O . O . .",
             open_three          = ". V O V O V .",
-            close_three         = ". V O V O V .",
         );
 
         test_pattern!(
             color = both,
             case                = "X . O . O . .",
             open_three          = "X . O V O V .",
-            close_three         = "X V O V O V .",
         );
     }
 
@@ -151,8 +148,7 @@ mod test_pattern {
             color = Color::Black,
             case                = "X . . X X . . .",
             open_three          = "X . . X X V V .",
-            close_three         = "X . V X X V V V",
-            closed_four_single  = "X . V X X . . .",
+            closed_four_single  = "X V V X X . . .",
         );
 
         test_pattern!(
@@ -166,28 +162,24 @@ mod test_pattern {
             color = Color::Black,
             case                = "X . . . X X . . . X",
             open_three          = "X . . V X X V . . X",
-            close_three         = "X . V V X X V V . X",
         );
 
         test_pattern!(
             color = Color::Black,
             case                = "X . . . X X . . X",
             open_three          = "X . . . X X . . X",
-            close_three         = "X . . . X X . . X",
         );
 
         test_pattern!(
             color = Color::Black,
             case                = "X . . X . X . .",
             open_three          = "X . . X V X V .",
-            close_three         = "X . V X V X V V",
         );
 
         test_pattern!(
             color = Color::Black,
             case                = "X . . X . X . . X",
             open_three          = "X . . X . X . . X",
-            close_three         = "X . . X . X . . X",
         );
     }
 
@@ -204,6 +196,7 @@ mod test_pattern {
             case                = ". . O O O . .",
             closed_four_single  = "V . O O O . V",
             open_four           = ". V O O O V .",
+            close_three         = ". V O O O V .",
         );
 
         test_pattern!(
@@ -211,6 +204,7 @@ mod test_pattern {
             case                = "X . O O O . .",
             closed_four_single  = "X V O O O . V",
             open_four           = "X . O O O V .",
+            close_three         = "X V O O O V .",
         );
 
         test_pattern!(
@@ -218,6 +212,15 @@ mod test_pattern {
             case                = ". . O O O . .",
             closed_four_single  = "V . O O O . V",
             open_four           = ". V O O O V .",
+            close_three         = ". V O O O V .",
+        );
+
+        test_pattern!(
+            color = Color::Black,
+            case                = "X . . X X X . . .",
+            closed_four_single  = "X . V X X X . V .",
+            open_four           = "X . . X X X V . .",
+            close_three         = "X . V X X X V V .",
         );
 
         test_pattern!(
@@ -225,6 +228,37 @@ mod test_pattern {
             case                = ". O O . O .",
             closed_four_single  = "V O O . O V",
             open_four           = ". O O V O .",
+            close_three         = "V O O V O V",
+        );
+
+        test_pattern!(
+            color = Color::Black,
+            case                = ". X . X X . X .",
+            closed_four_single  = "V X V X X V X V",
+            closed_four_double  = ". X . X X . X .",
+            open_four           = ". X . X X . X .",
+            close_three         = ". X . X X . X .",
+        );
+
+        test_pattern!(
+            color = Color::Black,
+            case                = ". X . X . X X . .",
+            closed_four_single  = ". X . X V X X V .",
+            closed_four_double  = ". X . X . X X . .",
+            open_four           = ". X . X . X X . .",
+            close_three         = ". X . X . X X . .",
+        );
+
+        test_pattern!(
+            color = both,
+            case                = ". O O . . O .",
+            closed_four_single  = ". O O V V O .",
+        );
+
+        test_pattern!(
+            color = Color::Black,
+            case                = ". X X . . X X .",
+            closed_four_single  = ". X X . . X X .",
         );
     }
 
@@ -246,14 +280,6 @@ mod test_pattern {
 
         test_pattern!(
             color = both,
-            case                = ". . O O O . . . O O O . .",
-            closed_four_single  = "V . O O O . . . O O O . V",
-            closed_four_double  = ". . O O O . V . O O O . .",
-            open_four           = ". V O O O V . V O O O V .",
-        );
-
-        test_pattern!(
-            color = both,
             case                = ". O . O O . . O .",
             closed_four_single  = "V O . O O . V O .",
             closed_four_double  = ". O . O O V . O .",
@@ -266,6 +292,14 @@ mod test_pattern {
             closed_four_single  = "V O O . O . V O O V",
             closed_four_double  = ". O O . O V . O O .",
             open_four           = ". O O V O . . O O .",
+        );
+
+        test_pattern!(
+            color = both,
+            case                = ". . O O O . . . O O O . .",
+            closed_four_single  = "V . O O O . . . O O O . V",
+            closed_four_double  = ". . O O O . V . O O O . .",
+            open_four           = ". V O O O V . V O O O V .",
         );
     }
 
