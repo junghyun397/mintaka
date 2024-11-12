@@ -90,10 +90,10 @@ fn find_patterns(
         (left, rev) => (match_long_pattern_for_black!(right));
         (right, rev) => (match_long_pattern_for_black!(left));
         (left) => {(
-            ob & 0b1 << offset + 1 == 0 // offset + 3 - 1 - 1
+            ob & (0b1 << offset + 2) == 0
         )};
         (right) => {(
-            ob & 0b1 << offset + 11 == 0 // offset + 3 + 8 + 1 - 1
+            ob & (0b1 << offset + 11) == 0
         )};
     }
 
@@ -133,10 +133,10 @@ fn find_patterns(
             let mut original = u128::from_ne_bytes($patterns_expr);
 
             let slice_patch_mask = PATCH_MASK_LUT.look_up_table[shift];
-            if PATCH_MASK_LUT.include_non_closed_four {
+            if PATCH_MASK_LUT.contains_non_closed_four {
                 original |= slice_patch_mask.patch_mask;
             }
-            if PATCH_MASK_LUT.include_closed_four {
+            if PATCH_MASK_LUT.contains_closed_four {
                 original = increase_closed_four_multiple(original,
                     slice_patch_mask.closed_four_clear_mask,
                     slice_patch_mask.closed_four_mask
@@ -181,13 +181,11 @@ fn find_patterns(
         };
     }
 
-    // TODO: STRONG control hazard, needs optimization.
-    // branch-less binary search for optimization?
-
     // THREE
 
     process_pattern!(black, asymmetry, "!.OO...!", "!.OO3..!", "!.OO.3.!");
     process_pattern!(black, asymmetry, "!..OO..X", "!..OO3.X");
+    process_pattern!(black, asymmetry, long-pattern, left, "..OO...O", "..OO3..O"); // [!]..OO...O
     process_pattern!(black, asymmetry, "!.O.O..!", "!.O3O..!", "!.O.O3.!");
 
     process_pattern!(white, asymmetry, ".OO...", ".OO3..", ".OO.3.");
@@ -203,9 +201,11 @@ fn find_patterns(
     
     process_pattern!(black, asymmetry, "XOO.O.!", "XOOFO.!", "XOO.O.F!");
     process_pattern!(black, asymmetry, "XOOO..!", "XOOOF.!", "XOOO.F!");
-    process_pattern!(black, asymmetry, "!..OOO.X", "!..OOOFX");
+    process_pattern!(black, asymmetry, "!..OOO.X", "!..OOOFX", "!C.OOO.X");
+
     process_pattern!(black, asymmetry, "!.OO.O.O", "!.OOFO.O");
     process_pattern!(black, asymmetry, "!.O.OO.O", "!.OFOO.O");
+    process_pattern!(black, asymmetry, long-pattern, left, "..OOO..O", "..OOOF.O", "C.OOO..O"); // [!]..OOO..O
 
     process_pattern!(white, symmetry, "O.O.O", "OFO.O", "O.OFO");
     process_pattern!(white, asymmetry, "OO.O.", "OO.OF");
@@ -214,7 +214,7 @@ fn find_patterns(
 
     process_pattern!(white, asymmetry, "XOO.O.", "XOOFO.", "XOO.OF");
     process_pattern!(white, asymmetry, "XOOO..", "XOOOF.", "XOOO.F");
-    process_pattern!(white, asymmetry, "..OOO.X", "..OOOFX");
+    process_pattern!(white, asymmetry, "..OOO.X", "..OOOFX", "C.OOO.X");
 
     // OPEN-FOUR
 
@@ -223,11 +223,6 @@ fn find_patterns(
 
     process_pattern!(white, asymmetry, ".OOO..", ".OOO4.", ".OOO.F", "COOO..", ".OOOC.");
     process_pattern!(white, asymmetry, ".OO.O.", ".OO4O.", "COO.O.", ".OOCO.", ".OO.OC");
-
-    // CLOSE-THREE
-
-    process_pattern!(black, asymmetry, long-pattern, right, "O..OOO..", "O..OOO.C");
-    process_pattern!(black, asymmetry, "X.OOO..!", "XCOOO..!", "X.OOO.C!");
 
     // FIVE
 
@@ -295,8 +290,8 @@ const MASK_LUT_SIZE: usize = pos::U_BOARD_WIDTH + 1;
 
 struct SlicePatchMaskLUT {
     pub look_up_table: [SlicePatchMask; MASK_LUT_SIZE],
-    pub include_non_closed_four: bool,
-    pub include_closed_four: bool
+    pub contains_non_closed_four: bool,
+    pub contains_closed_four: bool
 }
 
 // big-endian not supported
@@ -352,8 +347,8 @@ const fn build_slice_patch_mask_lut(sources: [&str; 4], reversed: bool) -> Slice
 
     SlicePatchMaskLUT {
         look_up_table,
-        include_non_closed_four: original.patch_mask != 0,
-        include_closed_four: original.closed_four_mask != 0,
+        contains_non_closed_four: original.patch_mask != 0,
+        contains_closed_four: original.closed_four_mask != 0,
     }
 }
 

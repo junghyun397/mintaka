@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod test_pattern {
+mod test_slice_pattern {
     use mintaka::notation::color::*;
     use mintaka::pattern::*;
     use mintaka::slice::*;
@@ -155,19 +155,18 @@ mod test_pattern {
             color = Color::Black,
             case                = "X . . . X X . . .",
             open_three          = "X . . V X X V V .",
-            close_three         = "X . . V X X V V .",
-        );
-
-        test_pattern!(
-            color = Color::Black,
-            case                = "X . . . X X . . . X",
-            open_three          = "X . . V X X V . . X",
         );
 
         test_pattern!(
             color = Color::Black,
             case                = "X . . . X X . . X",
             open_three          = "X . . . X X . . X",
+        );
+
+        test_pattern!(
+            color = Color::Black,
+            case                = "X . . . X X . . . X",
+            open_three          = "X . . V X X V . . X",
         );
 
         test_pattern!(
@@ -204,7 +203,7 @@ mod test_pattern {
             case                = "X . O O O . .",
             closed_four_single  = "X V O O O . V",
             open_four           = "X . O O O V .",
-            close_three         = "X V O O O V .",
+            close_three         = "X V O O O V V",
         );
 
         test_pattern!(
