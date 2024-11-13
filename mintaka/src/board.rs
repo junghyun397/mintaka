@@ -4,7 +4,6 @@ use crate::memo::hash_key::HashKey;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
-use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::pattern::Patterns;
 use crate::slice::{Slice, Slices};
@@ -267,51 +266,67 @@ impl Board {
             let slice_idx = slice.calculate_idx(direction, pos);
             let signature = (slice.black_stones >> (slice_idx - 2)) & 0b1111; // 0[1V34]5
 
-            let mut pos_1 = pos::INVALID_POS;
-            let mut pos_2 = pos::INVALID_POS;
-            let mut pos_3 = pos::INVALID_POS;
+            #[inline]
+            fn is_invalid_three_point(board: &Board, origin_pos: Pos, from_direction: Direction, pos: Pos) -> bool {
+                let pattern_unit = board.patterns.field[pos.idx_usize()].black_unit;
+
+                if (pattern_unit.has_four() || pattern_unit.has_overline()) && !pattern_unit.has_five() {
+                    return true;
+                }
+
+                if board.patterns.raw_double_three_field.is_hot(pos) {
+                    if board.is_valid_double_three::<true>(origin_pos, from_direction, pos) {
+                        return true;
+                    }
+                }
+                
+                false
+            }
 
             match signature {
                 /* .OV.O. */ 0b1001 => {
-                    pos_1 = pos.directional_offset(direction, -2);
-                    pos_2 = pos.directional_offset(direction, 1);
-                    pos_3 = pos.directional_offset(direction, 3);
+                    if 
+                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -2)) &&
+                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 1)) &&
+                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 3)) 
+                    {
+                        return false;
+                    }
                 },
                 /* .O.VO. */ 0b0010 => {
-                    pos_1 = pos.directional_offset(direction, -3);
-                    pos_2 = pos.directional_offset(direction, -1);
-                    pos_3 = pos.directional_offset(direction, 2);
+                    if
+                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -3)) &&
+                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -1)) &&
+                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 2))
+                    {
+                        return false;
+                    }
                 },
                 /* .VOO.  */ 0b0011 => {
-                    pos_1 = pos.directional_offset(direction, -1);
-                    pos_2 = pos.directional_offset(direction, 3);
+                    if
+                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -1)) &&
+                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 3))
+                    {
+                        return false;
+                    }
                 },
                 /* .OVO.  */ 0b1010 => {
-                    pos_1 = pos.directional_offset(direction, -2);
-                    pos_2 = pos.directional_offset(direction, 2);
+                    if
+                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -2)) &&
+                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 2))
+                    {
+                        return false;
+                    }
                 },
                 /* .OOV.  */ 0b1000 => {
-                    pos_1 = pos.directional_offset(direction, -3);
-                    pos_2 = pos.directional_offset(direction, 1);
+                    if
+                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -3)) &&
+                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 1))
+                    {
+                        return false;
+                    }
                 },
                 _ => unreachable!()
-            }
-
-            let next_pos = Pos::from_index(0);
-            let next_pattern_unit = self.patterns.field[next_pos.idx_usize()].black_unit;
-
-            if (next_pattern_unit.has_four() || next_pattern_unit.has_overline()) && !next_pattern_unit.has_five() {
-                return false;
-            }
-
-            if self.patterns.raw_double_three_field.is_hot(next_pos) {
-                // if self.is_valid_three::<true>(pos, direction, next_pos) {
-                //     return true;
-                // }
-            }
-
-            if pos_1 == pos::INVALID_POS && pos_2 == pos::INVALID_POS && pos_3 == pos::INVALID_POS {
-                // invalid three
             }
         }
 
