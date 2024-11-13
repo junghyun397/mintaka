@@ -1,3 +1,4 @@
+use crate::notation::direction::Direction;
 use crate::utils::str_utils::u8_from_str;
 
 pub const BOARD_WIDTH: u8 = 15;
@@ -82,5 +83,14 @@ impl Pos {
     pub const fn offset(&self, row: u8, col: u8) -> Pos {
         Self::from_cartesian(self.row() + row, self.col() + col)
     }
+    
+    pub const fn directional_offset(&self, direction: Direction, offset: i16) -> Pos {
+        match direction {
+            Direction::Vertical => Self::from_cartesian((self.row() as i16 + offset) as u8, self.col()),
+            _ => Self::from_cartesian(self.row(), (self.col() as i16 + offset) as u8)
+        }
+    }
 
 }
+
+pub const INVALID_POS: Pos = Pos::from_index(u8::MAX);

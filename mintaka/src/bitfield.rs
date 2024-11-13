@@ -113,9 +113,9 @@ impl Iterator for BitfieldPosIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.value != u256::MIN {
-            let tz = self.value.trailing_zeros();
+            let tails = self.value.trailing_zeros();
             self.value &= self.value - 1;
-            Some(Pos::from_index(tz as u8))
+            Some(Pos::from_index(tails as u8))
         } else {
             None
         }

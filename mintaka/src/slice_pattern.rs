@@ -357,7 +357,6 @@ fn increase_closed_four_single(packed: u8) -> u8 {
     packed | (0b1000_0000 >> (packed >> 7))
 }
 
-// big-endian not supported
 fn increase_closed_four_multiple(original: u128, clear_mask: u128, mask: u128) -> u128 {
     let mut copied: u128 = original;     // 0 0 0 | 1 0 0 | 1 1 0
     copied >>= 1;                        // 0 0 0 | 0 1 0 | 0 1 1

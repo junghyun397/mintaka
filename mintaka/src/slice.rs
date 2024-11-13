@@ -76,6 +76,14 @@ impl Slice {
     pub fn packed_slice(&self) -> u64 {
         self.black_stones as u64 | (self.white_stones as u64) << 32
     }
+    
+    pub fn calculate_idx(&self, direction: Direction, pos: Pos) -> usize {
+        match direction {
+            Direction::Vertical => pos.row_usize(),
+            Direction::Horizontal => pos.col_usize(),
+            _ => pos.col_usize() - self.start_col as usize
+        }
+    }
 
 }
 
@@ -137,31 +145,33 @@ impl Slices {
         }
     }
 
-    pub fn access_slice<const D: Direction>(&self, pos: Pos) -> Option<&Slice> {
-        match D {
-            Direction::Horizontal => Some(&self.horizontal_slices[pos.row_usize()]),
-            Direction::Vertical => Some(&self.vertical_slices[pos.col_usize()]),
-            Direction::Ascending => {
-                Self::ascending_slice_idx(pos)
-                    .map(|idx| &self.ascending_slices[idx])
-            },
-            Direction::Descending => {
-                Self::descending_slice_idx(pos)
-                    .map(|idx| &self.descending_slices[idx])
-            }
+    pub fn access_slice(&self, direction: Direction, pos: Pos) -> &Slice {
+        match direction {
+            Direction::Horizontal => &self.horizontal_slices[pos.row_usize()],
+            Direction::Vertical => &self.vertical_slices[pos.col_usize()],
+            Direction::Ascending => &self.ascending_slices[Self::calculate_ascending_slice_idx(pos) as usize],
+            Direction::Descending => &self.descending_slices[Self::calculate_descending_slice_idx(pos) as usize],
         }
+    }
+    
+    fn calculate_ascending_slice_idx(pos: Pos) -> isize {
+        // y = x + b, b = y - x (reversed row sequence)
+        I_DIAGONAL_SLICE_AMOUNT - (pos.row() as isize - pos.col() as isize + pos::I_BOARD_WIDTH - 4)
     }
 
     pub fn ascending_slice_idx(pos: Pos) -> Option<usize> {
-        // y = x + b, b = y - x (reversed row sequence)
-        let idx = I_DIAGONAL_SLICE_AMOUNT - (pos.row() as isize - pos.col() as isize + pos::I_BOARD_WIDTH - 4);
+        let idx = Self::calculate_ascending_slice_idx(pos);
         (0 .. I_DIAGONAL_SLICE_AMOUNT).contains(&idx)
             .then_some(idx as usize)
     }
+    
+    fn calculate_descending_slice_idx(pos: Pos) -> isize {
+        // y = -x + 15 + b, b = y + x - 15
+        pos.row() as isize + pos.col() as isize - 4
+    }
 
     pub fn descending_slice_idx(pos: Pos) -> Option<usize> {
-        // y = -x + 15 + b, b = y + x - 15
-        let idx = pos.row() as isize + pos.col() as isize - 4;
+        let idx = Self::calculate_descending_slice_idx(pos);
         (0 .. I_DIAGONAL_SLICE_AMOUNT).contains(&idx)
             .then_some(idx as usize)
     }
