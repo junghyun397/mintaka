@@ -96,17 +96,13 @@ impl Iterator for BitfieldIterator {
 }
 
 struct BitfieldPosIterator {
-    value: u256,
-    position: u8,
+    value: u256
 }
 
 impl From<u256> for BitfieldPosIterator {
 
     fn from(value: u256) -> Self {
-        Self {
-            value,
-            position: 0,
-        }
+        Self { value }
     }
 
 }
@@ -116,15 +112,12 @@ impl Iterator for BitfieldPosIterator {
     type Item = Pos;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.position == pos::U8_BOARD_SIZE {
-            None
+        if self.value != u256::MIN {
+            let tz = self.value.trailing_zeros();
+            self.value &= self.value - 1;
+            Some(Pos::from_index(tz as u8))
         } else {
-            let result = self.value & 0b1 == 1;
-            let idx = self.position;
-            self.position += 1;
-            self.value >>= 1;
-
-            result.then(|| Pos::from_index(idx))
+            None
         }
     }
 

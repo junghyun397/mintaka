@@ -5,7 +5,7 @@ mod test_slice_pattern {
     use mintaka::slice::*;
     use std::str::FromStr;
 
-    fn test(case: &str, expected: &str, color: Color, mask_kind: u8) {
+    fn test(case: &str, expected: &str, color: Color, mask: u8, result: u8) {
         assert_eq!(case.len(), expected.len());
 
         let slice = Slice::from_str(case).unwrap();
@@ -21,7 +21,7 @@ mod test_slice_pattern {
                     Color::White => white
                 };
 
-                if unit & mask_kind == mask_kind {
+                if unit & mask == result {
                     'V'
                 } else if case.as_bytes()[idx * 2] != b'.' {
                     case.as_bytes()[idx * 2] as char
@@ -37,9 +37,9 @@ mod test_slice_pattern {
         assert_eq!(content_pattern, expected);
     }
 
-    fn test_both_flow(case: &str, expected: &str, color: Color, mask_kind: u8) {
-        test(case, expected, color, mask_kind);
-        test(&case.chars().rev().collect::<String>(), &expected.chars().rev().collect::<String>(), color, mask_kind);
+    fn test_both_flow(case: &str, expected: &str, color: Color, mask: u8, result: u8) {
+        test(case, expected, color, mask, result);
+        test(&case.chars().rev().collect::<String>(), &expected.chars().rev().collect::<String>(), color, mask, result);
     }
 
     fn invert_color(case: &str) -> String {
@@ -93,19 +93,19 @@ mod test_slice_pattern {
             $(five = $five:expr,)?
             $(overline = $overline:expr,)?
         ) => {
-            $(test_both_flow($case, $open_three, $color, OPEN_THREE);)?
+            $(test_both_flow($case, $open_three, $color, OPEN_THREE, OPEN_THREE);)?
 
-            $(test_both_flow($case, $closed_four_single, $color, CLOSED_FOUR_SINGLE);)?
+            $(test_both_flow($case, $closed_four_single, $color, CLOSED_FOUR_DOUBLE, CLOSED_FOUR_SINGLE);)?
 
-            $(test_both_flow($case, $closed_four_double, $color, CLOSED_FOUR_DOUBLE);)?
+            $(test_both_flow($case, $closed_four_double, $color, CLOSED_FOUR_DOUBLE, CLOSED_FOUR_DOUBLE);)?
 
-            $(test_both_flow($case, $open_four, $color, OPEN_FOUR);)?
+            $(test_both_flow($case, $open_four, $color, OPEN_FOUR, OPEN_FOUR);)?
 
-            $(test_both_flow($case, $close_three, $color, CLOSE_THREE);)?
+            $(test_both_flow($case, $close_three, $color, CLOSE_THREE, CLOSE_THREE);)?
 
-            $(test_both_flow($case, $five, $color, FIVE);)?
+            $(test_both_flow($case, $five, $color, FIVE, FIVE);)?
 
-            $(test_both_flow($case, $overline, $color, INV_THREE_OVERLINE);)?
+            $(test_both_flow($case, $overline, $color, OVERLINE, OVERLINE);)?
         };
     }
 
@@ -288,7 +288,7 @@ mod test_slice_pattern {
         test_pattern!(
             color = both,
             case                = ". O O . O . . O O .",
-            closed_four_single  = "V O O . O . V O O V",
+            closed_four_single  = "V O O . O . V O O .",
             closed_four_double  = ". O O . O V . O O .",
             open_four           = ". O O V O . . O O .",
         );
@@ -299,6 +299,22 @@ mod test_slice_pattern {
             closed_four_single  = "V . O O O . . . O O O . V",
             closed_four_double  = ". . O O O . V . O O O . .",
             open_four           = ". V O O O V . V O O O V .",
+        );
+
+        test_pattern!(
+            color = Color::White,
+            case                = "O . O . O O . . O O . O . . .",
+            closed_four_single  = "O V O . O O . . O O . O V . .",
+            closed_four_double  = "O . O . O O V V O O . O . . .",
+            open_four           = "O . O V O O . . O O V O . . .",
+        );
+
+        test_pattern!(
+            color = Color::Black,
+            case                = "X . X . X X . . X X . X . . .",
+            closed_four_single  = "X . X V X X V V X X . X V . .",
+            closed_four_double  = "X . X . X X . . X X . X . . .",
+            open_four           = "X . X . X X . . X X V X . . .",
         );
     }
 

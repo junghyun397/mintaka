@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod test_forbid_complex {
-    use std::str::FromStr;
     use indoc::indoc;
     use mintaka::board::Board;
+    use std::str::FromStr;
 
     #[test]
     fn pseudo_double_three() {
@@ -128,7 +128,7 @@ mod test_forbid_complex {
     }
 
     #[test]
-    fn complex_double_three() {
+    fn nested_double_three() {
         let case = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15

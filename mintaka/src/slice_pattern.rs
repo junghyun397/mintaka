@@ -1,6 +1,6 @@
 use crate::notation::color::Color;
 use crate::notation::pos;
-use crate::pattern::{CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, INV_THREE_OVERLINE, OPEN_FOUR, OPEN_THREE};
+use crate::pattern::{CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, OPEN_FOUR, OPEN_THREE, OVERLINE, THREE_DIRECTION};
 use crate::slice::Slice;
 use crate::{max, min};
 
@@ -83,8 +83,8 @@ fn find_patterns(
     > EX: match black's closed-four = "!OOO.F"
     */
 
-    let b_u32_vector: u32 = b as u32 | (b as u32) << 8 | (cold as u32) << 16 | (ww as u32) << 24;
-    let w_u32_vector: u32 = w as u32 | (w as u32) << 8 | (cold as u32) << 16 | (bw as u32) << 24;
+    let b_vector: u32 = b as u32 | (b as u32) << 8 | (cold as u32) << 16 | (ww as u32) << 24;
+    let w_vector: u32 = w as u32 | (w as u32) << 8 | (cold as u32) << 16 | (bw as u32) << 24;
 
     macro_rules! match_long_pattern_for_black {
         (left, rev) => (match_long_pattern_for_black!(right));
@@ -99,8 +99,8 @@ fn find_patterns(
 
     macro_rules! match_pattern {
         ($color:ident,$pattern:literal) => (match_pattern!($color, rev=false, $pattern));
-        (black,rev=$rev:expr,$pattern:literal) => (match_pattern!(rev=$rev, $pattern, b_u32_vector));
-        (white,rev=$rev:expr,$pattern:literal) => (match_pattern!(rev=$rev, $pattern, w_u32_vector));
+        (black,rev=$rev:expr,$pattern:literal) => (match_pattern!(rev=$rev, $pattern, b_vector));
+        (white,rev=$rev:expr,$pattern:literal) => (match_pattern!(rev=$rev, $pattern, w_vector));
         (rev=$rev:expr,$pattern:literal,$elements:expr) => {{
             const MASK: u32 = build_pattern_mask($pattern, $rev);
             const RESULT: u32 = build_pattern_result($pattern, $rev);
@@ -137,7 +137,8 @@ fn find_patterns(
                 original |= slice_patch_mask.patch_mask;
             }
             if PATCH_MASK_LUT.contains_closed_four {
-                original = increase_closed_four_multiple(original,
+                original = increase_closed_four_multiple(
+                    original,
                     slice_patch_mask.closed_four_clear_mask,
                     slice_patch_mask.closed_four_mask
                 );
@@ -201,13 +202,13 @@ fn find_patterns(
     
     process_pattern!(black, asymmetry, "XOO.O.!", "XOOFO.!", "XOO.O.F!");
     process_pattern!(black, asymmetry, "XOOO..!", "XOOOF.!", "XOOO.F!");
-    process_pattern!(black, asymmetry, "!..OOO.X", "!..OOOFX", "!C.OOO.X");
+    process_pattern!(black, asymmetry, "X.OOO..!", "XFOOO..!", "X.OOO.C!");
 
-    process_pattern!(black, asymmetry, "!.OO.O.O", "!.OOFO.O");
-    process_pattern!(black, asymmetry, "!.O.OO.O", "!.OFOO.O");
+    process_pattern!(black, asymmetry, "O.O.OO.!", "O.OFOO.!");
+    process_pattern!(black, asymmetry, "O.OO.O.!", "O.OOFO.!");
     process_pattern!(black, asymmetry, long-pattern, left, "..OOO..O", "..OOOF.O", "C.OOO..O"); // [!]..OOO..O
 
-    process_pattern!(white, symmetry, "O.O.O", "OFO.O", "O.OFO");
+    process_pattern!(white, symmetry, "!O.O.O!", "!OFO.O!", "!O.OFO!");
     process_pattern!(white, asymmetry, "OO.O.", "OO.OF");
     process_pattern!(white, asymmetry, "O.OO.", "O.OOF");
     process_pattern!(white, asymmetry, "OO..O", "OOF.O", "OO.FO");
@@ -362,7 +363,7 @@ fn increase_closed_four_multiple(original: u128, clear_mask: u128, mask: u128) -
     copied >>= 1;                        // 0 0 0 | 0 1 0 | 0 1 1
     copied |= mask;                      // 1 0 0 | 1 1 0 | 1 1 1
     copied &= clear_mask;                // 1 0 0 | 1 1 0 | 1 1 0
-    original | copied                    // empty, four*1, four*2
+    original | copied                    // empty   slot 1  slot 2
 }
 
 const fn parse_patch_literal(source: &str, reversed: bool) -> (isize, u8) {
@@ -371,11 +372,12 @@ const fn parse_patch_literal(source: &str, reversed: bool) -> (isize, u8) {
         let pos = if reversed { 7 - idx } else { idx };
         match source.as_bytes()[idx as usize] as char {
             '3' => return (pos, OPEN_THREE),
+            'T' => return (pos, OPEN_THREE | THREE_DIRECTION),
             'C' => return (pos, CLOSE_THREE),
             '4' => return (pos, OPEN_FOUR),
             'F' => return (pos, CLOSED_FOUR_SINGLE),
             '5' => return (pos, FIVE),
-            '6' => return (pos, INV_THREE_OVERLINE),
+            '6' => return (pos, OVERLINE),
             _ => {}
         }
         idx += 1;

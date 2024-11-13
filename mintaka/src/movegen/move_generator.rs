@@ -58,7 +58,7 @@ pub fn generate_opening_moves(board: &Board, agent: OpeningStage) -> Bitfield {
 }
 
 const fn build_neighborhood_moves_lut() -> [Bitfield; BOARD_SIZE] {
-    let mut lut = [uint!("0"); BOARD_SIZE];
+    let mut lut = [u256::MIN; BOARD_SIZE];
 
     let mut idx = 0;
     while idx < BOARD_SIZE {

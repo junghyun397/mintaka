@@ -18,9 +18,10 @@ pub const FIVE: u8                  = 0b0001_0000;
 
 pub const OPEN_THREE: u8            = 0b0000_1000;
 pub const CLOSE_THREE: u8           = 0b0000_0100;
-// invalid-3 for black, overline(black) for white
-pub const INV_THREE_OVERLINE: u8    = 0b0000_0010;
-pub const PADDING: u8               = 0b0000_0001;
+pub const OVERLINE: u8              = 0b0000_0010;
+pub const THREE_DIRECTION: u8       = 0b0000_0001;
+
+const OPEN_THREE_POSITION: u32      = 3;
 
 const UNIT_CLOSED_FOUR_MASK: u32    = repeat_4x(CLOSED_FOUR_DOUBLE);
 const UNIT_OPEN_FOUR_MASK: u32      = repeat_4x(OPEN_FOUR);
@@ -29,7 +30,7 @@ const UNIT_FIVE_MASK: u32           = repeat_4x(FIVE);
 
 const UNIT_OPEN_THREE_MASK: u32     = repeat_4x(OPEN_THREE);
 const UNIT_CLOSE_THREE_MASK: u32    = repeat_4x(CLOSE_THREE);
-const UNIT_INV_3_OVERLINE_MASK: u32 = repeat_4x(INV_THREE_OVERLINE);
+const UNIT_OVERLINE_MASK: u32       = repeat_4x(OVERLINE);
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub enum PatternCount {
@@ -52,7 +53,7 @@ impl PatternCount {
 
 }
 
-// packed in 8-bit: closed-4-1 closed-4-2 open-4 five _ open-3 close-3 core-3 etc.
+// packed in 8-bit: closed-4-1 closed-4-2 open-4 five open-3 close-3 overline open-3-direction
 // total 32bit
 #[derive(Debug, Copy, Clone, Default)]
 pub struct PatternUnit {
@@ -80,6 +81,10 @@ impl PatternUnit {
         self.apply_mask(UNIT_OPEN_THREE_MASK).count_ones() > 1
     }
 
+    pub fn has_four(&self) -> bool {
+        self.apply_mask(UNIT_TOTAL_FOUR_MASK) != 0
+    }
+
     pub fn has_fours(&self) -> bool {
         self.apply_mask(UNIT_TOTAL_FOUR_MASK).count_ones() > 1
     }
@@ -90,6 +95,10 @@ impl PatternUnit {
 
     pub fn has_five(&self) -> bool {
         self.apply_mask(UNIT_FIVE_MASK) != 0
+    }
+
+    pub fn has_overline(&self) -> bool {
+        self.apply_mask(UNIT_OVERLINE_MASK) != 0
     }
 
     pub fn count_threes(&self) -> PatternCount {
@@ -155,8 +164,52 @@ impl PatternUnit {
         self.apply_mask(UNIT_FIVE_MASK).count_ones()
     }
 
+    pub fn iter_threes(&self) -> impl Iterator<Item=Direction> + '_ {
+        ThreeDirectionIterator::from(self)
+    }
+
     fn apply_mask(&self, mask: u32) -> u32 {
         u32::from(*self) & mask
+    }
+
+}
+
+struct ThreeDirectionIterator {
+    packed_unit: u32
+}
+
+impl From<&PatternUnit> for ThreeDirectionIterator {
+
+    fn from(value: &PatternUnit) -> Self {
+        Self { packed_unit: value.apply_mask(UNIT_OPEN_THREE_MASK) }
+    }
+
+}
+
+impl Iterator for ThreeDirectionIterator {
+
+    type Item = Direction;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.packed_unit != 0 {
+            let tz = self.packed_unit.trailing_zeros();
+            self.packed_unit &= self.packed_unit - 1;
+
+            const HORIZONTAL_N: u32 = OPEN_THREE_POSITION;
+            const VERTICAL_N: u32 = 8 + OPEN_THREE_POSITION;
+            const ASCENDING_N: u32 = 8 * 2 + OPEN_THREE_POSITION;
+            const DESCENDING_N: u32 = 8 * 3 + OPEN_THREE_POSITION;
+
+            Some(match tz {
+                HORIZONTAL_N => Direction::Horizontal,
+                VERTICAL_N => Direction::Vertical,
+                ASCENDING_N => Direction::Ascending,
+                DESCENDING_N => Direction::Descending,
+                _ => unreachable!()
+            })
+        } else {
+            None
+        }
     }
 
 }
@@ -235,7 +288,7 @@ impl Pattern {
     }
 
     pub fn has_overline(&self) -> bool {
-        false // TODO
+        self.black_unit.has_overline()
     }
 
 }
@@ -244,7 +297,8 @@ impl Pattern {
 pub struct Patterns {
     pub field: [Pattern; pos::BOARD_SIZE],
     pub five_in_a_row: Option<(Direction, u8, Color)>,
-    double_three_field: Bitfield,
+    pub double_three_field: Bitfield,
+    pub raw_double_three_field: Bitfield,
 }
 
 impl Default for Patterns {
@@ -254,6 +308,7 @@ impl Default for Patterns {
             field: [Pattern::default(); pos::BOARD_SIZE],
             five_in_a_row: None,
             double_three_field: u256::MIN,
+            raw_double_three_field: u256::MIN,
         }
     }
 
@@ -285,8 +340,12 @@ impl Patterns {
             self.field[idx].apply_mask_mut::<{ Color::Black }, D>(slice_pattern.black_patterns[offset as usize]);
             self.field[idx].apply_mask_mut::<{ Color::White }, D>(slice_pattern.white_patterns[offset as usize]);
 
+            let pos = Pos::from_index(idx as u8);
+
             if self.field[idx].black_unit.has_threes() {
-                self.double_three_field.set(Pos::from_index(idx as u8));
+                self.raw_double_three_field.set(pos);
+            } else if self.raw_double_three_field.is_hot(pos) {
+                self.raw_double_three_field.unset(pos);
             }
         }
 
@@ -294,11 +353,6 @@ impl Patterns {
             slice_pattern.five_in_a_row
                 .map(|(idx, color)| (D, idx, color))
         );
-    }
-
-    pub fn validate_double_three_mut(&mut self) {
-        for double_three_pos in self.double_three_field.iter_hot_pos() {
-        }
     }
 
 }

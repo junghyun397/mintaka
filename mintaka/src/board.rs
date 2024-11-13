@@ -124,6 +124,10 @@ impl Board {
         self.hash_key = HashKey::from(&self.slices.horizontal_slices);
     }
 
+    fn switch_player_mut(&mut self) {
+        self.player_color = self.opponent_color();
+    }
+
     #[inline(always)]
     fn incremental_update_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
@@ -205,7 +209,7 @@ impl Board {
             self.patterns.update_by_slice_mut::<{ Direction::Descending }>(memo, descending_slice);
         }
 
-        self.patterns.validate_double_three_mut();
+        self.validate_double_three_mut();
     }
 
     fn full_update_mut(&mut self) {
@@ -233,11 +237,51 @@ impl Board {
             }
         }
 
-        self.patterns.validate_double_three_mut();
+        self.validate_double_three_mut();
     }
 
-    fn switch_player_mut(&mut self) {
-        self.player_color = self.opponent_color();
+    fn validate_double_three_mut(&mut self) {
+        for double_three_pos in self.patterns.raw_double_three_field.iter_hot_pos() {
+            if self.is_valid_double_three::<false>(double_three_pos, Direction::Vertical, double_three_pos) {
+                self.patterns.double_three_field.unset(double_three_pos);
+            } else {
+                self.patterns.double_three_field.set(double_three_pos);
+            }
+        }
+    }
+
+    fn is_valid_double_three<const IS_NESTED: bool>(&self, origin_pos: Pos, from_direction: Direction, pos: Pos) -> bool {
+        // bypass recursive double three for performance
+        if IS_NESTED && origin_pos == pos {
+            return false;
+        }
+
+        let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
+        for direction in pattern_unit.iter_threes() {
+            if IS_NESTED && direction == from_direction {
+                continue;
+            }
+
+            // CASE I V O O O V
+            // CASE II V O O V O V
+            // CASE III V O V O O V
+            // components: 2 - 3
+
+            let next_pos = Pos::from_index(0);
+            let next_pattern_unit = self.patterns.field[next_pos.idx_usize()].black_unit;
+
+            if (next_pattern_unit.has_four() || next_pattern_unit.has_overline()) && !next_pattern_unit.has_five() {
+                return false;
+            }
+
+            if self.patterns.raw_double_three_field.is_hot(next_pos) {
+                if self.is_valid_double_three::<true>(pos, direction, next_pos) {
+                    return true;
+                }
+            }
+        }
+
+        true
     }
 
 }
