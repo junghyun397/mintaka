@@ -1,7 +1,6 @@
 #![allow(incomplete_features)]
 #![feature(portable_simd)]
 #![feature(adt_const_params)]
-#![feature(stdarch_aarch64_prefetch)]
 extern crate core;
 
 pub mod board;

@@ -49,6 +49,7 @@ mod test_nested_forbid {
 
     #[test]
     fn multiple_nested_double_three() {
+        // double-four related
         let case = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
@@ -86,8 +87,6 @@ mod test_nested_forbid {
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
-
-        println!("{}", Board::from_str(case).unwrap().build_debug_string());
 
         assert_eq!(Board::from_str(case).unwrap().to_string(), expected);
     }

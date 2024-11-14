@@ -168,7 +168,7 @@ impl PatternUnit {
         self.apply_mask(UNIT_FIVE_MASK).count_ones()
     }
 
-    pub fn iter_threes(&self) -> impl Iterator<Item=Direction> + '_ {
+    pub fn iter_three_directions(&self) -> impl Iterator<Item=Direction> + '_ {
         ThreeDirectionIterator::from(self)
     }
 

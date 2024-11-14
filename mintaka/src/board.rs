@@ -4,7 +4,7 @@ use crate::memo::hash_key::HashKey;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
-use crate::notation::pos::Pos;
+use crate::notation::pos::{Pos, INVALID_POS};
 use crate::pattern::Patterns;
 use crate::slice::{Slice, Slices};
 use ethnum::U256;
@@ -242,7 +242,10 @@ impl Board {
 
     fn validate_double_three_mut(&mut self) {
         for double_three_pos in self.patterns.unchecked_double_three_field.iter_hot_pos() {
-            if self.is_valid_double_three::<false>(double_three_pos, Direction::Vertical, double_three_pos) {
+            let mut paths: [Pos; 8] = [INVALID_POS; 8];
+            paths[0] = double_three_pos;
+
+            if self.is_valid_double_three::<false>(paths, 1, Direction::Vertical, double_three_pos) {
                 self.patterns.field[double_three_pos.idx_usize()].black_unit.mark_valid_double_three();
             } else {
                 self.patterns.field[double_three_pos.idx_usize()].black_unit.unmark_valid_double_three();
@@ -250,46 +253,59 @@ impl Board {
         }
     }
 
-    fn is_valid_double_three<const IS_NESTED: bool>(&self, origin_pos: Pos, from_direction: Direction, pos: Pos) -> bool {
+    #[inline(always)]
+    fn is_invalid_three_component(&self, paths: [Pos; 8], path_top: usize, from_direction: Direction, pos: Pos) -> bool {
+        let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
+
+        if !pattern_unit.has_three() || pattern_unit.has_four() || pattern_unit.has_overline() || paths.contains(&pos) {
+            return true;
+        }
+
+        if pattern_unit.has_threes() {
+            let mut new_paths = paths;
+            new_paths[path_top] = pos;
+            if self.is_valid_double_three::<true>(new_paths, path_top + 1, from_direction, pos) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn is_valid_double_three<const IS_NESTED: bool>(&self, paths: [Pos; 8], path_top: usize, from_direction: Direction, pos: Pos) -> bool {
         let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
         let mut total_threes = pattern_unit.count_open_threes();
 
-        for direction in pattern_unit.iter_threes() {
+        for direction in pattern_unit.iter_three_directions() {
             if IS_NESTED && direction == from_direction {
                 continue;
             }
 
-            #[inline(always)]
-            fn is_invalid_three_point(board: &Board, origin_pos: Pos, from_direction: Direction, pos: Pos) -> bool {
-                let pattern_unit = board.patterns.field[pos.idx_usize()].black_unit;
-
-                // if pos in pos_stack || !pattern_unit.has_three() || pattern_unit.has_four() || pattern_unit.has_overline() {
-                //     return true;
-                // }
-
-                if !pattern_unit.has_three() || pattern_unit.has_four() || pattern_unit.has_overline() {
-                    return true;
-                }
-
-                if pattern_unit.has_threes() {
-                    if board.is_valid_double_three::<true>(origin_pos, from_direction, pos) {
-                        return true;
-                    }
-                }
-
-                false
-            }
-
             let slice = self.slices.access_slice(direction, pos);
             let slice_idx = slice.calculate_idx(direction, pos);
-            let signature = (slice.black_stones >> (slice_idx - 2)) & 0b1111; // 0[1V34]5
+            let signature = (slice.black_stones >> (slice_idx - 2)) & 0b11111; // 0[00V00]0
 
             match signature {
-                /* .OV.O. */ 0b0010 => {
-                    if 
-                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -2)) &&
-                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 1)) &&
-                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 3))
+                /* .OV.O. */ 0b10010 => {
+                    if self.is_invalid_three_component(paths, path_top, direction, pos.directional_offset(direction, 1)) {
+                        total_threes -= 1;
+                        if total_threes < 2 {
+                            return false;
+                        }
+                    }
+                },
+                /* .O.VO. */ 0b01001 => {
+                    if self.is_invalid_three_component(paths, path_top, direction, pos.directional_offset(direction, -1)) {
+                        total_threes -= 1;
+                        if total_threes < 2 {
+                            return false;
+                        }
+                    }
+                },
+                /* .VOO.  */ 0b11000 => {
+                    if
+                        self.is_invalid_three_component(paths, path_top, direction, pos.directional_offset(direction, -1)) &&
+                        self.is_invalid_three_component(paths, path_top, direction, pos.directional_offset(direction, 3))
                     {
                         total_threes -= 1;
                         if total_threes < 2 {
@@ -297,11 +313,10 @@ impl Board {
                         }
                     }
                 },
-                /* .O.VO. */ 0b1001 => {
+                /* .OVO.  */ 0b01010 => {
                     if
-                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -3)) &&
-                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -1)) &&
-                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 2))
+                        self.is_invalid_three_component(paths, path_top, direction, pos.directional_offset(direction, -2)) &&
+                        self.is_invalid_three_component(paths, path_top, direction, pos.directional_offset(direction, 2))
                     {
                         total_threes -= 1;
                         if total_threes < 2 {
@@ -309,10 +324,10 @@ impl Board {
                         }
                     }
                 },
-                /* .VOO.  */ 0b1000 => {
+                /* .OOV.  */ 0b00011 => {
                     if
-                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -1)) &&
-                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 3))
+                        self.is_invalid_three_component(paths, path_top, direction, pos.directional_offset(direction, -3)) &&
+                        self.is_invalid_three_component(paths, path_top, direction, pos.directional_offset(direction, 1))
                     {
                         total_threes -= 1;
                         if total_threes < 2 {
@@ -320,10 +335,10 @@ impl Board {
                         }
                     }
                 },
-                /* .OVO.  */ 0b1010 => {
+                /* VO.O.  */ 0b01000 => {
                     if
-                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -2)) &&
-                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 2))
+                        self.is_invalid_three_component(paths, path_top, direction, pos.directional_offset(direction, 2)) &&
+                        self.is_invalid_three_component(paths, path_top, direction, pos.directional_offset(direction, 4))
                     {
                         total_threes -= 1;
                         if total_threes < 2 {
@@ -331,10 +346,10 @@ impl Board {
                         }
                     }
                 },
-                /* .OOV.  */ 0b0011 => {
+                /* .O.OV  */ 0b00010 => {
                     if
-                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -3)) &&
-                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 1))
+                        self.is_invalid_three_component(paths, path_top, direction, pos.directional_offset(direction, -2)) &&
+                        self.is_invalid_three_component(paths, path_top, direction, pos.directional_offset(direction, -4))
                     {
                         total_threes -= 1;
                         if total_threes < 2 {
