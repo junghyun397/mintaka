@@ -241,73 +241,83 @@ impl Board {
     }
 
     fn validate_double_three_mut(&mut self) {
-        for double_three_pos in self.patterns.raw_double_three_field.iter_hot_pos() {
+        for double_three_pos in self.patterns.unchecked_double_three_field.iter_hot_pos() {
             if self.is_valid_double_three::<false>(double_three_pos, Direction::Vertical, double_three_pos) {
-                self.patterns.double_three_field.unset(double_three_pos);
+                self.patterns.field[double_three_pos.idx_usize()].black_unit.mark_valid_double_three();
             } else {
-                self.patterns.double_three_field.set(double_three_pos);
+                self.patterns.field[double_three_pos.idx_usize()].black_unit.unmark_valid_double_three();
             }
         }
     }
 
     fn is_valid_double_three<const IS_NESTED: bool>(&self, origin_pos: Pos, from_direction: Direction, pos: Pos) -> bool {
-        // bypass recursive double three for performance
-        if IS_NESTED && origin_pos == pos {
-            return false;
-        }
-
         let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
+        let mut total_threes = pattern_unit.count_open_threes();
+
         for direction in pattern_unit.iter_threes() {
             if IS_NESTED && direction == from_direction {
                 continue;
+            }
+
+            #[inline(always)]
+            fn is_invalid_three_point(board: &Board, origin_pos: Pos, from_direction: Direction, pos: Pos) -> bool {
+                let pattern_unit = board.patterns.field[pos.idx_usize()].black_unit;
+
+                // if pos in pos_stack || !pattern_unit.has_three() || pattern_unit.has_four() || pattern_unit.has_overline() {
+                //     return true;
+                // }
+
+                if !pattern_unit.has_three() || pattern_unit.has_four() || pattern_unit.has_overline() {
+                    return true;
+                }
+
+                if pattern_unit.has_threes() {
+                    if board.is_valid_double_three::<true>(origin_pos, from_direction, pos) {
+                        return true;
+                    }
+                }
+
+                false
             }
 
             let slice = self.slices.access_slice(direction, pos);
             let slice_idx = slice.calculate_idx(direction, pos);
             let signature = (slice.black_stones >> (slice_idx - 2)) & 0b1111; // 0[1V34]5
 
-            #[inline]
-            fn is_invalid_three_point(board: &Board, origin_pos: Pos, from_direction: Direction, pos: Pos) -> bool {
-                let pattern_unit = board.patterns.field[pos.idx_usize()].black_unit;
-
-                if (pattern_unit.has_four() || pattern_unit.has_overline()) && !pattern_unit.has_five() {
-                    return true;
-                }
-
-                if board.patterns.raw_double_three_field.is_hot(pos) {
-                    if board.is_valid_double_three::<true>(origin_pos, from_direction, pos) {
-                        return true;
-                    }
-                }
-                
-                false
-            }
-
             match signature {
-                /* .OV.O. */ 0b1001 => {
+                /* .OV.O. */ 0b0010 => {
                     if 
                         is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -2)) &&
                         is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 1)) &&
-                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 3)) 
+                        is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 3))
                     {
-                        return false;
+                        total_threes -= 1;
+                        if total_threes < 2 {
+                            return false;
+                        }
                     }
                 },
-                /* .O.VO. */ 0b0010 => {
+                /* .O.VO. */ 0b1001 => {
                     if
                         is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -3)) &&
                         is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -1)) &&
                         is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 2))
                     {
-                        return false;
+                        total_threes -= 1;
+                        if total_threes < 2 {
+                            return false;
+                        }
                     }
                 },
-                /* .VOO.  */ 0b0011 => {
+                /* .VOO.  */ 0b1000 => {
                     if
                         is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -1)) &&
                         is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 3))
                     {
-                        return false;
+                        total_threes -= 1;
+                        if total_threes < 2 {
+                            return false;
+                        }
                     }
                 },
                 /* .OVO.  */ 0b1010 => {
@@ -315,15 +325,21 @@ impl Board {
                         is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -2)) &&
                         is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 2))
                     {
-                        return false;
+                        total_threes -= 1;
+                        if total_threes < 2 {
+                            return false;
+                        }
                     }
                 },
-                /* .OOV.  */ 0b1000 => {
+                /* .OOV.  */ 0b0011 => {
                     if
                         is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, -3)) &&
                         is_invalid_three_point(self, origin_pos, direction, pos.directional_offset(direction, 1))
                     {
-                        return false;
+                        total_threes -= 1;
+                        if total_threes < 2 {
+                            return false;
+                        }
                     }
                 },
                 _ => unreachable!()

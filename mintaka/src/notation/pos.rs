@@ -87,7 +87,11 @@ impl Pos {
     pub const fn directional_offset(&self, direction: Direction, offset: i16) -> Pos {
         match direction {
             Direction::Vertical => Self::from_cartesian((self.row() as i16 + offset) as u8, self.col()),
-            _ => Self::from_cartesian(self.row(), (self.col() as i16 + offset) as u8)
+            Direction::Horizontal => Self::from_cartesian(self.row(), (self.col() as i16 + offset) as u8),
+            Direction::Ascending =>
+                Self::from_cartesian((self.row() as i16 + offset) as u8, (self.col() as i16 + offset) as u8),
+            Direction::Descending =>
+                Self::from_cartesian((self.row() as i16 - offset) as u8, (self.col() as i16 + offset) as u8)
         }
     }
 

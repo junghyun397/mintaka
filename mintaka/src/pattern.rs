@@ -19,7 +19,7 @@ pub const FIVE: u8                  = 0b0001_0000;
 pub const OPEN_THREE: u8            = 0b0000_1000;
 pub const CLOSE_THREE: u8           = 0b0000_0100;
 pub const OVERLINE: u8              = 0b0000_0010;
-pub const THREE_DIRECTION: u8       = 0b0000_0001;
+pub const MARKER: u8                = 0b0000_0001;
 
 const OPEN_THREE_POSITION: u32      = 3;
 
@@ -75,6 +75,10 @@ impl PatternUnit {
 
     pub fn is_empty(&self) -> bool {
         u32::from(*self) == 0
+    }
+
+    pub fn has_three(&self) -> bool {
+        self.apply_mask(UNIT_OPEN_THREE_MASK) != 0
     }
 
     pub fn has_threes(&self) -> bool {
@@ -168,6 +172,18 @@ impl PatternUnit {
         ThreeDirectionIterator::from(self)
     }
 
+    pub fn has_valid_double_three(&self) -> bool {
+        self.horizontal & MARKER == MARKER
+    }
+
+    pub fn mark_valid_double_three(&mut self) {
+        self.horizontal |= MARKER;
+    }
+
+    pub fn unmark_valid_double_three(&mut self) {
+        self.horizontal &= !MARKER;
+    }
+
     fn apply_mask(&self, mask: u32) -> u32 {
         u32::from(*self) & mask
     }
@@ -248,7 +264,7 @@ impl Pattern {
     pub fn is_forbidden(&self) -> bool {
         self.is_not_empty()
             && (self.black_unit.has_fours()
-                || self.black_unit.has_threes()
+                || (self.black_unit.has_threes() && self.black_unit.has_valid_double_three())
                 || self.has_overline())
             && !self.black_unit.has_five()
     }
@@ -261,16 +277,17 @@ impl Pattern {
     }
 
     pub fn forbidden_kind(&self) -> Option<ForbiddenKind> {
-        self.is_forbidden()
-            .then(||
-                if self.black_unit.has_threes() {
-                    ForbiddenKind::DoubleThree
-                } else if self.black_unit.has_fours() {
-                    ForbiddenKind::DoubleFour
-                } else {
-                    ForbiddenKind::Overline
-                }
-            )
+        if self.is_forbidden() {
+            if self.black_unit.has_threes() {
+                Some(ForbiddenKind::DoubleThree)
+            } else if self.black_unit.has_fours() {
+                Some(ForbiddenKind::DoubleFour)
+            } else {
+                Some(ForbiddenKind::Overline)
+            }
+        } else {
+            None
+        }
     }
 
     #[inline(always)]
@@ -297,8 +314,7 @@ impl Pattern {
 pub struct Patterns {
     pub field: [Pattern; pos::BOARD_SIZE],
     pub five_in_a_row: Option<(Direction, u8, Color)>,
-    pub double_three_field: Bitfield,
-    pub raw_double_three_field: Bitfield,
+    pub unchecked_double_three_field: Bitfield,
 }
 
 impl Default for Patterns {
@@ -307,8 +323,7 @@ impl Default for Patterns {
         Self {
             field: [Pattern::default(); pos::BOARD_SIZE],
             five_in_a_row: None,
-            double_three_field: u256::MIN,
-            raw_double_three_field: u256::MIN,
+            unchecked_double_three_field: u256::MIN,
         }
     }
 
@@ -343,9 +358,9 @@ impl Patterns {
             let pos = Pos::from_index(idx as u8);
 
             if self.field[idx].black_unit.has_threes() {
-                self.raw_double_three_field.set(pos);
-            } else if self.raw_double_three_field.is_hot(pos) {
-                self.raw_double_three_field.unset(pos);
+                self.unchecked_double_three_field.set(pos);
+            } else if self.unchecked_double_three_field.is_hot(pos) {
+                self.unchecked_double_three_field.unset(pos);
             }
         }
 

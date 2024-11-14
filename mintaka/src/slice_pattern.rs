@@ -1,6 +1,6 @@
 use crate::notation::color::Color;
 use crate::notation::pos;
-use crate::pattern::{CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, OPEN_FOUR, OPEN_THREE, OVERLINE, THREE_DIRECTION};
+use crate::pattern::{CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, OPEN_FOUR, OPEN_THREE, OVERLINE};
 use crate::slice::Slice;
 use crate::{max, min};
 
@@ -295,7 +295,6 @@ struct SlicePatchMaskLUT {
     pub contains_closed_four: bool
 }
 
-// big-endian not supported
 const fn build_slice_patch_mask_lut(sources: [&str; 4], reversed: bool) -> SlicePatchMaskLUT {
     let original = unsafe {
         let mut patch_mask: [u8; 16] = [0; 16];
@@ -371,7 +370,6 @@ const fn parse_patch_literal(source: &str, reversed: bool) -> (isize, u8) {
         let pos = if reversed { 7 - idx } else { idx };
         match source.as_bytes()[idx as usize] as char {
             '3' => return (pos, OPEN_THREE),
-            'T' => return (pos, OPEN_THREE | THREE_DIRECTION),
             'C' => return (pos, CLOSE_THREE),
             '4' => return (pos, OPEN_FOUR),
             'F' => return (pos, CLOSED_FOUR_SINGLE),

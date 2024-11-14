@@ -52,7 +52,6 @@ pub trait AbstractTranspositionTable<T: Clearable> {
             _mm_prefetch::<_MM_HINT_T0>((entry as *const T).cast());
         }
         #[cfg(target_arch = "aarch64")]
-        #[feature(stdarch_aarch64_prefetch)]
         unsafe {
             use std::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY0, _PREFETCH_READ};
             let idx = self.calculate_index(key);
