@@ -1,8 +1,8 @@
+use crate::memo::abstract_transposition_table::{AbstractTranspositionTable, Clearable};
 use crate::memo::hash_key::HashKey;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::slice_pattern::SlicePattern;
-use crate::utils::abstract_transposition_table::{AbstractTranspositionTable, Clearable};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 // layout: block 0 = (padding 16 bits + Option<(u8, Color)> 16 bits, raw slice key 32 bits)

@@ -1,5 +1,5 @@
+use mintaka::memo::abstract_transposition_table::Clearable;
 use mintaka::notation::pos::Pos;
-use mintaka::utils::abstract_transposition_table::Clearable;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(Eq, PartialEq, Default)]

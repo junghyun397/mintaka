@@ -1,7 +1,7 @@
 use crate::memo::tt_entry::{TTEntry, TTEntryBucket, TTEntryBucketPosition, TTFlag};
+use mintaka::memo::abstract_transposition_table::AbstractTranspositionTable;
 use mintaka::memo::hash_key::HashKey;
 use mintaka::notation::pos::Pos;
-use mintaka::utils::abstract_transposition_table::AbstractTranspositionTable;
 use std::sync::atomic::AtomicU8;
 
 #[derive(Default)]

@@ -359,7 +359,7 @@ impl Patterns {
 
             if self.field[idx].black_unit.has_threes() {
                 self.unchecked_double_three_field.set(pos);
-            } else if self.unchecked_double_three_field.is_hot(pos) {
+            } else {
                 self.unchecked_double_three_field.unset(pos);
             }
         }

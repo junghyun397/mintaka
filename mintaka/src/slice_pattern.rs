@@ -252,6 +252,12 @@ fn find_patterns(
 
 }
 
+fn contains_five(mut stones: u16) -> bool {
+    stones &= stones >> 1;
+    stones &= stones >> 3;
+    stones != 0
+}
+
 const fn build_pattern_mask(source: &str, reversed: bool) -> u32 {
     parse_pattern_literal('O', source, reversed) as u32
         | (parse_pattern_literal('!', source, reversed) as u32) << 8
