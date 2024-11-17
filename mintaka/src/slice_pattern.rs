@@ -1,4 +1,3 @@
-use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::pattern::{CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, OPEN_FOUR, OPEN_THREE, OVERLINE};
 use crate::slice::Slice;
@@ -8,7 +7,6 @@ use crate::{max, min};
 pub struct SlicePattern {
     pub black_patterns: [u8; 16], // 128-bits
     pub white_patterns: [u8; 16],
-    pub five_in_a_row: Option<(u8, Color)>
 }
 
 impl SlicePattern {
@@ -16,7 +14,6 @@ impl SlicePattern {
     pub const EMPTY: Self = Self {
         black_patterns: [0; 16],
         white_patterns: [0; 16],
-        five_in_a_row: None,
     };
 
     pub fn is_empty(&self) -> bool {
@@ -70,17 +67,13 @@ fn find_patterns(
     * ! = not self-color-hot
     * . = cold
 
-    > EX: match black's closed-four = "!OOO..!"
-
-    ## PATTERN-PATTERN-LITERAL
+    ## PATTERN-APPLY-LITERAL
     * 3 = open-three
     * C = close-three
     * 4 = open-four
     * F = closed-four-single
     * 5 = five
     * 6 = overline
-
-    > EX: match black's closed-four = "!OOO.F"
     */
 
     let b_vector: u32 = b as u32 | (b as u32) << 8 | (cold as u32) << 16 | (ww as u32) << 24;
@@ -188,10 +181,12 @@ fn find_patterns(
     process_pattern!(black, asymmetry, "!..OO..X", "!..OO3.X");
     process_pattern!(black, asymmetry, long-pattern, left, "..OO...O", "..OO3..O"); // [!]..OO...O
     process_pattern!(black, asymmetry, "!.O.O..!", "!.O3O..!", "!.O.O3.!");
+    process_pattern!(black, symmetry, "!.O..O.!", "!.O3.O.!", "!.O.3O.!");
 
     process_pattern!(white, asymmetry, ".OO...", ".OO3..", ".OO.3.");
     process_pattern!(white, asymmetry, "..OO..X", "..OO3.X");
     process_pattern!(white, asymmetry, ".O.O..", ".O3O..", ".O.O3.");
+    process_pattern!(white, symmetry, ".O..O.", ".O3.O.", ".O.3O.");
 
     // CLOSED-FOUR
 
@@ -200,7 +195,8 @@ fn find_patterns(
     process_pattern!(black, asymmetry, "!O.OO.!", "!O.OOF!");
     process_pattern!(black, asymmetry, "!OO..O!", "!OOF.O!", "!OO.FO!");
     
-    process_pattern!(black, asymmetry, "XOO.O.!", "XOOFO.!", "XOO.O.F!");
+    process_pattern!(black, asymmetry, "XOO.O.!", "XOOFO.!");
+    process_pattern!(black, asymmetry, "XO.OO.!", "XOFOO.!");
     process_pattern!(black, asymmetry, "XOOO..!", "XOOOF.!", "XOOO.F!");
     process_pattern!(black, asymmetry, "X.OOO..!", "XFOOO..!", "X.OOO.C!");
 
@@ -213,7 +209,8 @@ fn find_patterns(
     process_pattern!(white, asymmetry, "O.OO.", "O.OOF");
     process_pattern!(white, asymmetry, "OO..O", "OOF.O", "OO.FO");
 
-    process_pattern!(white, asymmetry, "XOO.O.", "XOOFO.", "XOO.OF");
+    process_pattern!(white, asymmetry, "XOO.O.", "XOOFO.");
+    process_pattern!(white, asymmetry, "XO.OO.", "XOFOO.");
     process_pattern!(white, asymmetry, "XOOO..", "XOOOF.", "XOOO.F");
     process_pattern!(white, asymmetry, "..OOO.X", "..OOOFX", "C.OOO.X");
 
@@ -239,23 +236,24 @@ fn find_patterns(
 
     process_pattern!(black, asymmetry, "O.OOOO", "O6OOOO");
     process_pattern!(black, asymmetry, "OO.OOO", "OO6OOO");
-
-    // WIN
-
-    const FIVE_MASK: u8 = 0b_11111;
-
-    if b & FIVE_MASK == FIVE_MASK {
-        acc.five_in_a_row = Some((offset as u8, Color::Black));
-    } else if w & FIVE_MASK == FIVE_MASK {
-        acc.five_in_a_row = Some((offset as u8, Color::White));
-    }
-
 }
 
-fn contains_five(mut stones: u16) -> bool {
-    stones &= stones >> 1;
-    stones &= stones >> 3;
-    stones != 0
+pub fn contains_five_in_a_row(mut stones: u16) -> bool {
+    stones &= stones >> 1;  // 1 1 1 1 1 0 & 0 1 1 1 1 1
+    stones &= stones >> 3;  // 0 1 1 1 1 0 & 0 0 0 0 1 1 ...
+    stones != 0             // 0 0 0 0 1 0 ...
+}
+
+fn increase_closed_four_single(packed: u8) -> u8 {
+    packed | (0b1000_0000 >> (packed >> 7))
+}
+
+fn increase_closed_four_multiple(original: u128, clear_mask: u128, mask: u128) -> u128 {
+    let mut copied: u128 = original;     // 0 0 0 | 1 0 0 | 1 1 0
+    copied >>= 1;                        // 0 0 0 | 0 1 0 | 0 1 1
+    copied |= mask;                      // 1 0 0 | 1 1 0 | 1 1 1
+    copied &= clear_mask;                // 1 0 0 | 1 1 0 | 1 1 0
+    original | copied                    // empty   slot 1  slot 2
 }
 
 const fn build_pattern_mask(source: &str, reversed: bool) -> u32 {
@@ -356,18 +354,6 @@ const fn build_slice_patch_mask_lut(sources: [&str; 4], reversed: bool) -> Slice
         contains_non_closed_four: original.patch_mask != 0,
         contains_closed_four: original.closed_four_mask != 0,
     }
-}
-
-fn increase_closed_four_single(packed: u8) -> u8 {
-    packed | (0b1000_0000 >> (packed >> 7))
-}
-
-fn increase_closed_four_multiple(original: u128, clear_mask: u128, mask: u128) -> u128 {
-    let mut copied: u128 = original;     // 0 0 0 | 1 0 0 | 1 1 0
-    copied >>= 1;                        // 0 0 0 | 0 1 0 | 0 1 1
-    copied |= mask;                      // 1 0 0 | 1 1 0 | 1 1 1
-    copied &= clear_mask;                // 1 0 0 | 1 1 0 | 1 1 0
-    original | copied                    // empty   slot 1  slot 2
 }
 
 const fn parse_patch_literal(source: &str, reversed: bool) -> (isize, u8) {

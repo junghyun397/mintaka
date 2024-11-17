@@ -7,6 +7,7 @@ use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slice;
+use crate::slice_pattern::contains_five_in_a_row;
 use crate::utils::lang_utils::repeat_4x;
 use ethnum::u256;
 
@@ -313,7 +314,7 @@ impl Pattern {
 #[derive(Debug, Copy, Clone)]
 pub struct Patterns {
     pub field: [Pattern; pos::BOARD_SIZE],
-    pub five_in_a_row: Option<(Direction, u8, Color)>,
+    pub five_in_a_row: Option<Color>,
     pub unchecked_double_three_field: Bitfield,
 }
 
@@ -335,9 +336,17 @@ impl Patterns {
         let slice_pattern = memo.probe_or_put_mut(slice.packed_slice(), ||
             slice.calculate_slice_pattern()
         );
+        
+        let winner = if contains_five_in_a_row(slice.black_stones) {
+            Some(Color::Black)
+        } else if contains_five_in_a_row(slice.white_stones) {
+            Some(Color::White)
+        } else {
+            None
+        };
 
-        if slice_pattern.is_empty() {
-            return
+        if slice_pattern.is_empty() && winner.is_none() {
+            return;
         }
         
         for offset in 0 .. slice.length {
@@ -364,10 +373,7 @@ impl Patterns {
             }
         }
 
-        self.five_in_a_row = self.five_in_a_row.or_else(||
-            slice_pattern.five_in_a_row
-                .map(|(idx, color)| (D, idx, color))
-        );
+        self.five_in_a_row = self.five_in_a_row.or(winner);
     }
 
 }

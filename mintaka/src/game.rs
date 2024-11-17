@@ -57,13 +57,10 @@ impl Game {
 
     pub fn play_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos) {
         self.board.set_mut(memo, pos);
-
         self.history.play_mut(pos);
         self.result = self.board.patterns.five_in_a_row
-            .map(|(_, _, color)| GameResult::FiveInARow(color))
-            .or_else(||
-                 (self.board.stones == pos::U8_BOARD_SIZE).then_some(GameResult::Full)
-            );
+            .map(GameResult::FiveInARow)
+            .or_else(|| (self.board.stones == pos::U8_BOARD_SIZE).then_some(GameResult::Full));
     }
 
     pub fn undo_mut(&mut self, memo: &mut impl SlicePatternMemo) {

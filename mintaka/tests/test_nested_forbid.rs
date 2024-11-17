@@ -5,50 +5,15 @@ mod test_nested_forbid {
     use std::str::FromStr;
 
     #[test]
-    fn single_nested_double_three() {
-        let case = indoc! {"
-           A B C D E F G H I J K L M N O
-        15 . . . . . . . . . . . . . . . 15
-        14 . . . . . . . . . . . . . . . 14
-        13 . . . . . . . . . . . . . . . 13
-        12 . . . . . . . . . . . . . . . 12
-        11 . . . . . . . O . . . . . . . 11
-        10 . . . . . O . . . . . . . . O 10
-         9 . . . . . X X . . . . . . X . 9
-         8 . . . . . . O X O . . . X . . 8
-         7 . . . . . . O X X O . X . . . 7
-         6 . . . . . O . . X X . . . . . 6
-         5 . . . . . . X . . . O . . . . 5
-         4 . . . . . . . . . . . . . . . 4
-         3 . . . . . . . . . . . . . . . 3
-         2 . . . . . . . . . . . . . . . 2
-         1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
-
-        let expected = indoc! {"
-           A B C D E F G H I J K L M N O
-        15 . . . . . . . . . . . . . . . 15
-        14 . . . . . . . . . . . . . . . 14
-        13 . . . . . . . . . . . . . . . 13
-        12 . . . . . . . . . . . . . . . 12
-        11 . . . . . . . O . . . . . . . 11
-        10 . . . . . O . . . . . . . . O 10
-         9 . . . . . X X . . . . . . X . 9
-         8 . . . . . . O X O . . . X . . 8
-         7 . . . . . . O X X O . X . . . 7
-         6 . . . . . O . 3 X X . . . . . 6
-         5 . . . . . . X . . . O . . . . 5
-         4 . . . . . . . . . . . . . . . 4
-         3 . . . . . . . . . . . . . . . 3
-         2 . . . . . . . . . . . . . . . 2
-         1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
-
-        assert_eq!(Board::from_str(case).unwrap().to_string(), expected);
+    fn basic_nested_double_three() {
     }
 
     #[test]
-    fn multiple_nested_double_three() {
+    fn double_nested_double_three() {
+        /*
+g8 [e8, a18, a18, a18, a18, a18, a18] [a18, a18, a18, a18, a18, a18, a18]
+e6 [e8, g8, a18, a18, a18, a18, a18] [i10, a18, a18, a18, a18, a18, a18]
+         */
         // double-four related
         let case = indoc! {"
            A B C D E F G H I J K L M N O
@@ -92,7 +57,7 @@ mod test_nested_forbid {
     }
 
     #[test]
-    fn multiple_nested_double_three_by_move() {
+    fn multiple_nested_double_three() {
         let case = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15

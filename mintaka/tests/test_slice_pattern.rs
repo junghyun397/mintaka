@@ -140,6 +140,12 @@ mod test_slice_pattern {
             case                = "X . O . O . .",
             open_three          = "X . O V O V .",
         );
+        
+        test_pattern!(
+            color = both,
+            case                = ". O . . O .",
+            open_three          = ". O V V O .",
+        );
     }
 
     #[test]

@@ -243,12 +243,14 @@ impl Board {
     fn validate_double_three_mut(&mut self) {
         for double_three_pos in self.patterns.unchecked_double_three_field.iter_hot_pos() {
             if self.is_valid_double_three::<false>(DoubleThreeStack {
-                stack: {
-                    let mut stack: [Pos; 7] = [INVALID_POS; 7];
+                set_override: {
+                    let mut stack = [INVALID_POS; 7];
                     stack[0] = double_three_pos;
                     stack
                 },
-                top: 1
+                set_override_top: 1,
+                four_override: [INVALID_POS; 7],
+                four_override_top: 0,
             }, Direction::Vertical, double_three_pos) {
                 self.patterns.field[double_three_pos.idx_usize()].black_unit.mark_valid_double_three();
             } else {
@@ -261,31 +263,20 @@ impl Board {
     fn is_invalid_three_component(&self, stack: DoubleThreeStack, from_direction: Direction, pos: Pos) -> bool {
         let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
 
-        if !pattern_unit.has_three() || pattern_unit.has_four() || pattern_unit.has_overline() || stack.stack.contains(&pos) {
+        println!("{} {:?} {:?}", pos, stack.set_override, stack.four_override);
+        
+        if !pattern_unit.has_three() // non-three
+            || pattern_unit.has_four() // double-four
+            || pattern_unit.has_overline() || stack.four_override.contains(&pos)
+        {
             return true;
         }
 
-        if pattern_unit.has_threes() {
-            if self.is_valid_double_three::<true>(DoubleThreeStack {
-                stack: {
-                    let mut new_stack = stack.stack;
-                    new_stack[stack.top as usize] = pos;
-                    new_stack
-                },
-                top: stack.top + 1
-            }, from_direction, pos) {
-                return true;
-            }
-        }
-
-        false
+        pattern_unit.has_threes() 
+            && self.is_valid_double_three::<true>(stack.add_set_override(pos), from_direction, pos)
     }
 
     fn is_valid_double_three<const IS_NESTED: bool>(&self, stack: DoubleThreeStack, from_direction: Direction, pos: Pos) -> bool {
-        if IS_NESTED && pos == stack.stack[0] {
-            return true;
-        }
-
         let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
         let mut total_threes = pattern_unit.count_open_threes();
 
@@ -293,37 +284,49 @@ impl Board {
             if IS_NESTED && direction == from_direction {
                 continue;
             }
-
-            let slice = self.slices.access_slice(direction, pos);
-            let slice_idx = slice.calculate_idx(direction, pos);
-            let signature = (slice.black_stones >> (slice_idx - 2)) & 0b11111; // 0[00V00]0
+            
+            let signature = {
+                let slice = self.slices.access_slice(direction, pos);
+                let slice_idx = slice.calculate_idx(direction, pos);
+                (slice.black_stones >> (slice_idx - 2)) & 0b11111 // 0[00V00]0
+            };
 
             if match signature {
                 /* .VOO. */ 0b11000 => {
-                    self.is_invalid_three_component(stack, direction, pos.directional_negative_offset(direction, 1)) &&
-                    self.is_invalid_three_component(stack, direction, pos.directional_positive_offset(direction, 3))
+                    let slot_1 = pos.directional_negative_offset(direction, 1);
+                    let slot_2 = pos.directional_positive_offset(direction, 3);
+
+                    stack.set_override.contains(&slot_1) || stack.set_override.contains(&slot_2) ||
+                    (self.is_invalid_three_component(stack.add_four_override(slot_2), direction, slot_1) &&
+                    self.is_invalid_three_component(stack.add_four_override(slot_1), direction, slot_2))
                 },
                 /* .OOV. */ 0b00011 => {
-                    self.is_invalid_three_component(stack, direction, pos.directional_negative_offset(direction, 3)) &&
-                    self.is_invalid_three_component(stack, direction, pos.directional_positive_offset(direction, 1))
+                    let slot_1 = pos.directional_negative_offset(direction, 3);
+                    let slot_2 = pos.directional_positive_offset(direction, 1);
+
+                    stack.set_override.contains(&slot_1) || stack.set_override.contains(&slot_2) ||
+                    (self.is_invalid_three_component(stack.add_four_override(slot_2), direction, slot_1) &&
+                    self.is_invalid_three_component(stack.add_four_override(slot_1), direction, slot_2))
                 },
                 /* V.OO  */ 0b10000 => {
                     self.is_invalid_three_component(stack, direction, pos.directional_positive_offset(direction, 1))
                 }
-                /* OO.V  */ 0b000001 => {
+                /* OO.V  */ 0b00001 => {
                     self.is_invalid_three_component(stack, direction, pos.directional_negative_offset(direction, 1))
                 }
                 /* VO.O  */ 0b01000 => {
-                    self.is_invalid_three_component(stack, direction, pos.directional_positive_offset(direction, 2)) &&
-                    self.is_invalid_three_component(stack, direction, pos.directional_positive_offset(direction, 4))
-                },
-                /* .OVO. */ 0b01010 => {
-                    self.is_invalid_three_component(stack, direction, pos.directional_negative_offset(direction, 2)) &&
                     self.is_invalid_three_component(stack, direction, pos.directional_positive_offset(direction, 2))
                 },
+                /* .OVO. */ 0b01010 => {
+                    let slot_1 = pos.directional_negative_offset(direction, 2);
+                    let slot_2 = pos.directional_positive_offset(direction, 2);
+
+                    stack.set_override.contains(&slot_1) || stack.set_override.contains(&slot_2) ||
+                    (self.is_invalid_three_component(stack.add_four_override(slot_2), direction, slot_1) &&
+                    self.is_invalid_three_component(stack.add_four_override(slot_1), direction, slot_2))
+                },
                 /* O.OV  */ 0b00010 => {
-                    self.is_invalid_three_component(stack, direction, pos.directional_negative_offset(direction, 2)) &&
-                    self.is_invalid_three_component(stack, direction, pos.directional_negative_offset(direction, 4))
+                    self.is_invalid_three_component(stack, direction, pos.directional_negative_offset(direction, 2))
                 },
                 /* OV.O  */ 0b10010 => {
                     self.is_invalid_three_component(stack, direction, pos.directional_positive_offset(direction, 1))
@@ -333,10 +336,10 @@ impl Board {
                 },
                 _ => unreachable!()
             } {
-                total_threes -= 1;
-                if total_threes < 2 {
+                if total_threes < 3 {
                     return false;
                 }
+                total_threes -= 1;
             }
         }
 
@@ -347,6 +350,34 @@ impl Board {
 
 #[derive(Copy, Clone)]
 struct DoubleThreeStack {
-    stack: [Pos; 7],
-    top: u8,
+    four_override: [Pos; 7],
+    four_override_top: u8,
+    set_override: [Pos; 7],
+    set_override_top: u8,
+}
+
+impl DoubleThreeStack {
+    
+    fn add_four_override(&self, pos: Pos) -> Self { 
+        let mut four_override = self.four_override;
+        four_override[self.four_override_top as usize] = pos;
+        Self {
+            four_override,
+            four_override_top: self.four_override_top + 1,
+            set_override: self.set_override,
+            set_override_top: self.set_override_top,
+        }
+    }
+    
+    fn add_set_override(&self, pos: Pos) -> Self {
+        let mut set_override = self.set_override;
+        set_override[self.set_override_top as usize] = pos;
+        Self {
+            four_override: self.four_override,
+            four_override_top: self.four_override_top,
+            set_override,
+            set_override_top: self.set_override_top + 1,
+        }
+    }
+
 }

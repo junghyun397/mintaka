@@ -1,11 +1,11 @@
 use crate::memo::abstract_transposition_table::{AbstractTranspositionTable, Clearable};
 use crate::memo::hash_key::HashKey;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
-use crate::notation::color::Color;
 use crate::slice_pattern::SlicePattern;
+use std::mem::MaybeUninit;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-// layout: block 0 = (padding 16 bits + Option<(u8, Color)> 16 bits, raw slice key 32 bits)
+// layout: block 0 = slice key 32 bits
 //         block 1, 2 = black_patterns 128 bits
 //         block 3, 4 = white_patterns 128 bits
 struct AtomicTTSlicePatternEntry(AtomicU64, AtomicU64, AtomicU64, AtomicU64, AtomicU64);
@@ -26,8 +26,7 @@ impl AtomicTTSlicePatternEntry {
 
     fn encode(packed_slice: u64, pattern: &SlicePattern) -> Self {
         unsafe {
-            let pre_block_0 = (std::mem::transmute::<Option<(u8, Color)>, u16>(pattern.five_in_a_row) as u64) << 32;
-            let block_0 = pre_block_0 | packed_slice;
+            let block_0 = packed_slice;
             let block_1 = u64::from_ne_bytes(pattern.black_patterns[0 ..8].try_into().unwrap());
             let block_2 = u64::from_ne_bytes(pattern.black_patterns[8 .. 16].try_into().unwrap());
             let block_3 = u64::from_ne_bytes(pattern.white_patterns[0 ..8].try_into().unwrap());
@@ -44,24 +43,17 @@ impl AtomicTTSlicePatternEntry {
     }
 
     fn decode(&self) -> SlicePattern {
-        let five_in_a_row = unsafe {
-            std::mem::transmute::<u16, Option<(u8, Color)>>(
-                ((self.0.load(Ordering::Relaxed) & 0xFFFFFFFF_00000000) >> 48) as u16
-            )
-        };
-
-        let mut black_patterns = [0u8; 16];
+        let mut black_patterns: [u8; 16] = unsafe { MaybeUninit::uninit().assume_init() };
         black_patterns[0 .. 8].copy_from_slice(&self.1.load(Ordering::Relaxed).to_ne_bytes());
         black_patterns[8 .. 16].copy_from_slice(&self.2.load(Ordering::Relaxed).to_ne_bytes());
 
-        let mut white_patterns = [0u8; 16];
+        let mut white_patterns: [u8; 16] = unsafe { MaybeUninit::uninit().assume_init() };
         white_patterns[0 .. 8].copy_from_slice(&self.3.load(Ordering::Relaxed).to_ne_bytes());
         white_patterns[8 .. 16].copy_from_slice(&self.4.load(Ordering::Relaxed).to_ne_bytes());
 
         SlicePattern {
             black_patterns,
             white_patterns,
-            five_in_a_row,
         }
     }
 
