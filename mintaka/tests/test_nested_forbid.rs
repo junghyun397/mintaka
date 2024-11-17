@@ -5,16 +5,7 @@ mod test_nested_forbid {
     use std::str::FromStr;
 
     #[test]
-    fn basic_nested_double_three() {
-    }
-
-    #[test]
-    fn double_nested_double_three() {
-        /*
-g8 [e8, a18, a18, a18, a18, a18, a18] [a18, a18, a18, a18, a18, a18, a18]
-e6 [e8, g8, a18, a18, a18, a18, a18] [i10, a18, a18, a18, a18, a18, a18]
-         */
-        // double-four related
+    fn single_nested_double_three() {
         let case = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
@@ -57,7 +48,7 @@ e6 [e8, g8, a18, a18, a18, a18, a18] [i10, a18, a18, a18, a18, a18, a18]
     }
 
     #[test]
-    fn multiple_nested_double_three() {
+    fn double_nested_double_three() {
         let case = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
@@ -131,6 +122,49 @@ e6 [e8, g8, a18, a18, a18, a18, a18] [i10, a18, a18, a18, a18, a18, a18]
          6 . . . . . X O . . . . . . . . 6
          5 . . . . O X . . . . . . . . . 5
          4 . . . . . O . . . . . . . . . 4
+         3 . . . . . . . . . . . . . . . 3
+         2 . . . . . . . . . . . . . . . 2
+         1 . . . . . . . . . . . . . . . 1
+           A B C D E F G H I J K L M N O"};
+
+        assert_eq!(Board::from_str(case).unwrap().to_string(), expected);
+    }
+    
+    #[test]
+    fn multiple_nested_double_three() {
+        let case = indoc! {"
+           A B C D E F G H I J K L M N O
+        15 . . . . . . . . . . . . . . . 15
+        14 . . . . . . . X . . . . . . . 14
+        13 . . . . . . . . . . . . X . . 13
+        12 . . . . . O . . . . . . O X . 12
+        11 . . O X . . X O X X X O X . . 11
+        10 . . . X O O . X O . . . . . . 10
+         9 . O . . X X . . . X . . . . . 9
+         8 . . . . . . X . . . X X O . . 8
+         7 . . . . O . . . . . . . . . . 7
+         6 . . . . . . . . . . . . . . . 6
+         5 . . . . . . . . . . . . . . . 5
+         4 . . . . . . . . . . . . . . . 4
+         3 . . . . . . . . . . . . . . . 3
+         2 . . . . . . . . . . . . . . . 2
+         1 . . . . . . . . . . . . . . . 1
+           A B C D E F G H I J K L M N O"};
+
+        let expected = indoc! {"
+           A B C D E F G H I J K L M N O
+        15 . . . . . . . . . . . . . . . 15
+        14 . . . . . . . X . . . . . . . 14
+        13 . . . . . . . . . . . . X . . 13
+        12 . . . . . O . . . 3 . . O X . 12
+        11 . . O X . . X O X X X O X . . 11
+        10 . . . X O O . X O 3 . . . . . 10
+         9 . O . . X X 3 . . X 3 . . . . 9
+         8 . . . . . . X . . . X X O . . 8
+         7 . . . . O . . . . . . . . . . 7
+         6 . . . . . . . . . . . . . . . 6
+         5 . . . . . . . . . . . . . . . 5
+         4 . . . . . . . . . . . . . . . 4
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1

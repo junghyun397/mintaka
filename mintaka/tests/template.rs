@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod test_game {
+mod template {
     use indoc::indoc;
     use mintaka::board::Board;
     use std::str::FromStr;
