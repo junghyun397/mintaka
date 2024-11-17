@@ -255,15 +255,100 @@ impl Board {
         let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
 
         if !pattern_unit.has_three() // non-three
-            || pattern_unit.has_four() // double-four
+            || pattern_unit.has_four() || stack.four.contains(&pos) // double-four
             || pattern_unit.has_overline() // overline
-            || stack.stack.contains(&pos) // recursive
+            || stack.set.contains(&pos) // recursive
         {
             return true;
         }
 
-        pattern_unit.count_open_threes() > 2 // nested double-three
-            && self.is_valid_double_three::<true>(stack.add_set_override(pos), from_direction, pos)
+        // nested double-three
+        if pattern_unit.count_open_threes() > 2 {
+            let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
+
+            let mut new_stack = stack;
+            
+            for next_four_idx in 0 .. new_stack.next_four_top {
+                new_stack.four[(new_stack.four_top + next_four_idx) as usize] = stack.next_four[next_four_idx as usize];
+            }
+            new_stack.four_top += stack.next_four_top;
+            new_stack.next_four = [INVALID_POS; 9];
+            new_stack.next_four_top = 0;
+            
+            for direction in pattern_unit.iter_three_directions() {
+                if direction == from_direction {
+                    continue;
+                }
+
+                let signature = {
+                    let slice = self.slices.access_slice(direction, pos);
+                    let slice_idx = slice.calculate_idx(direction, pos);
+                    (slice.black_stones >> (slice_idx - 2)) & 0b11111 // 0[00V00]0
+                };
+
+                match signature {
+                    /* .VOO. */ 0b11000 => {
+                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 1);
+                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_positive_offset(direction, 3);
+                        new_stack.next_four_top += 2;
+                    },
+                    /* .OOV. */ 0b00011 => {
+                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 3);
+                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_positive_offset(direction, 1);
+                        new_stack.next_four_top += 2;
+                    },
+                    /* V.OO  */ 0b10000 => {
+                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 1);
+                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_positive_offset(direction, 1);
+                        new_stack.next_four[new_stack.next_four_top as usize + 2] = pos.directional_positive_offset(direction, 3);
+                        new_stack.next_four_top += 3;
+                    }
+                    /* OO.V  */ 0b00001 => {
+                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 1);
+                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_negative_offset(direction, 3);
+                        new_stack.next_four[new_stack.next_four_top as usize + 2] = pos.directional_positive_offset(direction, 1);
+                        new_stack.next_four_top += 3;
+                    }
+                    /* VO.O  */ 0b01000 => {
+                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 1);
+                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_positive_offset(direction, 2);
+                        new_stack.next_four[new_stack.next_four_top as usize + 2] = pos.directional_positive_offset(direction, 4);
+                        new_stack.next_four_top += 3;
+                    },
+                    /* .OVO. */ 0b01010 => {
+                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 2);
+                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_positive_offset(direction, 2);
+                        new_stack.next_four_top += 2;
+                    },
+                    /* O.OV  */ 0b00010 => {
+                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 4);
+                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_negative_offset(direction, 2);
+                        new_stack.next_four[new_stack.next_four_top as usize + 2] = pos.directional_positive_offset(direction, 1);
+                        new_stack.next_four_top += 3;
+                    },
+                    /* OV.O  */ 0b10010 => {
+                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 2);
+                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_positive_offset(direction, 1);
+                        new_stack.next_four[new_stack.next_four_top as usize + 2] = pos.directional_positive_offset(direction, 3);
+                        new_stack.next_four_top += 3;
+                    },
+                    /* O.VO  */ 0b01001 => {
+                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 3);
+                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_negative_offset(direction, 1);
+                        new_stack.next_four[new_stack.next_four_top as usize + 2] = pos.directional_positive_offset(direction, 2);
+                        new_stack.next_four_top += 3;
+                    },
+                    _ => unreachable!()
+                }
+            }
+            
+            new_stack.set[new_stack.set_top as usize] = pos;
+            new_stack.set_top += 1;
+
+            return self.is_valid_double_three::<true>(new_stack, from_direction, pos)
+        }
+        
+        false
     }
 
     fn is_valid_double_three<const IS_NESTED: bool>(&self, stack: SetOverrideStack, from_direction: Direction, pos: Pos) -> bool {
@@ -332,30 +417,25 @@ impl Board {
 
 #[derive(Copy, Clone)]
 struct SetOverrideStack {
-    stack: [Pos; 7],
-    top: u8,
+    set: [Pos; 7],
+    set_top: u8,
+    four: [Pos; 45],
+    four_top: u8,
+    next_four: [Pos; 9],
+    next_four_top: u8
 }
 
 impl SetOverrideStack {
     
     fn new(root: Pos) -> Self {
         Self {
-            stack: {
-                let mut stack = [INVALID_POS; 7];
-                stack[0] = root;
-                stack
-            },
-            top: 1,
+            set: [root, INVALID_POS, INVALID_POS, INVALID_POS, INVALID_POS, INVALID_POS, INVALID_POS],
+            set_top: 1,
+            four: [INVALID_POS; 45],
+            four_top: 0,
+            next_four: [INVALID_POS; 9],
+            next_four_top: 0,
         }       
-    }
-
-    fn add_set_override(&self, pos: Pos) -> Self {
-        let mut set_override = self.stack;
-        set_override[self.top as usize] = pos;
-        Self {
-            stack: set_override,
-            top: self.top + 1,
-        }
     }
 
 }
