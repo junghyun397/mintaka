@@ -254,10 +254,6 @@ impl Board {
     fn is_invalid_three_component<const IS_NESTED: bool>(&self, overrides: SetOverrideStack, from_direction: Direction, pos: Pos) -> bool {
         let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
 
-        if pos == Pos::from_str_unchecked("k7") {
-            println!("{:?} {:?}", overrides.set, overrides.four);
-        }
-
         if !pattern_unit.has_three() // non-three
             || pattern_unit.has_four() || overrides.four_contains(&pos) // double-four
             || pattern_unit.has_overline() // overline
@@ -401,11 +397,6 @@ impl Board {
         overrides.set[overrides.set_top as usize] = pos;
         overrides.set_top += 1;
 
-        // if !IS_NESTED {
-        //     self.update_four_overrides::<true>(overrides, from_direction, overrides.set[0])
-        // } else {
-        //     overrides
-        // }
         overrides
     }
 
