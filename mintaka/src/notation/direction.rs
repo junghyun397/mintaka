@@ -5,7 +5,7 @@ use std::marker::ConstParamTy;
 #[repr(u8)]
 pub enum Direction {
     Horizontal = 0,
-    Vertical = 8,
-    Ascending = 16,
-    Descending = 24
+    Vertical = 1,
+    Ascending = 2,
+    Descending = 3
 }

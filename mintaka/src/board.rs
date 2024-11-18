@@ -251,107 +251,29 @@ impl Board {
     }
 
     #[inline(always)]
-    fn is_invalid_three_component(&self, stack: SetOverrideStack, from_direction: Direction, pos: Pos) -> bool {
+    fn is_invalid_three_component<const IS_NESTED: bool>(&self, overrides: SetOverrideStack, from_direction: Direction, pos: Pos) -> bool {
         let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
 
+        if pos == Pos::from_str_unchecked("k7") {
+            println!("{:?} {:?}", overrides.set, overrides.four);
+        }
+
         if !pattern_unit.has_three() // non-three
-            || pattern_unit.has_four() || stack.four.contains(&pos) // double-four
+            || pattern_unit.has_four() || overrides.four_contains(&pos) // double-four
             || pattern_unit.has_overline() // overline
-            || stack.set.contains(&pos) // recursive
+            || overrides.set_contains(&pos) // recursive
         {
             return true;
         }
 
         // nested double-three
-        if pattern_unit.count_open_threes() > 2 {
-            let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
-
-            let mut new_stack = stack;
-            
-            for next_four_idx in 0 .. new_stack.next_four_top {
-                new_stack.four[(new_stack.four_top + next_four_idx) as usize] = stack.next_four[next_four_idx as usize];
-            }
-            new_stack.four_top += stack.next_four_top;
-            new_stack.next_four = [INVALID_POS; 9];
-            new_stack.next_four_top = 0;
-            
-            for direction in pattern_unit.iter_three_directions() {
-                if direction == from_direction {
-                    continue;
-                }
-
-                let signature = {
-                    let slice = self.slices.access_slice(direction, pos);
-                    let slice_idx = slice.calculate_idx(direction, pos);
-                    (slice.black_stones >> (slice_idx - 2)) & 0b11111 // 0[00V00]0
-                };
-
-                match signature {
-                    /* .VOO. */ 0b11000 => {
-                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 1);
-                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_positive_offset(direction, 3);
-                        new_stack.next_four_top += 2;
-                    },
-                    /* .OOV. */ 0b00011 => {
-                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 3);
-                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_positive_offset(direction, 1);
-                        new_stack.next_four_top += 2;
-                    },
-                    /* V.OO  */ 0b10000 => {
-                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 1);
-                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_positive_offset(direction, 1);
-                        new_stack.next_four[new_stack.next_four_top as usize + 2] = pos.directional_positive_offset(direction, 3);
-                        new_stack.next_four_top += 3;
-                    }
-                    /* OO.V  */ 0b00001 => {
-                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 1);
-                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_negative_offset(direction, 3);
-                        new_stack.next_four[new_stack.next_four_top as usize + 2] = pos.directional_positive_offset(direction, 1);
-                        new_stack.next_four_top += 3;
-                    }
-                    /* VO.O  */ 0b01000 => {
-                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 1);
-                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_positive_offset(direction, 2);
-                        new_stack.next_four[new_stack.next_four_top as usize + 2] = pos.directional_positive_offset(direction, 4);
-                        new_stack.next_four_top += 3;
-                    },
-                    /* .OVO. */ 0b01010 => {
-                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 2);
-                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_positive_offset(direction, 2);
-                        new_stack.next_four_top += 2;
-                    },
-                    /* O.OV  */ 0b00010 => {
-                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 4);
-                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_negative_offset(direction, 2);
-                        new_stack.next_four[new_stack.next_four_top as usize + 2] = pos.directional_positive_offset(direction, 1);
-                        new_stack.next_four_top += 3;
-                    },
-                    /* OV.O  */ 0b10010 => {
-                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 2);
-                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_positive_offset(direction, 1);
-                        new_stack.next_four[new_stack.next_four_top as usize + 2] = pos.directional_positive_offset(direction, 3);
-                        new_stack.next_four_top += 3;
-                    },
-                    /* O.VO  */ 0b01001 => {
-                        new_stack.next_four[new_stack.next_four_top as usize] = pos.directional_negative_offset(direction, 3);
-                        new_stack.next_four[new_stack.next_four_top as usize + 1] = pos.directional_negative_offset(direction, 1);
-                        new_stack.next_four[new_stack.next_four_top as usize + 2] = pos.directional_positive_offset(direction, 2);
-                        new_stack.next_four_top += 3;
-                    },
-                    _ => unreachable!()
-                }
-            }
-            
-            new_stack.set[new_stack.set_top as usize] = pos;
-            new_stack.set_top += 1;
-
-            return self.is_valid_double_three::<true>(new_stack, from_direction, pos)
+        pattern_unit.count_open_threes() > 2 && {
+            let new_overrides = self.update_four_overrides::<IS_NESTED>(overrides, from_direction, pos);
+            self.is_valid_double_three::<true>(new_overrides, from_direction, pos)
         }
-        
-        false
     }
 
-    fn is_valid_double_three<const IS_NESTED: bool>(&self, stack: SetOverrideStack, from_direction: Direction, pos: Pos) -> bool {
+    fn is_valid_double_three<const IS_NESTED: bool>(&self, overrides: SetOverrideStack, from_direction: Direction, pos: Pos) -> bool {
         let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
         let mut total_threes = if IS_NESTED {
             pattern_unit.count_open_threes() - 1
@@ -363,43 +285,37 @@ impl Board {
             if IS_NESTED && direction == from_direction {
                 continue;
             }
-            
-            let signature = {
-                let slice = self.slices.access_slice(direction, pos);
-                let slice_idx = slice.calculate_idx(direction, pos);
-                (slice.black_stones >> (slice_idx - 2)) & 0b11111 // 0[00V00]0
-            };
 
-            if match signature {
+            if match self.calculate_three_signature(direction, pos) {
                 /* .VOO. */ 0b11000 => {
-                    self.is_invalid_three_component(stack, direction, pos.directional_negative_offset(direction, 1)) &&
-                    self.is_invalid_three_component(stack, direction, pos.directional_positive_offset(direction, 3))
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_negative_offset(direction, 1)) &&
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_positive_offset(direction, 3))
                 },
                 /* .OOV. */ 0b00011 => {
-                    self.is_invalid_three_component(stack, direction, pos.directional_negative_offset(direction, 3)) &&
-                    self.is_invalid_three_component(stack, direction, pos.directional_positive_offset(direction, 1))
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_negative_offset(direction, 3)) &&
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_positive_offset(direction, 1))
                 },
                 /* V.OO  */ 0b10000 => {
-                    self.is_invalid_three_component(stack, direction, pos.directional_positive_offset(direction, 1))
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_positive_offset(direction, 1))
                 }
                 /* OO.V  */ 0b00001 => {
-                    self.is_invalid_three_component(stack, direction, pos.directional_negative_offset(direction, 1))
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_negative_offset(direction, 1))
                 }
                 /* VO.O  */ 0b01000 => {
-                    self.is_invalid_three_component(stack, direction, pos.directional_positive_offset(direction, 2))
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_positive_offset(direction, 2))
                 },
                 /* .OVO. */ 0b01010 => {
-                    self.is_invalid_three_component(stack, direction, pos.directional_negative_offset(direction, 2)) &&
-                    self.is_invalid_three_component(stack, direction, pos.directional_positive_offset(direction, 2))
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_negative_offset(direction, 2)) &&
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_positive_offset(direction, 2))
                 },
                 /* O.OV  */ 0b00010 => {
-                    self.is_invalid_three_component(stack, direction, pos.directional_negative_offset(direction, 2))
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_negative_offset(direction, 2))
                 },
                 /* OV.O  */ 0b10010 => {
-                    self.is_invalid_three_component(stack, direction, pos.directional_positive_offset(direction, 1))
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_positive_offset(direction, 1))
                 },
                 /* O.VO  */ 0b01001 => {
-                    self.is_invalid_three_component(stack, direction, pos.directional_negative_offset(direction, 1))
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_negative_offset(direction, 1))
                 },
                 _ => unreachable!()
             } {
@@ -413,29 +329,134 @@ impl Board {
         true
     }
 
+    fn update_four_overrides<const IS_NESTED: bool>(&self, mut overrides: SetOverrideStack, from_direction: Direction, pos: Pos) -> SetOverrideStack {
+        if IS_NESTED {
+            for next_four_idx in 0 .. 12 {
+                if next_four_idx / 3 != from_direction as u8 {
+                    let four_pos = overrides.next_four[next_four_idx as usize];
+                    if four_pos != INVALID_POS {
+                        overrides.four[overrides.four_top as usize] = four_pos;
+                        overrides.four_top += 1;
+                    }
+                }
+            }
+
+            overrides.next_four = [INVALID_POS; 12];
+        }
+
+        for direction in self.patterns.field[pos.idx_usize()].black_unit.iter_three_directions() {
+            if IS_NESTED && direction == from_direction {
+                continue;
+            }
+
+            let direction_offset = direction as usize * 3;
+
+            match self.calculate_three_signature(direction, pos) {
+                /* .VOO.  */ 0b11000 => {
+                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 1);
+                    overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 3);
+                },
+                /* .OOV.  */ 0b00011 => {
+                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 3);
+                    overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 1);
+                },
+                /* .V.OO. */ 0b10000 => {
+                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 1);
+                    overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 1);
+                    overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 3);
+                }
+                /* .OO.V. */ 0b00001 => {
+                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 3);
+                    overrides.next_four[direction_offset + 1] = pos.directional_negative_offset(direction, 1);
+                    overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 1);
+                }
+                /* .VO.O. */ 0b01000 => {
+                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 1);
+                    overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 2);
+                    overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 4);
+                },
+                /* .OVO.  */ 0b01010 => {
+                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 2);
+                    overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 2);
+                },
+                /* .O.OV. */ 0b00010 => {
+                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 4);
+                    overrides.next_four[direction_offset + 1] = pos.directional_negative_offset(direction, 2);
+                    overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 1);
+                },
+                /* .OV.O. */ 0b10010 => {
+                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 2);
+                    overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 1);
+                    overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 3);
+                },
+                /* .O.VO. */ 0b01001 => {
+                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 3);
+                    overrides.next_four[direction_offset + 1] = pos.directional_negative_offset(direction, 1);
+                    overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 2);
+                },
+                _ => unreachable!()
+            }
+        }
+
+        overrides.set[overrides.set_top as usize] = pos;
+        overrides.set_top += 1;
+
+        // if !IS_NESTED {
+        //     self.update_four_overrides::<true>(overrides, from_direction, overrides.set[0])
+        // } else {
+        //     overrides
+        // }
+        overrides
+    }
+
+    fn calculate_three_signature(&self, direction: Direction, pos: Pos) -> u16 {
+        let slice = self.slices.access_slice(direction, pos);
+        let slice_idx = slice.calculate_idx(direction, pos);
+        (slice.black_stones >> (slice_idx - 2)) & 0b11111 // 0[00V00]0
+    }
+
 }
 
+// 48 bytes
 #[derive(Copy, Clone)]
 struct SetOverrideStack {
     set: [Pos; 7],
     set_top: u8,
-    four: [Pos; 45],
+    four: [Pos; 27],
     four_top: u8,
-    next_four: [Pos; 9],
-    next_four_top: u8
+    next_four: [Pos; 12],
 }
 
 impl SetOverrideStack {
-    
+
+    fn set_contains(&self, pos: &Pos) -> bool {
+        for idx in 0 .. self.set_top {
+            if &self.set[idx as usize] == pos {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn four_contains(&self, pos: &Pos) -> bool {
+        for idx in 0 .. self.four_top {
+            if &self.four[idx as usize] == pos {
+                return true;
+            }
+        }
+
+        false
+    }
+
     fn new(root: Pos) -> Self {
         Self {
             set: [root, INVALID_POS, INVALID_POS, INVALID_POS, INVALID_POS, INVALID_POS, INVALID_POS],
             set_top: 1,
-            four: [INVALID_POS; 45],
+            four: [INVALID_POS; 27],
             four_top: 0,
-            next_four: [INVALID_POS; 9],
-            next_four_top: 0,
-        }       
+            next_four: [INVALID_POS; 12],
+        }
     }
 
 }
