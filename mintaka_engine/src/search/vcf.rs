@@ -10,13 +10,13 @@ pub fn vcf(
     board: &mut Board, max_depth: usize
 ) -> Option<Vec<Pos>> {
     match board.player_color {
-        Color::Black => find_vcf_solution::<{ Color::Black }>(tt, memo, board, max_depth),
-        Color::White => find_vcf_solution::<{ Color::White }>(tt, memo, board, max_depth)
+        Color::Black => vcf_by_color::<{ Color::Black }>(tt, memo, board, max_depth),
+        Color::White => vcf_by_color::<{ Color::White }>(tt, memo, board, max_depth)
     }
 }
 
-// Iterative Deepening Search(IDS), https://www.chessprogramming.org/Iterative_Deepening
-pub fn find_vcf_solution<const C: Color>(
+// Depth-First Search(DFS)
+fn vcf_by_color<const C: Color>(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
     board: &mut Board, max_depth: usize
 ) -> Option<Vec<Pos>> {
@@ -46,7 +46,7 @@ pub fn find_vcf_solution<const C: Color>(
         let next_pos = four_queue[queue_idx];
 
         board.set_mut(memo, next_pos);
-        let vcf_result = find_vcf_solution::<C>(tt, memo, board, max_depth);
+        let vcf_result = vcf_by_color::<C>(tt, memo, board, max_depth);
         board.unset_mut(memo, next_pos);
 
         if vcf_result.is_some() {

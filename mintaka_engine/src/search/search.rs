@@ -8,8 +8,10 @@ pub trait NodeType {
     const IS_ROOT: bool;
 }
 
+// Principal Variation Search(PVS), https://www.chessprogramming.org/Principal_Variation_Search
 pub fn search(
-    board: &mut Board, tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo
+    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
+    board: &mut Board
 ) -> (i16, Option<Pos>) {
     (0, None)
 }
