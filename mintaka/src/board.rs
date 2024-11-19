@@ -156,50 +156,49 @@ impl Board {
                 None
             };
 
-        let mut packed_slices: [u64; 3] = [0, 0, 0];
-        let mut prefetch_idx = 0;
+        let mut prefetch_stack: [u64; 3] = [0, 0, 0];
+        let mut prefetch_top: usize = 0;
 
         if is_vertical_slice_valid {
-            packed_slices[prefetch_idx] = vertical_slice.packed_slice();
-            prefetch_idx += 1;
+            prefetch_stack[prefetch_top] = vertical_slice.packed_slice();
+            prefetch_top += 1;
         }
 
         if valid_ascending_slice.as_ref()
             .map_or(false, |slice| slice.is_valid_pattern())
         {
-            packed_slices[prefetch_idx] = valid_ascending_slice.as_ref().unwrap().packed_slice();
-            prefetch_idx += 1;
+            prefetch_stack[prefetch_top] = valid_ascending_slice.as_ref().unwrap().packed_slice();
+            prefetch_top += 1;
         }
 
         if valid_descending_slice.as_ref()
             .map_or(false, |slice| slice.is_valid_pattern())
         {
-            packed_slices[prefetch_idx] = valid_descending_slice.as_ref().unwrap().packed_slice();
+            prefetch_stack[prefetch_top] = valid_descending_slice.as_ref().unwrap().packed_slice();
+            prefetch_top += 1;
         }
 
-        prefetch_idx = 0;
-
         if is_horizontal_slice_valid {
-            if packed_slices[prefetch_idx] != 0 {
-                memo.prefetch_memo(packed_slices[prefetch_idx]);
-                prefetch_idx += 1;
+            if prefetch_top != 0 {
+                prefetch_top -= 1;
+                memo.prefetch_memo(prefetch_stack[prefetch_top]);
             }
 
             self.patterns.update_by_slice_mut::<{ Direction::Horizontal }>(memo, horizontal_slice);
         }
 
         if is_vertical_slice_valid {
-            if packed_slices[prefetch_idx] != 0 {
-                memo.prefetch_memo(packed_slices[prefetch_idx]);
-                prefetch_idx += 1;
+            if prefetch_top != 0 {
+                prefetch_top -= 1;
+                memo.prefetch_memo(prefetch_stack[prefetch_top]);
             }
 
             self.patterns.update_by_slice_mut::<{ Direction::Vertical }>(memo, vertical_slice);
         }
 
         if let Some(ascending_slice) = valid_ascending_slice {
-            if packed_slices[prefetch_idx] != 0 {
-                memo.prefetch_memo(packed_slices[prefetch_idx]);
+            if prefetch_top != 0 {
+                memo.prefetch_memo(prefetch_stack[prefetch_top]);
             }
 
             self.patterns.update_by_slice_mut::<{ Direction::Ascending }>(memo, ascending_slice);
@@ -264,7 +263,12 @@ impl Board {
 
         // nested double-three
         pattern_unit.count_open_threes() > 2 && {
-            let new_overrides = self.update_four_overrides::<IS_NESTED>(overrides, from_direction, pos);
+            let mut new_overrides = overrides;
+            if !IS_NESTED {
+                self.update_four_overrides_root(&mut new_overrides);
+            }
+            self.update_four_overrides(&mut new_overrides, from_direction, pos);
+
             self.is_valid_double_three::<true>(new_overrides, from_direction, pos)
         }
     }
@@ -325,79 +329,88 @@ impl Board {
         true
     }
 
-    fn update_four_overrides<const IS_NESTED: bool>(&self, mut overrides: SetOverrideStack, from_direction: Direction, pos: Pos) -> SetOverrideStack {
-        if IS_NESTED {
-            for next_four_idx in 0 .. 12 {
-                if next_four_idx / 3 != from_direction as u8 {
-                    let four_pos = overrides.next_four[next_four_idx as usize];
-                    if four_pos != INVALID_POS {
-                        overrides.four[overrides.four_top as usize] = four_pos;
-                        overrides.four_top += 1;
-                    }
-                }
-            }
-
-            overrides.next_four = [INVALID_POS; 12];
-        }
+    fn update_four_overrides_root(&self, overrides: &mut SetOverrideStack) {
+        let pos = overrides.set[0];
 
         for direction in self.patterns.field[pos.idx_usize()].black_unit.iter_three_directions() {
-            if IS_NESTED && direction == from_direction {
+            self.update_four_overrides_each_direction(overrides, direction, pos);
+        }
+    }
+
+    fn update_four_overrides(&self, overrides: &mut SetOverrideStack, from_direction: Direction, pos: Pos) {
+        for next_four_idx in 0 .. 12 {
+            if next_four_idx / 3 != from_direction as u8 {
+                let four_pos = overrides.next_four[next_four_idx as usize];
+                if four_pos != INVALID_POS {
+                    overrides.four[overrides.four_top as usize] = four_pos;
+                    overrides.four_top += 1;
+                }
+            }
+        }
+
+        overrides.next_four = [INVALID_POS; 12];
+
+        for direction in self.patterns.field[pos.idx_usize()].black_unit.iter_three_directions() {
+            if direction == from_direction {
                 continue;
             }
 
-            let direction_offset = direction as usize * 3;
-
-            match self.calculate_three_signature(direction, pos) {
-                /* .VOO.  */ 0b11000 => {
-                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 1);
-                    overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 3);
-                },
-                /* .OOV.  */ 0b00011 => {
-                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 3);
-                    overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 1);
-                },
-                /* .V.OO. */ 0b10000 => {
-                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 1);
-                    overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 1);
-                    overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 3);
-                }
-                /* .OO.V. */ 0b00001 => {
-                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 3);
-                    overrides.next_four[direction_offset + 1] = pos.directional_negative_offset(direction, 1);
-                    overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 1);
-                }
-                /* .VO.O. */ 0b01000 => {
-                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 1);
-                    overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 2);
-                    overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 4);
-                },
-                /* .OVO.  */ 0b01010 => {
-                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 2);
-                    overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 2);
-                },
-                /* .O.OV. */ 0b00010 => {
-                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 4);
-                    overrides.next_four[direction_offset + 1] = pos.directional_negative_offset(direction, 2);
-                    overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 1);
-                },
-                /* .OV.O. */ 0b10010 => {
-                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 2);
-                    overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 1);
-                    overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 3);
-                },
-                /* .O.VO. */ 0b01001 => {
-                    overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 3);
-                    overrides.next_four[direction_offset + 1] = pos.directional_negative_offset(direction, 1);
-                    overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 2);
-                },
-                _ => unreachable!()
-            }
+            self.update_four_overrides_each_direction(overrides, direction, pos);
         }
 
         overrides.set[overrides.set_top as usize] = pos;
         overrides.set_top += 1;
+    }
 
-        overrides
+    #[inline(always)]
+    fn update_four_overrides_each_direction(&self, overrides: &mut SetOverrideStack, direction: Direction, pos: Pos) {
+        let direction_offset = direction as usize * 3;
+
+        match self.calculate_three_signature(direction, pos) {
+            /* .VOO.  */ 0b11000 => {
+                overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 1);
+                overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 3);
+            },
+            /* .OOV.  */ 0b00011 => {
+                overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 3);
+                overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 1);
+            },
+            /* .V.OO. */ 0b10000 => {
+                overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 1);
+                overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 1);
+                overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 3);
+            }
+            /* .OO.V. */ 0b00001 => {
+                overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 3);
+                overrides.next_four[direction_offset + 1] = pos.directional_negative_offset(direction, 1);
+                overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 1);
+            }
+            /* .VO.O. */ 0b01000 => {
+                overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 1);
+                overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 2);
+                overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 4);
+            },
+            /* .OVO.  */ 0b01010 => {
+                overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 2);
+                overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 2);
+            },
+            /* .O.OV. */ 0b00010 => {
+                overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 4);
+                overrides.next_four[direction_offset + 1] = pos.directional_negative_offset(direction, 2);
+                overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 1);
+            },
+            /* .OV.O. */ 0b10010 => {
+                overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 2);
+                overrides.next_four[direction_offset + 1] = pos.directional_positive_offset(direction, 1);
+                overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 3);
+            },
+            /* .O.VO. */ 0b01001 => {
+                overrides.next_four[direction_offset] = pos.directional_negative_offset(direction, 3);
+                overrides.next_four[direction_offset + 1] = pos.directional_negative_offset(direction, 1);
+                overrides.next_four[direction_offset + 2] = pos.directional_positive_offset(direction, 2);
+            },
+            _ => unreachable!()
+        }
     }
 
     fn calculate_three_signature(&self, direction: Direction, pos: Pos) -> u16 {

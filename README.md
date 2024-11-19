@@ -1,9 +1,9 @@
 # mintaka
 (WIP) HCE-based Renju engine with strict Renju-rule implementation.
 
-* Strict [Renju-rule](https://www.renju.net/rules/) support w/ [single line/nested forbidden moves](https://www.renju.net/advanced/).
-* AVX-512(512-bits), AVX2(256-bits), Neon(128-bits) SIMD-accelerated.
-* (WIP) High-performance endgame VCT/VCF calculator.
+* Strict [Renju-rule](https://www.renju.net/rules/) support w/ [single line/nested forbidden moves](./renju.md).
+* AVX-512(512-bits), AVX2(256-bits) SIMD-accelerated.
+* High-performance endgame VCT/VCF calculator.
 * (WIP) [Negmax](https://en.wikipedia.org/wiki/Negamax) w/ HCE(Hand-Crafted Evaluation) based strong A.I.
 * (WIP) [Solid.js](https://www.solidjs.com/)-based Web Frontend UI and REST API server.
 * (WIP) Java Native Interface([JNI](https://en.wikipedia.org/wiki/Java_Native_Interface)) support.

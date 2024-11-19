@@ -361,12 +361,14 @@ impl Patterns {
                     cartesian_to_index!(slice.start_row - offset, slice.start_col + offset),
             } as usize;
 
-            self.field[idx].apply_mask_mut::<{ Color::Black }, D>(slice_pattern.black_patterns[offset as usize]);
-            self.field[idx].apply_mask_mut::<{ Color::White }, D>(slice_pattern.white_patterns[offset as usize]);
+            let pattern = &mut self.field[idx];
+
+            pattern.apply_mask_mut::<{ Color::Black }, D>(slice_pattern.black_patterns[offset as usize]);
+            pattern.apply_mask_mut::<{ Color::White }, D>(slice_pattern.white_patterns[offset as usize]);
 
             let pos = Pos::from_index(idx as u8);
 
-            if self.field[idx].black_unit.has_threes() {
+            if pattern.black_unit.has_threes() {
                 self.unchecked_double_three_field.set(pos);
             } else {
                 self.unchecked_double_three_field.unset(pos);

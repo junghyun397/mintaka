@@ -25,21 +25,19 @@ impl Clearable for AtomicTTSlicePatternEntry {
 impl AtomicTTSlicePatternEntry {
 
     fn encode(packed_slice: u64, pattern: &SlicePattern) -> Self {
-        unsafe {
-            let block_0 = packed_slice;
-            let block_1 = u64::from_ne_bytes(pattern.black_patterns[0 ..8].try_into().unwrap());
-            let block_2 = u64::from_ne_bytes(pattern.black_patterns[8 .. 16].try_into().unwrap());
-            let block_3 = u64::from_ne_bytes(pattern.white_patterns[0 ..8].try_into().unwrap());
-            let block_4 = u64::from_ne_bytes(pattern.white_patterns[8 .. 16].try_into().unwrap());
+        let block_0 = packed_slice;
+        let block_1 = u64::from_ne_bytes(pattern.black_patterns[0 ..8].try_into().unwrap());
+        let block_2 = u64::from_ne_bytes(pattern.black_patterns[8 .. 16].try_into().unwrap());
+        let block_3 = u64::from_ne_bytes(pattern.white_patterns[0 ..8].try_into().unwrap());
+        let block_4 = u64::from_ne_bytes(pattern.white_patterns[8 .. 16].try_into().unwrap());
 
-            Self(
-                AtomicU64::from(block_0),
-                AtomicU64::from(block_1),
-                AtomicU64::from(block_2),
-                AtomicU64::from(block_3),
-                AtomicU64::from(block_4),
-            )
-        }
+        Self(
+            AtomicU64::from(block_0),
+            AtomicU64::from(block_1),
+            AtomicU64::from(block_2),
+            AtomicU64::from(block_3),
+            AtomicU64::from(block_4),
+        )
     }
 
     fn decode(&self) -> SlicePattern {

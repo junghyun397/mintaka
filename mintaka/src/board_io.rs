@@ -1,4 +1,3 @@
-use crate::bitfield::BitfieldOps;
 use crate::board::Board;
 use crate::board_iter::BoardIterItem;
 use crate::game::Game;

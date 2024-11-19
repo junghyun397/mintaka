@@ -1,5 +1,5 @@
 # mintaka-renju
-## In-line forbidden moves
+## Single-line forbidden moves
 ## Double-four related pseudo forbidden moves
 ## Nested forbidden moves
 ## Multiple-nested forbidden moves

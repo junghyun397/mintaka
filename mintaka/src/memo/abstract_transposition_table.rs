@@ -23,7 +23,7 @@ pub trait AbstractTranspositionTable<T: Clearable> {
     }
 
     fn clear_mut(&mut self) {
-        for mut entry in self.internal_table_mut() {
+        for entry in self.internal_table_mut() {
             entry.clear_mut();
         }
     }
