@@ -128,7 +128,32 @@ impl Board {
         self.player_color = self.opponent_color();
     }
 
-    #[inline(always)]
+    #[cfg(not(feature = "prefetch_slice"))]
+    fn incremental_update_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
+        let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
+        slice_mut_op(horizontal_slice, self.player_color, pos.col());
+        self.patterns.update_by_slice_mut::<{ Direction::Horizontal }>(memo, horizontal_slice);
+
+        let vertical_slice = &mut self.slices.vertical_slices[pos.col_usize()];
+        slice_mut_op(vertical_slice, self.player_color, pos.row());
+        self.patterns.update_by_slice_mut::<{ Direction::Vertical }>(memo, vertical_slice);
+
+        if let Some(ascending_slice_idx) = Slices::ascending_slice_idx(pos) {
+            let ascending_slice = &mut self.slices.ascending_slices[ascending_slice_idx];
+            slice_mut_op(ascending_slice, self.player_color, pos.col() - ascending_slice.start_col);
+            self.patterns.update_by_slice_mut::<{ Direction::Ascending }>(memo, ascending_slice);
+        }
+
+        if let Some(descending_slice_idx) = Slices::descending_slice_idx(pos) {
+            let descending_slice = &mut self.slices.descending_slices[descending_slice_idx];
+            slice_mut_op(descending_slice, self.player_color, pos.col() - descending_slice.start_col);
+            self.patterns.update_by_slice_mut::<{ Direction::Descending }>(memo, descending_slice);
+        }
+
+        self.validate_double_three_mut();
+    }
+
+    #[cfg(feature = "prefetch_slice")]
     fn incremental_update_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
         slice_mut_op(horizontal_slice, self.player_color, pos.col());
@@ -242,13 +267,24 @@ impl Board {
     fn validate_double_three_mut(&mut self) {
         for double_three_pos in self.patterns.unchecked_double_three_field.iter_hot_pos() {
             if self.is_valid_double_three::<false>(SetOverrideStack::new(double_three_pos), Direction::Vertical, double_three_pos) {
-                self.patterns.field[double_three_pos.idx_usize()].black_unit.mark_valid_double_three();
+                self.patterns.field[double_three_pos.idx_usize()].black_unit.unmark_invalid_double_three();
             } else {
-                self.patterns.field[double_three_pos.idx_usize()].black_unit.unmark_valid_double_three();
+                self.patterns.field[double_three_pos.idx_usize()].black_unit.mark_invalid_double_three();
             }
         }
     }
 
+    #[cfg(not(feature = "strict_renju"))]
+    #[inline(always)]
+    fn is_invalid_three_component<const IS_NESTED: bool>(&self, _overrides: SetOverrideStack, _from_direction: Direction, pos: Pos) -> bool {
+        let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
+
+        !pattern_unit.has_three() // non-three
+            || pattern_unit.has_four() // double-four
+            || pattern_unit.has_overline() // overline
+    }
+
+    #[cfg(feature = "strict_renju")]
     #[inline(always)]
     fn is_invalid_three_component<const IS_NESTED: bool>(&self, overrides: SetOverrideStack, from_direction: Direction, pos: Pos) -> bool {
         let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;

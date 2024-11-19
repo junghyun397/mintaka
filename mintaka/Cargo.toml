@@ -3,6 +3,11 @@ name = "mintaka"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["prefetch_slice", "strict_renju"]
+prefetch_slice = []
+strict_renju = []
+
 [dependencies]
 ethnum = "1.5.0"
 indoc = "2.0.5"

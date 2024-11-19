@@ -1,4 +1,5 @@
 #![feature(stdarch_aarch64_prefetch)]
+#![feature(adt_const_params)]
 
 pub mod config;
 pub mod memo;

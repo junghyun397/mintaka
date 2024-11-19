@@ -12,12 +12,7 @@ mod test_endgame_vct {
     }
 
     #[test]
-    fn long_vct() {
-        todo!()
-    }
-
-    #[test]
-    fn vct_length() {
+    fn deep_vct() {
         todo!()
     }
 

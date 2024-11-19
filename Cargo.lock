@@ -90,6 +90,7 @@ dependencies = [
 name = "mintaka_engine"
 version = "0.1.0"
 dependencies = [
+ "indoc",
  "mintaka",
 ]
 

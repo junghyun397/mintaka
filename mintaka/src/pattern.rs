@@ -173,15 +173,15 @@ impl PatternUnit {
         ThreeDirectionIterator::from(self)
     }
 
-    pub fn has_valid_double_three(&self) -> bool {
+    pub fn has_invalid_double_three(&self) -> bool {
         self.horizontal & MARKER == MARKER
     }
 
-    pub fn mark_valid_double_three(&mut self) {
+    pub fn mark_invalid_double_three(&mut self) {
         self.horizontal |= MARKER;
     }
 
-    pub fn unmark_valid_double_three(&mut self) {
+    pub fn unmark_invalid_double_three(&mut self) {
         self.horizontal &= !MARKER;
     }
 
@@ -264,9 +264,11 @@ impl Pattern {
 
     pub fn is_forbidden(&self) -> bool {
         self.is_not_empty()
-            && (self.black_unit.has_fours()
-                || (self.black_unit.has_threes() && self.black_unit.has_valid_double_three())
-                || self.has_overline())
+            && (
+                self.black_unit.has_fours()
+                    || (self.black_unit.has_threes() && !self.black_unit.has_invalid_double_three())
+                    || self.has_overline()
+            )
             && !self.black_unit.has_five()
     }
 
