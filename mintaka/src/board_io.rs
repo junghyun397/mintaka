@@ -1,7 +1,7 @@
 use crate::board::Board;
 use crate::board_iter::BoardIterItem;
 use crate::game::Game;
-use crate::history::History;
+use crate::history::{Action, History};
 use crate::impl_debug_by_display;
 use crate::notation::color::Color;
 use crate::notation::pos;
@@ -237,8 +237,8 @@ impl Display for History {
         let history = self.0.iter()
             .map(|mv|
                 match mv {
-                    Some(pos) => pos.to_string(),
-                    None => HISTORY_LITERAL_PASS.to_string()
+                    Action::Move(pos) => pos.to_string(),
+                    Action::Pass => HISTORY_LITERAL_PASS.to_string()
                 }
             )
             .reduce(|head, tail|
@@ -268,7 +268,7 @@ impl FromStr for History {
 
         Ok(History(IntoIterator::into_iter(history)
             .filter_map(|r| r.ok()
-                .map(Some)
+                .map(Action::Move)
             )
             .collect()
         ))
@@ -281,15 +281,19 @@ impl From<History> for Game {
     fn from(history: History) -> Self {
         let blacks: Box<[Pos]> = history.0.iter()
             .enumerate()
-            .filter_map(|(idx, pos)| pos
-                .filter(|_| idx % 2 == 0)
+            .filter_map(|(idx, action)|
+                (idx % 2 == 0)
+                    .then(|| action.maybe_move())
+                    .flatten()
             )
             .collect();
 
         let whites: Box<[Pos]> = history.0.iter()
             .enumerate()
-            .filter_map(|(idx, pos)| pos
-                .filter(|_| idx % 2 == 1)
+            .filter_map(|(idx, action)|
+                (idx % 2 == 1)
+                    .then(|| action.maybe_move())
+                    .flatten()
             )
             .collect();
 

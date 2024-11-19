@@ -1,7 +1,31 @@
 use crate::notation::pos::Pos;
 
+#[derive(Copy, Clone)]
+pub enum Action {
+    Move(Pos),
+    Pass
+}
+
+impl Action {
+    
+    pub fn maybe_move(&self) -> Option<Pos> {
+        match self {
+            Action::Move(pos) => Some(*pos),
+            Action::Pass => None
+        }
+    }
+    
+    pub fn unwrap(&self) -> Pos {
+        match self {
+            Action::Move(pos) => *pos,
+            Action::Pass => unreachable!()
+        }
+    }
+
+}
+
 #[derive(Clone, Default)]
-pub struct History(pub Vec<Option<Pos>>);
+pub struct History(pub Vec<Action>);
 
 impl History {
 
@@ -13,22 +37,21 @@ impl History {
         self.0.is_empty()
     }
 
-    pub fn get(&self, idx: usize) -> Option<Pos> {
+    pub fn get(&self, idx: usize) -> Option<Action> {
         self.0.get(idx)
             .copied()
-            .flatten()
     }
 
     pub fn play_mut(&mut self, pos: Pos) {
-        self.0.push(Some(pos));
+        self.0.push(Action::Move(pos));
     }
 
-    pub fn undo_mut(&mut self) -> Option<Pos> {
-        self.0.pop().unwrap_or(None)
+    pub fn undo_mut(&mut self) -> Action {
+        self.0.pop().unwrap_or(Action::Pass)
     }
 
     pub fn pass_mut(&mut self) {
-        self.0.push(None)
+        self.0.push(Action::Pass)
     }
 
 }

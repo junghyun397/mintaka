@@ -1,6 +1,6 @@
 use crate::bitfield::BitfieldOps;
 use crate::board::Board;
-use crate::history::History;
+use crate::history::{Action, History};
 use crate::memo::dummy_pattern_memo::DummySlicePatternMemo;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
@@ -64,7 +64,7 @@ impl Game {
     }
 
     pub fn undo_mut(&mut self, memo: &mut impl SlicePatternMemo) {
-        if let Some(pos) = self.history.undo_mut() {
+        if let Action::Move(pos) = self.history.undo_mut() {
             self.board.unset_mut(memo, pos);
         }
         self.result = None;
