@@ -11,27 +11,28 @@ use crate::slice_pattern::contains_five_in_a_row;
 use crate::utils::lang_utils::repeat_4x;
 use ethnum::u256;
 
-pub const CLOSED_FOUR_SINGLE: u8    = 0b1000_0000;
-pub const CLOSED_FOUR_DOUBLE: u8    = 0b1100_0000;
-pub const OPEN_FOUR: u8             = 0b0010_0000;
-pub const TOTAL_FOUR: u8            = 0b1110_0000;
-pub const FIVE: u8                  = 0b0001_0000;
+pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
+pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
+pub const OPEN_FOUR: u8                 = 0b0010_0000;
+pub const TOTAL_FOUR: u8                = 0b1110_0000;
+pub const FIVE: u8                      = 0b0001_0000;
 
-pub const OPEN_THREE: u8            = 0b0000_1000;
-pub const CLOSE_THREE: u8           = 0b0000_0100;
-pub const OVERLINE: u8              = 0b0000_0010;
-pub const MARKER: u8                = 0b0000_0001;
+pub const OPEN_THREE: u8                = 0b0000_1000;
+pub const CLOSE_THREE: u8               = 0b0000_0100;
+pub const OVERLINE: u8                  = 0b0000_0010;
+pub const MARKER: u8                    = 0b0000_0001;
 
-const OPEN_THREE_POSITION: u32      = 3;
+const OPEN_THREE_POSITION: u32          = 3;
 
-const UNIT_CLOSED_FOUR_MASK: u32    = repeat_4x(CLOSED_FOUR_DOUBLE);
-const UNIT_OPEN_FOUR_MASK: u32      = repeat_4x(OPEN_FOUR);
-const UNIT_TOTAL_FOUR_MASK: u32     = repeat_4x(TOTAL_FOUR);
-const UNIT_FIVE_MASK: u32           = repeat_4x(FIVE);
+const UNIT_CLOSED_FOUR_SINGLE_MASK: u32 = repeat_4x(CLOSED_FOUR_SINGLE);
+const UNIT_CLOSED_FOUR_MASK: u32        = repeat_4x(CLOSED_FOUR_DOUBLE);
+const UNIT_OPEN_FOUR_MASK: u32          = repeat_4x(OPEN_FOUR);
+const UNIT_TOTAL_FOUR_MASK: u32         = repeat_4x(TOTAL_FOUR);
+const UNIT_FIVE_MASK: u32               = repeat_4x(FIVE);
 
-const UNIT_OPEN_THREE_MASK: u32     = repeat_4x(OPEN_THREE);
-const UNIT_CLOSE_THREE_MASK: u32    = repeat_4x(CLOSE_THREE);
-const UNIT_OVERLINE_MASK: u32       = repeat_4x(OVERLINE);
+const UNIT_OPEN_THREE_MASK: u32         = repeat_4x(OPEN_THREE);
+const UNIT_CLOSE_THREE_MASK: u32        = repeat_4x(CLOSE_THREE);
+const UNIT_OVERLINE_MASK: u32           = repeat_4x(OVERLINE);
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub enum PatternCount {
@@ -188,49 +189,26 @@ impl PatternUnit {
     pub fn unmark_invalid_double_three(&mut self) {
         self.horizontal &= !MARKER;
     }
+    
+    pub fn closed_four_direction_unchecked(&self) -> Direction {
+        let masked = self.apply_mask(UNIT_CLOSED_FOUR_SINGLE_MASK);
+        
+        const HORIZONTAL: u32 = CLOSED_FOUR_SINGLE as u32;
+        const VERTICAL: u32 = (CLOSED_FOUR_SINGLE as u32) << 8;
+        const ASCENDING: u32 = (CLOSED_FOUR_SINGLE as u32) << 16;
+        const DESCENDING: u32 = (CLOSED_FOUR_SINGLE as u32) << 24;
+
+        match masked { 
+            HORIZONTAL => Direction::Horizontal,
+            VERTICAL => Direction::Vertical,
+            ASCENDING => Direction::Ascending,
+            DESCENDING => Direction::Descending,
+            _ => unreachable!()
+        }
+    }
 
     fn apply_mask(&self, mask: u32) -> u32 {
         u32::from(*self) & mask
-    }
-
-}
-
-struct ThreeDirectionIterator {
-    packed_unit: u32
-}
-
-impl From<&PatternUnit> for ThreeDirectionIterator {
-
-    fn from(value: &PatternUnit) -> Self {
-        Self { packed_unit: value.apply_mask(UNIT_OPEN_THREE_MASK) }
-    }
-
-}
-
-impl Iterator for ThreeDirectionIterator {
-
-    type Item = Direction;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.packed_unit != 0 {
-            let tails = self.packed_unit.trailing_zeros();
-            self.packed_unit &= self.packed_unit - 1;
-
-            const HORIZONTAL_N: u32 = OPEN_THREE_POSITION;
-            const VERTICAL_N: u32 = 8 + OPEN_THREE_POSITION;
-            const ASCENDING_N: u32 = 8 * 2 + OPEN_THREE_POSITION;
-            const DESCENDING_N: u32 = 8 * 3 + OPEN_THREE_POSITION;
-
-            Some(match tails {
-                HORIZONTAL_N => Direction::Horizontal,
-                VERTICAL_N => Direction::Vertical,
-                ASCENDING_N => Direction::Ascending,
-                DESCENDING_N => Direction::Descending,
-                _ => unreachable!()
-            })
-        } else {
-            None
-        }
     }
 
 }
@@ -378,6 +356,46 @@ impl Patterns {
         }
 
         self.five_in_a_row = self.five_in_a_row.or(winner);
+    }
+
+}
+
+struct ThreeDirectionIterator {
+    packed_unit: u32
+}
+
+impl From<&PatternUnit> for ThreeDirectionIterator {
+
+    fn from(value: &PatternUnit) -> Self {
+        Self { packed_unit: value.apply_mask(UNIT_OPEN_THREE_MASK) }
+    }
+
+}
+
+impl Iterator for ThreeDirectionIterator {
+
+    type Item = Direction;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.packed_unit != 0 {
+            let tails = self.packed_unit.trailing_zeros();
+            self.packed_unit &= self.packed_unit - 1;
+
+            const HORIZONTAL_N: u32 = OPEN_THREE_POSITION;
+            const VERTICAL_N: u32 = 8 + OPEN_THREE_POSITION;
+            const ASCENDING_N: u32 = 8 * 2 + OPEN_THREE_POSITION;
+            const DESCENDING_N: u32 = 8 * 3 + OPEN_THREE_POSITION;
+
+            Some(match tails {
+                HORIZONTAL_N => Direction::Horizontal,
+                VERTICAL_N => Direction::Vertical,
+                ASCENDING_N => Direction::Ascending,
+                DESCENDING_N => Direction::Descending,
+                _ => unreachable!()
+            })
+        } else {
+            None
+        }
     }
 
 }

@@ -3,7 +3,7 @@ use crate::pattern::{CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, OPEN_FOUR, OPEN_THRE
 use crate::slice::Slice;
 use crate::{max, min};
 
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct SlicePattern {
     pub black_patterns: [u8; 16], // 128-bits
     pub white_patterns: [u8; 16],

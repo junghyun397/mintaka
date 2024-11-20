@@ -84,7 +84,7 @@ impl Pos {
         Self::from_cartesian(self.row() + row, self.col() + col)
     }
     
-    pub const fn directional_positive_offset(&self, direction: Direction, offset: u8) -> Pos {
+    pub const fn directional_offset_positive_unchecked(&self, direction: Direction, offset: u8) -> Pos {
         match direction {
             Direction::Vertical => Self::from_cartesian(self.row() + offset, self.col()),
             Direction::Horizontal => Self::from_cartesian(self.row(), self.col() + offset),
@@ -93,13 +93,21 @@ impl Pos {
         }
     }
 
-    pub const fn directional_negative_offset(&self, direction: Direction, offset: u8) -> Pos {
+    pub const fn directional_offset_unchecked(&self, direction: Direction, offset: u8) -> Pos {
         match direction {
             Direction::Vertical => Self::from_cartesian(self.row() - offset, self.col()),
             Direction::Horizontal => Self::from_cartesian(self.row(), self.col() - offset),
             Direction::Ascending => Self::from_cartesian(self.row() - offset, self.col() - offset),
             Direction::Descending => Self::from_cartesian(self.row() + offset, self.col() - offset)
         }
+    }
+
+    pub fn directional_offset_positive(&self, direction: Direction, offset: u8) -> Option<Pos> {
+        todo!()
+    }
+
+    pub fn directional_offset_negative(&self, direction: Direction, offset: u8) -> Option<Pos> {
+        todo!()
     }
 
 }

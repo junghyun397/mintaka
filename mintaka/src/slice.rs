@@ -58,7 +58,8 @@ impl Slice {
     }
 
     pub fn is_valid_pattern(&self) -> bool {
-        self.black_stones.count_ones() > 1 || self.white_stones.count_ones() > 1
+        // self.black_stones.count_ones() > 1 || self.white_stones.count_ones() > 1; // TODO: re-implementation
+        true
     }
 
     pub fn stone_kind(&self, idx: u8) -> Option<Color> {

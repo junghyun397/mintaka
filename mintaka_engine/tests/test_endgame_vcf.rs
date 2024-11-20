@@ -15,7 +15,8 @@ mod test_endgame_vcf {
             let mut vcf_result = vcf::vcf(&mut tt, &mut memo, &mut board, u8::MAX).unwrap();
             vcf_result.reverse();
             println!("{:?}", vcf_result);
-            ""
+            board.batch_set_mut(vcf_result.into_boxed_slice());
+            board.to_string()
         }};
     }
 
@@ -47,7 +48,7 @@ mod test_endgame_vcf {
         13 . . . . . . . . . . . . . . . 13
         12 . . . . . . . . . . . . . . . 12
         11 . . . . . . . . . . O . O . . 11
-        10 . . . . . . . .[X]X . X . . . 10
+        10 . . . . . . . . X X . X . . . 10
          9 . . . . . . . . X O X . . . . 9
          8 . . . . . . O X X X X O . . . 8
          7 . . . . . . X . X O 3 . . . . 7
