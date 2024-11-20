@@ -27,9 +27,9 @@ impl Color {
 
     pub fn player_color_from_each_moves<T: Ord>(black_moves: T, white_moves: T) -> Self {
         if black_moves > white_moves {
-            Color::Black
-        } else {
             Color::White
+        } else {
+            Color::Black
         }
     }
 

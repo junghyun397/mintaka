@@ -2,20 +2,21 @@
 mod test_endgame_vcf {
     use indoc::indoc;
     use mintaka::board::Board;
-    use mintaka::memo::tt_slice_pattern_memo::TTSlicePatternMemo;
-    use mintaka::notation::pos::BOARD_SIZE;
+    use mintaka::memo::dummy_pattern_memo::DummySlicePatternMemo;
     use mintaka_engine::memo::transposition_table::TranspositionTable;
-    use mintaka_engine::search::vcf::find_vcf_solution;
+    use mintaka_engine::search::vcf;
     use std::str::FromStr;
 
     macro_rules! vcf {
-        ($case:expr) => {
+        ($case:expr) => {{
             let mut board = Board::from_str($case).unwrap();
             let mut tt = TranspositionTable::default();
-            let mut memo = TTSlicePatternMemo::default();
-            let vcf_result = vcf(&mut tt, &mut memo, &mut board, usize::MAX);
+            let mut memo = DummySlicePatternMemo;
+            let mut vcf_result = vcf::vcf(&mut tt, &mut memo, &mut board, u8::MAX).unwrap();
+            vcf_result.reverse();
+            println!("{:?}", vcf_result);
             ""
-        };
+        }};
     }
 
     #[test]

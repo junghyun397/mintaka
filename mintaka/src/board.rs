@@ -129,31 +129,41 @@ impl Board {
     }
 
     #[cfg(not(feature = "prefetch_slice"))]
+    #[inline(always)]
     fn incremental_update_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
         slice_mut_op(horizontal_slice, self.player_color, pos.col());
-        self.patterns.update_by_slice_mut::<{ Direction::Horizontal }>(memo, horizontal_slice);
+        if horizontal_slice.is_valid_pattern() {
+            self.patterns.update_by_slice_mut::<{ Direction::Horizontal }>(memo, horizontal_slice);
+        }
 
         let vertical_slice = &mut self.slices.vertical_slices[pos.col_usize()];
         slice_mut_op(vertical_slice, self.player_color, pos.row());
-        self.patterns.update_by_slice_mut::<{ Direction::Vertical }>(memo, vertical_slice);
+        if vertical_slice.is_valid_pattern() {
+            self.patterns.update_by_slice_mut::<{ Direction::Vertical }>(memo, vertical_slice);
+        }
 
         if let Some(ascending_slice_idx) = Slices::ascending_slice_idx(pos) {
             let ascending_slice = &mut self.slices.ascending_slices[ascending_slice_idx];
             slice_mut_op(ascending_slice, self.player_color, pos.col() - ascending_slice.start_col);
-            self.patterns.update_by_slice_mut::<{ Direction::Ascending }>(memo, ascending_slice);
+            if ascending_slice.is_valid_pattern() {
+                self.patterns.update_by_slice_mut::<{ Direction::Ascending }>(memo, ascending_slice);
+            }
         }
 
         if let Some(descending_slice_idx) = Slices::descending_slice_idx(pos) {
             let descending_slice = &mut self.slices.descending_slices[descending_slice_idx];
             slice_mut_op(descending_slice, self.player_color, pos.col() - descending_slice.start_col);
-            self.patterns.update_by_slice_mut::<{ Direction::Descending }>(memo, descending_slice);
+            if descending_slice.is_valid_pattern() {
+                self.patterns.update_by_slice_mut::<{ Direction::Descending }>(memo, descending_slice);
+            }
         }
 
         self.validate_double_three_mut();
     }
 
     #[cfg(feature = "prefetch_slice")]
+    #[inline(always)]
     fn incremental_update_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
         slice_mut_op(horizontal_slice, self.player_color, pos.col());

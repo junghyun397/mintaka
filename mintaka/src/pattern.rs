@@ -90,6 +90,10 @@ impl PatternUnit {
         self.apply_mask(UNIT_TOTAL_FOUR_MASK) != 0
     }
 
+    pub fn has_open_four(&self) -> bool {
+        self.apply_mask(UNIT_OPEN_FOUR_MASK) != 0
+    }
+
     pub fn has_fours(&self) -> bool {
         self.apply_mask(UNIT_TOTAL_FOUR_MASK).count_ones() > 1
     }
@@ -347,10 +351,6 @@ impl Patterns {
             None
         };
 
-        if slice_pattern.is_empty() && winner.is_none() {
-            return;
-        }
-        
         for offset in 0 .. slice.length {
             let idx = match D {
                 Direction::Horizontal =>

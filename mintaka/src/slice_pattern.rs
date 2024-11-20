@@ -238,10 +238,23 @@ fn find_patterns(
     process_pattern!(black, asymmetry, "OO.OOO", "OO6OOO");
 }
 
+pub fn contains_four_in_a_row(mut stones: u16) -> bool {
+    stones &= stones >> 1;
+    stones &= stones >> 2;
+    stones != 0
+}
+
 pub fn contains_five_in_a_row(mut stones: u16) -> bool {
     stones &= stones >> 1;  // 1 1 1 1 1 0 & 0 1 1 1 1 1
     stones &= stones >> 3;  // 0 1 1 1 1 0 & 0 0 0 0 1 1 ...
     stones != 0             // 0 0 0 0 1 0 ...
+}
+
+pub fn contains_six_in_a_row(mut stones: u16) -> bool {
+    stones &= stones >> 1;
+    stones &= stones >> 1;
+    stones &= stones >> 3;
+    stones != 0
 }
 
 fn increase_closed_four_single(packed: u8) -> u8 {
