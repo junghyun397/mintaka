@@ -101,7 +101,7 @@ impl SlicePatternMemo for TTSlicePatternMemo {
     where F: FnOnce() -> SlicePattern
     {
         // fibonacci-hashing
-        let slice_hash = HashKey((packed_slice | (packed_slice << 32)).overflowing_mul(0x9e3779b97f4a7c15).0);
+        let slice_hash = HashKey(unsafe { (packed_slice | (packed_slice << 32)).overflowing_mul(0x9e3779b97f4a7c15).0 });
         let idx = self.calculate_index(slice_hash);
         let atomic_entry = &self.table[idx];
 

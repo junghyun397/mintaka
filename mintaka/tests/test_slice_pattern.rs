@@ -198,6 +198,12 @@ mod test_slice_pattern {
 
         test_pattern!(
             color = both,
+            case                = ". O O O .",
+            closed_four_single  = "V O O O V",
+        );
+
+        test_pattern!(
+            color = both,
             case                = ". . O O O . .",
             closed_four_single  = "V . O O O . V",
             open_four           = ". V O O O V .",
@@ -264,6 +270,18 @@ mod test_slice_pattern {
             color = Color::Black,
             case                = ". X X . . X X .",
             closed_four_single  = ". X X . . X X .",
+        );
+
+        test_pattern!(
+            color = Color::White,
+            case                = "O . . O O O",
+            closed_four_single  = "O V V O O O",
+        );
+
+        test_pattern!(
+            color = Color::White,
+            case                = "O O O . . O O O",
+            closed_four_single  = "O O O V V O O O",
         );
     }
 

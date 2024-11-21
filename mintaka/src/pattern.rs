@@ -236,6 +236,20 @@ impl Pattern {
         }
     }
 
+    pub fn player_unit<const C: Color>(&self) -> PatternUnit {
+        match C {
+            Color::Black => self.black_unit,
+            Color::White => self.white_unit
+        }
+    }
+
+    pub fn opponent_unit<const C: Color>(&self) -> PatternUnit {
+        match C {
+            Color::Black => self.white_unit,
+            Color::White => self.black_unit
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         u64::from(*self) == 0
     }

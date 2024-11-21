@@ -53,11 +53,11 @@ mod test_endgame_vcf {
         14 . . . . . . . . . . . . . . . 14
         13 . . . . . . . . . . . . . . . 13
         12 . . . . . . . . . . . . . . . 12
-        11 . . . . . . . . O . O . O . . 11
-        10 . . . . . . . . X X[X]X . . . 10
+        11 . . . . . . . . . . O . O . . 11
+        10 . . . . . . . .[X]X . X . . . 10
          9 . . . . . . . . X O X . . . . 9
          8 . . . . . . O X X X X O . . . 8
-         7 . . . . . . X . X O . . . . . 7
+         7 . . . . . . X . X O 3 . . . . 7
          6 . . . . . O . O O . . . . . . 6
          5 . . . . . . O . . . . . . . . 5
          4 . . . . . . . . . . . . . . . 4
@@ -106,7 +106,7 @@ mod test_endgame_vcf {
          1 . . . . . . . . X . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        // assert_eq!(vcf!(case), expected);
+        assert_eq!(vcf!(case), expected);
 
         let case = indoc! {"
            A B C D E F G H I J K L M N O
@@ -132,9 +132,9 @@ mod test_endgame_vcf {
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
         13 . . . . . . . . . . . . . . . 13
-        12 . . . . . . . O . .[X]O . . O 12
+        12 . . . . . . . O . . . O . . . 12
         11 . . . . . . . O X O X X X X O 11
-        10 . . . . . . . . . X O O X . . 10
+        10 . . . . . . . . . X O O[X]. . 10
          9 . . . . . . . O X O X X X X O 9
          8 . . . . . . . X O . X X O . . 8
          7 . . . . . . O . . O O X O . . 7
@@ -173,8 +173,8 @@ mod test_endgame_vcf {
         14 . . . . . . . . . . . . . . . 14
         13 . . . . . O . . . . . . . . . 13
         12 . . . . . . X . O . O . . . . 12
-        11 . . . . . O O X O X X X . . . 11
-        10 . . . . . . X O X O[X]. . . . 10
+        11 . . . . . O O X . X X[X]. . . 11
+        10 . . . . . . X O X O . . . . . 10
          9 . . . . O X X X O X O . . . . 9
          8 . . . . X O X X X X O . . . . 8
          7 . . . O . O O . O X . . . . . 7
@@ -216,9 +216,9 @@ mod test_endgame_vcf {
         11 . . . . . . . . . . . . . . . 11
         10 . . . . . X . O . . . . . . . 10
          9 . . . . O O O X O . . . . . . 9
-         8 . . . . . X X X O O . . . . . 8
+         8 . . . . . X[X]X O O . . . . . 8
          7 . . . . O X X X X O . . . . . 7
-         6 . . . .[X]X O X O X . . . . . 6
+         6 . . . . . X . X O X . . . . . 6
          5 . . . . X O X O O . O . . . . 5
          4 . . . O . X X X O X . X . . . 4
          3 . . . . O . O . X . . . . . . 3
@@ -356,46 +356,6 @@ mod test_endgame_vcf {
     fn deep_vcf() {
         let case = indoc! {"
            A B C D E F G H I J K L M N O
-        15 O O . . X . X . . O X O O X . 15
-        14 O . X . . O . . . . X . . . X 14
-        13 O . . . . . . . . . . . . . . 13
-        12 O . . . . X . . . . . . . . X 12
-        11 X . X . . . . . . . . . . . . 11
-        10 O . . O . . X . . . . . . X . 10
-         9 O . . . . . . . O . . . . O X 9
-         8 . . . O . . O X . . . . X . . 8
-         7 . X . . . . . . O . . . X . . 7
-         6 . . . . O . . . O . X . . . O 6
-         5 . . . X . . . . . . . . . . X 5
-         4 X O . . . X . . X . . X . X O 4
-         3 . X . . . . . . . . . . . . O 3
-         2 . O . . . . . . . . O . . X O 2
-         1 X O . O . O . X . X O O X O . 1
-           A B C D E F G H I J K L M N O"};
-
-        let expected = indoc! {"
-           A B C D E F G H I J K L M N O
-        15 O O O . X[X]X . . O X O O X O 15
-        14 O O X X . O O O X O X X X O X 14
-        13 O O X X X X O X X O X X X O X 13
-        12 O O X X O X O X X X O O O O X 12
-        11 X X X O X O O O O X X X X O X 11
-        10 O O O O X X X X O O X O O X O 10
-         9 O X O X X X O O O X O O X O X 9
-         8 O X O O X O O X X X O X X X X 8
-         7 O X O O O X X O O X O O X O O 7
-         6 X O X X O X X O O O X O O X O 6
-         5 X X O X X X X O X X X O X X X 5
-         4 X O O O X X O X X X O X X X O 4
-         3 X X O X X O O O X X X O X O O 3
-         2 O O O O X O X X X O O O O X O 2
-         1 X O X O O O O X O X O O X O O 1
-           A B C D E F G H I J K L M N O"};
-
-        assert_eq!(vcf!(case), expected);
-
-        let case = indoc! {"
-           A B C D E F G H I J K L M N O
         15 O . . . X . . . . . . . X . X 15
         14 X . . . . O . . . O . . O . X 14
         13 . . . . . . . O . . . . . O . 13
@@ -430,6 +390,46 @@ mod test_endgame_vcf {
          3 X O X X X O X X O O O O X X O 3
          2 O O O X O X X X O X X O O O O 2
          1 X O O O O X O O X O X X X X O 1
+           A B C D E F G H I J K L M N O"};
+
+        assert_eq!(vcf!(case), expected);
+
+        let case = indoc! {"
+           A B C D E F G H I J K L M N O
+        15 O O . . X . X . . O X O O X . 15
+        14 O . X . . O . . . . X . . . X 14
+        13 O . . . . . . . . . . . . . . 13
+        12 O . . . . X . . . . . . . . X 12
+        11 X . X . . . . . . . . . . . . 11
+        10 O . . O . . X . . . . . . X . 10
+         9 O . . . . . . . O . . . . O X 9
+         8 . . . O . . O X . . . . X . . 8
+         7 . X . . . . . . O . . . X . . 7
+         6 . . . . O . . . O . X . . . O 6
+         5 . . . X . . . . . . . . . . X 5
+         4 X O . . . X . . X . . X . X O 4
+         3 . X . . . . . . . . . . . . O 3
+         2 . O . . . . . . . . O . . X O 2
+         1 X O . O . O . X . X O O X O . 1
+           A B C D E F G H I J K L M N O"};
+
+        let expected = indoc! {"
+           A B C D E F G H I J K L M N O
+        15 O O O . X[X]X . . O X O O X O 15
+        14 O O X X . O O O X O X X X O X 14
+        13 O O X X X X O X X O X X X O X 13
+        12 O O X X O X O X X X O O O O X 12
+        11 X X X O X O O O O X X X X O X 11
+        10 O O O O X X X X O O X O O X O 10
+         9 O X O X X X O O O X O O X O X 9
+         8 O X O O X O O X X X O X X X X 8
+         7 O X O O O X X O O X O O X O O 7
+         6 X O X X O X X O O O X O O X O 6
+         5 X X O X X X X O X X X O X X X 5
+         4 X O O O X X O X X X O X X X O 4
+         3 X X O X X O O O X X X O X O O 3
+         2 O O O O X O X X X O O O O X O 2
+         1 X O X O O O O X O X O O X O O 1
            A B C D E F G H I J K L M N O"};
 
         assert_eq!(vcf!(case), expected);

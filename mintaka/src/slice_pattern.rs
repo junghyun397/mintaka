@@ -198,7 +198,8 @@ fn find_patterns(
     process_pattern!(black, asymmetry, "XOO.O.!", "XOOFO.!");
     process_pattern!(black, asymmetry, "XO.OO.!", "XOFOO.!");
     process_pattern!(black, asymmetry, "XOOO..!", "XOOOF.!", "XOOO.F!");
-    process_pattern!(black, asymmetry, "X.OOO..!", "XFOOO..!", "X.OOO.C!");
+    process_pattern!(black, asymmetry, "!.OOO.X", "!.OOOFX");
+    process_pattern!(black, asymmetry, "X.OOO..!", "X.OOO.C!");
 
     process_pattern!(black, asymmetry, "O.O.OO.!", "O.OFOO.!");
     process_pattern!(black, asymmetry, "O.OO.O.!", "O.OOFO.!");
@@ -207,12 +208,14 @@ fn find_patterns(
     process_pattern!(white, symmetry, "!O.O.O!", "!OFO.O!", "!O.OFO!");
     process_pattern!(white, asymmetry, "OO.O.", "OO.OF");
     process_pattern!(white, asymmetry, "O.OO.", "O.OOF");
-    process_pattern!(white, asymmetry, "OO..O", "OOF.O", "OO.FO");
+    process_pattern!(white, asymmetry, "OO..O!", "OOF.O!", "OO.FO!");
+    process_pattern!(white, symmetry, "OO..OO", "OOF.OO", "OO.FOO");
 
     process_pattern!(white, asymmetry, "XOO.O.", "XOOFO.");
     process_pattern!(white, asymmetry, "XO.OO.", "XOFOO.");
-    process_pattern!(white, asymmetry, "XOOO..", "XOOOF.", "XOOO.F");
-    process_pattern!(white, asymmetry, "..OOO.X", "..OOOFX", "C.OOO.X");
+    process_pattern!(white, asymmetry, "XOOO..!", "XOOOF.!", "XOOO.F!");
+    process_pattern!(white, asymmetry, ".OOO.X", ".OOOFX");
+    process_pattern!(white, asymmetry, "..OOO.X", "C.OOO.X");
 
     // OPEN-FOUR
 
