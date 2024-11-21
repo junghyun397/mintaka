@@ -72,6 +72,15 @@ fn extract_color_stones(source: &[Option<Color>], target_color: Color) -> Box<[P
 
 impl Board {
 
+    pub fn to_string_with_move_marker(&self, pos: Pos) -> String {
+        add_move_marker(self.to_string(), self.opponent_color(), pos, '[', ']')
+    }
+
+    pub fn to_string_with_move_marker_pair(&self, pre: Pos, post: Pos) -> String {
+        let board_string = add_move_marker(self.to_string(), self.player_color, pre, '|', '|');
+        add_move_marker(board_string, self.opponent_color(), post, '[', ']')
+    }
+
     pub fn build_attribute_string<F>(&self, transform: F) -> String
     where F: Fn(&BoardIterItem) -> String
     {
@@ -369,4 +378,19 @@ impl Display for ForbiddenKind {
         write!(f, "{}", char::from(*self))
     }
 
+}
+
+pub fn add_move_marker(mut board_string: String, color: Color, pos: Pos, pre_marker: char, post_marker: char) -> String {
+    const COL_INDEX_OFFSET: usize = 3 + U_BOARD_WIDTH * 2; // row(2) + margin(1) + col(w*2) + br(1)
+    const LINE_OFFSET: usize = 3 + U_BOARD_WIDTH * 2 + 3; // row(2) + margin(1) + col(w*2) + row(2) + br(1)
+    const LINE_BEGIN_OFFSET: usize = 2; // row(2)
+
+    let reversed_row = U_BOARD_WIDTH - 1 - pos.row_usize();
+    let offset: usize = COL_INDEX_OFFSET
+        + LINE_OFFSET * reversed_row
+        - reversed_row.saturating_add_signed(-((U_BOARD_WIDTH - 9) as isize))
+        + LINE_BEGIN_OFFSET + pos.col_usize() * 2;
+
+    board_string.replace_range(offset .. offset + 3, &format!("{pre_marker}{}{post_marker}", char::from(color)));
+    board_string
 }

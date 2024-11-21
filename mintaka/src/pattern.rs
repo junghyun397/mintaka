@@ -300,6 +300,7 @@ pub struct Patterns {
     pub field: [Pattern; pos::BOARD_SIZE],
     pub five_in_a_row: Option<Color>,
     pub unchecked_double_three_field: Bitfield,
+    pub critical_field: Bitfield,
 }
 
 impl Default for Patterns {
@@ -309,6 +310,7 @@ impl Default for Patterns {
             field: [Pattern::default(); pos::BOARD_SIZE],
             five_in_a_row: None,
             unchecked_double_three_field: u256::MIN,
+            critical_field: u256::MIN,
         }
     }
 

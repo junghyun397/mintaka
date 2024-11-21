@@ -61,22 +61,24 @@ impl Board {
     }
 
     pub fn set_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos) {
-        self.incremental_update_mut(memo, pos, Slice::set_mut);
+        self.incremental_update_mut::<false>(memo, pos, Slice::set_mut);
 
         self.stones += 1;
         self.hot_field.set(pos);
         self.switch_player_mut();
+
         self.hash_key = self.hash_key.set(self.player_color, pos);
     }
 
     pub fn unset_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos) {
         self.patterns.five_in_a_row = None;
+
         self.switch_player_mut();
-
-        self.incremental_update_mut(memo, pos, Slice::unset_mut);
-
-        self.stones -= 1;
         self.hot_field.unset(pos);
+        self.stones -= 1;
+
+        self.incremental_update_mut::<true>(memo, pos, Slice::unset_mut);
+
         self.hash_key = self.hash_key.set(self.player_color, pos);
     }
 
@@ -130,31 +132,35 @@ impl Board {
 
     #[cfg(not(feature = "prefetch_slice"))]
     #[inline(always)]
-    fn incremental_update_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
+    fn incremental_update_mut<const OVERWRITE: bool>(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
+        let horizontal_slice_was_valid = OVERWRITE & horizontal_slice.is_valid_pattern();
         slice_mut_op(horizontal_slice, self.player_color, pos.col());
-        if horizontal_slice.is_valid_pattern() {
+        if horizontal_slice_was_valid | horizontal_slice.is_valid_pattern() {
             self.patterns.update_by_slice_mut::<{ Direction::Horizontal }>(memo, horizontal_slice);
         }
 
         let vertical_slice = &mut self.slices.vertical_slices[pos.col_usize()];
+        let vertical_slice_was_valid = OVERWRITE & vertical_slice.is_valid_pattern();
         slice_mut_op(vertical_slice, self.player_color, pos.row());
-        if vertical_slice.is_valid_pattern() {
+        if vertical_slice_was_valid | vertical_slice.is_valid_pattern() {
             self.patterns.update_by_slice_mut::<{ Direction::Vertical }>(memo, vertical_slice);
         }
 
         if let Some(ascending_slice_idx) = Slices::ascending_slice_idx(pos) {
             let ascending_slice = &mut self.slices.ascending_slices[ascending_slice_idx];
+            let ascending_slice_was_valid = OVERWRITE & ascending_slice.is_valid_pattern();
             slice_mut_op(ascending_slice, self.player_color, pos.col() - ascending_slice.start_col);
-            if ascending_slice.is_valid_pattern() {
+            if ascending_slice_was_valid | ascending_slice.is_valid_pattern() {
                 self.patterns.update_by_slice_mut::<{ Direction::Ascending }>(memo, ascending_slice);
             }
         }
 
         if let Some(descending_slice_idx) = Slices::descending_slice_idx(pos) {
             let descending_slice = &mut self.slices.descending_slices[descending_slice_idx];
+            let descending_slice_was_valid = OVERWRITE & descending_slice.is_valid_pattern();
             slice_mut_op(descending_slice, self.player_color, pos.col() - descending_slice.start_col);
-            if descending_slice.is_valid_pattern() {
+            if descending_slice_was_valid | descending_slice.is_valid_pattern() {
                 self.patterns.update_by_slice_mut::<{ Direction::Descending }>(memo, descending_slice);
             }
         }
@@ -164,20 +170,23 @@ impl Board {
 
     #[cfg(feature = "prefetch_slice")]
     #[inline(always)]
-    fn incremental_update_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
+    fn incremental_update_mut<const OVERWRITE: bool>(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
+        let horizontal_slice_was_valid = OVERWRITE & horizontal_slice.is_valid_pattern();
         slice_mut_op(horizontal_slice, self.player_color, pos.col());
-        let is_horizontal_slice_valid = horizontal_slice.is_valid_pattern();
+        let is_horizontal_slice_valid = horizontal_slice_was_valid | horizontal_slice.is_valid_pattern();
 
         let vertical_slice = &mut self.slices.vertical_slices[pos.col_usize()];
+        let vertical_slice_was_valid = OVERWRITE & vertical_slice.is_valid_pattern();
         slice_mut_op(vertical_slice, self.player_color, pos.row());
-        let is_vertical_slice_valid = vertical_slice.is_valid_pattern();
+        let is_vertical_slice_valid = vertical_slice_was_valid | vertical_slice.is_valid_pattern();
 
         let valid_ascending_slice =
             if let Some(idx) = Slices::ascending_slice_idx(pos) {
                 let ascending_slice = &mut self.slices.ascending_slices[idx];
+                let ascending_slice_was_valid = OVERWRITE & ascending_slice.is_valid_pattern();
                 slice_mut_op(ascending_slice, self.player_color, pos.col() - ascending_slice.start_col);
-                ascending_slice.is_valid_pattern().then_some(ascending_slice)
+                (ascending_slice_was_valid | ascending_slice.is_valid_pattern()).then_some(ascending_slice)
             } else {
                 None
             };
@@ -185,8 +194,9 @@ impl Board {
         let valid_descending_slice =
             if let Some(idx) = Slices::descending_slice_idx(pos) {
                 let descending_slice = &mut self.slices.descending_slices[idx];
+                let descending_slice_was_valid = OVERWRITE & descending_slice.is_valid_pattern();
                 slice_mut_op(descending_slice, self.player_color, pos.col() - descending_slice.start_col);
-                descending_slice.is_valid_pattern().then_some(descending_slice)
+                (descending_slice_was_valid | descending_slice.is_valid_pattern()).then_some(descending_slice)
             } else {
                 None
             };
@@ -332,7 +342,7 @@ impl Board {
                 continue;
             }
 
-            if match self.calculate_local_signature(direction, pos) {
+            if match self.calculate_near_5_signature::<{ Color::Black }>(direction, pos) {
                 /* .VOO. */ 0b11000 => {
                     self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_unchecked(direction, 1)) &&
                     self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_positive_unchecked(direction, 3))
@@ -412,7 +422,7 @@ impl Board {
     fn update_four_overrides_each_direction(&self, overrides: &mut SetOverrideStack, direction: Direction, pos: Pos) {
         let direction_offset = direction as usize * 3;
 
-        match self.calculate_local_signature(direction, pos) {
+        match self.calculate_near_5_signature::<{ Color::Black }>(direction, pos) {
             /* .VOO.  */ 0b11000 => {
                 overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, 1);
                 overrides.next_four[direction_offset + 1] = pos.directional_offset_positive_unchecked(direction, 3);
@@ -459,10 +469,24 @@ impl Board {
         }
     }
 
-    pub fn calculate_local_signature(&self, direction: Direction, pos: Pos) -> u16 {
+    pub fn calculate_near_5_signature<const C: Color>(&self, direction: Direction, pos: Pos) -> u16 {
         let slice = self.slices.access_slice(direction, pos);
         let slice_idx = slice.calculate_idx(direction, pos);
-        (slice.black_stones >> (slice_idx - 2)) & 0b11111 // 0[00V00]0
+        let stones = match C {
+            Color::Black => slice.black_stones,
+            Color::White => slice.white_stones
+        };
+        (stones >> (slice_idx - 2)) & 0b11111 // 0[00V00]0
+    }
+
+    pub fn calculate_near_3_signature<const C: Color>(&self, direction: Direction, pos: Pos) -> u16 {
+        let slice = self.slices.access_slice(direction, pos);
+        let slice_idx = slice.calculate_idx(direction, pos);
+        let stones = match C {
+            Color::Black => slice.black_stones,
+            Color::White => slice.white_stones
+        };
+        (stones >> (slice_idx - 1)) & 0b111
     }
 
 }
