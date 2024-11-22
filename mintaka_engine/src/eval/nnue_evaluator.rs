@@ -1,4 +1,5 @@
 use crate::eval::evaluator::Evaluator;
+use crate::memo::tt_entry::Score;
 use mintaka::board::Board;
 
 pub struct NnueEvaluator {
@@ -15,7 +16,7 @@ impl Default for NnueEvaluator {
 
 impl Evaluator for NnueEvaluator {
 
-    fn eval(&self, board: &Board) -> i16 {
+    fn eval(&self, board: &Board) -> Score {
         todo!()
     }
 

@@ -11,13 +11,16 @@ pub enum TTFlag {
     EXACT,
 }
 
+pub type Score = i16;
+pub type Eval = i16;
+
 // 64 bit
 pub struct TTEntry {
     pub best_move: Pos, // 8
     pub depth: u8, // 8
     pub flag: TTFlag, // 8
-    pub score: i16, // 16
-    pub eval: i16, // 16
+    pub score: Score, // 16
+    pub eval: Eval, // 16
 }
 
 impl From<TTEntry> for u64 {

@@ -1,4 +1,5 @@
 use crate::memo::transposition_table::TranspositionTable;
+use crate::memo::tt_entry::Score;
 use mintaka::board::Board;
 use mintaka::memo::slice_pattern_memo::SlicePatternMemo;
 use mintaka::notation::pos::Pos;
@@ -12,6 +13,6 @@ pub trait NodeType {
 pub fn search(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
     board: &mut Board
-) -> (i16, Option<Pos>) {
+) -> (Score, Option<Pos>) {
     (0, None)
 }

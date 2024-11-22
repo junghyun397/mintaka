@@ -1,4 +1,5 @@
 use crate::memo::transposition_table::TranspositionTable;
+use crate::memo::tt_entry::Score;
 use mintaka::board::Board;
 use mintaka::memo::slice_pattern_memo::SlicePatternMemo;
 use mintaka::notation::color::Color;
@@ -9,7 +10,7 @@ use mintaka::pattern::PatternCount;
 pub fn vcf(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
     board: &mut Board, max_depth: u8
-) -> i16 {
+) -> Score {
     todo!()
 }
 
@@ -18,8 +19,8 @@ pub fn vcf_sequence(
     board: &mut Board, max_depth: u8
 ) -> Option<Vec<Pos>> {
     match board.player_color {
-        Color::Black => try_vcf::<{ Color::Black }>(tt, memo, board, max_depth, 0, false),
-        Color::White => try_vcf::<{ Color::White }>(tt, memo, board, max_depth, 0, false),
+        Color::Black => try_vcf::<{ Color::Black }>(tt, memo, board, max_depth, 0, opponent_has_any_five::<{ Color::Black }>(board)),
+        Color::White => try_vcf::<{ Color::White }>(tt, memo, board, max_depth, 0, opponent_has_any_five::<{ Color::Black }>(board)),
     }.map(|mut result| {
         result.reverse();
         result
@@ -29,7 +30,7 @@ pub fn vcf_sequence(
 // Depth-First Search(DFS)
 fn try_vcf<const C: Color>(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
-    board: &mut Board, max_depth: u8, depth: u8, opponent_four_opened: bool,
+    board: &mut Board, max_depth: u8, depth: u8, opponent_has_five: bool,
 ) -> Option<Vec<Pos>> {
     if board.stones > U8_BOARD_SIZE - 2 {
         return None;
@@ -42,7 +43,7 @@ fn try_vcf<const C: Color>(
 
         if !player_unit.has_four()
             || (C == Color::Black && pattern.is_forbidden())
-            || (opponent_four_opened && opponent_unit.count_fives() != 1)
+            || (opponent_has_five && !opponent_unit.has_five())
         {
             continue;
         }
@@ -116,10 +117,20 @@ fn player_has_any_open_four<const C: Color>(board: &Board) -> bool {
     false
 }
 
+fn opponent_has_any_five<const C: Color>(board: &Board) -> bool {
+    for idx in 0 .. pos::BOARD_SIZE {
+        if board.patterns.field[idx].opponent_unit::<C>().has_five() {
+            return true;
+        }
+    }
+
+    false
+}
+
 // Depth-First Search(DFS)
 fn try_vcf_legacy<const C: Color>(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
-    board: &mut Board, max_depth: u8, depth: u8, three_opened: bool,
+    board: &mut Board, max_depth: u8, depth: u8
 ) -> Option<Vec<Pos>> {
     if depth > max_depth {
         return None;
@@ -140,21 +151,13 @@ fn try_vcf_legacy<const C: Color>(
 
         let four_pos = Pos::from_index(idx as u8);
 
-        if three_opened {
-            if player_unit.has_open_four() {
-                return Some(vec![four_pos]);
-            } else {
-                continue;
-            }
-        }
-
         if C == Color::White && player_unit.has_fours() {
             return Some(vec![four_pos])
         }
 
         board.set_mut(memo, four_pos);
 
-        let maybe_vcf = defend_vcf::<C>(tt, memo, board, max_depth, depth + 1, player_unit.has_three());
+        let maybe_vcf = defend_vcf::<C>(tt, memo, board, max_depth, depth + 1);
 
         board.unset_mut(memo, four_pos);
 
@@ -169,7 +172,7 @@ fn try_vcf_legacy<const C: Color>(
 
 fn defend_vcf<const C: Color>(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
-    board: &mut Board, max_depth: u8, depth: u8, three_opened: bool,
+    board: &mut Board, max_depth: u8, depth: u8
 ) -> Option<Vec<Pos>> {
     let defend_pos = {
         let mut defend_pos = INVALID_POS;
@@ -211,7 +214,7 @@ fn defend_vcf<const C: Color>(
 
     board.set_mut(memo, defend_pos);
 
-    let maybe_vcf = try_vcf_legacy::<C>(tt, memo, board, max_depth, depth + 1, three_opened);
+    let maybe_vcf = try_vcf_legacy::<C>(tt, memo, board, max_depth, depth + 1);
 
     board.unset_mut(memo, defend_pos);
 

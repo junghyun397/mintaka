@@ -206,23 +206,33 @@ fn find_patterns(
     process_pattern!(black, asymmetry, long-pattern, left, "..OOO..O", "..OOOF.O", "C.OOO..O"); // [!]..OOO..O
 
     process_pattern!(white, symmetry, "!O.O.O!", "!OFO.O!", "!O.OFO!");
-    process_pattern!(white, asymmetry, "OO.O.", "OO.OF");
-    process_pattern!(white, asymmetry, "O.OO.", "O.OOF");
-    process_pattern!(white, asymmetry, "OO..O!", "OOF.O!", "OO.FO!");
-    process_pattern!(white, symmetry, "OO..OO", "OOF.OO", "OO.FOO");
+    process_pattern!(white, asymmetry, "OOO..!", "OOO.F!");
+    process_pattern!(white, asymmetry, "!OOO..O!", "!OOO.FO!");
 
+    process_pattern!(white, asymmetry, "X.OOO.", "XFOOO.");
+    process_pattern!(white, asymmetry, "X.OOO..", "X.OOO.C");
+
+    process_pattern!(white, asymmetry, "XOOO..", "XOOOF.");
     process_pattern!(white, asymmetry, "XOO.O.", "XOOFO.");
     process_pattern!(white, asymmetry, "XO.OO.", "XOFOO.");
-    process_pattern!(white, asymmetry, "XOOO..!", "XOOOF.!", "XOOO.F!");
-    process_pattern!(white, asymmetry, ".OOO.X", ".OOOFX");
-    process_pattern!(white, asymmetry, "..OOO.X", "C.OOO.X");
+
+    process_pattern!(white, asymmetry, "!OO..O!", "!OOF.O!", "!OO.FO!");
+    process_pattern!(white, asymmetry, "OO.O.", "OO.OF");
+    process_pattern!(white, asymmetry, "O.OOF!", "O.OOF!");
+
+    // process_pattern!(white, symmetry, "OO..OO", "OOF.OO", "OO.FOO");
+    // process_pattern!(white, asymmetry, "OO.O.O", "OO.OFO");
+    // process_pattern!(white, asymmetry, "OO.O.!", "OO.OF!");
+    // process_pattern!(white, asymmetry, "OO..O!", "OOF.O!", "OO.FO!");
+    // process_pattern!(white, asymmetry, "O.OO.!", "O.OOF!");
+    // process_pattern!(white, asymmetry, "XOOO..!", "XOOOF.!", "XOOO.F!");
 
     // OPEN-FOUR
 
     process_pattern!(black, asymmetry, "!.OOO..!", "!.OOO4.!", "!.OOO.F!", "!COOO..!", "!.OOOC.!");
     process_pattern!(black, asymmetry, "!.OO.O.!", "!.OO4O.!", "!COO.O.!", "!.OOCO.!", "!.OO.OC!");
 
-    process_pattern!(white, asymmetry, ".OOO..", ".OOO4.", ".OOO.F", "COOO..", ".OOOC.");
+    process_pattern!(white, asymmetry, ".OOO..", ".OOO4.", "COOO..", ".OOOC.");
     process_pattern!(white, asymmetry, ".OO.O.", ".OO4O.", "COO.O.", ".OOCO.", ".OO.OC");
 
     // FIVE
@@ -241,23 +251,31 @@ fn find_patterns(
     process_pattern!(black, asymmetry, "OO.OOO", "OO6OOO");
 }
 
-pub fn contains_four_in_a_row(mut stones: u16) -> bool {
+fn calculate_four_in_a_rows(mut stones: u16) -> u16 {
     stones &= stones >> 1;
     stones &= stones >> 2;
-    stones != 0
+    stones
 }
 
-pub fn contains_five_in_a_row(mut stones: u16) -> bool {
+fn calculate_five_in_a_rows(mut stones: u16) -> u16 {
     stones &= stones >> 1;  // 1 1 1 1 1 0 & 0 1 1 1 1 1
     stones &= stones >> 3;  // 0 1 1 1 1 0 & 0 0 0 0 1 1 ...
-    stones != 0             // 0 0 0 0 1 0 ...
+    stones                  // 0 0 0 0 1 0 ...
 }
 
-pub fn contains_six_in_a_row(mut stones: u16) -> bool {
+fn calculate_six_in_a_rows(mut stones: u16) -> u16 {
     stones &= stones >> 1;
     stones &= stones >> 1;
     stones &= stones >> 3;
-    stones != 0
+    stones
+}
+
+pub fn contains_five_in_a_row(stones: u16) -> bool {
+    calculate_five_in_a_rows(stones) != 0
+}
+
+pub fn contains_overline(stones: u16) -> bool {
+    calculate_six_in_a_rows(stones) != 0
 }
 
 fn increase_closed_four_single(packed: u8) -> u8 {

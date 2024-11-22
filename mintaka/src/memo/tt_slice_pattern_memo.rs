@@ -24,20 +24,13 @@ impl Clearable for AtomicTTSlicePatternEntry {
 
 impl AtomicTTSlicePatternEntry {
 
-    fn encode(packed_slice: u64, pattern: &SlicePattern) -> Self {
-        let block_0 = packed_slice;
-        let block_1 = u64::from_ne_bytes(pattern.black_patterns[0 ..8].try_into().unwrap());
-        let block_2 = u64::from_ne_bytes(pattern.black_patterns[8 .. 16].try_into().unwrap());
-        let block_3 = u64::from_ne_bytes(pattern.white_patterns[0 ..8].try_into().unwrap());
-        let block_4 = u64::from_ne_bytes(pattern.white_patterns[8 .. 16].try_into().unwrap());
-
-        Self(
-            AtomicU64::from(block_0),
-            AtomicU64::from(block_1),
-            AtomicU64::from(block_2),
-            AtomicU64::from(block_3),
-            AtomicU64::from(block_4),
-        )
+    // interior-mutability
+    fn store_mut(&self, packed_slice: u64, pattern: &SlicePattern) {
+        self.0.store(packed_slice, Ordering::Relaxed);
+        self.1.store(u64::from_ne_bytes(pattern.black_patterns[0 ..8].try_into().unwrap()), Ordering::Relaxed);
+        self.2.store(u64::from_ne_bytes(pattern.black_patterns[8 .. 16].try_into().unwrap()), Ordering::Relaxed);
+        self.3.store(u64::from_ne_bytes(pattern.white_patterns[0 ..8].try_into().unwrap()), Ordering::Relaxed);
+        self.4.store(u64::from_ne_bytes(pattern.white_patterns[8 .. 16].try_into().unwrap()), Ordering::Relaxed);
     }
 
     fn decode(&self) -> SlicePattern {
@@ -94,14 +87,14 @@ impl AbstractTranspositionTable<AtomicTTSlicePatternEntry> for TTSlicePatternMem
 impl SlicePatternMemo for TTSlicePatternMemo {
 
     fn prefetch_memo(&self, packed_slice: u64) {
-        self.prefetch(HashKey(packed_slice));
+        self.prefetch(Self::build_hash_key(packed_slice));
     }
 
     fn probe_or_put_mut<F>(&mut self, packed_slice: u64, produce: F) -> SlicePattern
     where F: FnOnce() -> SlicePattern
     {
         // fibonacci-hashing
-        let slice_hash = HashKey(unsafe { (packed_slice | (packed_slice << 32)).overflowing_mul(0x9e3779b97f4a7c15).0 });
+        let slice_hash = Self::build_hash_key(packed_slice);
         let idx = self.calculate_index(slice_hash);
         let atomic_entry = &self.table[idx];
 
@@ -111,12 +104,20 @@ impl SlicePatternMemo for TTSlicePatternMemo {
         }
 
         let slice_pattern = produce();
-        self.table[idx] = AtomicTTSlicePatternEntry::encode(
+        atomic_entry.store_mut(
             packed_slice,
             &slice_pattern
         );
 
         slice_pattern
+    }
+
+}
+
+impl TTSlicePatternMemo {
+
+    fn build_hash_key(packed_slice: u64) -> HashKey {
+        HashKey(unsafe { (packed_slice | (packed_slice << 32)).overflowing_mul(0x9e3779b97f4a7c15).0 })
     }
 
 }

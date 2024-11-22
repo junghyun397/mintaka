@@ -201,49 +201,51 @@ impl Board {
                 None
             };
 
-        let mut prefetch_stack: [u64; 3] = [0, 0, 0];
-        let mut prefetch_top: usize = 0;
+        let mut prefetch_queue: [u64; 3] = [0, 0, 0];
+        let mut prefetch_idx: usize = 0;
 
         if is_vertical_slice_valid {
-            prefetch_stack[prefetch_top] = vertical_slice.packed_slice();
-            prefetch_top += 1;
+            prefetch_queue[prefetch_idx] = vertical_slice.packed_slice();
+            prefetch_idx += 1;
         }
 
         if valid_ascending_slice.as_ref()
             .map_or(false, |slice| slice.is_valid_pattern())
         {
-            prefetch_stack[prefetch_top] = valid_ascending_slice.as_ref().unwrap().packed_slice();
-            prefetch_top += 1;
+            prefetch_queue[prefetch_idx] = valid_ascending_slice.as_ref().unwrap().packed_slice();
+            prefetch_idx += 1;
         }
 
         if valid_descending_slice.as_ref()
             .map_or(false, |slice| slice.is_valid_pattern())
         {
-            prefetch_stack[prefetch_top] = valid_descending_slice.as_ref().unwrap().packed_slice();
-            prefetch_top += 1;
+            prefetch_queue[prefetch_idx] = valid_descending_slice.as_ref().unwrap().packed_slice();
+            prefetch_idx += 1;
         }
 
+        prefetch_idx = 0;
+
         if is_horizontal_slice_valid {
-            if prefetch_top != 0 {
-                prefetch_top -= 1;
-                memo.prefetch_memo(prefetch_stack[prefetch_top]);
+            if prefetch_queue[prefetch_idx] != 0 {
+                memo.prefetch_memo(prefetch_queue[prefetch_idx]);
+                prefetch_idx += 1;
             }
 
             self.patterns.update_by_slice_mut::<{ Direction::Horizontal }>(memo, horizontal_slice);
         }
 
         if is_vertical_slice_valid {
-            if prefetch_top != 0 {
-                prefetch_top -= 1;
-                memo.prefetch_memo(prefetch_stack[prefetch_top]);
+            if prefetch_queue[prefetch_idx] != 0 {
+                memo.prefetch_memo(prefetch_queue[prefetch_idx]);
+                prefetch_idx += 1;
             }
 
             self.patterns.update_by_slice_mut::<{ Direction::Vertical }>(memo, vertical_slice);
         }
 
         if let Some(ascending_slice) = valid_ascending_slice {
-            if prefetch_top != 0 {
-                memo.prefetch_memo(prefetch_stack[prefetch_top]);
+            if prefetch_queue[prefetch_idx] != 0 {
+                memo.prefetch_memo(prefetch_queue[prefetch_idx]);
             }
 
             self.patterns.update_by_slice_mut::<{ Direction::Ascending }>(memo, ascending_slice);

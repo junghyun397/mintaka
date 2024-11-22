@@ -1,4 +1,4 @@
-use crate::memo::tt_entry::{TTEntry, TTEntryBucket, TTEntryBucketPosition, TTFlag};
+use crate::memo::tt_entry::{Eval, Score, TTEntry, TTEntryBucket, TTEntryBucketPosition, TTFlag};
 use mintaka::memo::abstract_transposition_table::AbstractTranspositionTable;
 use mintaka::memo::hash_key::HashKey;
 use mintaka::notation::pos::Pos;
@@ -41,8 +41,8 @@ impl TranspositionTable {
         best_move: Pos,
         depth: u8,
         flag: TTFlag,
-        score: i16,
-        eval: i16,
+        score: Score,
+        eval: Eval,
     ) {
         let idx = self.calculate_index(key);
         let lower_half_key = key.0 as u32;

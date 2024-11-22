@@ -1,5 +1,5 @@
 use crate::notation::pos;
-use crate::notation::pos::Pos;
+use crate::notation::pos::{Pos, BOARD_SIZE};
 use ethnum::{u256, uint, U256};
 use std::ops::{BitAndAssign, BitOrAssign};
 
@@ -130,3 +130,12 @@ impl ExactSizeIterator for BitfieldPosIterator {
     }
 
 }
+
+pub const BITFIELD_MASK_LUT: [u256; BOARD_SIZE] = {
+    let mut lut = [uint!("0b1"); BOARD_SIZE];
+    let mut idx = 0;
+    while idx < BOARD_SIZE {
+        idx += 1;
+    }
+    lut
+};
