@@ -1,5 +1,4 @@
-use crate::bitfield::{Bitfield, BitfieldOps};
-use crate::cartesian_to_index;
+use crate::bitfield::Bitfield;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
@@ -9,7 +8,7 @@ use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slice;
 use crate::slice_pattern::contains_five_in_a_row;
 use crate::utils::lang_utils::repeat_4x;
-use ethnum::u256;
+use crate::cartesian_to_index;
 
 pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
@@ -323,8 +322,8 @@ impl Default for Patterns {
         Self {
             field: [Pattern::default(); pos::BOARD_SIZE],
             five_in_a_row: None,
-            unchecked_double_three_field: u256::MIN,
-            critical_field: u256::MIN,
+            unchecked_double_three_field: Bitfield::ZERO_FILLED,
+            critical_field: Bitfield::ZERO_FILLED,
         }
     }
 

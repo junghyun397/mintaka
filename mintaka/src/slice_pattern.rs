@@ -175,77 +175,78 @@ fn find_patterns(
         };
     }
 
-    // THREE
+    // black-open-three
 
     process_pattern!(black, asymmetry, "!.OO...!", "!.OO3..!", "!.OO.3.!");
-    process_pattern!(black, asymmetry, "!..OO..X", "!..OO3.X");
-    process_pattern!(black, asymmetry, long-pattern, left, "..OO...O", "..OO3..O"); // [!]..OO...O
+    process_pattern!(black, asymmetry, "X..OO..!", "X.3OO..!");
     process_pattern!(black, asymmetry, "!.O.O..!", "!.O3O..!", "!.O.O3.!");
     process_pattern!(black, symmetry, "!.O..O.!", "!.O3.O.!", "!.O.3O.!");
+    process_pattern!(black, asymmetry, long-pattern, left, "..OO...O", "..OO3..O"); // [!]..OO...O
+
+    // white-open-three
 
     process_pattern!(white, asymmetry, ".OO...", ".OO3..", ".OO.3.");
-    process_pattern!(white, asymmetry, "..OO..X", "..OO3.X");
+    process_pattern!(white, asymmetry, "X..OO..", "X.3OO..");
     process_pattern!(white, asymmetry, ".O.O..", ".O3O..", ".O.O3.");
     process_pattern!(white, symmetry, ".O..O.", ".O3.O.", ".O.3O.");
 
-    // CLOSED-FOUR
+    // black-closed-four
 
     process_pattern!(black, symmetry, "!O.O.O!", "!OFO.O!", "!O.OFO!");
     process_pattern!(black, asymmetry, "!OO.O.!", "!OO.OF!");
     process_pattern!(black, asymmetry, "!O.OO.!", "!O.OOF!");
     process_pattern!(black, asymmetry, "!OO..O!", "!OOF.O!", "!OO.FO!");
-    
+
+    process_pattern!(black, asymmetry, "XOOO..!", "XOOOF.!", "XOOO.F!");
     process_pattern!(black, asymmetry, "XOO.O.!", "XOOFO.!");
     process_pattern!(black, asymmetry, "XO.OO.!", "XOFOO.!");
-    process_pattern!(black, asymmetry, "XOOO..!", "XOOOF.!", "XOOO.F!");
-    process_pattern!(black, asymmetry, "!.OOO.X", "!.OOOFX");
+    process_pattern!(black, asymmetry, "X.OOO.!", "XFOOO.!");
     process_pattern!(black, asymmetry, "X.OOO..!", "X.OOO.C!");
 
     process_pattern!(black, asymmetry, "O.O.OO.!", "O.OFOO.!");
     process_pattern!(black, asymmetry, "O.OO.O.!", "O.OOFO.!");
     process_pattern!(black, asymmetry, long-pattern, left, "..OOO..O", "..OOOF.O", "C.OOO..O"); // [!]..OOO..O
 
+    // white-closed-four
+
     process_pattern!(white, symmetry, "!O.O.O!", "!OFO.O!", "!O.OFO!");
     process_pattern!(white, asymmetry, "OOO..!", "OOO.F!");
-    process_pattern!(white, asymmetry, "!OOO..O!", "!OOO.FO!");
+    process_pattern!(white, asymmetry, "XOOO..!", "XOOOF.!");
+    process_pattern!(white, asymmetry, "XOO.O.", "XOOFO.");
+    process_pattern!(white, asymmetry, "XO.OO.", "XOFOO.");
+
+    process_pattern!(white, symmetry, "OOO..OOO", "OOOF.OOO", "OOO.FOOO");
+    process_pattern!(white, asymmetry, "OO..O", "OOF.O", "OO.FO");
+
+    process_pattern!(white, asymmetry, "OO.O.", "OO.OF");
+    process_pattern!(white, asymmetry, "O.OO.", "O.OOF");
 
     process_pattern!(white, asymmetry, "X.OOO.", "XFOOO.");
     process_pattern!(white, asymmetry, "X.OOO..", "X.OOO.C");
 
-    process_pattern!(white, asymmetry, "XOOO..", "XOOOF.");
-    process_pattern!(white, asymmetry, "XOO.O.", "XOOFO.");
-    process_pattern!(white, asymmetry, "XO.OO.", "XOFOO.");
-
-    process_pattern!(white, asymmetry, "!OO..O!", "!OOF.O!", "!OO.FO!");
-    process_pattern!(white, asymmetry, "OO.O.", "OO.OF");
-    process_pattern!(white, asymmetry, "O.OOF!", "O.OOF!");
-
-    // process_pattern!(white, symmetry, "OO..OO", "OOF.OO", "OO.FOO");
-    // process_pattern!(white, asymmetry, "OO.O.O", "OO.OFO");
-    // process_pattern!(white, asymmetry, "OO.O.!", "OO.OF!");
-    // process_pattern!(white, asymmetry, "OO..O!", "OOF.O!", "OO.FO!");
-    // process_pattern!(white, asymmetry, "O.OO.!", "O.OOF!");
-    // process_pattern!(white, asymmetry, "XOOO..!", "XOOOF.!", "XOOO.F!");
-
-    // OPEN-FOUR
+    // black open-four
 
     process_pattern!(black, asymmetry, "!.OOO..!", "!.OOO4.!", "!.OOO.F!", "!COOO..!", "!.OOOC.!");
     process_pattern!(black, asymmetry, "!.OO.O.!", "!.OO4O.!", "!COO.O.!", "!.OOCO.!", "!.OO.OC!");
 
+    // white-open-four
+
     process_pattern!(white, asymmetry, ".OOO..", ".OOO4.", "COOO..", ".OOOC.");
     process_pattern!(white, asymmetry, ".OO.O.", ".OO4O.", "COO.O.", ".OOCO.", ".OO.OC");
 
-    // FIVE
+    // black-five
 
     process_pattern!(black, symmetry, "!OO.OO!", "!OO5OO!");
     process_pattern!(black, asymmetry, "!OOO.O!", "!OOO5O!");
     process_pattern!(black, asymmetry, "!OOOO.!", "!OOOO5!");
 
+    // white-five
+
     process_pattern!(white, symmetry, "OO.OO", "OO5OO");
     process_pattern!(white, asymmetry, "OOO.O", "OOO5O");
     process_pattern!(white, asymmetry, "OOOO.", "OOOO5");
 
-    // OVERLINE
+    // black-overline
 
     process_pattern!(black, asymmetry, "O.OOOO", "O6OOOO");
     process_pattern!(black, asymmetry, "OO.OOO", "OO6OOO");

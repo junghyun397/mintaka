@@ -1,4 +1,4 @@
-use crate::bitfield::{Bitfield, BitfieldOps};
+use crate::bitfield::Bitfield;
 use crate::memo::dummy_pattern_memo::DummySlicePatternMemo;
 use crate::memo::hash_key::HashKey;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
@@ -7,7 +7,6 @@ use crate::notation::direction::Direction;
 use crate::notation::pos::{Pos, INVALID_POS};
 use crate::pattern::Patterns;
 use crate::slice::{Slice, Slices};
-use ethnum::U256;
 
 // 2256-bytes
 #[derive(Copy, Clone)]
@@ -27,7 +26,7 @@ impl Default for Board {
             player_color: Color::Black,
             slices: Slices::default(),
             patterns: Patterns::default(),
-            hot_field: U256::MIN,
+            hot_field: Bitfield::ZERO_FILLED,
             stones: 0,
             hash_key: HashKey::default()
         }

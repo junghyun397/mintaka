@@ -1,4 +1,3 @@
-use crate::bitfield::BitfieldOps;
 use crate::board::Board;
 use crate::history::{Action, History};
 use crate::memo::dummy_pattern_memo::DummySlicePatternMemo;

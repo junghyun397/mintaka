@@ -1,56 +1,57 @@
 use crate::notation::pos;
-use crate::notation::pos::{Pos, BOARD_SIZE};
-use ethnum::{u256, uint, U256};
-use std::ops::{BitAndAssign, BitOrAssign};
+use crate::notation::pos::Pos;
+use ethnum::{u256, uint};
+use std::simd::u8x32;
 
-pub type Bitfield = U256;
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+pub struct Bitfield([u8; 32]);
 
-pub trait BitfieldOps {
+impl Bitfield {
 
-    fn is_cold(&self, pos: Pos) -> bool;
+    pub const ZERO_FILLED: Bitfield = Bitfield([0; 32]);
 
-    fn is_hot(&self, pos: Pos) -> bool;
-
-    fn set(&mut self, pos: Pos);
-
-    fn unset(&mut self, pos: Pos);
-
-    fn iter(&self) -> impl Iterator<Item=bool> + '_;
-
-    fn iter_hot_pos(&self) -> impl Iterator<Item=Pos> + '_;
-
-    fn iter_cold_pos(&self) -> impl Iterator<Item=Pos> + '_;
-
-}
-
-impl BitfieldOps for Bitfield {
-
-    fn is_cold(&self, pos: Pos) -> bool {
-        self & (uint!("0b1") << pos.idx()) == 0
+    pub fn is_cold(&self, pos: Pos) -> bool {
+        self.0[pos.idx_usize() / 8] & 0b1 << (pos.idx_usize() % 8) == 0
     }
 
-    fn is_hot(&self, pos: Pos) -> bool {
-        self & (uint!("0b1") << pos.idx()) != 0
+    pub fn is_hot(&self, pos: Pos) -> bool {
+        self.0[pos.idx_usize() / 8] & 0b1 << (pos.idx_usize() % 8) != 0
     }
 
-    fn set(&mut self, pos: Pos) {
-        self.bitor_assign(uint!("0b1") << pos.idx())
+    pub fn set(&mut self, pos: Pos) {
+        self.0[pos.idx_usize() / 8] |= 0b1 << pos.idx() % 8;
     }
 
-    fn unset(&mut self, pos: Pos) {
-        self.bitand_assign(!(uint!("0b1") << pos.idx()))
+    pub fn unset(&mut self, pos: Pos) {
+        self.0[pos.idx_usize() / 8] &= !(0b1 << pos.idx() % 8);
     }
 
-    fn iter(&self) -> impl Iterator<Item=bool> + '_ {
-        BitfieldIterator::from(*self)
+    pub fn iter(&self) -> impl Iterator<Item=bool> + '_ {
+        BitfieldIterator::from(self.to_u256())
     }
 
-    fn iter_hot_pos(&self) -> impl Iterator<Item=Pos> + '_ {
-        BitfieldPosIterator::from(*self)
+    pub fn iter_hot_pos(&self) -> impl Iterator<Item=Pos> + '_ {
+        BitfieldPosIterator::from(self.to_u256())
     }
 
-    fn iter_cold_pos(&self) -> impl Iterator<Item=Pos> + '_ {
-        BitfieldPosIterator::from(!*self)
+    pub fn iter_cold_pos(&self) -> impl Iterator<Item=Pos> + '_ {
+        BitfieldPosIterator::from(!self.to_u256())
+    }
+
+    pub fn to_simd(self) -> u8x32 {
+        u8x32::from_array(self.0)
+    }
+
+    pub fn to_u256(self) -> u256 {
+        u256::from_ne_bytes(self.0)
+    }
+
+    pub fn from_simd(x: u8x32) -> Self {
+        Self { 0: x.to_array() }
+    }
+
+    pub fn from_u256(x: u256) -> Self {
+        Self { 0: x.to_ne_bytes() }
     }
 
 }
@@ -113,9 +114,9 @@ impl Iterator for BitfieldPosIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.value != u256::MIN {
-            let tails = self.value.trailing_zeros();
+            let pos = Pos::from_index(self.value.trailing_zeros() as u8);
             self.value &= self.value - 1;
-            Some(Pos::from_index(tails as u8))
+            Some(pos)
         } else {
             None
         }
@@ -130,12 +131,3 @@ impl ExactSizeIterator for BitfieldPosIterator {
     }
 
 }
-
-pub const BITFIELD_MASK_LUT: [u256; BOARD_SIZE] = {
-    let mut lut = [uint!("0b1"); BOARD_SIZE];
-    let mut idx = 0;
-    while idx < BOARD_SIZE {
-        idx += 1;
-    }
-    lut
-};

@@ -1,4 +1,3 @@
-use crate::bitfield::BitfieldOps;
 use crate::board::Board;
 use crate::notation::color::Color;
 use crate::notation::rule::ForbiddenKind;
