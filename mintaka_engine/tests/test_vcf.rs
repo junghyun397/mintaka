@@ -13,14 +13,13 @@ mod test_endgame_vcf {
             let mut tt = TranspositionTable::default();
             let mut memo = DummySlicePatternMemo;
 
-            let mut vcf_result = vcf::vcf_sequence(&mut tt, &mut memo, &mut board, u8::MAX).unwrap();
+            let vcf_result = vcf::vcf_sequence(&mut tt, &mut memo, &mut board, u8::MAX).unwrap();
             let final_move = vcf_result.last().copied().unwrap();
 
             for m in vcf_result.iter() {
                 board.set_mut(&mut memo, *m);
                 println!("{}", board.to_string_with_move_marker(*m));
             }
-            println!("{:?}", vcf_result);
 
             board.to_string_with_move_marker(final_move)
         }};
@@ -356,46 +355,6 @@ mod test_endgame_vcf {
     fn deep_vcf() {
         let case = indoc! {"
            A B C D E F G H I J K L M N O
-        15 O . . . X . . . . . . . X . X 15
-        14 X . . . . O . . . O . . O . X 14
-        13 . . . . . . . O . . . . . O . 13
-        12 O . . . . . . . . . . X . . X 12
-        11 X . . . . . . . . . . . O . . 11
-        10 O . O . . . . . . . . . . . . 10
-         9 O O X O . . . . X . . . O . . 9
-         8 O . O O . . . X . O . . . . . 8
-         7 . X . . . . . . . O . . X . . 7
-         6 . . . . . . . . O . . . . . X 6
-         5 X . . . . . . . . . . . X . X 5
-         4 . . . . . . . . . . . . . X O 4
-         3 X . . . . . . . . . . . . X . 3
-         2 . . . . . . . X . . . . . . O 2
-         1 X O O O . X . . X . X . . . . 1
-           A B C D E F G H I J K L M N O"};
-
-        let expected = indoc! {"
-           A B C D E F G H I J K L M N O
-        15 O . O X X X X O X O X X X O X 15
-        14 X X O X X O O X O O X O O O X 14
-        13 O[X]O O O O X O X X O O X O O 13
-        12 O X X O X O X O O O X X O X X 12
-        11 X X X O X O X X X O X X O O X 11
-        10 O . O X O X O O O O X X X O X 10
-         9 O O X O X O X X X X O X O O O 9
-         8 O O O O X O O X O O X O O O X 8
-         7 X X O X X O X X O O X X X X O 7
-         6 O O X O O O X O O X O X O O X 6
-         5 X O X O X X X X O O X O X X X 5
-         4 X X X X O O O X X X X O X X O 4
-         3 X O X X X O X X O O O O X X O 3
-         2 O O O X O X X X O X X O O O O 2
-         1 X O O O O X O O X O X X X X O 1
-           A B C D E F G H I J K L M N O"};
-
-        assert_eq!(vcf!(case), expected);
-
-        let case = indoc! {"
-           A B C D E F G H I J K L M N O
         15 O O . . X . X . . O X O O X . 15
         14 O . X . . O . . . . X . . . X 14
         13 O . . . . . . . . . . . . . . 13
@@ -430,6 +389,46 @@ mod test_endgame_vcf {
          3 X X O X X O O O X X X O X O O 3
          2 O O O O X O X X X O O O O X O 2
          1 X O X O O O O X O X O O X O O 1
+           A B C D E F G H I J K L M N O"};
+
+        assert_eq!(vcf!(case), expected);
+
+        let case = indoc! {"
+           A B C D E F G H I J K L M N O
+        15 O . . . X . . . . . . . X . X 15
+        14 X . . . . O . . . O . . O . X 14
+        13 . . . . . . . O . . . . . O . 13
+        12 O . . . . . . . . . . X . . X 12
+        11 X . . . . . . . . . . . O . . 11
+        10 O . O . . . . . . . . . . . . 10
+         9 O O X O . . . . X . . . O . . 9
+         8 O . O O . . . X . O . . . . . 8
+         7 . X . . . . . . . O . . X . . 7
+         6 . . . . . . . . O . . . . . X 6
+         5 X . . . . . . . . . . . X . X 5
+         4 . . . . . . . . . . . . . X O 4
+         3 X . . . . . . . . . . . . X . 3
+         2 . . . . . . . X . . . . . . O 2
+         1 X O O O . X . . X . X . . . . 1
+           A B C D E F G H I J K L M N O"};
+
+        let expected = indoc! {"
+           A B C D E F G H I J K L M N O
+        15 O . O X X X X O X O X X X O X 15
+        14 X X O X X O O X O O X O O O X 14
+        13 O[X]O O O O X O X X O O X O O 13
+        12 O X X O X O X O O O X X O X X 12
+        11 X X X O X O X X X O X X O O X 11
+        10 O . O X O X O O O O X X X O X 10
+         9 O O X O X O X X X X O X O O O 9
+         8 O O O O X O O X O O X O O O X 8
+         7 X X O X X O X X O O X X X X O 7
+         6 O O X O O O X O O X O X O O X 6
+         5 X O X O X X X X O O X O X X X 5
+         4 X X X X O O O X X X X O X X O 4
+         3 X O X X X O X X O O O O X X O 3
+         2 O O O X O X X X O X X O O O O 2
+         1 X O O O O X O O X O X X X X O 1
            A B C D E F G H I J K L M N O"};
 
         assert_eq!(vcf!(case), expected);

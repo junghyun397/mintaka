@@ -2,7 +2,6 @@ use crate::memo::abstract_transposition_table::{AbstractTranspositionTable, Clea
 use crate::memo::hash_key::HashKey;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::slice_pattern::SlicePattern;
-use std::mem::MaybeUninit;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 // layout: block 0 = slice key 32 bits
@@ -34,11 +33,11 @@ impl AtomicTTSlicePatternEntry {
     }
 
     fn decode(&self) -> SlicePattern {
-        let mut black_patterns: [u8; 16] = unsafe { MaybeUninit::uninit().assume_init() };
+        let mut black_patterns: [u8; 16] = [0u8; 16];
         black_patterns[0 .. 8].copy_from_slice(&self.1.load(Ordering::Relaxed).to_ne_bytes());
         black_patterns[8 .. 16].copy_from_slice(&self.2.load(Ordering::Relaxed).to_ne_bytes());
 
-        let mut white_patterns: [u8; 16] = unsafe { MaybeUninit::uninit().assume_init() };
+        let mut white_patterns: [u8; 16] = [0u8; 16];
         white_patterns[0 .. 8].copy_from_slice(&self.3.load(Ordering::Relaxed).to_ne_bytes());
         white_patterns[8 .. 16].copy_from_slice(&self.4.load(Ordering::Relaxed).to_ne_bytes());
 
@@ -61,7 +60,7 @@ impl Default for TTSlicePatternMemo {
             table: Vec::new(),
         };
 
-        new.resize_mut(256);
+        new.resize_mut(128);
 
         new
     }
@@ -93,13 +92,11 @@ impl SlicePatternMemo for TTSlicePatternMemo {
     fn probe_or_put_mut<F>(&mut self, packed_slice: u64, produce: F) -> SlicePattern
     where F: FnOnce() -> SlicePattern
     {
-        // fibonacci-hashing
         let slice_hash = Self::build_hash_key(packed_slice);
         let idx = self.calculate_index(slice_hash);
         let atomic_entry = &self.table[idx];
 
-        let entry_block_0 = atomic_entry.0.load(Ordering::Relaxed);
-        if entry_block_0 & 0x0000_0000_FFFF_FFFF == packed_slice {
+        if atomic_entry.0.load(Ordering::Relaxed) == packed_slice {
             return atomic_entry.decode();
         }
 
@@ -117,7 +114,8 @@ impl SlicePatternMemo for TTSlicePatternMemo {
 impl TTSlicePatternMemo {
 
     fn build_hash_key(packed_slice: u64) -> HashKey {
-        HashKey(unsafe { (packed_slice | (packed_slice << 32)).overflowing_mul(0x9e3779b97f4a7c15).0 })
+        // fibonacci-hashing
+        HashKey(unsafe { packed_slice.wrapping_mul(0x9e3779b97f4a7c15) })
     }
 
 }

@@ -46,11 +46,19 @@ impl Bitfield {
         u256::from_ne_bytes(self.0)
     }
 
-    pub fn from_simd(x: u8x32) -> Self {
+}
+
+impl From<u8x32> for Bitfield {
+
+    fn from(x: u8x32) -> Self {
         Self { 0: x.to_array() }
     }
 
-    pub fn from_u256(x: u256) -> Self {
+}
+
+impl From<u256> for Bitfield {
+
+    fn from(x: u256) -> Self {
         Self { 0: x.to_ne_bytes() }
     }
 

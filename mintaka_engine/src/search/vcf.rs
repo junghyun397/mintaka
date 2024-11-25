@@ -32,23 +32,23 @@ fn try_vcf<const C: Color>(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
     board: &mut Board, max_depth: u8, depth: u8, opponent_has_five: bool,
 ) -> Option<Vec<Pos>> {
-    if board.stones > U8_BOARD_SIZE - 2 {
+    if board.stones > U8_BOARD_SIZE - 3 {
         return None;
     }
 
     for idx in 0 .. pos::BOARD_SIZE {
-        let pattern = board.patterns.field[idx].clone();
+        let pattern = board.patterns.field[idx];
         let player_unit = pattern.player_unit::<C>();
         let opponent_unit = pattern.opponent_unit::<C>();
 
+        let four_pos = Pos::from_index(idx as u8);
+
         if !player_unit.has_four()
-            || (C == Color::Black && pattern.is_forbidden())
             || (opponent_has_five && !opponent_unit.has_five())
+            || (C == Color::Black && pattern.is_forbidden())
         {
             continue;
         }
-
-        let four_pos = Pos::from_index(idx as u8);
 
         if player_unit.has_open_four() {
             return Some(vec![four_pos]);
@@ -58,7 +58,7 @@ fn try_vcf<const C: Color>(
 
         let defend_pos = find_defend_pos_unchecked::<C>(board);
 
-        let defend_pattern = board.patterns.field[defend_pos.idx_usize()].clone();
+        let defend_pattern = board.patterns.field[defend_pos.idx_usize()];
         let defend_opponent_unit = defend_pattern.opponent_unit::<C>();
         let opponent_four_count = defend_opponent_unit.count_fours();
 

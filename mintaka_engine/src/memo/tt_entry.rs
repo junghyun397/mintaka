@@ -67,13 +67,13 @@ impl TTEntryBucket {
         todo!()
     }
 
-    pub fn probe(&self, compact_key: u32) -> Option<(TTEntryBucketPosition, TTEntry)> {
+    pub fn probe(&self, compact_key: u32) -> Option<TTEntry> {
         let key_pair = self.key_pair.load(Ordering::Relaxed);
 
-        if key_pair & 0x00000000_FFFFFFFF == compact_key as u64 {
-            Some((TTEntryBucketPosition::HI, TTEntry::from(self.hi_body.load(Ordering::Relaxed))))
-        } else if ((key_pair & compact_key as u64) << 32) == 0xFFFFFFFF_00000000 {
-            Some((TTEntryBucketPosition::LO, TTEntry::from(self.lo_body.load(Ordering::Relaxed))))
+        if key_pair & 0x0000_0000_FFFF_FFFF == compact_key as u64 {
+            Some(TTEntry::from(self.hi_body.load(Ordering::Relaxed)))
+        } else if key_pair >> 32 == compact_key as u64 {
+            Some(TTEntry::from(self.lo_body.load(Ordering::Relaxed)))
         } else { None }
     }
 
