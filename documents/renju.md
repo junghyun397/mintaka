@@ -1,5 +1,9 @@
 # mintaka-renju
+mintaka applies strict Renju rules while maintaining low computational cost.
+Below are some examples of strict Renju rules that mintaka can handle.
+
 ## Single-line forbidden moves
+![single-line-forbidden-moves](./images/single-line-forbidden-moves.png)
 ```text
    A B C D E F G H I J K L M N O
 15 . . . . . . . . . . . . . . . 15
@@ -11,7 +15,7 @@
  9 . . . . . . . . . . . . . . . 9
  8 . . . . O O O O O O O . . . . 8
  7 . . . . . . . . . . . . . . . 7
- 6 . . . . X X . X 4 . X . . . . 6
+ 6 . . . . X X . X 4 . X X . . . 6
  5 . . . . . . . . . . . . . . . 5
  4 . . . . O O O O O O O . . . . 4
  3 . . . . . . . . . . . . . . . 3
@@ -20,6 +24,7 @@
    A B C D E F G H I J K L M N O
 ```
 ## Double-four related pseudo forbidden moves
+![double-four-related-pseudo-forbidden-moves](./images/double-four-related-pseudo-forbidden-moves.png)
 ```text
    A B C D E F G H I J K L M N O
 15 . . . . . . . . . . . . . . . 15
@@ -40,6 +45,7 @@
    A B C D E F G H I J K L M N O
 ```
 ## Nested forbidden moves
+![nested-forbidden-moves](./images/nested-forbidden-moves.png)
 ```text
    A B C D E F G H I J K L M N O
 15 . . . . . . . . . . . . . . . 15
@@ -60,6 +66,7 @@
    A B C D E F G H I J K L M N O
 ```
 ## Multiple-nested forbidden moves
+![multiple-nested-forbidden-moves](./images/multiple-nested-forbidden-moves.png)
 ```text
    A B C D E F G H I J K L M N O
 15 . . . . . . . . . . . . . . . 15
@@ -81,6 +88,7 @@
 
 ```
 ## Recursive forbidden moves
+![recursive-forbidden-moves](./images/recursive-forbidden-moves.png)
 ```text
    A B C D E F G H I J K L M N O
 15 . . . . . . . . . . . . . . . 15
