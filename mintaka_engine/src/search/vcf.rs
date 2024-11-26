@@ -19,8 +19,8 @@ pub fn vcf_sequence(
     board: &mut Board, max_depth: u8
 ) -> Option<Vec<Pos>> {
     match board.player_color {
-        Color::Black => try_vcf::<{ Color::Black }>(tt, memo, board, max_depth, 0, opponent_has_any_five::<{ Color::Black }>(board)),
-        Color::White => try_vcf::<{ Color::White }>(tt, memo, board, max_depth, 0, opponent_has_any_five::<{ Color::Black }>(board)),
+        Color::Black => try_vcf::<{ Color::Black }>(tt, memo, board, max_depth, 0, false),
+        Color::White => try_vcf::<{ Color::White }>(tt, memo, board, max_depth, 0, false),
     }.map(|mut result| {
         result.reverse();
         result
@@ -125,102 +125,4 @@ fn opponent_has_any_five<const C: Color>(board: &Board) -> bool {
     }
 
     false
-}
-
-// Depth-First Search(DFS)
-fn try_vcf_legacy<const C: Color>(
-    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
-    board: &mut Board, max_depth: u8, depth: u8
-) -> Option<Vec<Pos>> {
-    if depth > max_depth {
-        return None;
-    }
-
-    for idx in 0 .. pos::BOARD_SIZE {
-        let pattern = &board.patterns.field[idx];
-        let player_unit = match C {
-            Color::Black => pattern.black_unit,
-            Color::White => pattern.white_unit
-        };
-
-        if !player_unit.has_four()
-            || (C == Color::Black && pattern.is_forbidden())
-        {
-            continue;
-        }
-
-        let four_pos = Pos::from_index(idx as u8);
-
-        if C == Color::White && player_unit.has_fours() {
-            return Some(vec![four_pos])
-        }
-
-        board.set_mut(memo, four_pos);
-
-        let maybe_vcf = defend_vcf::<C>(tt, memo, board, max_depth, depth + 1);
-
-        board.unset_mut(memo, four_pos);
-
-        if let Some(mut vcf) = maybe_vcf {
-            vcf.push(four_pos);
-            return Some(vcf);
-        }
-    }
-
-    None
-}
-
-fn defend_vcf<const C: Color>(
-    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
-    board: &mut Board, max_depth: u8, depth: u8
-) -> Option<Vec<Pos>> {
-    let defend_pos = {
-        let mut defend_pos = INVALID_POS;
-
-        for idx in 0 .. pos::BOARD_SIZE {
-            let pattern = &board.patterns.field[idx];
-            let player_unit = match C {
-                Color::Black => pattern.black_unit,
-                Color::White => pattern.white_unit
-            };
-
-            if !player_unit.has_five() {
-                continue;
-            }
-
-            if C == Color::White && pattern.is_forbidden() { // trap vcf
-                return Some(vec![]);
-           }
-            
-            if match C {
-                Color::Black => pattern.white_unit,
-                Color::White => pattern.black_unit
-            }.has_four() { // opponent has a five
-                if player_unit.has_four() {
-                    defend_pos = INVALID_POS;
-                    break;
-                }
-
-                return None;
-            }
-            
-            defend_pos = Pos::from_index(idx as u8);
-            break;
-        }
-
-        assert_ne!(defend_pos, INVALID_POS);
-        defend_pos
-    };
-
-    board.set_mut(memo, defend_pos);
-
-    let maybe_vcf = try_vcf_legacy::<C>(tt, memo, board, max_depth, depth + 1);
-
-    board.unset_mut(memo, defend_pos);
-
-    maybe_vcf.map(|vcf| {
-        let mut new_vcf = vcf;
-        new_vcf.push(defend_pos);
-        new_vcf
-    })
 }

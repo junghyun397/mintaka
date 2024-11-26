@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod test_endgame_vcf {
+mod test_vcf {
     use indoc::indoc;
     use mintaka::board::Board;
     use mintaka::memo::dummy_pattern_memo::DummySlicePatternMemo;
