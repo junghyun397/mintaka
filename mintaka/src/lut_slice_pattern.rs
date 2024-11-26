@@ -21,11 +21,11 @@ impl Slice {
 
     pub fn _calculate_slice_pattern(&self) -> SlicePattern {
         // padding = 3
-        let masked: u32 = !(!(u32::MAX << self.length as u32) << 3);
+        let block: u32 = !(!(u32::MAX << self.length as u32) << 3);
         let extended_b: u32 = (self.black_stones as u32) << 3;
         let extended_w: u32 = (self.white_stones as u32) << 3;
-        let bw = extended_b | masked;
-        let ww = extended_w | masked;
+        let bb = extended_b | block;
+        let wb = extended_w | block;
 
         let mut acc: SlicePattern = SlicePattern::EMPTY;
         for shift in 0 ..= self.length as usize + 1 { // length - 5 + 3 * 2
@@ -33,17 +33,17 @@ impl Slice {
             let w = (extended_w >> shift) as u16 & 0x00FF;
 
             if b.count_ones() > 1 {
-                find_patterns(
+                find_patterns::<{ Color::Black }>(
                     &mut acc, shift, shift as isize - 3,
-                    b | (((ww >> shift) as u16 & 0x00FF) << 8),
+                    b | (((wb >> shift) as u16 & 0x00FF) << 8),
                     extended_b
                 );
             }
 
             if w.count_ones() > 1 {
-                find_patterns(
+                find_patterns::<{ Color::White }>(
                     &mut acc, shift, shift as isize - 3,
-                    w | (((bw >> shift) as u16 & 0x00FF) << 8),
+                    w | (((bb >> shift) as u16 & 0x00FF) << 8),
                     extended_b
                 );
             }
@@ -61,71 +61,57 @@ fn find_patterns<const C: Color>(
     vector: u16,
     b_raw: u32,
 ) {
-    macro_rules! match_long_pattern_for_black {
-        (left, rev) => (match_long_pattern_for_black!(right));
-        (right, rev) => (match_long_pattern_for_black!(left));
-        (left) => {(
-            b_raw & (0b1 << offset + 2) == 0
-        )};
-        (right) => {(
-            b_raw & (0b1 << offset + 11) == 0
-        )};
+    #[cold]
+    #[inline(always)]
+    fn extended_match_for_black(direction: ExtendedMatch, b_raw: u32, offset: isize) -> bool {
+        match direction {
+            ExtendedMatch::Left => b_raw & (0b1 << offset + 2) == 0,
+            ExtendedMatch::Right => b_raw & (0b1 << offset + 11) == 0,
+            _ => unreachable!()
+        }
     }
 
-    let pattern_idx = match C {
+    let patch_idx = match C {
         Color::Black => SLICE_PATTERN_LUT.vector.black[vector as usize],
         Color::White => SLICE_PATTERN_LUT.vector.white[vector as usize],
     };
 
-    if pattern_idx != 0 {
-        let slice_patch_data = SLICE_PATTERN_LUT.pattern.black[pattern_idx as usize];
+    if patch_idx != 0 {
+        let slice_patch_data = SLICE_PATTERN_LUT.patch.black[patch_idx as usize];
 
         if C == Color::Black
-            && slice_patch_data.additional_match != None
-            && !match_long_pattern_for_black!(left)
+            && slice_patch_data.extended_match != ExtendedMatch::None
+            && extended_match_for_black(slice_patch_data.extended_match, b_raw, offset)
         {
             return;
         }
 
+        let shl = 0.min(shift as isize - 3).abs() * 8;
+        let shr = 0.max(shift as isize - 3) * 8;
+
         let mut original = u128::from_ne_bytes(acc.black_patterns);
         if slice_patch_data.contains_patch_mask {
-            original |= slice_patch_data.patch_mask;
+            original |= (slice_patch_data.patch_mask << shr) >> shl;
         }
         if slice_patch_data.contains_closed_four {
             original = increase_closed_four_multiple(
                 original,
-                slice_patch_data.closed_four_clear_mask,
-                slice_patch_data.closed_four_mask
+                (slice_patch_data.closed_four_clear_mask << shr) >> shl,
+                (slice_patch_data.closed_four_mask << shr) >> shl
             )
         }
 
-        acc.black_patterns = original.to_ne_bytes();
+        match C {
+            Color::Black => acc.black_patterns = original.to_ne_bytes(),
+            Color::White => acc.white_patterns = original.to_ne_bytes()
+        };
     }
 }
 
-fn calculate_five_in_a_rows(mut stones: u16) -> u16 {
+fn calculate_five_in_a_rows(mut stones: u16) -> bool {
     stones &= stones >> 1;  // 1 1 1 1 1 0 & 0 1 1 1 1 1
     stones &= stones >> 3;  // 0 1 1 1 1 0 & 0 0 0 0 1 1 ...
-    stones                  // 0 0 0 0 1 0 ...
-}
-
-fn calculate_six_in_a_rows(mut stones: u16) -> u16 {
-    stones &= stones >> 1;
-    stones &= stones >> 1;
-    stones &= stones >> 3;
-    stones
-}
-
-pub fn contains_five_in_a_row(stones: u16) -> bool {
-    calculate_five_in_a_rows(stones) != 0
-}
-
-pub fn contains_overline(stones: u16) -> bool {
-    calculate_six_in_a_rows(stones) != 0
-}
-
-fn increase_closed_four_single(packed: u8) -> u8 {
-    packed | (0b1000_0000 >> (packed >> 7))
+    stones != 0             // 0 0 0 0 1 0 ...
 }
 
 fn increase_closed_four_multiple(original: u128, clear_mask: u128, mask: u128) -> u128 {
@@ -138,7 +124,7 @@ fn increase_closed_four_multiple(original: u128, clear_mask: u128, mask: u128) -
 
 struct SlicePatternLut {
     vector: VectorMatchLut,
-    pattern: PatternLut,
+    patch: PatchLut,
 }
 
 // 32 KiB
@@ -147,7 +133,7 @@ struct VectorMatchLut {
     white:      [u8; u16::MAX as usize],
 }
 
-struct PatternLut {
+struct PatchLut {
     black: [SlicePatchData; u8::MAX as usize],
     white: [SlicePatchData; u8::MAX as usize],
 }
@@ -162,22 +148,49 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
             closed_four_mask: 0,
             contains_patch_mask: false,
             contains_closed_four: false,
-            additional_match: ExtendedMatch::None
+            extended_match: ExtendedMatch::None
         };
 
         SlicePatternLut {
             vector: VectorMatchLut {
-                black:      [0; u16::MAX as usize],
-                white:      [0; u16::MAX as usize],
+                black: [0; u16::MAX as usize],
+                white: [0; u16::MAX as usize],
             },
-            pattern: PatternLut {
+            patch: PatchLut {
                 black: [initial_patch_data; u8::MAX as usize],
                 white: [initial_patch_data; u8::MAX as usize],
             },
         }
     };
 
+    let mut pattern_black_idx: usize = 1;
+    let mut pattern_white_idx: usize = 1;
+
+    macro_rules! flash_pattern {
+        ($vector_expr:expr, $pattern_expr:expr, $idx_expr:expr, $extended_match:expr, $rev:expr, $sources:expr) => {{
+            let overlap = slice_pattern_lut.vector.black[0] != 0;
+
+            let target_idx = if overlap {
+                $vector_expr[0] as usize
+            } else {
+                pattern_black_top
+            };
+
+            $vector_expr[target_idx] = build_slice_patch_data($extended_match, $rev, $sources);
+
+            if !overlap {
+                $idx_expr += 1;
+            }
+
+            target_idx
+        }};
+    }
+
+    // slice_pattern_lut.pattern.
+
     macro_rules! embed_pattern {
+        (black,asymmetry,long-pattern,$position:ident,$pattern:literal,$($patch:literal),+) => {
+        };
         ($color:ident,symmetry,$pattern:literal,$($patch:literal),+) => {
             embed_pattern!($color, rev=false, $pattern, $($patch),+);
         };
@@ -185,9 +198,9 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
             embed_pattern!($color, rev=false, $pattern, $($patch),+);
             embed_pattern!($color, rev=true, $pattern, $($patch),+)
         };
-        (black,asymmetry,long-pattern,$position:ident,$pattern:literal,$($patch:literal),+) => {
-        };
         ($color:ident,rev=$rev:expr,$pattern:literal,$($patch:literal),+) => {
+            // flash-pattern -> idx
+            // flash-vector <- idx
         };
     }
 
@@ -274,35 +287,7 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
     slice_pattern_lut
 }
 
-const fn build_pattern_mask(source: &str, reversed: bool) -> u32 {
-    parse_pattern_literal('O', source, reversed) as u32
-        | (parse_pattern_literal('!', source, reversed) as u32) << 8
-        | (parse_pattern_literal('.', source, reversed) as u32) << 16
-        | (parse_pattern_literal('X', source, reversed) as u32) << 24
-}
-
-const fn build_pattern_result(source: &str, reversed: bool) -> u32 {
-    parse_pattern_literal('O', source, reversed) as u32
-        | (parse_pattern_literal('.', source, reversed) as u32) << 16
-        | (parse_pattern_literal('X', source, reversed) as u32) << 24
-}
-
-const fn parse_pattern_literal(kind: char, source: &str, reversed: bool) -> u8 {
-    let mut acc: u8 = 0;
-    let mut idx: usize = 0;
-    while idx < source.len() {
-        let pos = if reversed { 7 - idx } else { idx };
-        if source.as_bytes()[idx] as char == kind {
-            acc |= 0b1 << pos;
-        }
-
-        idx += 1;
-    }
-
-    acc
-}
-
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 enum ExtendedMatch {
     None,
     Left,
@@ -316,10 +301,10 @@ struct SlicePatchData {
     pub closed_four_mask: u128,
     pub contains_patch_mask: bool,
     pub contains_closed_four: bool,
-    pub additional_match: ExtendedMatch,
+    pub extended_match: ExtendedMatch,
 }
 
-const fn build_slice_patch_data(sources: [&str; 4], extended_match: ExtendedMatch, reversed: bool) -> SlicePatchData {
+const fn build_slice_patch_data(extended_match: ExtendedMatch, reversed: bool, sources: [&str; 4]) -> SlicePatchData {
     let mut patch_mask: [u8; 16] = [0; 16];
     let mut closed_four_clear_mask: [u8; 16] = [0; 16];
     let mut closed_four_mask: [u8; 16] = [0; 16];
@@ -343,7 +328,7 @@ const fn build_slice_patch_data(sources: [&str; 4], extended_match: ExtendedMatc
     let closed_four_clear_mask = u128::from_ne_bytes(closed_four_clear_mask);
     let closed_four_mask = u128::from_ne_bytes(closed_four_mask);
 
-    let additional_match = if reversed {
+    let extended_match = if reversed {
         match extended_match {
             ExtendedMatch::Left => ExtendedMatch::Right,
             ExtendedMatch::Right => ExtendedMatch::Left,
@@ -359,8 +344,23 @@ const fn build_slice_patch_data(sources: [&str; 4], extended_match: ExtendedMatc
         patch_mask,
         closed_four_clear_mask,
         closed_four_mask,
-        additional_match,
+        extended_match,
     }
+}
+
+const fn parse_pattern_literal(kind: char, source: &str, reversed: bool) -> u8 {
+    let mut acc: u8 = 0;
+    let mut idx: usize = 0;
+    while idx < source.len() {
+        let pos = if reversed { 7 - idx } else { idx };
+        if source.as_bytes()[idx] as char == kind {
+            acc |= 0b1 << pos;
+        }
+
+        idx += 1;
+    }
+
+    acc
 }
 
 const fn parse_patch_literal(source: &str, reversed: bool) -> (isize, u8) {
