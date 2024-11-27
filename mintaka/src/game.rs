@@ -1,6 +1,5 @@
 use crate::board::Board;
 use crate::history::{Action, History};
-use crate::memo::dummy_pattern_memo::DummySlicePatternMemo;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::pos;
@@ -34,13 +33,13 @@ impl Game {
         )
     }
 
-    pub fn play(mut self, pos: Pos) -> Self {
-        self.play_mut(&mut DummySlicePatternMemo, pos);
+    pub fn play(mut self, memo: &mut impl SlicePatternMemo, pos: Pos) -> Self {
+        self.play_mut(memo, pos);
         self
     }
 
-    pub fn undo(mut self) -> Self {
-        self.undo_mut(&mut DummySlicePatternMemo);
+    pub fn undo(mut self, memo: &mut impl SlicePatternMemo) -> Self {
+        self.undo_mut(memo);
         self
     }
 

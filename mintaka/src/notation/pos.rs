@@ -35,10 +35,10 @@ pub const CENTER_ROW_COL: u8 = CENTER.col();
 macro_rules! directional_offset {
     ($op:tt,$neg_op:tt,$pos:expr,$direction:expr,$offset:expr) => {
         match $direction {
-            Direction::Vertical => Self::from_cartesian($pos.row() $op $offset, $pos.col()),
-            Direction::Horizontal => Self::from_cartesian($pos.row(), $pos.col() $op $offset),
-            Direction::Ascending => Self::from_cartesian($pos.row() $op $offset, $pos.col() $op $offset),
-            Direction::Descending => Self::from_cartesian($pos.row() $neg_op $offset, $pos.col() $op $offset)
+            Direction::Vertical => Pos::from_cartesian($pos.row() $op $offset, $pos.col()),
+            Direction::Horizontal => Pos::from_cartesian($pos.row(), $pos.col() $op $offset),
+            Direction::Ascending => Pos::from_cartesian($pos.row() $op $offset, $pos.col() $op $offset),
+            Direction::Descending => Pos::from_cartesian($pos.row() $neg_op $offset, $pos.col() $op $offset)
         }
     };
 }

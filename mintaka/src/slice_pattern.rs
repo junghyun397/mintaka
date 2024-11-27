@@ -188,7 +188,8 @@ fn find_patterns(
     process_pattern!(white, asymmetry, ".OO...", ".OO.3.");
     process_pattern!(white, asymmetry, "!.OO...", "!.OO3..");
     process_pattern!(white, asymmetry, "X..OO..", "X.3OO..");
-    process_pattern!(white, asymmetry, ".O.O..", ".O.O3.");
+    process_pattern!(white, asymmetry, ".O.O..!!", ".O.O3.!!");
+    process_pattern!(white, asymmetry, ".O.O..O!", ".O.O3.O!");
     process_pattern!(white, asymmetry, "!.O.O..", "!.O3O..");
     process_pattern!(white, asymmetry, "!.O..O.", "!.O3.O.");
     process_pattern!(white, asymmetry, "!O.O..O.", "!O.O3.O.");

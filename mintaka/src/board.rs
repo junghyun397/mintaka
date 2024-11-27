@@ -44,13 +44,13 @@ impl Board {
         self.slices.vertical_slices[pos.row_usize()].stone_kind(pos.col())
     }
 
-    pub fn set(mut self, pos: Pos) -> Self {
-        self.set_mut(&mut DummySlicePatternMemo, pos);
+    pub fn set(mut self, memo: &mut impl SlicePatternMemo, pos: Pos) -> Self {
+        self.set_mut(memo, pos);
         self
     }
 
-    pub fn unset(mut self, pos: Pos) -> Self {
-        self.unset_mut(&mut DummySlicePatternMemo, pos);
+    pub fn unset(mut self, memo: &mut impl SlicePatternMemo, pos: Pos) -> Self {
+        self.unset_mut(memo, pos);
         self
     }
 
