@@ -32,6 +32,17 @@ pub const CENTER_ROW_COL: u8 = CENTER.col();
     ($row:expr,$col:expr) => ($row < 15 && $col < 15);
 }
 
+macro_rules! directional_offset {
+    ($op:tt,$neg_op:tt,$pos:expr,$direction:expr,$offset:expr) => {
+        match $direction {
+            Direction::Vertical => Self::from_cartesian($pos.row() $op $offset, $pos.col()),
+            Direction::Horizontal => Self::from_cartesian($pos.row(), $pos.col() $op $offset),
+            Direction::Ascending => Self::from_cartesian($pos.row() $op $offset, $pos.col() $op $offset),
+            Direction::Descending => Self::from_cartesian($pos.row() $neg_op $offset, $pos.col() $op $offset)
+        }
+    };
+}
+
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub struct Pos(u8);
 
@@ -85,29 +96,11 @@ impl Pos {
     }
     
     pub const fn directional_offset_positive_unchecked(&self, direction: Direction, offset: u8) -> Pos {
-        match direction {
-            Direction::Vertical => Self::from_cartesian(self.row() + offset, self.col()),
-            Direction::Horizontal => Self::from_cartesian(self.row(), self.col() + offset),
-            Direction::Ascending => Self::from_cartesian(self.row() + offset, self.col() + offset),
-            Direction::Descending => Self::from_cartesian(self.row() - offset, self.col() + offset)
-        }
+        directional_offset!(+, -, self, direction, offset)
     }
 
-    pub const fn directional_offset_unchecked(&self, direction: Direction, offset: u8) -> Pos {
-        match direction {
-            Direction::Vertical => Self::from_cartesian(self.row() - offset, self.col()),
-            Direction::Horizontal => Self::from_cartesian(self.row(), self.col() - offset),
-            Direction::Ascending => Self::from_cartesian(self.row() - offset, self.col() - offset),
-            Direction::Descending => Self::from_cartesian(self.row() + offset, self.col() - offset)
-        }
-    }
-
-    pub fn directional_offset_positive(&self, direction: Direction, offset: u8) -> Option<Pos> {
-        todo!()
-    }
-
-    pub fn directional_offset_negative(&self, direction: Direction, offset: u8) -> Option<Pos> {
-        todo!()
+    pub const fn directional_offset_negative_unchecked(&self, direction: Direction, offset: u8) -> Pos {
+        directional_offset!(-, +, self, direction, offset)
     }
 
 }

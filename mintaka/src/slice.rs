@@ -72,7 +72,7 @@ impl Slice {
     }
 
     pub fn packed_slice(&self) -> u64 {
-        self.black_stones as u64 | (self.white_stones as u64) << 32
+         (self.length as u64) << 32 | (self.white_stones as u64) << 16 | self.black_stones as u64
     }
     
     pub fn calculate_idx(&self, direction: Direction, pos: Pos) -> usize {

@@ -2,7 +2,7 @@
 mod test_vcf {
     use indoc::indoc;
     use mintaka::board::Board;
-    use mintaka::memo::dummy_pattern_memo::DummySlicePatternMemo;
+    use mintaka::memo::tt_slice_pattern_memo::TTSlicePatternMemo;
     use mintaka_engine::memo::transposition_table::TranspositionTable;
     use mintaka_engine::search::vcf;
     use std::str::FromStr;
@@ -11,7 +11,7 @@ mod test_vcf {
         ($case:expr) => {{
             let mut board = Board::from_str($case).unwrap();
             let mut tt = TranspositionTable::default();
-            let mut memo = DummySlicePatternMemo;
+            let mut memo = TTSlicePatternMemo::default();
 
             let vcf_result = vcf::vcf_sequence(&mut tt, &mut memo, &mut board, u8::MAX).unwrap();
             let final_move = vcf_result.last().copied().unwrap();
@@ -248,7 +248,7 @@ mod test_vcf {
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
-        
+
         let expected = indoc! {"
            A B C D E F G H I J K L M N O
         15 X . .[O]O . . . . . . . . . . 15
@@ -393,6 +393,7 @@ mod test_vcf {
 
         assert_eq!(vcf!(case), expected);
 
+        // transposition table required
         let case = indoc! {"
            A B C D E F G H I J K L M N O
         15 O . . . X . . . . . . . X . X 15
@@ -430,6 +431,8 @@ mod test_vcf {
          2 O O O X O X X X O X X O O O O 2
          1 X O O O O X O O X O X X X X O 1
            A B C D E F G H I J K L M N O"};
+
+        panic!();
 
         assert_eq!(vcf!(case), expected);
     }

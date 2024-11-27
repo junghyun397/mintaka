@@ -12,10 +12,10 @@ use crate::slice::{Slice, Slices};
 #[derive(Copy, Clone)]
 pub struct Board {
     pub player_color: Color,
+    pub stones: u8,
     pub slices: Slices,
     pub patterns: Patterns,
     pub hot_field: Bitfield,
-    pub stones: u8,
     pub hash_key: HashKey,
 }
 
@@ -24,10 +24,10 @@ impl Default for Board {
     fn default() -> Self {
         Self {
             player_color: Color::Black,
+            stones: 0,
             slices: Slices::default(),
             patterns: Patterns::default(),
             hot_field: Bitfield::ZERO_FILLED,
-            stones: 0,
             hash_key: HashKey::default()
         }
     }
@@ -343,36 +343,36 @@ impl Board {
                 continue;
             }
 
-            if match self.calculate_near_5_signature::<{ Color::Black }>(direction, pos) {
+            if match self.calculate_near_four_window::<{ Color::Black }>(direction, pos) {
                 /* .VOO. */ 0b11000 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_unchecked(direction, 1)) &&
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_negative_unchecked(direction, 1)) &&
                     self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_positive_unchecked(direction, 3))
                 },
                 /* .OOV. */ 0b00011 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_unchecked(direction, 3)) &&
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_negative_unchecked(direction, 3)) &&
                     self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_positive_unchecked(direction, 1))
                 },
                 /* V.OO  */ 0b10000 => {
                     self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_positive_unchecked(direction, 1))
                 }
                 /* OO.V  */ 0b00001 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_unchecked(direction, 1))
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_negative_unchecked(direction, 1))
                 }
                 /* VO.O  */ 0b01000 => {
                     self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_positive_unchecked(direction, 2))
                 },
                 /* .OVO. */ 0b01010 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_unchecked(direction, 2)) &&
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_negative_unchecked(direction, 2)) &&
                     self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_positive_unchecked(direction, 2))
                 },
                 /* O.OV  */ 0b00010 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_unchecked(direction, 2))
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_negative_unchecked(direction, 2))
                 },
                 /* OV.O  */ 0b10010 => {
                     self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_positive_unchecked(direction, 1))
                 },
                 /* O.VO  */ 0b01001 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_unchecked(direction, 1))
+                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.directional_offset_negative_unchecked(direction, 1))
                 },
                 _ => unreachable!()
             } {
@@ -423,71 +423,63 @@ impl Board {
     fn update_four_overrides_each_direction(&self, overrides: &mut SetOverrideStack, direction: Direction, pos: Pos) {
         let direction_offset = direction as usize * 3;
 
-        match self.calculate_near_5_signature::<{ Color::Black }>(direction, pos) {
+        match self.calculate_near_four_window::<{ Color::Black }>(direction, pos) {
             /* .VOO.  */ 0b11000 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, 1);
+                overrides.next_four[direction_offset] = pos.directional_offset_negative_unchecked(direction, 1);
                 overrides.next_four[direction_offset + 1] = pos.directional_offset_positive_unchecked(direction, 3);
             },
             /* .OOV.  */ 0b00011 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, 3);
+                overrides.next_four[direction_offset] = pos.directional_offset_negative_unchecked(direction, 3);
                 overrides.next_four[direction_offset + 1] = pos.directional_offset_positive_unchecked(direction, 1);
             },
             /* .V.OO. */ 0b10000 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, 1);
+                overrides.next_four[direction_offset] = pos.directional_offset_negative_unchecked(direction, 1);
                 overrides.next_four[direction_offset + 1] = pos.directional_offset_positive_unchecked(direction, 1);
                 overrides.next_four[direction_offset + 2] = pos.directional_offset_positive_unchecked(direction, 3);
             }
             /* .OO.V. */ 0b00001 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, 3);
-                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 1);
+                overrides.next_four[direction_offset] = pos.directional_offset_negative_unchecked(direction, 3);
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_negative_unchecked(direction, 1);
                 overrides.next_four[direction_offset + 2] = pos.directional_offset_positive_unchecked(direction, 1);
             }
             /* .VO.O. */ 0b01000 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, 1);
+                overrides.next_four[direction_offset] = pos.directional_offset_negative_unchecked(direction, 1);
                 overrides.next_four[direction_offset + 1] = pos.directional_offset_positive_unchecked(direction, 2);
                 overrides.next_four[direction_offset + 2] = pos.directional_offset_positive_unchecked(direction, 4);
             },
             /* .OVO.  */ 0b01010 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, 2);
+                overrides.next_four[direction_offset] = pos.directional_offset_negative_unchecked(direction, 2);
                 overrides.next_four[direction_offset + 1] = pos.directional_offset_positive_unchecked(direction, 2);
             },
             /* .O.OV. */ 0b00010 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, 4);
-                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 2);
+                overrides.next_four[direction_offset] = pos.directional_offset_negative_unchecked(direction, 4);
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_negative_unchecked(direction, 2);
                 overrides.next_four[direction_offset + 2] = pos.directional_offset_positive_unchecked(direction, 1);
             },
             /* .OV.O. */ 0b10010 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, 2);
+                overrides.next_four[direction_offset] = pos.directional_offset_negative_unchecked(direction, 2);
                 overrides.next_four[direction_offset + 1] = pos.directional_offset_positive_unchecked(direction, 1);
                 overrides.next_four[direction_offset + 2] = pos.directional_offset_positive_unchecked(direction, 3);
             },
             /* .O.VO. */ 0b01001 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, 3);
-                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 1);
+                overrides.next_four[direction_offset] = pos.directional_offset_negative_unchecked(direction, 3);
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_negative_unchecked(direction, 1);
                 overrides.next_four[direction_offset + 2] = pos.directional_offset_positive_unchecked(direction, 2);
             },
             _ => unreachable!()
         }
     }
 
-    pub fn calculate_near_5_signature<const C: Color>(&self, direction: Direction, pos: Pos) -> u16 {
+    pub fn calculate_near_four_window<const C: Color>(&self, direction: Direction, pos: Pos) -> u16 {
         let slice = self.slices.access_slice(direction, pos);
         let slice_idx = slice.calculate_idx(direction, pos);
-        let stones = match C {
-            Color::Black => slice.black_stones,
-            Color::White => slice.white_stones
-        };
-        (stones >> (slice_idx - 2)) & 0b11111 // 0[00V00]0
-    }
 
-    pub fn calculate_near_3_signature<const C: Color>(&self, direction: Direction, pos: Pos) -> u16 {
-        let slice = self.slices.access_slice(direction, pos);
-        let slice_idx = slice.calculate_idx(direction, pos);
         let stones = match C {
             Color::Black => slice.black_stones,
             Color::White => slice.white_stones
         };
-        (stones >> (slice_idx - 1)) & 0b111
+
+        (stones >> (slice_idx - 2)) & 0b11111 // 0[00V00]0
     }
 
 }

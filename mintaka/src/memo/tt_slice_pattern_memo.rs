@@ -23,6 +23,10 @@ impl Clearable for AtomicTTSlicePatternEntry {
 
 impl AtomicTTSlicePatternEntry {
 
+    fn is_hit(&self, packed_slice: u64) -> bool {
+        self.0.load(Ordering::Relaxed) == packed_slice
+    }
+
     // interior-mutability
     fn store_mut(&self, packed_slice: u64, pattern: &SlicePattern) {
         self.0.store(packed_slice, Ordering::Relaxed);
@@ -60,7 +64,7 @@ impl Default for TTSlicePatternMemo {
             table: Vec::new(),
         };
 
-        new.resize_mut(128);
+        new.resize_mut(64);
 
         new
     }
@@ -92,15 +96,18 @@ impl SlicePatternMemo for TTSlicePatternMemo {
     fn probe_or_put_mut<F>(&mut self, packed_slice: u64, produce: F) -> SlicePattern
     where F: FnOnce() -> SlicePattern
     {
-        let slice_hash = Self::build_hash_key(packed_slice);
-        let idx = self.calculate_index(slice_hash);
-        let atomic_entry = &self.table[idx];
+        let atomic_entry = {
+            let slice_hash = Self::build_hash_key(packed_slice);
+            let idx = self.calculate_index(slice_hash);
+            &self.table[idx]
+        };
 
-        if atomic_entry.0.load(Ordering::Relaxed) == packed_slice {
+        if atomic_entry.is_hit(packed_slice) {
             return atomic_entry.decode();
         }
 
         let slice_pattern = produce();
+
         atomic_entry.store_mut(
             packed_slice,
             &slice_pattern

@@ -32,7 +32,7 @@ fn try_vcf<const C: Color>(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
     board: &mut Board, max_depth: u8, depth: u8, opponent_has_five: bool,
 ) -> Option<Vec<Pos>> {
-    if board.stones > U8_BOARD_SIZE - 3 {
+    if board.stones > U8_BOARD_SIZE - 2 {
         return None;
     }
 
