@@ -64,7 +64,7 @@ impl Default for TTSlicePatternMemo {
             table: Vec::new(),
         };
 
-        new.resize_mut(64);
+        new.resize_mut(32);
 
         new
     }

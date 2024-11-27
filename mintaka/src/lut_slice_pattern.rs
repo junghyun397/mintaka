@@ -163,17 +163,24 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
         }
     };
 
-    let mut pattern_black_idx: usize = 1;
-    let mut pattern_white_idx: usize = 1;
+    let mut patch_black_idx: usize = 1;
+    let mut patch_white_idx: usize = 1;
+
+    macro_rules! sources {
+        ($a:expr) => ([$a, "", "", ""]);
+        ($a:expr,$b:expr) => ([$a, $b, "", ""]);
+        ($a:expr,$b:expr,$c:expr) => ([$a, $b, $c, ""]);
+        ($a:expr,$b:expr,$c:expr,$d:expr) => ([$a, $b, $c, $d]);
+    }
 
     macro_rules! flash_pattern {
-        ($vector_expr:expr, $pattern_expr:expr, $idx_expr:expr, $extended_match:expr, $rev:expr, $sources:expr) => {{
+        ($vector_expr:expr, $idx_expr:expr, $extended_match:expr, $rev:expr, $sources:expr) => {{
             let overlap = slice_pattern_lut.vector.black[0] != 0;
 
             let target_idx = if overlap {
                 $vector_expr[0] as usize
             } else {
-                pattern_black_top
+                $idx_expr
             };
 
             $vector_expr[target_idx] = build_slice_patch_data($extended_match, $rev, $sources);
@@ -199,8 +206,8 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
             embed_pattern!($color, rev=true, $pattern, $($patch),+)
         };
         ($color:ident,rev=$rev:expr,$pattern:literal,$($patch:literal),+) => {
-            // flash-pattern -> idx
-            // flash-vector <- idx
+            // let patch_idx = flash_pattern!(slice_pattern_lut.vector.black, patch_black_idx, ExtendedMatch::None, $rev, sources!($($patch),+));
+//             slice_pattern_lut.vector.black[0] = patch_idx;
         };
     }
 

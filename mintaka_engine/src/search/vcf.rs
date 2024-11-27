@@ -57,34 +57,44 @@ fn try_vcf<const C: Color>(
         board.set_mut(memo, four_pos);
 
         let defend_pos = find_defend_pos_unchecked::<C>(board);
-
         let defend_pattern = board.patterns.field[defend_pos.idx_usize()];
-        let defend_opponent_unit = defend_pattern.opponent_unit::<C>();
-        let opponent_four_count = defend_opponent_unit.count_fours();
-
-        board.set_mut(memo, defend_pos);
+        let defend_unit = defend_pattern.opponent_unit::<C>();
+        let defend_four_count = defend_unit.count_fours();
+        let defend_is_forbidden = C == Color::White && defend_pattern.is_forbidden();
 
         let maybe_vcf =
-        if opponent_four_count != PatternCount::Multiple
-            && !defend_opponent_unit.has_open_four()
-        {
-            if opponent_four_count == PatternCount::Cold
-                && (player_unit.has_three() || player_has_any_open_four::<C>(board))
-            {
+        if match C {
+            Color::Black => defend_four_count != PatternCount::Multiple
+                && !defend_unit.has_open_four(),
+            Color::White => !defend_unit.has_open_four()
+                || defend_is_forbidden
+        } {
+            if match C {
+                Color::Black => defend_four_count == PatternCount::Cold
+                    && player_unit.has_three(),
+                Color::White => defend_is_forbidden
+                    || (defend_four_count == PatternCount::Cold
+                     && player_unit.has_three())
+            } {
                 Some(vec![four_pos])
             } else {
-                try_vcf::<C>(tt, memo, board, max_depth, depth + 2, opponent_four_count != PatternCount::Cold)
+                board.set_mut(memo, defend_pos);
+
+                let maybe_vcf = try_vcf::<C>(tt, memo, board, max_depth, depth + 2, defend_four_count != PatternCount::Cold)
                     .map(|mut vcf| {
                         vcf.push(defend_pos);
                         vcf.push(four_pos);
                         vcf
-                    })
+                    });
+
+                board.unset_mut(memo, defend_pos);
+
+                maybe_vcf
             }
         } else {
             None
         };
 
-        board.unset_mut(memo, defend_pos);
         board.unset_mut(memo, four_pos);
 
         if maybe_vcf.is_some() {
@@ -105,24 +115,4 @@ fn find_defend_pos_unchecked<const C: Color>(board: &Board) -> Pos {
     }
 
     defend_pos
-}
-
-fn player_has_any_open_four<const C: Color>(board: &Board) -> bool {
-    for idx in 0 .. pos::BOARD_SIZE {
-        if board.patterns.field[idx].player_unit::<C>().has_open_four() {
-            return true;
-        }
-    }
-
-    false
-}
-
-fn opponent_has_any_five<const C: Color>(board: &Board) -> bool {
-    for idx in 0 .. pos::BOARD_SIZE {
-        if board.patterns.field[idx].opponent_unit::<C>().has_five() {
-            return true;
-        }
-    }
-
-    false
 }

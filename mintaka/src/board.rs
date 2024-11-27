@@ -60,21 +60,21 @@ impl Board {
     }
 
     pub fn set_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos) {
-        self.incremental_update_mut::<false>(memo, pos, Slice::set_mut);
-
         self.stones += 1;
         self.hot_field.set(pos);
-        self.switch_player_mut();
 
+        self.incremental_update_mut::<false>(memo, pos, Slice::set_mut);
+
+        self.switch_player_mut();
         self.hash_key = self.hash_key.set(self.player_color, pos);
     }
 
     pub fn unset_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos) {
         self.patterns.five_in_a_row = None;
 
-        self.switch_player_mut();
         self.hot_field.unset(pos);
         self.stones -= 1;
+        self.switch_player_mut();
 
         self.incremental_update_mut::<true>(memo, pos, Slice::unset_mut);
 
@@ -470,16 +470,16 @@ impl Board {
         }
     }
 
-    pub fn calculate_near_four_window<const C: Color>(&self, direction: Direction, pos: Pos) -> u16 {
+    pub fn calculate_near_four_window<const C: Color>(&self, direction: Direction, pos: Pos) -> u8 {
         let slice = self.slices.access_slice(direction, pos);
         let slice_idx = slice.calculate_idx(direction, pos);
 
         let stones = match C {
             Color::Black => slice.black_stones,
             Color::White => slice.white_stones
-        };
+        } as u32;
 
-        (stones >> (slice_idx - 2)) & 0b11111 // 0[00V00]0
+        (((stones << 2) >> slice_idx) & 0b11111) as u8 // 0[00V00]0
     }
 
 }
