@@ -353,7 +353,7 @@ mod test_vcf {
         assert_eq!(vcf!(case), expected);
     }
 
-    // 32 ms in M1 pro 10C, 50 ms in 5800X3D
+    // 32 ms in M1 pro 10C, 80 ms in 5800X3D
     // 2400 ms without a slice memo
     #[test]
     fn deep_vcf() {

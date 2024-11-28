@@ -91,13 +91,13 @@ fn find_patterns<const C: Color>(
 
         let mut original = u128::from_ne_bytes(acc.black_patterns);
         if slice_patch_data.contains_patch_mask {
-            original |= (slice_patch_data.patch_mask << shr) >> shl;
+            original |= ((slice_patch_data.patch_mask << shr) >> shl) as u128;
         }
         if slice_patch_data.contains_closed_four {
             original = increase_closed_four_multiple(
                 original,
-                (slice_patch_data.closed_four_clear_mask << shr) >> shl,
-                (slice_patch_data.closed_four_mask << shr) >> shl
+                ((slice_patch_data.closed_four_clear_mask << shr) >> shl) as u128,
+                ((slice_patch_data.closed_four_mask << shr) >> shl) as u128
             )
         }
 
@@ -207,7 +207,7 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
         };
         ($color:ident,rev=$rev:expr,$pattern:literal,$($patch:literal),+) => {
             // let patch_idx = flash_pattern!(slice_pattern_lut.vector.black, patch_black_idx, ExtendedMatch::None, $rev, sources!($($patch),+));
-//             slice_pattern_lut.vector.black[0] = patch_idx;
+            // slice_pattern_lut.vector.black[0] = patch_idx;
         };
     }
 
@@ -303,18 +303,18 @@ enum ExtendedMatch {
 
 #[derive(Copy, Clone)]
 struct SlicePatchData {
-    pub patch_mask: u128,
-    pub closed_four_clear_mask: u128,
-    pub closed_four_mask: u128,
+    pub patch_mask: u64,
+    pub closed_four_clear_mask: u64,
+    pub closed_four_mask: u64,
     pub contains_patch_mask: bool,
     pub contains_closed_four: bool,
     pub extended_match: ExtendedMatch,
 }
 
 const fn build_slice_patch_data(extended_match: ExtendedMatch, reversed: bool, sources: [&str; 4]) -> SlicePatchData {
-    let mut patch_mask: [u8; 16] = [0; 16];
-    let mut closed_four_clear_mask: [u8; 16] = [0; 16];
-    let mut closed_four_mask: [u8; 16] = [0; 16];
+    let mut patch_mask: [u8; 8] = [0; 8];
+    let mut closed_four_clear_mask: [u8; 8] = [0; 8];
+    let mut closed_four_mask: [u8; 8] = [0; 8];
 
     let mut idx: usize = 0;
     while idx < 4 {
@@ -331,9 +331,9 @@ const fn build_slice_patch_data(extended_match: ExtendedMatch, reversed: bool, s
         idx += 1;
     }
 
-    let patch_mask = u128::from_ne_bytes(patch_mask);
-    let closed_four_clear_mask = u128::from_ne_bytes(closed_four_clear_mask);
-    let closed_four_mask = u128::from_ne_bytes(closed_four_mask);
+    let patch_mask = u64::from_ne_bytes(patch_mask);
+    let closed_four_clear_mask = u64::from_ne_bytes(closed_four_clear_mask);
+    let closed_four_mask = u64::from_ne_bytes(closed_four_mask);
 
     let extended_match = if reversed {
         match extended_match {
