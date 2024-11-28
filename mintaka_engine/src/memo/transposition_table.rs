@@ -1,8 +1,6 @@
-use crate::memo::tt_entry::{TTEntry, TTEntryBucket, TTFlag};
+use crate::memo::tt_entry::{TTEntry, TTEntryBucket};
 use mintaka::memo::abstract_transposition_table::AbstractTranspositionTable;
 use mintaka::memo::hash_key::HashKey;
-use mintaka::notation::node::{Eval, Score};
-use mintaka::notation::pos::Pos;
 use std::sync::atomic::AtomicU8;
 
 pub struct TranspositionTable {
@@ -26,22 +24,18 @@ impl AbstractTranspositionTable<TTEntryBucket> for TranspositionTable {
 
 }
 
-impl Default for TranspositionTable {
+impl TranspositionTable {
 
-    fn default() -> Self {
+    pub fn new_with_size(size_in_mib: usize) -> Self {
         let mut new = Self {
             table: Vec::new(),
             age: AtomicU8::new(0),
         };
 
-        new.resize_mut(256);
+        new.resize_mut(size_in_mib);
 
         new
     }
-
-}
-
-impl TranspositionTable {
 
     pub fn probe(&self, key: HashKey) -> Option<TTEntry> {
         let idx = self.calculate_index(key);
@@ -53,29 +47,10 @@ impl TranspositionTable {
     pub fn store_mut(
         &mut self,
         key: HashKey,
-        best_move: Pos,
-        depth: u8,
-        flag: TTFlag,
-        score: Score,
-        eval: Eval,
+        entry: TTEntry,
     ) {
         let idx = self.calculate_index(key);
-        let entry = TTEntry {
-            best_move,
-            depth,
-            flag,
-            score,
-            eval,
-        };
-
         self.table[idx].store_mut(key.0 as u32, entry);
-    }
-
-    pub fn hash_usage(&self) -> usize {
-        self.table.iter()
-            .take(1000)
-            .filter(|bucket| true)
-            .count()
     }
 
 }

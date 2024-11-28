@@ -1,13 +1,12 @@
 use crate::memo::transposition_table::TranspositionTable;
-use crate::memo::tt_entry::TTFlag;
+use crate::memo::tt_entry::{TTEntry, TTFlag, VCFlag};
 use mintaka::board::Board;
 use mintaka::memo::slice_pattern_memo::SlicePatternMemo;
 use mintaka::notation::color::Color;
-use mintaka::notation::node::Score;
+use mintaka::notation::node::{Eval, Score};
 use mintaka::notation::pos;
 use mintaka::notation::pos::{Pos, INVALID_POS, U8_BOARD_SIZE};
 use mintaka::pattern::PatternCount;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub fn vcf(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
@@ -29,14 +28,12 @@ pub fn vcf_sequence(
     })
 }
 
-pub static NODES: AtomicUsize = AtomicUsize::new(0);
-
 // Depth-First Search(DFS)
 fn try_vcf<const C: Color>(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
     board: &mut Board, max_depth: u8, depth: u8, opponent_has_five: bool,
 ) -> Option<Vec<Pos>> {
-    if board.stones > U8_BOARD_SIZE - 2 {
+    if depth > max_depth || board.stones > U8_BOARD_SIZE - 2 {
         return None;
     }
 
@@ -45,8 +42,6 @@ fn try_vcf<const C: Color>(
         let player_unit = pattern.player_unit::<C>();
         let opponent_unit = pattern.opponent_unit::<C>();
 
-        let four_pos = Pos::from_index(idx as u8);
-
         if !player_unit.has_four()
             || (opponent_has_five && !opponent_unit.has_five())
             || (C == Color::Black && pattern.is_forbidden())
@@ -54,15 +49,19 @@ fn try_vcf<const C: Color>(
             continue;
         }
 
-        if let Some(tt_entry) = tt.probe(board.hash_key.set(C.reversed(), four_pos)) {
-            if tt_entry.score == 0 {
+        let four_pos = Pos::from_index(idx as u8);
+
+        let mut maybe_tt_entry = tt.probe(board.hash_key.set(C, four_pos));
+
+        if let Some(tt_entry) = &maybe_tt_entry {
+            if tt_entry.vc_flag == VCFlag::Cold {
                 continue;
             }
         }
 
-        NODES.fetch_add(1, Ordering::Relaxed);
-
         if player_unit.has_open_four() {
+            tt.store_mut(board.hash_key, build_vcf_win_tt_entry(four_pos));
+
             return Some(vec![four_pos]);
         }
 
@@ -88,6 +87,8 @@ fn try_vcf<const C: Color>(
                     || (defend_four_count == PatternCount::Cold
                      && player_unit.has_three())
             } {
+                tt.store_mut(board.hash_key, build_vcf_win_tt_entry(four_pos));
+
                 Some(vec![four_pos])
             } else {
                 board.set_mut(memo, defend_pos);
@@ -113,14 +114,21 @@ fn try_vcf<const C: Color>(
             return maybe_vcf;
         }
 
-        tt.store_mut(
-            board.hash_key.set(C.reversed(), four_pos),
-            INVALID_POS,
-            0,
-            TTFlag::EXACT,
-            0,
-            0
-        )
+        let tt_entry = maybe_tt_entry
+            .map(|mut tt_entry| {
+                tt_entry.vc_flag = VCFlag::Cold;
+                tt_entry
+            })
+            .unwrap_or_else(|| TTEntry {
+                best_move: INVALID_POS,
+                depth: 0,
+                flag: Default::default(),
+                vc_flag: VCFlag::Cold,
+                score: 0,
+                eval: 0,
+            });
+
+        tt.store_mut(board.hash_key.set(C, four_pos), tt_entry)
     }
 
     None
@@ -136,4 +144,15 @@ fn find_defend_pos_unchecked<const C: Color>(board: &Board) -> Pos {
     }
 
     defend_pos
+}
+
+fn build_vcf_win_tt_entry(four_pos: Pos) -> TTEntry {
+    TTEntry {
+        best_move: four_pos,
+        depth: 0,
+        flag: TTFlag::EXACT,
+        vc_flag: VCFlag::VcfWin,
+        score: Score::MAX,
+        eval: Eval::MAX,
+    }
 }

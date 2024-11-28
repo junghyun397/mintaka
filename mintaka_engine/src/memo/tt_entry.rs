@@ -1,4 +1,4 @@
-use mintaka::memo::abstract_transposition_table::Clearable;
+use mintaka::memo::abstract_transposition_table::AbstractTTEntry;
 use mintaka::notation::node::{Eval, Score};
 use mintaka::notation::pos::Pos;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -12,11 +12,22 @@ pub enum TTFlag {
     EXACT,
 }
 
+#[derive(Eq, PartialEq, Default)]
+#[repr(u8)]
+pub enum VCFlag {
+    #[default] Cold,
+    VcfWin,
+    VcfLose,
+    VctWin,
+    VctLose,
+}
+
 // 64 bit
 pub struct TTEntry {
     pub best_move: Pos, // 8
     pub depth: u8, // 8
     pub flag: TTFlag, // 8
+    pub vc_flag: VCFlag, // 8
     pub score: Score, // 16
     pub eval: Eval, // 16
 }
@@ -46,12 +57,27 @@ pub struct TTEntryBucket {
     lo_body: AtomicU64,
 }
 
-impl Clearable for TTEntryBucket {
+impl AbstractTTEntry for TTEntryBucket {
 
     fn clear_mut(&mut self) {
         self.key_pair.store(0, Ordering::Relaxed);
         self.hi_body.store(0, Ordering::Relaxed);
         self.lo_body.store(0, Ordering::Relaxed);
+    }
+
+    fn usage(&self) -> usize {
+        let key_pair = self.key_pair.load(Ordering::Relaxed);
+        let mut count = 0;
+
+        if key_pair & HI_KEY_MASK != 0 {
+            count += 1;
+        }
+
+        if key_pair & LO_KEY_MASK != 0 {
+            count += 1;
+        }
+
+        count
     }
 
 }

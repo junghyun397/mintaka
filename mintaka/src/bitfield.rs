@@ -19,11 +19,11 @@ impl Bitfield {
     }
 
     pub fn set(&mut self, pos: Pos) {
-        self.0[pos.idx_usize() / 8] |= 0b1 << pos.idx() % 8;
+        self.0[pos.idx_usize() / 8] |= 0b1 << (pos.idx() % 8);
     }
 
     pub fn unset(&mut self, pos: Pos) {
-        self.0[pos.idx_usize() / 8] &= !(0b1 << pos.idx() % 8);
+        self.0[pos.idx_usize() / 8] &= !(0b1 << (pos.idx() % 8));
     }
 
     pub fn iter(&self) -> impl Iterator<Item=bool> + '_ {
@@ -51,7 +51,7 @@ impl Bitfield {
 impl From<u8x32> for Bitfield {
 
     fn from(x: u8x32) -> Self {
-        Self { 0: x.to_array() }
+        Self(x.to_array())
     }
 
 }
@@ -59,7 +59,7 @@ impl From<u8x32> for Bitfield {
 impl From<u256> for Bitfield {
 
     fn from(x: u256) -> Self {
-        Self { 0: x.to_ne_bytes() }
+        Self(x.to_ne_bytes())
     }
 
 }

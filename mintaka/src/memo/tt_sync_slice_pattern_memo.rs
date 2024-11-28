@@ -1,15 +1,19 @@
-use crate::memo::abstract_transposition_table::{AbstractTranspositionTable, Clearable};
+use crate::memo::abstract_transposition_table::{AbstractTTEntry, AbstractTranspositionTable};
 use crate::memo::hash_key::HashKey;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::slice_pattern::SlicePattern;
 
-struct TTSyncSlicePatternEntry(u64, SlicePattern);
+pub struct TTSyncSlicePatternEntry(u64, SlicePattern);
 
-impl Clearable for TTSyncSlicePatternEntry {
+impl AbstractTTEntry for TTSyncSlicePatternEntry {
 
     fn clear_mut(&mut self) {
         self.0 = 0;
         self.1 = SlicePattern::EMPTY;
+    }
+
+    fn usage(&self) -> usize {
+        self.0.min(2) as usize
     }
 
 }
@@ -101,7 +105,7 @@ impl TTSyncSlicePatternMemo {
 
     fn build_hash_key(packed_slice: u64) -> HashKey {
         // fibonacci-hashing
-        HashKey(unsafe { packed_slice.wrapping_mul(0x9e3779b97f4a7c15) })
+        HashKey(packed_slice.wrapping_mul(0x9e3779b97f4a7c15))
     }
 
 }

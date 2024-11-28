@@ -209,17 +209,16 @@ impl Board {
         }
 
         if valid_ascending_slice.as_ref()
-            .map_or(false, |slice| slice.is_valid_pattern())
+            .is_some_and(|slice| slice.is_valid_pattern())
         {
             prefetch_queue[prefetch_idx] = valid_ascending_slice.as_ref().unwrap().packed_slice();
             prefetch_idx += 1;
         }
 
         if valid_descending_slice.as_ref()
-            .map_or(false, |slice| slice.is_valid_pattern())
+            .is_some_and(|slice| slice.is_valid_pattern())
         {
             prefetch_queue[prefetch_idx] = valid_descending_slice.as_ref().unwrap().packed_slice();
-            prefetch_idx += 1;
         }
 
         prefetch_idx = 0;

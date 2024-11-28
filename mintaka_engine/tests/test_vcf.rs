@@ -10,16 +10,18 @@ mod test_vcf {
     macro_rules! vcf {
         ($case:expr) => {{
             let mut board = Board::from_str($case).unwrap();
-            let mut tt = TranspositionTable::default();
+            let mut tt = TranspositionTable::new_with_size(1);
             let mut memo = TTSlicePatternMemo::default();
 
             let vcf_result = vcf::vcf_sequence(&mut tt, &mut memo, &mut board, u8::MAX).unwrap();
             let final_move = vcf_result.last().copied().unwrap();
 
-            for m in vcf_result.iter() {
-                board.set_mut(&mut memo, *m);
-                println!("{}", board.to_string_with_move_marker(*m));
-            }
+            board.batch_set_mut(vcf_result.into_boxed_slice());
+
+            // for m in vcf_result.iter() {
+            //     board.set_mut(&mut memo, *m);
+            //     println!("{}", board.to_string_with_move_marker(*m));
+            // }
 
             board.to_string_with_move_marker(final_move)
         }};
@@ -351,6 +353,8 @@ mod test_vcf {
         assert_eq!(vcf!(case), expected);
     }
 
+    // 32 ms in M1 pro 10C, 50 ms in 5800X3D
+    // 2400 ms without a slice memo
     #[test]
     fn deep_vcf() {
         let case = indoc! {"

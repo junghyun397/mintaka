@@ -1,4 +1,4 @@
-use crate::memo::abstract_transposition_table::{AbstractTranspositionTable, Clearable};
+use crate::memo::abstract_transposition_table::{AbstractTTEntry, AbstractTranspositionTable};
 use crate::memo::hash_key::HashKey;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::slice_pattern::SlicePattern;
@@ -7,9 +7,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 // layout: block 0 = slice key 32 bits
 //         block 1, 2 = black_patterns 128 bits
 //         block 3, 4 = white_patterns 128 bits
-struct AtomicTTSlicePatternEntry(AtomicU64, AtomicU64, AtomicU64, AtomicU64, AtomicU64);
+pub struct AtomicTTSlicePatternEntry(AtomicU64, AtomicU64, AtomicU64, AtomicU64, AtomicU64);
 
-impl Clearable for AtomicTTSlicePatternEntry {
+impl AbstractTTEntry for AtomicTTSlicePatternEntry {
 
     fn clear_mut(&mut self) {
         self.0.store(0, Ordering::Relaxed);
@@ -17,6 +17,10 @@ impl Clearable for AtomicTTSlicePatternEntry {
         self.2.store(0, Ordering::Relaxed);
         self.3.store(0, Ordering::Relaxed);
         self.4.store(0, Ordering::Relaxed);
+    }
+
+    fn usage(&self) -> usize {
+        self.0.load(Ordering::Relaxed).min(2) as usize
     }
 
 }
@@ -37,13 +41,13 @@ impl AtomicTTSlicePatternEntry {
     }
 
     fn decode(&self) -> SlicePattern {
-        let mut black_patterns: [u8; 16] = [0u8; 16];
-        black_patterns[0 .. 8].copy_from_slice(&self.1.load(Ordering::Relaxed).to_ne_bytes());
-        black_patterns[8 .. 16].copy_from_slice(&self.2.load(Ordering::Relaxed).to_ne_bytes());
+        let black_patterns: [u8; 16] = unsafe {
+            std::mem::transmute([self.1.load(Ordering::Relaxed), self.2.load(Ordering::Relaxed)])
+        };
 
-        let mut white_patterns: [u8; 16] = [0u8; 16];
-        white_patterns[0 .. 8].copy_from_slice(&self.3.load(Ordering::Relaxed).to_ne_bytes());
-        white_patterns[8 .. 16].copy_from_slice(&self.4.load(Ordering::Relaxed).to_ne_bytes());
+        let white_patterns: [u8; 16] = unsafe {
+            std::mem::transmute([self.3.load(Ordering::Relaxed), self.4.load(Ordering::Relaxed)])
+        };
 
         SlicePattern {
             black_patterns,
@@ -122,7 +126,7 @@ impl TTSlicePatternMemo {
 
     fn build_hash_key(packed_slice: u64) -> HashKey {
         // fibonacci-hashing
-        HashKey(unsafe { packed_slice.wrapping_mul(0x9e3779b97f4a7c15) })
+        HashKey(packed_slice.wrapping_mul(0x9e3779b97f4a7c15))
     }
 
 }
