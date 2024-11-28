@@ -1,8 +1,8 @@
 use crate::eval::evaluator::Evaluator;
-use crate::memo::tt_entry::Score;
 use mintaka::board::Board;
 use mintaka::board_iter::BoardIterItem;
 use mintaka::notation::color::Color;
+use mintaka::notation::node::Score;
 
 pub struct HeuristicEvaluator;
 

@@ -1,4 +1,5 @@
 use mintaka::memo::abstract_transposition_table::Clearable;
+use mintaka::notation::node::{Eval, Score};
 use mintaka::notation::pos::Pos;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -10,9 +11,6 @@ pub enum TTFlag {
     UPPER,
     EXACT,
 }
-
-pub type Score = i16;
-pub type Eval = i16;
 
 // 64 bit
 pub struct TTEntry {
@@ -39,15 +37,13 @@ impl From<u64> for TTEntry {
 
 }
 
+const HI_KEY_MASK: u64 = 0x0000_0000_FFFF_FFFF;
+const LO_KEY_MASK: u64 = 0xFFFF_FFFF_0000_0000;
+
 pub struct TTEntryBucket {
     key_pair: AtomicU64,
     hi_body: AtomicU64,
     lo_body: AtomicU64,
-}
-
-pub enum TTEntryBucketPosition {
-    HI,
-    LO
 }
 
 impl Clearable for TTEntryBucket {
@@ -62,31 +58,25 @@ impl Clearable for TTEntryBucket {
 
 impl TTEntryBucket {
 
-    pub fn next_position(&self) -> TTEntryBucketPosition {
-        let key_pair = self.key_pair.load(Ordering::Relaxed);
-        todo!()
-    }
-
     pub fn probe(&self, compact_key: u32) -> Option<TTEntry> {
         let key_pair = self.key_pair.load(Ordering::Relaxed);
 
-        if key_pair & 0x0000_0000_FFFF_FFFF == compact_key as u64 {
+        if key_pair & HI_KEY_MASK == compact_key as u64 {
             Some(TTEntry::from(self.hi_body.load(Ordering::Relaxed)))
         } else if key_pair >> 32 == compact_key as u64 {
             Some(TTEntry::from(self.lo_body.load(Ordering::Relaxed)))
         } else { None }
     }
 
-    pub fn store(&mut self, compact_key: u32, pos: TTEntryBucketPosition, entry: TTEntry) {
-        match pos {
-            TTEntryBucketPosition::HI => {
-                self.key_pair.store((compact_key as u64) << 32, Ordering::Relaxed);
-                self.hi_body.store(u64::from(entry), Ordering::Relaxed);
-            }
-            TTEntryBucketPosition::LO => {
-                self.key_pair.store(compact_key as u64, Ordering::Relaxed);
-                self.lo_body.store(u64::from(entry), Ordering::Relaxed);
-            }
+    pub fn store_mut(&self, compact_key: u32, entry: TTEntry) {
+        let key_pair = self.key_pair.load(Ordering::Relaxed);
+
+        if key_pair == 0 || key_pair & HI_KEY_MASK == compact_key as u64 {
+            self.key_pair.store((key_pair & LO_KEY_MASK) | (compact_key as u64), Ordering::Relaxed);
+            self.hi_body.store(u64::from(entry), Ordering::Relaxed);
+        } else {
+            self.key_pair.store((key_pair & HI_KEY_MASK) | ((compact_key as u64) << 32), Ordering::Relaxed);
+            self.lo_body.store(u64::from(entry), Ordering::Relaxed);
         }
     }
 

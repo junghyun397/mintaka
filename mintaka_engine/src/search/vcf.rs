@@ -1,11 +1,13 @@
 use crate::memo::transposition_table::TranspositionTable;
-use crate::memo::tt_entry::Score;
+use crate::memo::tt_entry::TTFlag;
 use mintaka::board::Board;
 use mintaka::memo::slice_pattern_memo::SlicePatternMemo;
 use mintaka::notation::color::Color;
+use mintaka::notation::node::Score;
 use mintaka::notation::pos;
 use mintaka::notation::pos::{Pos, INVALID_POS, U8_BOARD_SIZE};
 use mintaka::pattern::PatternCount;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub fn vcf(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
@@ -26,6 +28,8 @@ pub fn vcf_sequence(
         result
     })
 }
+
+pub static NODES: AtomicUsize = AtomicUsize::new(0);
 
 // Depth-First Search(DFS)
 fn try_vcf<const C: Color>(
@@ -49,6 +53,14 @@ fn try_vcf<const C: Color>(
         {
             continue;
         }
+
+        if let Some(tt_entry) = tt.probe(board.hash_key.set(C.reversed(), four_pos)) {
+            if tt_entry.score == 0 {
+                continue;
+            }
+        }
+
+        NODES.fetch_add(1, Ordering::Relaxed);
 
         if player_unit.has_open_four() {
             return Some(vec![four_pos]);
@@ -100,6 +112,15 @@ fn try_vcf<const C: Color>(
         if maybe_vcf.is_some() {
             return maybe_vcf;
         }
+
+        tt.store_mut(
+            board.hash_key.set(C.reversed(), four_pos),
+            INVALID_POS,
+            0,
+            TTFlag::EXACT,
+            0,
+            0
+        )
     }
 
     None

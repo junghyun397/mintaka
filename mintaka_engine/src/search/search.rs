@@ -1,7 +1,7 @@
 use crate::memo::transposition_table::TranspositionTable;
-use crate::memo::tt_entry::Score;
 use mintaka::board::Board;
 use mintaka::memo::slice_pattern_memo::SlicePatternMemo;
+use mintaka::notation::node::Score;
 use mintaka::notation::pos::Pos;
 
 pub trait NodeType {

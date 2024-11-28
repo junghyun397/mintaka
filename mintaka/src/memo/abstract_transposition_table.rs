@@ -1,4 +1,5 @@
 use crate::memo::hash_key::HashKey;
+use std::time::Instant;
 
 pub trait Clearable {
 
@@ -31,6 +32,8 @@ pub trait AbstractTranspositionTable<T: Clearable> {
     fn resize_mut(&mut self, size_in_mib: usize) {
         let len = Self::calculate_table_len_in_mib(size_in_mib);
         unsafe {
+            let time = Instant::now();
+
             let new_table = Vec::from_raw_parts(
                 std::alloc::alloc_zeroed(
                     std::alloc::Layout::array::<T>(len).unwrap()
@@ -38,6 +41,8 @@ pub trait AbstractTranspositionTable<T: Clearable> {
                 len,
                 len
             );
+
+            println!("{:?}", time.elapsed());
 
             self.assign_internal_table_mut(new_table);
         };

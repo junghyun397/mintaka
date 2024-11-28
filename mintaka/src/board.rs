@@ -78,7 +78,7 @@ impl Board {
 
         self.incremental_update_mut::<true>(memo, pos, Slice::unset_mut);
 
-        self.hash_key = self.hash_key.set(self.player_color, pos);
+        self.hash_key = self.hash_key.set(self.opponent_color(), pos);
     }
 
     pub fn pass_mut(&mut self) {

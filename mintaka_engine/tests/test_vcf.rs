@@ -432,7 +432,7 @@ mod test_vcf {
          1 X O O O O X O O X O X X X X O 1
            A B C D E F G H I J K L M N O"};
 
-        // assert_eq!(vcf!(case), expected);
+        assert_eq!(vcf!(case), expected);
     }
 
 }
