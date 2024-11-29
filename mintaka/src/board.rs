@@ -62,23 +62,23 @@ impl Board {
     pub fn set_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos) {
         self.stones += 1;
         self.hot_field.set(pos);
+        self.hash_key = self.hash_key.set(self.player_color, pos);
 
         self.incremental_update_mut::<false>(memo, pos, Slice::set_mut);
 
         self.switch_player_mut();
-        self.hash_key = self.hash_key.set(self.player_color, pos);
     }
 
     pub fn unset_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos) {
         self.patterns.five_in_a_row = None;
 
+        self.hash_key = self.hash_key.set(self.opponent_color(), pos);
         self.hot_field.unset(pos);
         self.stones -= 1;
         self.switch_player_mut();
 
         self.incremental_update_mut::<true>(memo, pos, Slice::unset_mut);
 
-        self.hash_key = self.hash_key.set(self.opponent_color(), pos);
     }
 
     pub fn pass_mut(&mut self) {
@@ -86,7 +86,7 @@ impl Board {
     }
 
     pub fn batch_set_mut(&mut self, moves: Box<[Pos]>) {
-        let (black_moves, white_moves): (Vec<Pos>, Vec<Pos>) = moves.iter()
+        let (behind_moves, after_moves): (Vec<Pos>, Vec<Pos>) = moves.iter()
             .enumerate()
             .fold(
                 (Vec::with_capacity(moves.len() / 2), Vec::with_capacity(moves.len() / 2)),
@@ -100,6 +100,11 @@ impl Board {
                     (even, odd)
                 }
             );
+
+        let (black_moves, white_moves) = match self.player_color {
+            Color::Black => (behind_moves, after_moves),
+            Color::White => (after_moves, behind_moves)
+        };
 
         let player = Color::player_color_from_each_moves(black_moves.len(), white_moves.len());
 

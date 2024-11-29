@@ -7,19 +7,17 @@ use std::sync::atomic::{AtomicU64, Ordering};
 #[repr(u8)]
 pub enum TTFlag {
     #[default] PV,
-    LOWER,
-    UPPER,
-    EXACT,
+    Lower,
+    Upper,
+    Exact,
 }
 
 #[derive(Eq, PartialEq, Default)]
 #[repr(u8)]
 pub enum VCFlag {
-    #[default] Cold,
-    VcfWin,
-    VcfLose,
-    VctWin,
-    VctLose,
+    #[default] Unknown,
+    Cold,
+    VcWin,
 }
 
 // 64 bit

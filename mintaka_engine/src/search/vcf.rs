@@ -51,16 +51,8 @@ fn try_vcf<const C: Color>(
 
         let four_pos = Pos::from_index(idx as u8);
 
-        let mut maybe_tt_entry = tt.probe(board.hash_key.set(C, four_pos));
-
-        if let Some(tt_entry) = &maybe_tt_entry {
-            if tt_entry.vc_flag == VCFlag::Cold {
-                continue;
-            }
-        }
-
         if player_unit.has_open_four() {
-            tt.store_mut(board.hash_key, build_vcf_win_tt_entry(four_pos));
+            tt.store_mut(board.hash_key, build_vcf_win_tt_entry(0, four_pos));
 
             return Some(vec![four_pos]);
         }
@@ -87,10 +79,12 @@ fn try_vcf<const C: Color>(
                     || (defend_four_count == PatternCount::Cold
                      && player_unit.has_three())
             } {
-                tt.store_mut(board.hash_key, build_vcf_win_tt_entry(four_pos));
+                tt.store_mut(board.hash_key, build_vcf_win_tt_entry(0, four_pos));
 
                 Some(vec![four_pos])
-            } else {
+            } else if !tt.probe(
+                board.hash_key.set(C.reversed(), defend_pos)
+            ).is_some_and(|entry| entry.vc_flag == VCFlag::Cold) {
                 board.set_mut(memo, defend_pos);
 
                 let maybe_vcf = try_vcf::<C>(tt, memo, board, max_depth, depth + 2, defend_four_count != PatternCount::Cold)
@@ -103,6 +97,8 @@ fn try_vcf<const C: Color>(
                 board.unset_mut(memo, defend_pos);
 
                 maybe_vcf
+            } else {
+                None
             }
         } else {
             None
@@ -113,23 +109,23 @@ fn try_vcf<const C: Color>(
         if maybe_vcf.is_some() {
             return maybe_vcf;
         }
-
-        let tt_entry = maybe_tt_entry
-            .map(|mut tt_entry| {
-                tt_entry.vc_flag = VCFlag::Cold;
-                tt_entry
-            })
-            .unwrap_or_else(|| TTEntry {
-                best_move: INVALID_POS,
-                depth: 0,
-                flag: Default::default(),
-                vc_flag: VCFlag::Cold,
-                score: 0,
-                eval: 0,
-            });
-
-        tt.store_mut(board.hash_key.set(C, four_pos), tt_entry)
     }
+
+    let tt_entry = tt.probe(board.hash_key)
+        .map(|mut tt_entry| {
+            tt_entry.vc_flag = VCFlag::Cold;
+            tt_entry
+        })
+        .unwrap_or_else(|| TTEntry {
+            best_move: INVALID_POS,
+            depth: 0,
+            flag: Default::default(),
+            vc_flag: VCFlag::Cold,
+            score: 0,
+            eval: 0,
+        });
+
+    tt.store_mut(board.hash_key, tt_entry);
 
     None
 }
@@ -146,12 +142,12 @@ fn find_defend_pos_unchecked<const C: Color>(board: &Board) -> Pos {
     defend_pos
 }
 
-fn build_vcf_win_tt_entry(four_pos: Pos) -> TTEntry {
+fn build_vcf_win_tt_entry(depth: u8, four_pos: Pos) -> TTEntry {
     TTEntry {
         best_move: four_pos,
-        depth: 0,
-        flag: TTFlag::EXACT,
-        vc_flag: VCFlag::VcfWin,
+        depth,
+        flag: TTFlag::Exact,
+        vc_flag: VCFlag::VcWin,
         score: Score::MAX,
         eval: Eval::MAX,
     }

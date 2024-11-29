@@ -6,6 +6,7 @@ mod test_vcf {
     use mintaka_engine::memo::transposition_table::TranspositionTable;
     use mintaka_engine::search::vcf;
     use std::str::FromStr;
+    use std::time::Instant;
 
     macro_rules! vcf {
         ($case:expr) => {{
@@ -13,7 +14,10 @@ mod test_vcf {
             let mut tt = TranspositionTable::new_with_size(1);
             let mut memo = TTSlicePatternMemo::default();
 
+            let instant = Instant::now();
             let vcf_result = vcf::vcf_sequence(&mut tt, &mut memo, &mut board, u8::MAX).unwrap();
+            let time = instant.elapsed();
+
             let final_move = vcf_result.last().copied().unwrap();
 
             board.batch_set_mut(vcf_result.into_boxed_slice());
@@ -23,7 +27,11 @@ mod test_vcf {
             //     println!("{}", board.to_string_with_move_marker(*m));
             // }
 
-            board.to_string_with_move_marker(final_move)
+            let board_string = board.to_string_with_move_marker(final_move);
+            println!("{}", board_string);
+            println!("{:?}", time);
+
+            board_string
         }};
     }
 
@@ -353,8 +361,6 @@ mod test_vcf {
         assert_eq!(vcf!(case), expected);
     }
 
-    // 32 ms in M1 pro 10C, 80 ms in 5800X3D
-    // 2400 ms without a slice memo
     #[test]
     fn deep_vcf() {
         let case = indoc! {"
@@ -397,6 +403,8 @@ mod test_vcf {
 
         assert_eq!(vcf!(case), expected);
 
+        // 14 ms in M1 pro 10C, 50 ms in 5800X3D
+        // 2400 ms without a slice memo
         // transposition table required
         let case = indoc! {"
            A B C D E F G H I J K L M N O

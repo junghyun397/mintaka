@@ -15,7 +15,7 @@
 renju-board implementation.
 
 ## mintaka-engine
-HCE-based renju engine.
+PVS+HCE based renju engine.
 
 ## mintaka-server
 REST API backend server for web-ui frontend.

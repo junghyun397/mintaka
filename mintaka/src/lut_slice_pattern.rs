@@ -19,7 +19,7 @@ impl SlicePattern {
 
 impl Slice {
 
-    pub fn _calculate_slice_pattern(&self) -> SlicePattern {
+    pub fn calculate_slice_pattern_alt(&self) -> SlicePattern {
         // padding = 3
         let block: u32 = !(!(u32::MAX << self.length as u32) << 3);
         let extended_b: u32 = (self.black_stones as u32) << 3;
@@ -80,8 +80,8 @@ fn find_patterns<const C: Color>(
         let slice_patch_data = SLICE_PATTERN_LUT.patch.black[patch_idx as usize];
 
         if C == Color::Black
-            && slice_patch_data.extended_match != ExtendedMatch::None
-            && extended_match_for_black(slice_patch_data.extended_match, b_raw, offset)
+            && slice_patch_data.extended_match != None
+            && extended_match_for_black(slice_patch_data.extended_match.unwrap(), b_raw, offset)
         {
             return;
         }
@@ -148,7 +148,7 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
             closed_four_mask: 0,
             contains_patch_mask: false,
             contains_closed_four: false,
-            extended_match: ExtendedMatch::None
+            extended_match: None
         };
 
         SlicePatternLut {
@@ -296,7 +296,6 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum ExtendedMatch {
-    None,
     Left,
     Right
 }
@@ -308,10 +307,10 @@ struct SlicePatchData {
     pub closed_four_mask: u64,
     pub contains_patch_mask: bool,
     pub contains_closed_four: bool,
-    pub extended_match: ExtendedMatch,
+    pub extended_match: Option<ExtendedMatch>,
 }
 
-const fn build_slice_patch_data(extended_match: ExtendedMatch, reversed: bool, sources: [&str; 4]) -> SlicePatchData {
+const fn build_slice_patch_data(extended_match: Option<ExtendedMatch>, reversed: bool, sources: [&str; 4]) -> SlicePatchData {
     let mut patch_mask: [u8; 8] = [0; 8];
     let mut closed_four_clear_mask: [u8; 8] = [0; 8];
     let mut closed_four_mask: [u8; 8] = [0; 8];
@@ -337,9 +336,9 @@ const fn build_slice_patch_data(extended_match: ExtendedMatch, reversed: bool, s
 
     let extended_match = if reversed {
         match extended_match {
-            ExtendedMatch::Left => ExtendedMatch::Right,
-            ExtendedMatch::Right => ExtendedMatch::Left,
-            _ => extended_match,
+            Some(ExtendedMatch::Left) => Some(ExtendedMatch::Right),
+            Some(ExtendedMatch::Right) => Some(ExtendedMatch::Left),
+            _ => None,
         }
     } else {
         extended_match
