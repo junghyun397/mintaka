@@ -13,6 +13,9 @@
 
 ## mintaka
 renju-board implementation.
+ * ``strict-renju``: Enable nesting double-three checks.
+ * ``slice-prefetch``: Enable prefetch on line-level patterns memoization.
+ * ``slice-memo-size``: Size of hash-table for line-level patterns memoization.
 
 ## mintaka-engine
 PVS+HCE based renju engine.
