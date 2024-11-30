@@ -238,6 +238,7 @@ mod test_vcf {
         assert_eq!(vcf!(case), expected);
     }
 
+    // TODO: not working; needs debug
     #[test]
     fn trap_vcf() {
         let case = indoc! {"
@@ -403,8 +404,8 @@ mod test_vcf {
 
         assert_eq!(vcf!(case), expected);
 
-        // 14 ms in M1 pro 10C, 37-40 ms in 5800X3D
-        // 2400 ms without a slice memo
+        // 9 ms in M1 pro 10C, 24 ms in 5800X3D
+        // 110 ms without a slice memo
         // transposition table required
         let case = indoc! {"
            A B C D E F G H I J K L M N O

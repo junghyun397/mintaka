@@ -64,7 +64,7 @@ impl Board {
         self.hot_field.set(pos);
         self.hash_key = self.hash_key.set(self.player_color, pos);
 
-        self.incremental_update_mut::<false>(memo, pos, Slice::set_mut);
+        self.incremental_update_mut(memo, pos, Slice::set_mut);
 
         self.switch_player_mut();
     }
@@ -77,8 +77,7 @@ impl Board {
         self.stones -= 1;
         self.switch_player_mut();
 
-        self.incremental_update_mut::<true>(memo, pos, Slice::unset_mut);
-
+        self.incremental_update_mut(memo, pos, Slice::unset_mut);
     }
 
     pub fn pass_mut(&mut self) {
@@ -131,8 +130,7 @@ impl Board {
     }
 
     #[cfg(feature = "prefetch_slice")]
-    #[inline(always)]
-    fn incremental_update_mut<const OVERWRITE: bool>(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
+    fn incremental_update_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
         macro_rules! update_by_slice {
             ($direction:expr,$slice:expr,$slice_idx:expr) => {{
                 let black_was_available = $slice.black_pattern_available;
@@ -141,11 +139,11 @@ impl Board {
                 slice_mut_op($slice, self.player_color, $slice_idx);
 
                 if black_was_available | $slice.black_pattern_available {
-                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }>(memo, $slice);
+                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, false>(memo, $slice, $slice_idx, !black_was_available);
                 }
 
                 if white_was_available | $slice.white_pattern_available {
-                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }>(memo, $slice);
+                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, false>(memo, $slice, $slice_idx, !white_was_available);
                 }
             }};
         }
@@ -255,44 +253,32 @@ impl Board {
     }
 
     pub fn full_update_mut(&mut self) {
-        for horizontal_slice in self.slices.horizontal_slices.iter() {
-            if horizontal_slice.black_pattern_available {
-                self.patterns.update_by_slice_mut::<{ Color::Black }, { Direction::Horizontal }>(&mut DummySlicePatternMemo, horizontal_slice);
-            }
+        macro_rules! update_by_slice {
+            ($slice:expr,$direction:expr) => {{
+                if $slice.black_pattern_available {
+                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, true>(&mut DummySlicePatternMemo, $slice, 0, false);
+                }
 
-            if horizontal_slice.white_pattern_available {
-                self.patterns.update_by_slice_mut::<{ Color::White }, { Direction::Horizontal }>(&mut DummySlicePatternMemo, horizontal_slice);
-            }
+                if $slice.white_pattern_available {
+                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, true>(&mut DummySlicePatternMemo, $slice, 0, false);
+                }
+            }};
+        }
+
+        for horizontal_slice in self.slices.horizontal_slices.iter() {
+            update_by_slice!(horizontal_slice, Direction::Horizontal);
         }
 
         for vertical_slice in self.slices.vertical_slices.iter() {
-            if vertical_slice.black_pattern_available {
-                self.patterns.update_by_slice_mut::<{ Color::Black }, { Direction::Vertical }>(&mut DummySlicePatternMemo, vertical_slice);
-            }
-
-            if vertical_slice.white_pattern_available {
-                self.patterns.update_by_slice_mut::<{ Color::White }, { Direction::Vertical }>(&mut DummySlicePatternMemo, vertical_slice);
-            }
+            update_by_slice!(vertical_slice, Direction::Vertical);
         }
 
         for ascending_slice in self.slices.ascending_slices.iter() {
-            if ascending_slice.black_pattern_available {
-                self.patterns.update_by_slice_mut::<{ Color::Black }, { Direction::Ascending }>(&mut DummySlicePatternMemo, ascending_slice);
-            }
-
-            if ascending_slice.white_pattern_available {
-                self.patterns.update_by_slice_mut::<{ Color::White }, { Direction::Ascending }>(&mut DummySlicePatternMemo, ascending_slice);
-            }
+            update_by_slice!(ascending_slice, Direction::Ascending);
         }
 
         for descending_slice in self.slices.descending_slices.iter() {
-            if descending_slice.black_pattern_available {
-                self.patterns.update_by_slice_mut::<{ Color::Black }, { Direction::Descending }>(&mut DummySlicePatternMemo, descending_slice);
-            }
-
-            if descending_slice.white_pattern_available {
-                self.patterns.update_by_slice_mut::<{ Color::White }, { Direction::Horizontal }>(&mut DummySlicePatternMemo, descending_slice);
-            }
+            update_by_slice!(descending_slice, Direction::Descending);
         }
 
         self.validate_double_three_mut();

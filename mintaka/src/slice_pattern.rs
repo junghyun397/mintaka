@@ -23,23 +23,25 @@ impl Slice {
 
     pub fn calculate_slice_pattern<const C: Color>(&self) -> SlicePattern {
         // padding = 3
-        let wall: u32 = !(!(u32::MAX << self.length as u32) << 3);
-        let b: u32 = (self.black_stones as u32) << 3;
-        let w: u32 = (self.white_stones as u32) << 3;
-        let bw = b | wall;
-        let ww = w | wall;
-        let cold = !(bw | ww);
+        let block: u32 = !(!(u32::MAX << self.length as u32) << 3);
+        let extended_p: u32 = (self.stones::<C>() as u32) << 3;
+        let extended_q: u32 = (self.stones_reversed::<C>() as u32) << 3;
+        let qb = extended_q | block;
+        let cold = !(extended_q | extended_p | block);
 
         let mut acc: SlicePattern = SlicePattern::EMPTY;
         for shift in 0 ..= self.length as usize + 1 { // length - 5 + 3 * 2
-            let cold_frag = (cold >> shift) as u8;
-            if !(b.count_ones() < 2 && w.count_ones() < 2) && cold != 0 {
+            let p = (extended_p >> shift) as u8;
+            let q = (extended_q >> shift) as u8;
+            let c = (cold >> shift) as u8;
+
+            if p.count_ones() > 1 && c != u8::MAX && (
+                p & !(q << 1) & !(q >> 1) != 0
+            ) {
                 find_patterns::<C>(
                     &mut acc, shift, shift as isize - 3,
-                    b,
-                    (b >> shift) as u8, (w >> shift) as u8,
-                    (bw >> shift) as u8, (ww >> shift) as u8,
-                    cold_frag
+                    (extended_p >> shift) as u8, (cold >> shift) as u8, (qb >> shift) as u8,
+                    extended_p
                 );
             }
         }
@@ -54,7 +56,8 @@ impl Slice {
 fn find_patterns<const C: Color>(
     acc: &mut SlicePattern,
     shift: usize, offset: isize,
-    ob: u32, b: u8, w: u8, bw: u8, ww: u8, cold: u8
+    p: u8, cold: u8, qb: u8,
+    raw: u32
 ) {
     /*
     ## PATTERN-MATCH-LITERAL
@@ -72,17 +75,16 @@ fn find_patterns<const C: Color>(
     * 6 = overline
     */
 
-    let b_vector: u32 = b as u32 | (b as u32) << 8 | (cold as u32) << 16 | (ww as u32) << 24;
-    let w_vector: u32 = w as u32 | (w as u32) << 8 | (cold as u32) << 16 | (bw as u32) << 24;
+    let vector: u32 = p as u32 | (p as u32) << 8 | (cold as u32) << 16 | (qb as u32) << 24;
 
     macro_rules! match_long_pattern_for_black {
         (left, rev) => (match_long_pattern_for_black!(right));
         (right, rev) => (match_long_pattern_for_black!(left));
         (left) => {(
-            ob & (0b1 << offset + 2) == 0
+            raw & (0b1 << offset + 2) == 0
         )};
         (right) => {(
-            ob & (0b1 << offset + 11) == 0
+            raw & (0b1 << offset + 11) == 0
         )};
     }
 
@@ -92,13 +94,13 @@ fn find_patterns<const C: Color>(
             const MASK: u32 = build_pattern_mask($pattern, $rev);
             const RESULT: u32 = build_pattern_result($pattern, $rev);
 
-            b_vector & MASK == RESULT
+            vector & MASK == RESULT
         }};
         (white,rev=$rev:expr,$pattern:literal) => {C == Color::White && {
             const MASK: u32 = build_pattern_mask($pattern, $rev);
             const RESULT: u32 = build_pattern_result($pattern, $rev);
 
-            w_vector & MASK == RESULT
+            vector & MASK == RESULT
         }};
     }
 

@@ -109,10 +109,16 @@ impl Slice {
     }
 
     fn calculate_available_pattern_mut(&mut self) {
+        // filter . . O . . . .
+        // filter O X . . O X .
+        // filter O . . . O . .
+        // TODO: filter . X O O O X .
         self.black_pattern_available = self.black_stones.count_ones() > 1
-            && (self.black_stones & !(self.white_stones << 1) & !(self.white_stones >> 1)) != 0;
+            && self.black_stones & !(self.white_stones << 1) & !(self.white_stones >> 1) != 0
+            && self.black_stones & ((self.black_stones << 2) | (self.black_stones << 1) | (self.black_stones >> 1) | (self.black_stones >> 2)) != 0;
         self.white_pattern_available = self.white_stones.count_ones() > 1
-            && (self.white_stones & !(self.black_stones << 1) & !(self.black_stones >> 1)) != 0;
+            && self.white_stones & !(self.black_stones << 1) & !(self.black_stones >> 1) != 0
+            && self.white_stones & ((self.white_stones << 2) | (self.white_stones << 1) | (self.white_stones >> 1) | (self.white_stones >> 2)) != 0;
     }
 
 }

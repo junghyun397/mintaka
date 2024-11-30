@@ -23,8 +23,11 @@ impl Slice {
         let mut acc: SlicePattern = SlicePattern::EMPTY;
         for shift in 0 ..= self.length as usize + 1 { // length - 5 + 3 * 2
             let p = (extended_p >> shift) as u16 & 0x00FF;
+            let q = (extended_q >> shift) as u16 & 0x00FF;
 
-            if p.count_ones() > 1 {
+            if p.count_ones() > 1
+                && (p & !(q << 1) & !(q >> 1) != 0)
+            {
                 find_patterns::<C>(
                     &mut acc, shift, shift as isize - 3,
                     p | (((qb >> shift) as u16 & 0x00FF) << 8),
