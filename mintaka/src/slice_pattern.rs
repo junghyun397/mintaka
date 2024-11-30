@@ -1,3 +1,4 @@
+use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::pattern::{CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, OPEN_FOUR, OPEN_THREE, OVERLINE};
 use crate::slice::Slice;
@@ -5,26 +6,22 @@ use crate::{max, min};
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct SlicePattern {
-    pub black_patterns: [u8; 16], // 128-bits
-    pub white_patterns: [u8; 16],
+    pub patterns: [u8; 16]
 }
 
 impl SlicePattern {
 
-    pub const EMPTY: Self = Self {
-        black_patterns: [0; 16],
-        white_patterns: [0; 16],
-    };
+    pub const EMPTY: Self = Self { patterns: [0; 16] };
 
     pub fn is_empty(&self) -> bool {
-        u128::from_ne_bytes(self.black_patterns) == 0 && u128::from_ne_bytes(self.white_patterns) == 0
+        u128::from_ne_bytes(self.patterns) == 0
     }
 
 }
 
 impl Slice {
 
-    pub fn calculate_slice_pattern(&self) -> SlicePattern {
+    pub fn calculate_slice_pattern<const C: Color>(&self) -> SlicePattern {
         // padding = 3
         let wall: u32 = !(!(u32::MAX << self.length as u32) << 3);
         let b: u32 = (self.black_stones as u32) << 3;
@@ -37,7 +34,7 @@ impl Slice {
         for shift in 0 ..= self.length as usize + 1 { // length - 5 + 3 * 2
             let cold_frag = (cold >> shift) as u8;
             if !(b.count_ones() < 2 && w.count_ones() < 2) && cold != 0 {
-                find_patterns(
+                find_patterns::<C>(
                     &mut acc, shift, shift as isize - 3,
                     b,
                     (b >> shift) as u8, (w >> shift) as u8,
@@ -54,8 +51,7 @@ impl Slice {
 
 // big endian system is NOT supported
 #[allow(clippy::too_many_arguments)]
-#[inline]
-fn find_patterns(
+fn find_patterns<const C: Color>(
     acc: &mut SlicePattern,
     shift: usize, offset: isize,
     ob: u32, b: u8, w: u8, bw: u8, ww: u8, cold: u8
@@ -92,38 +88,42 @@ fn find_patterns(
 
     macro_rules! match_pattern {
         ($color:ident,$pattern:literal) => (match_pattern!($color, rev=false, $pattern));
-        (black,rev=$rev:expr,$pattern:literal) => (match_pattern!(rev=$rev, $pattern, b_vector));
-        (white,rev=$rev:expr,$pattern:literal) => (match_pattern!(rev=$rev, $pattern, w_vector));
-        (rev=$rev:expr,$pattern:literal,$elements:expr) => {{
+        (black,rev=$rev:expr,$pattern:literal) => {C == Color::Black && {
             const MASK: u32 = build_pattern_mask($pattern, $rev);
             const RESULT: u32 = build_pattern_result($pattern, $rev);
 
-            $elements & MASK == RESULT
+            b_vector & MASK == RESULT
+        }};
+        (white,rev=$rev:expr,$pattern:literal) => {C == Color::White && {
+            const MASK: u32 = build_pattern_mask($pattern, $rev);
+            const RESULT: u32 = build_pattern_result($pattern, $rev);
+
+            w_vector & MASK == RESULT
         }};
     }
 
     macro_rules! apply_single_patch {
-        (black,rev=$rev:expr,$patch:literal) => (apply_single_patch!(acc.black_patterns,rev=$rev,$patch));
-        (white,rev=$rev:expr,$patch:literal) => (apply_single_patch!(acc.white_patterns,rev=$rev,$patch));
-        ($patterns_expr:expr,rev=$rev:expr,$patch:literal) => {{
+        (black,rev=$rev:expr,$patch:literal) => (apply_single_patch!(rev=$rev,$patch));
+        (white,rev=$rev:expr,$patch:literal) => (apply_single_patch!(rev=$rev,$patch));
+        (rev=$rev:expr,$patch:literal) => {{
             const POS_KIND_TUPLE: (isize, u8) = parse_patch_literal($patch, $rev);
 
             if (POS_KIND_TUPLE.1 == CLOSED_FOUR_SINGLE) {
-                let original = $patterns_expr[(offset + POS_KIND_TUPLE.0) as usize];
-                $patterns_expr[(offset + POS_KIND_TUPLE.0) as usize] = increase_closed_four_single(original);
+                let original = acc.patterns[(offset + POS_KIND_TUPLE.0) as usize];
+                acc.patterns[(offset + POS_KIND_TUPLE.0) as usize] = increase_closed_four_single(original);
             } else {
-                $patterns_expr[(offset + POS_KIND_TUPLE.0) as usize] |= POS_KIND_TUPLE.1;
+                acc.patterns[(offset + POS_KIND_TUPLE.0) as usize] |= POS_KIND_TUPLE.1;
             }
         }};
     }
     
     macro_rules! apply_multiple_patch {
-        (black,rev=$rev:expr,$($patch:literal),+) => (apply_multiple_patch!(acc.black_patterns,rev=$rev, $($patch),+));
-        (white,rev=$rev:expr,$($patch:literal),+) => (apply_multiple_patch!(acc.white_patterns,rev=$rev, $($patch),+));
-        ($patterns_expr:expr,rev=$rev:expr,$($patch:literal),+) => {{
+        (black,rev=$rev:expr,$($patch:literal),+) => (apply_multiple_patch!(rev=$rev, $($patch),+));
+        (white,rev=$rev:expr,$($patch:literal),+) => (apply_multiple_patch!(rev=$rev, $($patch),+));
+        (rev=$rev:expr,$($patch:literal),+) => {{
             const PATCH_MASK_LUT: SlicePatchMaskLUT = build_slice_patch_mask_lut([$($patch),*], $rev);
 
-            let mut original = u128::from_ne_bytes($patterns_expr);
+            let mut original = u128::from_ne_bytes(acc.patterns);
 
             let slice_patch_mask = PATCH_MASK_LUT.look_up_table[shift];
             if PATCH_MASK_LUT.contains_non_closed_four {
@@ -137,7 +137,7 @@ fn find_patterns(
                 );
             }
 
-            $patterns_expr = original.to_ne_bytes();
+            acc.patterns = original.to_ne_bytes();
         }};
     }
 

@@ -6,7 +6,7 @@ use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::notation::rule::ForbiddenKind;
-use crate::slice::{AvailablePattern, Slice};
+use crate::slice::Slice;
 use crate::slice_pattern::{contains_five_in_a_row, SlicePattern};
 use crate::utils::lang_utils::repeat_4x;
 
@@ -331,21 +331,13 @@ impl Default for Patterns {
 
 impl Patterns {
 
-    pub fn update_by_slice_mut<const D: Direction>(&mut self, memo: &mut impl SlicePatternMemo, slice: &Slice) {
-        let slice_pattern = if slice.available_pattern != AvailablePattern::None {
-            memo.probe_or_put_mut(slice.packed_slice(), ||
-                slice.calculate_slice_pattern()
+    pub fn update_by_slice_mut<const C: Color, const D: Direction>(&mut self, memo: &mut impl SlicePatternMemo, slice: &Slice) {
+        let slice_pattern = if slice.pattern_available::<C>() {
+            memo.probe_or_put_mut(slice.packed_slice::<C>(), ||
+                slice.calculate_slice_pattern::<C>()
             )
         } else {
             SlicePattern::EMPTY
-        };
-        
-        let winner = if contains_five_in_a_row(slice.black_stones) {
-            Some(Color::Black)
-        } else if contains_five_in_a_row(slice.white_stones) {
-            Some(Color::White)
-        } else {
-            None
         };
 
         for offset in 0 .. slice.length {
@@ -362,19 +354,24 @@ impl Patterns {
 
             let pattern = &mut self.field[idx];
 
-            pattern.apply_mask_mut::<{ Color::Black }, D>(slice_pattern.black_patterns[offset as usize]);
-            pattern.apply_mask_mut::<{ Color::White }, D>(slice_pattern.white_patterns[offset as usize]);
+            pattern.apply_mask_mut::<C, D>(slice_pattern.patterns[offset as usize]);
 
-            let pos = Pos::from_index(idx as u8);
+            if C == Color::Black {
+                let pos = Pos::from_index(idx as u8);
 
-            if pattern.black_unit.has_threes() {
-                self.unchecked_double_three_field.set(pos);
-            } else {
-                self.unchecked_double_three_field.unset(pos);
+                if pattern.black_unit.has_threes() {
+                    self.unchecked_double_three_field.set(pos);
+                } else {
+                    self.unchecked_double_three_field.unset(pos);
+                }
             }
         }
 
-        self.five_in_a_row = self.five_in_a_row.or(winner);
+        self.five_in_a_row = self.five_in_a_row
+            .or_else(||
+                contains_five_in_a_row(slice.stones::<C>())
+                    .then_some(C)
+            );
     }
 
 }

@@ -22,7 +22,7 @@ mod test_vcf {
 
             board.batch_set_mut(vcf_result.into_boxed_slice());
 
-            // for m in vcf_result.iter() {
+            // for m in vcf_result.clone().iter() {
             //     board.set_mut(&mut memo, *m);
             //     println!("{}", board.to_string_with_move_marker(*m));
             // }

@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 // layout: block 0 = slice key 32 bits
 //         block 1, 2 = black_patterns 128 bits
 //         block 3, 4 = white_patterns 128 bits
-pub struct AtomicTTSlicePatternEntry(AtomicU64, AtomicU64, AtomicU64, AtomicU64, AtomicU64);
+pub struct AtomicTTSlicePatternEntry(AtomicU64, AtomicU64, AtomicU64);
 
 impl AbstractTTEntry for AtomicTTSlicePatternEntry {
 
@@ -15,8 +15,6 @@ impl AbstractTTEntry for AtomicTTSlicePatternEntry {
         self.0.store(0, Ordering::Relaxed);
         self.1.store(0, Ordering::Relaxed);
         self.2.store(0, Ordering::Relaxed);
-        self.3.store(0, Ordering::Relaxed);
-        self.4.store(0, Ordering::Relaxed);
     }
 
     fn usage(&self) -> usize {
@@ -34,24 +32,15 @@ impl AtomicTTSlicePatternEntry {
     // interior-mutability
     fn store_mut(&self, packed_slice: u64, pattern: &SlicePattern) {
         self.0.store(packed_slice, Ordering::Relaxed);
-        self.1.store(u64::from_ne_bytes(pattern.black_patterns[0 ..8].try_into().unwrap()), Ordering::Relaxed);
-        self.2.store(u64::from_ne_bytes(pattern.black_patterns[8 .. 16].try_into().unwrap()), Ordering::Relaxed);
-        self.3.store(u64::from_ne_bytes(pattern.white_patterns[0 ..8].try_into().unwrap()), Ordering::Relaxed);
-        self.4.store(u64::from_ne_bytes(pattern.white_patterns[8 .. 16].try_into().unwrap()), Ordering::Relaxed);
+        self.1.store(u64::from_ne_bytes(pattern.patterns[0 ..8].try_into().unwrap()), Ordering::Relaxed);
+        self.2.store(u64::from_ne_bytes(pattern.patterns[8 .. 16].try_into().unwrap()), Ordering::Relaxed);
     }
 
     fn decode(&self) -> SlicePattern {
-        let black_patterns: [u8; 16] = unsafe {
-            std::mem::transmute([self.1.load(Ordering::Relaxed), self.2.load(Ordering::Relaxed)])
-        };
-
-        let white_patterns: [u8; 16] = unsafe {
-            std::mem::transmute([self.3.load(Ordering::Relaxed), self.4.load(Ordering::Relaxed)])
-        };
-
         SlicePattern {
-            black_patterns,
-            white_patterns,
+            patterns: unsafe {
+                std::mem::transmute([self.1.load(Ordering::Relaxed), self.2.load(Ordering::Relaxed)])
+            }
         }
     }
 
