@@ -6,7 +6,7 @@ use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::{Pos, INVALID_POS};
 use crate::pattern::Patterns;
-use crate::slice::{Slice, Slices};
+use crate::slice::{AvailablePattern, Slice, Slices};
 
 // 2256-bytes
 #[derive(Copy, Clone)]
@@ -138,33 +138,33 @@ impl Board {
     #[inline(always)]
     fn incremental_update_mut<const OVERWRITE: bool>(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
-        let horizontal_slice_was_valid = OVERWRITE & horizontal_slice.is_valid_pattern();
+        let horizontal_slice_was_valid = OVERWRITE & horizontal_slice.available_pattern;
         slice_mut_op(horizontal_slice, self.player_color, pos.col());
-        if horizontal_slice_was_valid | horizontal_slice.is_valid_pattern() {
+        if horizontal_slice_was_valid | horizontal_slice.available_pattern {
             self.patterns.update_by_slice_mut::<{ Direction::Horizontal }>(memo, horizontal_slice);
         }
 
         let vertical_slice = &mut self.slices.vertical_slices[pos.col_usize()];
-        let vertical_slice_was_valid = OVERWRITE & vertical_slice.is_valid_pattern();
+        let vertical_slice_was_valid = OVERWRITE & vertical_slice.available_pattern;
         slice_mut_op(vertical_slice, self.player_color, pos.row());
-        if vertical_slice_was_valid | vertical_slice.is_valid_pattern() {
+        if vertical_slice_was_valid | vertical_slice.available_pattern {
             self.patterns.update_by_slice_mut::<{ Direction::Vertical }>(memo, vertical_slice);
         }
 
         if let Some(ascending_slice_idx) = Slices::ascending_slice_idx(pos) {
             let ascending_slice = &mut self.slices.ascending_slices[ascending_slice_idx];
-            let ascending_slice_was_valid = OVERWRITE & ascending_slice.is_valid_pattern();
+            let ascending_slice_was_valid = OVERWRITE & ascending_slice.available_pattern;
             slice_mut_op(ascending_slice, self.player_color, pos.col() - ascending_slice.start_col);
-            if ascending_slice_was_valid | ascending_slice.is_valid_pattern() {
+            if ascending_slice_was_valid | ascending_slice.available_pattern {
                 self.patterns.update_by_slice_mut::<{ Direction::Ascending }>(memo, ascending_slice);
             }
         }
 
         if let Some(descending_slice_idx) = Slices::descending_slice_idx(pos) {
             let descending_slice = &mut self.slices.descending_slices[descending_slice_idx];
-            let descending_slice_was_valid = OVERWRITE & descending_slice.is_valid_pattern();
+            let descending_slice_was_valid = OVERWRITE & descending_slice.available_pattern;
             slice_mut_op(descending_slice, self.player_color, pos.col() - descending_slice.start_col);
-            if descending_slice_was_valid | descending_slice.is_valid_pattern() {
+            if descending_slice_was_valid | descending_slice.available_pattern {
                 self.patterns.update_by_slice_mut::<{ Direction::Descending }>(memo, descending_slice);
             }
         }
@@ -176,21 +176,21 @@ impl Board {
     #[inline(always)]
     fn incremental_update_mut<const OVERWRITE: bool>(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
-        let horizontal_slice_was_valid = OVERWRITE & horizontal_slice.is_valid_pattern();
+        let horizontal_slice_was_valid = horizontal_slice.available_pattern != AvailablePattern::None;
         slice_mut_op(horizontal_slice, self.player_color, pos.col());
-        let is_horizontal_slice_valid = horizontal_slice_was_valid | horizontal_slice.is_valid_pattern();
+        let is_horizontal_slice_valid = horizontal_slice_was_valid || horizontal_slice.available_pattern != AvailablePattern::None;
 
         let vertical_slice = &mut self.slices.vertical_slices[pos.col_usize()];
-        let vertical_slice_was_valid = OVERWRITE & vertical_slice.is_valid_pattern();
+        let vertical_slice_was_valid = vertical_slice.available_pattern != AvailablePattern::None;
         slice_mut_op(vertical_slice, self.player_color, pos.row());
-        let is_vertical_slice_valid = vertical_slice_was_valid | vertical_slice.is_valid_pattern();
+        let is_vertical_slice_valid = vertical_slice_was_valid || vertical_slice.available_pattern != AvailablePattern::None;
 
         let valid_ascending_slice =
             if let Some(idx) = Slices::ascending_slice_idx(pos) {
                 let ascending_slice = &mut self.slices.ascending_slices[idx];
-                let ascending_slice_was_valid = OVERWRITE & ascending_slice.is_valid_pattern();
+                let ascending_slice_was_valid = ascending_slice.available_pattern != AvailablePattern::None;
                 slice_mut_op(ascending_slice, self.player_color, pos.col() - ascending_slice.start_col);
-                (ascending_slice_was_valid | ascending_slice.is_valid_pattern()).then_some(ascending_slice)
+                (ascending_slice_was_valid || ascending_slice.available_pattern != AvailablePattern::None).then_some(ascending_slice)
             } else {
                 None
             };
@@ -198,9 +198,9 @@ impl Board {
         let valid_descending_slice =
             if let Some(idx) = Slices::descending_slice_idx(pos) {
                 let descending_slice = &mut self.slices.descending_slices[idx];
-                let descending_slice_was_valid = OVERWRITE & descending_slice.is_valid_pattern();
+                let descending_slice_was_valid = descending_slice.available_pattern != AvailablePattern::None;
                 slice_mut_op(descending_slice, self.player_color, pos.col() - descending_slice.start_col);
-                (descending_slice_was_valid | descending_slice.is_valid_pattern()).then_some(descending_slice)
+                (descending_slice_was_valid || descending_slice.available_pattern != AvailablePattern::None).then_some(descending_slice)
             } else {
                 None
             };
@@ -213,16 +213,12 @@ impl Board {
             prefetch_idx += 1;
         }
 
-        if valid_ascending_slice.as_ref()
-            .is_some_and(|slice| slice.is_valid_pattern())
-        {
+        if valid_ascending_slice.is_some() {
             prefetch_queue[prefetch_idx] = valid_ascending_slice.as_ref().unwrap().packed_slice();
             prefetch_idx += 1;
         }
 
-        if valid_descending_slice.as_ref()
-            .is_some_and(|slice| slice.is_valid_pattern())
-        {
+        if valid_descending_slice.is_some() {
             prefetch_queue[prefetch_idx] = valid_descending_slice.as_ref().unwrap().packed_slice();
         }
 
@@ -263,25 +259,25 @@ impl Board {
 
     fn full_update_mut(&mut self) {
         for horizontal_slice in self.slices.horizontal_slices.iter() {
-            if horizontal_slice.is_valid_pattern() {
+            if horizontal_slice.available_pattern != AvailablePattern::None {
                 self.patterns.update_by_slice_mut::<{ Direction::Horizontal }>(&mut DummySlicePatternMemo, horizontal_slice);
             }
         }
 
         for vertical_slice in self.slices.vertical_slices.iter() {
-            if vertical_slice.is_valid_pattern() {
+            if vertical_slice.available_pattern != AvailablePattern::None {
                 self.patterns.update_by_slice_mut::<{ Direction::Vertical }>(&mut DummySlicePatternMemo, vertical_slice);
             }
         }
 
         for ascending_slice in self.slices.ascending_slices.iter() {
-            if ascending_slice.is_valid_pattern() {
+            if ascending_slice.available_pattern != AvailablePattern::None {
                 self.patterns.update_by_slice_mut::<{ Direction::Ascending }>(&mut DummySlicePatternMemo, ascending_slice);
             }
         }
 
         for descending_slice in self.slices.descending_slices.iter() {
-            if descending_slice.is_valid_pattern() {
+            if descending_slice.available_pattern != AvailablePattern::None {
                 self.patterns.update_by_slice_mut::<{ Direction::Descending }>(&mut DummySlicePatternMemo, descending_slice);
             }
         }

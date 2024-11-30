@@ -8,6 +8,14 @@ use std::ops::Neg;
 const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
 
+#[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
+pub enum AvailablePattern {
+    #[default] None,
+    Black,
+    White,
+    Both,
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Slice {
     pub length: u8,
@@ -15,6 +23,7 @@ pub struct Slice {
     pub start_col: u8,
     pub black_stones: u16,
     pub white_stones: u16,
+    pub available_pattern: AvailablePattern,
 }
 
 impl Slice {
@@ -26,6 +35,7 @@ impl Slice {
             start_col,
             black_stones: 0,
             white_stones: 0,
+            available_pattern: AvailablePattern::None,
         }
     }
 
@@ -45,6 +55,8 @@ impl Slice {
             Color::Black => self.black_stones |= mask,
             Color::White => self.white_stones |= mask
         };
+
+        self.available_pattern = self.calculate_available_pattern();
     }
 
     pub fn unset_mut(&mut self, color: Color, idx: u8) {
@@ -53,14 +65,36 @@ impl Slice {
             Color::Black => self.black_stones &= mask,
             Color::White => self.white_stones &= mask
         };
+
+        self.available_pattern = self.calculate_available_pattern();
     }
 
-    pub fn is_valid_pattern(&self) -> bool {
-        (self.black_stones.count_ones() > 1 || self.white_stones.count_ones() > 1)
-            &&
-            ((self.black_stones & !(self.white_stones << 1) & !(self.white_stones >> 1))
-            | (self.white_stones & !(self.black_stones << 1) & !(self.black_stones >> 1))
-             != 0)
+    pub fn stones<const C: Color>(&self) -> u16 {
+        match C {
+            Color::Black => self.black_stones,
+            Color::White => self.white_stones
+        }
+    }
+
+    pub fn stones_reversed<const C: Color>(&self) -> u16 {
+        match C {
+            Color::Black => self.white_stones,
+            Color::White => self.black_stones
+        }
+    }
+
+    pub fn calculate_available_pattern(&self) -> AvailablePattern {
+        let black = self.black_stones.count_ones() > 1
+            && (self.black_stones & !(self.white_stones << 1) & !(self.white_stones >> 1)) != 0;
+        let white = self.white_stones.count_ones() > 1
+            && (self.white_stones & !(self.black_stones << 1) & !(self.black_stones >> 1)) != 0;
+
+        match (black, white) {
+            (true, true) => AvailablePattern::Both,
+            (true, false) => AvailablePattern::Black,
+            (false, true) => AvailablePattern::White,
+            _ => AvailablePattern::None,
+        }
     }
 
     pub fn stone_kind(&self, idx: u8) -> Option<Color> {
@@ -77,6 +111,10 @@ impl Slice {
 
     pub fn packed_slice(&self) -> u64 {
          (self.length as u64) << 32 | (self.white_stones as u64) << 16 | self.black_stones as u64
+    }
+
+    pub fn packed_slice_by_color<const C: Color>(&self) -> u32 {
+        self.stones::<C>() as u32 | (self.length as u32) >> 16 | C as u32 >> 24
     }
     
     pub fn calculate_idx(&self, direction: Direction, pos: Pos) -> usize {

@@ -2,49 +2,33 @@ use crate::notation::color::Color;
 use crate::pattern::{CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, OPEN_FOUR, OPEN_THREE, OVERLINE};
 use crate::slice::Slice;
 
-#[derive(Eq, PartialEq, Copy, Clone, Debug)]
-pub struct SlicePattern {
-    pub black_patterns: [u8; 16], // 128-bits
-    pub white_patterns: [u8; 16],
-}
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub struct SlicePattern(pub [u8; 16]);
 
 impl SlicePattern {
 
-    pub const EMPTY: Self = Self {
-        black_patterns: [0; 16],
-        white_patterns: [0; 16],
-    };
+    pub const EMPTY: Self = Self([0; 16]);
 
 }
 
 impl Slice {
 
-    pub fn calculate_slice_pattern_alt(&self) -> SlicePattern {
+    pub fn calculate_slice_pattern_alt<const C: Color>(&self) -> SlicePattern {
         // padding = 3
         let block: u32 = !(!(u32::MAX << self.length as u32) << 3);
-        let extended_b: u32 = (self.black_stones as u32) << 3;
-        let extended_w: u32 = (self.white_stones as u32) << 3;
-        let bb = extended_b | block;
-        let wb = extended_w | block;
+        let extended_p: u32 = (self.stones::<C>() as u32) << 3;
+        let extended_q: u32 = (self.stones_reversed::<C>() as u32) << 3;
+        let qb = extended_q | block;
 
         let mut acc: SlicePattern = SlicePattern::EMPTY;
         for shift in 0 ..= self.length as usize + 1 { // length - 5 + 3 * 2
-            let b = (extended_b >> shift) as u16 & 0x00FF;
-            let w = (extended_w >> shift) as u16 & 0x00FF;
+            let p = (extended_p >> shift) as u16 & 0x00FF;
 
-            if b.count_ones() > 1 {
-                find_patterns::<{ Color::Black }>(
+            if p.count_ones() > 1 {
+                find_patterns::<C>(
                     &mut acc, shift, shift as isize - 3,
-                    b | (((wb >> shift) as u16 & 0x00FF) << 8),
-                    extended_b
-                );
-            }
-
-            if w.count_ones() > 1 {
-                find_patterns::<{ Color::White }>(
-                    &mut acc, shift, shift as isize - 3,
-                    w | (((bb >> shift) as u16 & 0x00FF) << 8),
-                    extended_b
+                    p | (((qb >> shift) as u16 & 0x00FF) << 8),
+                    extended_p
                 );
             }
         }
@@ -59,7 +43,7 @@ fn find_patterns<const C: Color>(
     acc: &mut SlicePattern,
     shift: usize, offset: isize,
     vector: u16,
-    b_raw: u32,
+    raw: u32,
 ) {
     #[cold]
     #[inline(always)]
@@ -81,7 +65,7 @@ fn find_patterns<const C: Color>(
 
         if C == Color::Black
             && slice_patch_data.extended_match != None
-            && extended_match_for_black(slice_patch_data.extended_match.unwrap(), b_raw, offset)
+            && extended_match_for_black(slice_patch_data.extended_match.unwrap(), raw, offset)
         {
             return;
         }
@@ -89,7 +73,7 @@ fn find_patterns<const C: Color>(
         let shl = 0.min(shift as isize - 3).abs() * 8;
         let shr = 0.max(shift as isize - 3) * 8;
 
-        let mut original = u128::from_ne_bytes(acc.black_patterns);
+        let mut original = u128::from_ne_bytes(acc.0);
         if slice_patch_data.contains_patch_mask {
             original |= ((slice_patch_data.patch_mask << shr) >> shl) as u128;
         }
@@ -101,10 +85,7 @@ fn find_patterns<const C: Color>(
             )
         }
 
-        match C {
-            Color::Black => acc.black_patterns = original.to_ne_bytes(),
-            Color::White => acc.white_patterns = original.to_ne_bytes()
-        };
+        acc.0 = original.to_ne_bytes();
     }
 }
 

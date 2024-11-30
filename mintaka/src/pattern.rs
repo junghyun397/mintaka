@@ -1,14 +1,14 @@
 use crate::bitfield::Bitfield;
+use crate::cartesian_to_index;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::notation::rule::ForbiddenKind;
-use crate::slice::Slice;
-use crate::slice_pattern::contains_five_in_a_row;
+use crate::slice::{AvailablePattern, Slice};
+use crate::slice_pattern::{contains_five_in_a_row, SlicePattern};
 use crate::utils::lang_utils::repeat_4x;
-use crate::cartesian_to_index;
 
 pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
@@ -332,9 +332,13 @@ impl Default for Patterns {
 impl Patterns {
 
     pub fn update_by_slice_mut<const D: Direction>(&mut self, memo: &mut impl SlicePatternMemo, slice: &Slice) {
-        let slice_pattern = memo.probe_or_put_mut(slice.packed_slice(), ||
-            slice.calculate_slice_pattern()
-        );
+        let slice_pattern = if slice.available_pattern != AvailablePattern::None {
+            memo.probe_or_put_mut(slice.packed_slice(), ||
+                slice.calculate_slice_pattern()
+            )
+        } else {
+            SlicePattern::EMPTY
+        };
         
         let winner = if contains_five_in_a_row(slice.black_stones) {
             Some(Color::Black)

@@ -403,7 +403,7 @@ mod test_vcf {
 
         assert_eq!(vcf!(case), expected);
 
-        // 14 ms in M1 pro 10C, 50 ms in 5800X3D
+        // 14 ms in M1 pro 10C, 37-40 ms in 5800X3D
         // 2400 ms without a slice memo
         // transposition table required
         let case = indoc! {"
