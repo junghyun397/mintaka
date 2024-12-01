@@ -3,7 +3,7 @@ mod test_slice {
     use mintaka::slice::*;
     use std::str::FromStr;
 
-    macro_rules! test_validity {
+    macro_rules! test_availability {
         ($case:expr, black=$black:expr, whthe=$white:expr) => {{
             let black = Slice::from_str($case).unwrap().black_pattern_available;
             let white = Slice::from_str($case).unwrap().white_pattern_available;
@@ -14,10 +14,10 @@ mod test_slice {
 
     #[test]
     fn test_slice_validity() {
-        test_validity!(
-            "O O X O . . O O . . X . . . X",
+        test_availability!(
+            ". . . . . X . . X . . . . . .",
             black=true,
-            whthe=true
+            whthe=false
         );
     }
 

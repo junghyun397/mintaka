@@ -5,7 +5,7 @@ use mintaka::memo::slice_pattern_memo::SlicePatternMemo;
 use mintaka::notation::color::Color;
 use mintaka::notation::node::{Eval, Score};
 use mintaka::notation::pos;
-use mintaka::notation::pos::{Pos, INVALID_POS, U8_BOARD_SIZE};
+use mintaka::notation::pos::Pos;
 use mintaka::pattern::PatternCount;
 
 pub fn vcf(
@@ -33,7 +33,7 @@ fn try_vcf<const C: Color>(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
     board: &mut Board, max_depth: u8, depth: u8, opponent_has_five: bool,
 ) -> Option<Vec<Pos>> {
-    if depth > max_depth || board.stones > U8_BOARD_SIZE - 2 {
+    if depth > max_depth || board.stones > pos::U8_BOARD_SIZE - 2 {
         return None;
     }
 
@@ -117,7 +117,7 @@ fn try_vcf<const C: Color>(
             tt_entry
         })
         .unwrap_or_else(|| TTEntry {
-            best_move: INVALID_POS,
+            best_move: pos::INVALID_POS,
             depth: 0,
             flag: Default::default(),
             vc_flag: VCFlag::Cold,
@@ -131,7 +131,7 @@ fn try_vcf<const C: Color>(
 }
 
 fn find_defend_pos_unchecked<const C: Color>(board: &Board) -> Pos {
-    let mut defend_pos = INVALID_POS;
+    let mut defend_pos = pos::INVALID_POS;
     for defend_idx in 0 .. pos::BOARD_SIZE {
         if board.patterns.field[defend_idx].player_unit::<C>().has_five() {
             defend_pos = Pos::from_index(defend_idx as u8);

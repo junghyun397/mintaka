@@ -129,7 +129,6 @@ impl Board {
         self.player_color = self.opponent_color();
     }
 
-    #[cfg(feature = "prefetch_slice")]
     fn incremental_update_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
         macro_rules! update_by_slice {
             ($direction:expr,$slice:expr,$slice_idx:expr) => {{
@@ -162,91 +161,6 @@ impl Board {
         if let Some(descending_slice_idx) = Slices::descending_slice_idx(pos) {
             let descending_slice = &mut self.slices.descending_slices[descending_slice_idx];
             update_by_slice!(Direction::Descending, descending_slice, pos.col() - descending_slice.start_col);
-        }
-
-        self.validate_double_three_mut();
-    }
-
-    #[cfg(not(feature = "prefetch_slice"))]
-    #[inline(always)]
-    fn incremental_update_mut<const OVERWRITE: bool>(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
-        let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
-        let horizontal_slice_was_valid = horizontal_slice.available_pattern != AvailablePattern::None;
-        slice_mut_op(horizontal_slice, self.player_color, pos.col());
-        let is_horizontal_slice_valid = horizontal_slice_was_valid || horizontal_slice.available_pattern != AvailablePattern::None;
-
-        let vertical_slice = &mut self.slices.vertical_slices[pos.col_usize()];
-        let vertical_slice_was_valid = vertical_slice.available_pattern != AvailablePattern::None;
-        slice_mut_op(vertical_slice, self.player_color, pos.row());
-        let is_vertical_slice_valid = vertical_slice_was_valid || vertical_slice.available_pattern != AvailablePattern::None;
-
-        let valid_ascending_slice =
-            if let Some(idx) = Slices::ascending_slice_idx(pos) {
-                let ascending_slice = &mut self.slices.ascending_slices[idx];
-                let ascending_slice_was_valid = ascending_slice.available_pattern != AvailablePattern::None;
-                slice_mut_op(ascending_slice, self.player_color, pos.col() - ascending_slice.start_col);
-                (ascending_slice_was_valid || ascending_slice.available_pattern != AvailablePattern::None).then_some(ascending_slice)
-            } else {
-                None
-            };
-
-        let valid_descending_slice =
-            if let Some(idx) = Slices::descending_slice_idx(pos) {
-                let descending_slice = &mut self.slices.descending_slices[idx];
-                let descending_slice_was_valid = descending_slice.available_pattern != AvailablePattern::None;
-                slice_mut_op(descending_slice, self.player_color, pos.col() - descending_slice.start_col);
-                (descending_slice_was_valid || descending_slice.available_pattern != AvailablePattern::None).then_some(descending_slice)
-            } else {
-                None
-            };
-
-        let mut prefetch_queue: [u64; 3] = [0, 0, 0];
-        let mut prefetch_idx: usize = 0;
-
-        if is_vertical_slice_valid {
-            prefetch_queue[prefetch_idx] = vertical_slice.packed_slice();
-            prefetch_idx += 1;
-        }
-
-        if valid_ascending_slice.is_some() {
-            prefetch_queue[prefetch_idx] = valid_ascending_slice.as_ref().unwrap().packed_slice();
-            prefetch_idx += 1;
-        }
-
-        if valid_descending_slice.is_some() {
-            prefetch_queue[prefetch_idx] = valid_descending_slice.as_ref().unwrap().packed_slice();
-        }
-
-        prefetch_idx = 0;
-
-        if is_horizontal_slice_valid {
-            if prefetch_queue[prefetch_idx] != 0 {
-                memo.prefetch_memo(prefetch_queue[prefetch_idx]);
-                prefetch_idx += 1;
-            }
-
-            self.patterns.update_by_slice_mut::<{ Direction::Horizontal }>(memo, horizontal_slice);
-        }
-
-        if is_vertical_slice_valid {
-            if prefetch_queue[prefetch_idx] != 0 {
-                memo.prefetch_memo(prefetch_queue[prefetch_idx]);
-                prefetch_idx += 1;
-            }
-
-            self.patterns.update_by_slice_mut::<{ Direction::Vertical }>(memo, vertical_slice);
-        }
-
-        if let Some(ascending_slice) = valid_ascending_slice {
-            if prefetch_queue[prefetch_idx] != 0 {
-                memo.prefetch_memo(prefetch_queue[prefetch_idx]);
-            }
-
-            self.patterns.update_by_slice_mut::<{ Direction::Ascending }>(memo, ascending_slice);
-        }
-
-        if let Some(descending_slice) = valid_descending_slice {
-            self.patterns.update_by_slice_mut::<{ Direction::Descending }>(memo, descending_slice);
         }
 
         self.validate_double_three_mut();

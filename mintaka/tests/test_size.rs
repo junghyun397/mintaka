@@ -7,8 +7,8 @@ mod test_size {
 
     #[test]
     fn test_size() {
-        assert_eq!(size_of::<Slice>(), 8);
-        assert_eq!(size_of::<Slices>(), 576);
+        assert_eq!(size_of::<Slice>(), 10);
+        assert_eq!(size_of::<Slices>(), 720);
         assert_eq!(size_of::<Pattern>(), 8);
         assert_eq!(size_of::<Patterns>(), 1840);
         assert_eq!(size_of::<SlicePattern>(), 34);

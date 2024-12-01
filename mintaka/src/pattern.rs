@@ -343,7 +343,7 @@ impl Patterns {
             SlicePattern::EMPTY
         };
 
-        for offset in
+        for pattern_idx in
             if FULL_WRITE { 0 .. slice.length as usize }
             else if shrink_write {
                 // little-endian reverse
@@ -354,18 +354,18 @@ impl Patterns {
         {
             let idx = match D {
                 Direction::Horizontal =>
-                    cartesian_to_index!(slice.start_row as usize, slice.start_col as usize + offset),
+                    cartesian_to_index!(slice.start_row as usize, slice.start_col as usize + pattern_idx),
                 Direction::Vertical =>
-                    cartesian_to_index!(slice.start_row as usize + offset, slice.start_col as usize),
+                    cartesian_to_index!(slice.start_row as usize + pattern_idx, slice.start_col as usize),
                 Direction::Ascending =>
-                    cartesian_to_index!(slice.start_row as usize + offset, slice.start_col as usize + offset),
+                    cartesian_to_index!(slice.start_row as usize + pattern_idx, slice.start_col as usize + pattern_idx),
                 Direction::Descending =>
-                    cartesian_to_index!(slice.start_row as usize - offset, slice.start_col as usize + offset),
+                    cartesian_to_index!(slice.start_row as usize - pattern_idx, slice.start_col as usize + pattern_idx),
             };
 
             let pattern = &mut self.field[idx];
 
-            pattern.apply_mask_mut::<C, D>(slice_pattern.patterns[offset]);
+            pattern.apply_mask_mut::<C, D>(slice_pattern.patterns[pattern_idx]);
 
             if C == Color::Black {
                 let pos = Pos::from_index(idx as u8);

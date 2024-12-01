@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["prefetch_slice", "strict_renju"]
-prefetch_slice = []
+default = ["strict_renju"]
 strict_renju = []
 
 [dependencies]

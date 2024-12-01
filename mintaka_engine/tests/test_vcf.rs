@@ -238,7 +238,6 @@ mod test_vcf {
         assert_eq!(vcf!(case), expected);
     }
 
-    // TODO: not working; needs debug
     #[test]
     fn trap_vcf() {
         let case = indoc! {"
