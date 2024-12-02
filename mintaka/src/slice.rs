@@ -108,23 +108,25 @@ impl Slice {
         }
     }
 
-    fn remove_enclosed_pattern(&self, mut p: u16, q: u16) -> u16 {
-        // filter X O O O X
-        // filter X O O O O X
-        let mut vector = p as u32 | ((q as u32) << 16);
+    pub fn remove_enclosed_stones(&self, mut p: u16, q: u16) -> u16 {
+        // filter X O O O X, filter X O O O O X
+        let mut vector = q as u32 | ((p as u32) << 16);
 
-        const THREE_ENCLOSED: u32 = 0b01110_0000_0000_0001_0001;
-        const CLEAR_THREE_ENCLOSED: u16 = !0b01110;
-        const FOUR_ENCLOSED: u32 = 0b011110_0000_0000_0010_0001;
-        const CLEAR_FOUR_ENCLOSED: u16 = !0b011110;
+        const THREE_ENCLOSED: u32   = 0b0000_1110_0000_0000_0001_0001;
+        const CLEAR_THREE_ENCLOSED: u16                   = 0b0_1110;
+        const FOUR_ENCLOSED: u32    = 0b0001_1110_0000_0000_0010_0001;
+        const CLEAR_FOUR_ENCLOSED: u16                   = 0b01_1110;
 
-        for shift in 0 .. self.length - 4 {
-            vector <<= 1;
-            if vector & THREE_ENCLOSED == THREE_ENCLOSED {
-                p &= CLEAR_THREE_ENCLOSED << shift;
+        for shift in 0 .. self.length - 5 {
+            p &= if vector & THREE_ENCLOSED == THREE_ENCLOSED {
+                !(CLEAR_THREE_ENCLOSED << shift)
             } else if vector & FOUR_ENCLOSED == FOUR_ENCLOSED {
-                p &= CLEAR_FOUR_ENCLOSED << shift;
-            }
+                !(CLEAR_FOUR_ENCLOSED << shift)
+            } else {
+                u16::MAX
+            };
+
+            vector >>= 1;
         }
 
         p
@@ -134,14 +136,17 @@ impl Slice {
         // filter . . O . . . .
         // filter O X . . O X .
         // filter O . . . O . .
-        self.black_pattern_available = self.black_stones.count_ones() > 1
-            && self.remove_enclosed_pattern(self.black_stones, self.white_stones)
-                & !(self.white_stones << 1) & !(self.white_stones >> 1) != 0
-            && self.black_stones & ((self.black_stones << 3) | (self.black_stones << 2) | (self.black_stones << 1) | (self.black_stones >> 1) | (self.black_stones >> 2) | (self.black_stones >> 3)) != 0;
-        self.white_pattern_available = self.white_stones.count_ones() > 1
-            && self.remove_enclosed_pattern(self.white_stones, self.black_stones)
-                & !(self.black_stones << 1) & !(self.black_stones >> 1) != 0
-            && self.white_stones & ((self.white_stones << 3) | (self.white_stones << 2) | (self.white_stones << 1) | (self.white_stones >> 1) | (self.white_stones >> 2) | (self.white_stones >> 3)) != 0;
+        macro_rules! calculate_available_pattern {
+            ($p:expr,$q:expr) => {{
+                $p.count_ones() > 1
+                    && $p & !($q << 1) & !($q >> 1) != 0
+                    && $p & (($p << 3) | ($p << 2) | ($p << 1) | ($p >> 1) | ($p >> 2) | ($p >> 3)) != 0
+                    && self.remove_enclosed_stones($p, $q) & !($q << 1) & !($q >> 1) != 0
+            }};
+        }
+
+        self.black_pattern_available = calculate_available_pattern!(self.black_stones, self.white_stones);
+        self.white_pattern_available = calculate_available_pattern!(self.white_stones, self.black_stones);
     }
 
 }
