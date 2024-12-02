@@ -51,8 +51,8 @@ fn find_patterns<const C: Color>(
     #[cold]
     fn extended_match_for_black(direction: ExtendedMatch, b_raw: u32, offset: isize) -> bool {
         match direction {
-            ExtendedMatch::Left => b_raw & (0b1 << offset + 2) == 0,
-            ExtendedMatch::Right => b_raw & (0b1 << offset + 11) == 0,
+            ExtendedMatch::Left => b_raw & (0b1 << (offset + 2)) == 0,
+            ExtendedMatch::Right => b_raw & (0b1 << (offset + 11)) == 0,
         }
     }
 

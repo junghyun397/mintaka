@@ -1,5 +1,3 @@
-use rand::Rng;
-
 #[cfg(test)]
 mod codegen {
     use mintaka::notation::pos;

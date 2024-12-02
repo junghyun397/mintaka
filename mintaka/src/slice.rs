@@ -108,16 +108,39 @@ impl Slice {
         }
     }
 
+    fn remove_enclosed_pattern(&self, mut p: u16, q: u16) -> u16 {
+        // filter X O O O X
+        // filter X O O O O X
+        let mut vector = p as u32 | ((q as u32) << 16);
+
+        const THREE_ENCLOSED: u32 = 0b01110_0000_0000_0001_0001;
+        const CLEAR_THREE_ENCLOSED: u16 = !0b01110;
+        const FOUR_ENCLOSED: u32 = 0b011110_0000_0000_0010_0001;
+        const CLEAR_FOUR_ENCLOSED: u16 = !0b011110;
+
+        for shift in 0 .. self.length - 4 {
+            vector <<= 1;
+            if vector & THREE_ENCLOSED == THREE_ENCLOSED {
+                p &= CLEAR_THREE_ENCLOSED << shift;
+            } else if vector & FOUR_ENCLOSED == FOUR_ENCLOSED {
+                p &= CLEAR_FOUR_ENCLOSED << shift;
+            }
+        }
+
+        p
+    }
+
     fn calculate_available_pattern_mut(&mut self) {
         // filter . . O . . . .
         // filter O X . . O X .
         // filter O . . . O . .
-        // TODO: filter . X O O O X .
         self.black_pattern_available = self.black_stones.count_ones() > 1
-            && self.black_stones & !(self.white_stones << 1) & !(self.white_stones >> 1) != 0
+            && self.remove_enclosed_pattern(self.black_stones, self.white_stones)
+                & !(self.white_stones << 1) & !(self.white_stones >> 1) != 0
             && self.black_stones & ((self.black_stones << 3) | (self.black_stones << 2) | (self.black_stones << 1) | (self.black_stones >> 1) | (self.black_stones >> 2) | (self.black_stones >> 3)) != 0;
         self.white_pattern_available = self.white_stones.count_ones() > 1
-            && self.white_stones & !(self.black_stones << 1) & !(self.black_stones >> 1) != 0
+            && self.remove_enclosed_pattern(self.white_stones, self.black_stones)
+                & !(self.black_stones << 1) & !(self.black_stones >> 1) != 0
             && self.white_stones & ((self.white_stones << 3) | (self.white_stones << 2) | (self.white_stones << 1) | (self.white_stones >> 1) | (self.white_stones >> 2) | (self.white_stones >> 3)) != 0;
     }
 
@@ -181,7 +204,7 @@ impl Slices {
         }
     }
 
-    pub fn access_slice(&self, direction: Direction, pos: Pos) -> &Slice {
+    pub fn access_slice_unchecked(&self, direction: Direction, pos: Pos) -> &Slice {
         match direction {
             Direction::Horizontal => &self.horizontal_slices[pos.row_usize()],
             Direction::Vertical => &self.vertical_slices[pos.col_usize()],

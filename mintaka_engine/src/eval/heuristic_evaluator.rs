@@ -21,7 +21,7 @@ impl Evaluator for HeuristicEvaluator {
 
         for item in board.iter_items() {
             score += match item {
-                BoardIterItem::Stone(stine) => {
+                BoardIterItem::Stone(stone) => {
                     0
                 }
                 BoardIterItem::Pattern(pattern) => {

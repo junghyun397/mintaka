@@ -384,7 +384,7 @@ impl Board {
     }
 
     pub fn calculate_near_four_window<const C: Color>(&self, direction: Direction, pos: Pos) -> u8 {
-        let slice = self.slices.access_slice(direction, pos);
+        let slice = self.slices.access_slice_unchecked(direction, pos);
         let slice_idx = slice.calculate_idx(direction, pos);
 
         let stones = match C {

@@ -15,8 +15,8 @@ mod test_slice {
     #[test]
     fn test_slice_validity() {
         test_availability!(
-            ". . . . . X . . X . . . . . .",
-            black=true,
+            ". . . . . X O O O X O . . . O",
+            black=false,
             whthe=false
         );
     }
