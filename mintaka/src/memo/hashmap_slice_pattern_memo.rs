@@ -2,7 +2,7 @@ use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::slice_pattern::SlicePattern;
 use std::collections::HashMap;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct HashMapSlicePatternMemo {
     table: HashMap<u64, SlicePattern>,
 }
@@ -17,7 +17,7 @@ impl SlicePatternMemo for HashMapSlicePatternMemo {
         let maybe_entry = self.table.get_mut(&packed_slice);
 
         if let Some(entry) = maybe_entry {
-            entry.clone()
+            *entry
         } else {
             let slice_pattern = produce();
 

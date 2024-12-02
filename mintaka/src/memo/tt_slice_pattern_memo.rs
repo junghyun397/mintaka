@@ -39,7 +39,7 @@ impl AtomicTTSlicePatternEntry {
     fn decode(&self) -> SlicePattern {
         SlicePattern {
             patterns: unsafe {
-                std::mem::transmute([self.1.load(Ordering::Relaxed), self.2.load(Ordering::Relaxed)])
+                std::mem::transmute::<[u64; 2], [u8; 16]>([self.1.load(Ordering::Relaxed), self.2.load(Ordering::Relaxed)])
             }
         }
     }

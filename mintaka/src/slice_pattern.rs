@@ -1,8 +1,8 @@
+use crate::min;
 use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::pattern::{CLOSED_FOUR_SINGLE, CLOSE_THREE, FIVE, OPEN_FOUR, OPEN_THREE, OVERLINE};
 use crate::slice::Slice;
-use crate::{max, min};
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct SlicePattern {
@@ -342,7 +342,7 @@ struct SlicePatchMaskLUT {
 }
 
 const fn build_slice_patch_mask_lut(sources: [&str; 4], reversed: bool) -> SlicePatchMaskLUT {
-    let original = unsafe {
+    let original = {
         let mut patch_mask: [u8; 16] = [0; 16];
         let mut closed_four_clear_mask: [u8; 16] = [0; 16];
         let mut closed_four_mask: [u8; 16] = [0; 16];
@@ -374,12 +374,12 @@ const fn build_slice_patch_mask_lut(sources: [&str; 4], reversed: bool) -> Slice
             patch_mask: 0, closed_four_clear_mask: 0, closed_four_mask: 0
         }; MASK_LUT_SIZE];
 
-        let mut idx: isize = 0;
-        while idx < MASK_LUT_SIZE as isize {
-            let shl = min!(0, idx - 3).abs() * 8;
-            let shr = max!(0, idx - 3) * 8;
+        let mut idx: usize = 0;
+        while idx < MASK_LUT_SIZE {
+            let shl = min!(idx as isize - 3, 0).unsigned_abs() * 8;
+            let shr = idx.saturating_sub(3) * 8;
 
-            lut[idx as usize] = SlicePatchMask {
+            lut[idx] = SlicePatchMask {
                 patch_mask: (original.patch_mask << shr) >> shl,
                 closed_four_clear_mask: (original.closed_four_clear_mask << shr) >> shl,
                 closed_four_mask: (original.closed_four_mask << shr) >> shl,

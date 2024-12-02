@@ -96,7 +96,7 @@ impl Slice {
         }
     }
 
-    pub fn packed_slice<const C: Color>(&self) -> u64 {
+    pub fn pack_slice<const C: Color>(&self) -> u64 {
         (C as u64) << 40 | (self.length as u64) << 32 | (self.white_stones as u64) << 16 | self.black_stones as u64
     }
 
@@ -115,10 +115,10 @@ impl Slice {
         // TODO: filter . X O O O X .
         self.black_pattern_available = self.black_stones.count_ones() > 1
             && self.black_stones & !(self.white_stones << 1) & !(self.white_stones >> 1) != 0
-            && self.black_stones & ((self.black_stones << 2) | (self.black_stones << 1) | (self.black_stones >> 1) | (self.black_stones >> 2)) != 0;
+            && self.black_stones & ((self.black_stones << 3) | (self.black_stones << 2) | (self.black_stones << 1) | (self.black_stones >> 1) | (self.black_stones >> 2) | (self.black_stones >> 3)) != 0;
         self.white_pattern_available = self.white_stones.count_ones() > 1
             && self.white_stones & !(self.black_stones << 1) & !(self.black_stones >> 1) != 0
-            && self.white_stones & ((self.white_stones << 2) | (self.white_stones << 1) | (self.white_stones >> 1) | (self.white_stones >> 2)) != 0;
+            && self.white_stones & ((self.white_stones << 3) | (self.white_stones << 2) | (self.white_stones << 1) | (self.white_stones >> 1) | (self.white_stones >> 2) | (self.white_stones >> 3)) != 0;
     }
 
 }

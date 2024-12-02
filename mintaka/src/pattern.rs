@@ -336,7 +336,7 @@ impl Patterns {
         slice: &Slice, slice_idx: u8, shrink_write: bool
     ) {
         let slice_pattern = if slice.pattern_available::<C>() {
-            memo.probe_or_put_mut(slice.packed_slice::<C>(), ||
+            memo.probe_or_put_mut(slice.pack_slice::<C>(), ||
                 slice.calculate_slice_pattern::<C>()
             )
         } else {

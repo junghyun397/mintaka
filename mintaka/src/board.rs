@@ -132,16 +132,16 @@ impl Board {
     fn incremental_update_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
         macro_rules! update_by_slice {
             ($direction:expr,$slice:expr,$slice_idx:expr) => {{
-                let black_was_available = $slice.black_pattern_available;
-                let white_was_available = $slice.white_pattern_available;
+                let black_was_available = $slice.pattern_available::<{ Color::Black }>();
+                let white_was_available = $slice.pattern_available::<{ Color::White }>();
 
                 slice_mut_op($slice, self.player_color, $slice_idx);
 
-                if black_was_available | $slice.black_pattern_available {
+                if black_was_available | $slice.pattern_available::< { Color::Black }>() {
                     self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, false>(memo, $slice, $slice_idx, !black_was_available);
                 }
 
-                if white_was_available | $slice.white_pattern_available {
+                if white_was_available | $slice.pattern_available::<{ Color::White }>() {
                     self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, false>(memo, $slice, $slice_idx, !white_was_available);
                 }
             }};
@@ -169,11 +169,11 @@ impl Board {
     pub fn full_update_mut(&mut self) {
         macro_rules! update_by_slice {
             ($slice:expr,$direction:expr) => {{
-                if $slice.black_pattern_available {
+                if $slice.pattern_available::<{ Color::Black }>() {
                     self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, true>(&mut DummySlicePatternMemo, $slice, 0, false);
                 }
 
-                if $slice.white_pattern_available {
+                if $slice.pattern_available::<{ Color::White }>() {
                     self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, true>(&mut DummySlicePatternMemo, $slice, 0, false);
                 }
             }};
