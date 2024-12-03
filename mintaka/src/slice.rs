@@ -141,7 +141,11 @@ impl Slice {
                 $p.count_ones() > 1
                     && $p & !($q << 1) & !($q >> 1) != 0
                     && $p & (($p << 3) | ($p << 2) | ($p << 1) | ($p >> 1) | ($p >> 2) | ($p >> 3)) != 0
-                    && self.remove_enclosed_stones($p, $q) & !($q << 1) & !($q >> 1) != 0
+                    // && {
+                    // let mod_p = self.remove_enclosed_stones($p, $q);
+                    // mod_p & !($q << 1) & !($q >> 1) != 0
+                    //     && mod_p & ((mod_p << 3) | (mod_p << 2) | (mod_p << 1) | (mod_p >> 1) | (mod_p >> 2) | (mod_p >> 3)) != 0
+                    // }
             }};
         }
 

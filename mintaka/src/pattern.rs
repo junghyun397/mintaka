@@ -42,10 +42,10 @@ pub enum PatternCount {
 
 impl PatternCount {
 
-    fn from_masked_unit(packed: u32) -> Self {
-        if packed == 0 {
+    fn from_masked_unit(masked: u32) -> Self {
+        if masked == 0 {
             PatternCount::Cold
-        } else if packed.count_ones() < 2 {
+        } else if masked.count_ones() < 2 {
             PatternCount::Single
         } else {
             PatternCount::Multiple
@@ -333,7 +333,7 @@ impl Patterns {
 
     pub fn update_by_slice_mut<const C: Color, const D: Direction, const FULL_WRITE: bool>(
         &mut self, memo: &mut impl SlicePatternMemo,
-        slice: &Slice, slice_idx: u8, shrink_write: bool
+        slice: &Slice, slice_idx: usize, shrink_write: bool
     ) {
         let slice_pattern = if slice.pattern_available::<C>() {
             memo.probe_or_put_mut(slice.pack_slice::<C>(), ||
@@ -347,10 +347,12 @@ impl Patterns {
             if FULL_WRITE { 0 .. slice.length as usize }
             else if shrink_write {
                 // little-endian reverse
-                (u128::from_ne_bytes(slice_pattern.patterns).trailing_zeros() / 8) as usize
-                    .. (16 - (u128::from_ne_bytes(slice_pattern.patterns).leading_zeros() / 8)) as usize
+                slice_idx.saturating_sub(6)
+                    .max((u128::from_ne_bytes(slice_pattern.patterns).trailing_zeros() / 8) as usize)
+                    ..(slice_idx + 6)
+                    .min(16 - (u128::from_ne_bytes(slice_pattern.patterns).leading_zeros() / 8) as usize)
             }
-            else { slice_idx.saturating_sub(6) as usize .. (slice_idx + 6).min(slice.length) as usize }
+            else { slice_idx.saturating_sub(6).. (slice_idx + 6).min(slice.length as usize) }
         {
             let idx = match D {
                 Direction::Horizontal =>

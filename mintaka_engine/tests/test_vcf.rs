@@ -3,8 +3,8 @@ mod test_vcf {
     use indoc::indoc;
     use mintaka::board::Board;
     use mintaka::memo::tt_slice_pattern_memo::TTSlicePatternMemo;
+    use mintaka_engine::endgame::vcf;
     use mintaka_engine::memo::transposition_table::TranspositionTable;
-    use mintaka_engine::search::vcf;
     use std::str::FromStr;
     use std::time::Instant;
 
@@ -20,7 +20,7 @@ mod test_vcf {
 
             let final_move = vcf_result.last().copied().unwrap();
 
-            board.batch_set_mut(vcf_result.into_boxed_slice());
+            board.batch_set_mut(&vcf_result.into_boxed_slice());
 
             // for m in vcf_result.clone().iter() {
             //     board.set_mut(&mut memo, *m);

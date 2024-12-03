@@ -7,8 +7,12 @@
 pub mod config;
 pub mod memo;
 pub mod eval;
-pub mod search;
+pub mod endgame;
 pub mod tablebase;
 pub mod worker;
 pub mod utils;
 pub mod protocol;
+pub mod search;
+pub mod search_info;
+pub mod principal_variation;
+pub mod history_table;

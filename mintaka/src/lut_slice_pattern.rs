@@ -26,9 +26,9 @@ impl Slice {
             let q = (extended_q >> shift) as u16 & 0x00FF;
 
             if p.count_ones() > 1
-                && (p & !(q << 1) & !(q >> 1) != 0)
+                && p & !(q << 1) & !(q >> 1) != 0
             {
-                find_patterns::<C>(
+                lookup_patterns::<C>(
                     &mut acc, shift, shift as isize - 3,
                     p | (((qb >> shift) as u16 & 0x00FF) << 8),
                     extended_p
@@ -42,7 +42,7 @@ impl Slice {
 }
 
 #[inline]
-fn find_patterns<const C: Color>(
+fn lookup_patterns<const C: Color>(
     acc: &mut SlicePattern,
     shift: usize, offset: isize,
     vector: u16,
@@ -115,6 +115,23 @@ struct VectorMatchLut {
     black:      [u8; u16::MAX as usize],
     white:      [u8; u16::MAX as usize],
 }
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum ExtendedMatch {
+    Left,
+    Right
+}
+
+#[derive(Copy, Clone)]
+struct SlicePatchData {
+    pub patch_mask: u64,
+    pub closed_four_clear_mask: u64,
+    pub closed_four_mask: u64,
+    pub contains_patch_mask: bool,
+    pub contains_closed_four: bool,
+    pub extended_match: Option<ExtendedMatch>,
+}
+
 
 struct PatchLut {
     black: [SlicePatchData; 64],
@@ -205,7 +222,8 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
     embed_pattern!(white, asymmetry, ".OO...", ".OO.3.");
     embed_pattern!(white, asymmetry, "!.OO...", "!.OO3..");
     embed_pattern!(white, asymmetry, "X..OO..", "X.3OO..");
-    embed_pattern!(white, asymmetry, ".O.O..", ".O.O3.");
+    embed_pattern!(white, asymmetry, ".O.O..!!", ".O.O3.!!");
+    embed_pattern!(white, asymmetry, ".O.O..O!", ".O.O3.O!");
     embed_pattern!(white, asymmetry, "!.O.O..", "!.O3O..");
     embed_pattern!(white, asymmetry, "!.O..O.", "!.O3.O.");
     embed_pattern!(white, asymmetry, "!O.O..O.", "!O.O3.O.");
@@ -273,22 +291,6 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
     embed_pattern!(black, asymmetry, "OO.OOO", "OO6OOO");
 
     slice_pattern_lut
-}
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-enum ExtendedMatch {
-    Left,
-    Right
-}
-
-#[derive(Copy, Clone)]
-struct SlicePatchData {
-    pub patch_mask: u64,
-    pub closed_four_clear_mask: u64,
-    pub closed_four_mask: u64,
-    pub contains_patch_mask: bool,
-    pub contains_closed_four: bool,
-    pub extended_match: Option<ExtendedMatch>,
 }
 
 const fn build_slice_patch_data(extended_match: Option<ExtendedMatch>, reversed: bool, sources: [&str; 4]) -> SlicePatchData {

@@ -84,7 +84,7 @@ impl Board {
         self.switch_player_mut();
     }
 
-    pub fn batch_set_mut(&mut self, moves: Box<[Pos]>) {
+    pub fn batch_set_mut(&mut self, moves: &[Pos]) {
         let (behind_moves, after_moves): (Vec<Pos>, Vec<Pos>) = moves.iter()
             .enumerate()
             .fold(
@@ -138,11 +138,11 @@ impl Board {
                 slice_mut_op($slice, self.player_color, $slice_idx);
 
                 if black_was_available | $slice.pattern_available::< { Color::Black }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, false>(memo, $slice, $slice_idx, !black_was_available);
+                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, false>(memo, $slice, $slice_idx as usize, !black_was_available);
                 }
 
                 if white_was_available | $slice.pattern_available::<{ Color::White }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, false>(memo, $slice, $slice_idx, !white_was_available);
+                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, false>(memo, $slice, $slice_idx as usize, !white_was_available);
                 }
             }};
         }
