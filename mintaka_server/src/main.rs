@@ -14,7 +14,7 @@ fn main() {
 
     let server = tiny_http::Server::http(format!("0.0.0.0:{}", pref.port)).unwrap();
 
-    println!("mintaka web-ui backend now listening on port {}.", pref.port);
+    println!("rusty_renju web-ui backend now listening on port {}.", pref.port);
 
     loop {
         let request = match server.recv() {
@@ -22,7 +22,7 @@ fn main() {
             _ => break
         };
 
-        if pref.verbose_mode {
+        if pref.verbose_output {
             println!("{} income request: {:?}", log_prefix(), request);
         }
     }

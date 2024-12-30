@@ -1,6 +1,6 @@
 use crate::memo::tt_entry::{TTEntry, TTEntryBucket};
-use mintaka::memo::abstract_transposition_table::AbstractTranspositionTable;
-use mintaka::memo::hash_key::HashKey;
+use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
+use rusty_renju::memo::hash_key::HashKey;
 use std::sync::atomic::AtomicU8;
 
 pub struct TranspositionTable {

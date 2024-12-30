@@ -1,5 +1,5 @@
-use mintaka::notation::node::Score;
-use mintaka::notation::pos::Pos;
+use rusty_renju::notation::node::Score;
+use rusty_renju::notation::pos::Pos;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PrincipalVariation {

@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod test_slice_pattern {
-    use mintaka::notation::color::*;
-    use mintaka::pattern::*;
-    use mintaka::slice::*;
+    use rusty_renju::notation::color::*;
+    use rusty_renju::pattern::*;
+    use rusty_renju::slice::*;
     use std::str::FromStr;
 
     macro_rules! test {

@@ -1,6 +1,6 @@
 use crate::eval::evaluator::Evaluator;
-use mintaka::board::Board;
-use mintaka::notation::node::Score;
+use rusty_renju::board::Board;
+use rusty_renju::notation::node::Score;
 
 pub struct NnueEvaluator {
     weights: (),

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod codegen {
-    use mintaka::notation::pos;
     use rand::Rng;
+    use rusty_renju::notation::pos;
 
     #[test]
     fn generate_hash_table() {

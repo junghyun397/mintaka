@@ -1,8 +1,8 @@
 use crate::eval::evaluator::Evaluator;
-use mintaka::board::Board;
-use mintaka::board_iter::BoardIterItem;
-use mintaka::notation::color::Color;
-use mintaka::notation::node::Score;
+use rusty_renju::board::Board;
+use rusty_renju::board_iter::BoardIterItem;
+use rusty_renju::notation::color::Color;
+use rusty_renju::notation::node::Score;
 
 pub struct HeuristicEvaluator;
 

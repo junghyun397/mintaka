@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-mintaka = {path = "../mintaka"}
+rusty_renju = {path = "../rusty_renju" }
 indoc = "2.0.5"

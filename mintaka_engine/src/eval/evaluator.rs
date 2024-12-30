@@ -1,5 +1,5 @@
-use mintaka::board::Board;
-use mintaka::notation::node::Score;
+use rusty_renju::board::Board;
+use rusty_renju::notation::node::Score;
 
 pub trait Evaluator {
 

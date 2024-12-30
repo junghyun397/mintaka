@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod test_size {
-    use mintaka::board::Board;
-    use mintaka::pattern::{Pattern, Patterns};
-    use mintaka::slice::{Slice, Slices};
-    use mintaka::slice_pattern::SlicePattern;
+    use rusty_renju::board::Board;
+    use rusty_renju::pattern::{Pattern, Patterns};
+    use rusty_renju::slice::{Slice, Slices};
+    use rusty_renju::slice_pattern::SlicePattern;
 
     #[test]
     fn test_size() {

@@ -1,12 +1,12 @@
 use crate::memo::transposition_table::TranspositionTable;
 use crate::memo::tt_entry::{TTEntry, TTFlag, VCFlag};
-use mintaka::board::Board;
-use mintaka::memo::slice_pattern_memo::SlicePatternMemo;
-use mintaka::notation::color::Color;
-use mintaka::notation::node::{Eval, Score};
-use mintaka::notation::pos;
-use mintaka::notation::pos::Pos;
-use mintaka::pattern::PatternCount;
+use rusty_renju::board::Board;
+use rusty_renju::memo::slice_pattern_memo::SlicePatternMemo;
+use rusty_renju::notation::color::Color;
+use rusty_renju::notation::node::{Eval, Score};
+use rusty_renju::notation::pos;
+use rusty_renju::notation::pos::Pos;
+use rusty_renju::pattern::PatternCount;
 
 pub fn vcf(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
@@ -16,8 +16,8 @@ pub fn vcf(
 }
 
 pub fn vcf_sequence(
-    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
-    board: &mut Board, max_depth: u8
+    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo, board: &mut Board,
+    max_depth: u8
 ) -> Option<Vec<Pos>> {
     match board.player_color {
         Color::Black => try_vcf::<{ Color::Black }>(tt, memo, board, max_depth, 0, false),
@@ -29,9 +29,9 @@ pub fn vcf_sequence(
 }
 
 // Depth-First Search(DFS)
-fn try_vcf<const C: Color>(
-    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
-    board: &mut Board, max_depth: u8, depth: u8, opponent_has_five: bool,
+pub fn try_vcf<const C: Color>(
+    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo, board: &mut Board,
+    max_depth: u8, depth: u8, opponent_has_five: bool,
 ) -> Option<Vec<Pos>> {
     if depth > max_depth || board.stones > pos::U8_BOARD_SIZE - 2 {
         return None;

@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod test_vcf {
     use indoc::indoc;
-    use mintaka::board::Board;
-    use mintaka::memo::tt_slice_pattern_memo::TTSlicePatternMemo;
     use mintaka_engine::endgame::vcf;
     use mintaka_engine::memo::transposition_table::TranspositionTable;
+    use rusty_renju::board::Board;
+    use rusty_renju::memo::tt_slice_pattern_memo::TTSlicePatternMemo;
     use std::str::FromStr;
     use std::time::Instant;
 

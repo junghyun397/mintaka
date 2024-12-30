@@ -1,6 +1,6 @@
 pub struct Preference {
     pub port: usize,
-    pub verbose_mode: bool,
+    pub verbose_output: bool,
 }
 
 impl Default for Preference {
@@ -8,7 +8,7 @@ impl Default for Preference {
     fn default() -> Self {
         Self {
             port: 8000,
-            verbose_mode: false,
+            verbose_output: false,
         }
     }
 

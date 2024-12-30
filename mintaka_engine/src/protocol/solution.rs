@@ -1,4 +1,4 @@
-use mintaka::notation::pos::Pos;
+use rusty_renju::notation::pos::Pos;
 use std::iter::Map;
 use std::rc::Rc;
 

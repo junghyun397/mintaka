@@ -1,6 +1,6 @@
 [workspace]
-members = ["mintaka", "mintaka_engine", "mintaka_server"]
-default-members = ["mintaka", "mintaka_engine"]
+members = ["rusty_renju", "mintaka_engine", "mintaka_server"]
+default-members = ["rusty_renju", "mintaka_engine"]
 workspace.resolver = "2"
 
 [profile.release]

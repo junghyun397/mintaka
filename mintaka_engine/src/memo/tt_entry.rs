@@ -1,6 +1,6 @@
-use mintaka::memo::abstract_transposition_table::AbstractTTEntry;
-use mintaka::notation::node::{Eval, Score};
-use mintaka::notation::pos::Pos;
+use rusty_renju::memo::abstract_transposition_table::AbstractTTEntry;
+use rusty_renju::notation::node::{Eval, Score};
+use rusty_renju::notation::pos::Pos;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(Eq, PartialEq, Default)]

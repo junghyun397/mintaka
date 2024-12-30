@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod template {
     use indoc::indoc;
-    use mintaka::board::Board;
+    use rusty_renju::board::Board;
     use std::str::FromStr;
 
     #[test]
