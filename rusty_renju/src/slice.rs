@@ -122,9 +122,9 @@ impl Slice {
         let mut vector = q as u32 | ((p as u32) << 16);
 
         const THREE_ENCLOSED: u32   = 0b0000_1110_0000_0000_0001_0001;
-        const CLEAR_THREE_ENCLOSED: u16                   = 0b0_1110;
+        const CLEAR_THREE_ENCLOSED: u16                    = 0b0_1110;
         const FOUR_ENCLOSED: u32    = 0b0001_1110_0000_0000_0010_0001;
-        const CLEAR_FOUR_ENCLOSED: u16                   = 0b01_1110;
+        const CLEAR_FOUR_ENCLOSED: u16                    = 0b01_1110;
 
         for shift in 0 .. self.length - 5 {
             p &= if vector & THREE_ENCLOSED == THREE_ENCLOSED {
@@ -202,12 +202,12 @@ impl Slices {
 
             ascending_slices[idx] = Slice::empty(
                 (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
-                max!(0, seq_num * -1) as u8,
+                max!(0, -seq_num) as u8,
                 max!(0, seq_num) as u8
             );
             descending_slices[idx] = Slice::empty(
                 (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
-                pos::BOARD_WIDTH - 1 - max!(0, seq_num * -1) as u8,
+                pos::BOARD_WIDTH - 1 - max!(0, -seq_num) as u8,
                 max!(0, seq_num) as u8
             );
 
