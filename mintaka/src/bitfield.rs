@@ -3,8 +3,16 @@ use crate::notation::pos::Pos;
 use ethnum::{u256, uint};
 use std::simd::u8x32;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Bitfield([u8; 32]);
+
+impl Default for Bitfield {
+
+    fn default() -> Self {
+        Self::ZERO_FILLED
+    }
+
+}
 
 impl Bitfield {
 

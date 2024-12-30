@@ -48,6 +48,8 @@ pub struct Pos(u8);
 
 impl Pos {
 
+    pub const INVALID: Self = Self(u8::MAX);
+
     pub const fn from_index(index: u8) -> Self {
         Self(index)
     }
@@ -104,5 +106,3 @@ impl Pos {
     }
 
 }
-
-pub const INVALID_POS: Pos = Pos::from_index(u8::MAX);

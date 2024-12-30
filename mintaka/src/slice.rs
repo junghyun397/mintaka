@@ -1,9 +1,8 @@
+use crate::max;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use std::cmp::max;
-use std::ops::Neg;
 
 const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
@@ -20,6 +19,16 @@ pub struct Slice {
 }
 
 impl Slice {
+
+    pub const PLACEHOLDER: Self = Self {
+        length: 0,
+        start_row: 0,
+        start_col: 0,
+        black_stones: 0,
+        white_stones: 0,
+        black_pattern_available: false,
+        white_pattern_available: false,
+    };
 
     pub const fn empty(length: u8, start_row: u8, start_col: u8) -> Self {
         Slice {
@@ -166,35 +175,52 @@ pub struct Slices {
 impl Default for Slices {
 
     fn default() -> Self {
-        Self {
-            horizontal_slices: std::array::from_fn(|idx|
-                Slice::empty(pos::BOARD_WIDTH, idx as u8, 0)
-            ),
-            vertical_slices: std::array::from_fn(|idx|
-                Slice::empty(pos::BOARD_WIDTH, 0, idx as u8)
-            ),
-            ascending_slices: std::array::from_fn(|idx| {
-                let seq_num = idx as isize + 5 - pos::I_BOARD_WIDTH;
-                Slice::empty(
-                    (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
-                    max(0, seq_num.neg()) as u8,
-                    max(0, seq_num) as u8
-                )
-            }),
-            descending_slices: std::array::from_fn(|idx| {
-                let seq_num = idx as isize + 5 - pos::I_BOARD_WIDTH;
-                Slice::empty(
-                    (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
-                    pos::BOARD_WIDTH - 1 - max(0, seq_num.neg()) as u8,
-                    max(0, seq_num) as u8
-                )
-            })
-        }
+        Slices::EMPTY
     }
 
 }
 
 impl Slices {
+
+    pub const EMPTY: Self = {
+        let mut horizontal_slices = [Slice::PLACEHOLDER; pos::U_BOARD_WIDTH];
+        let mut vertical_slices = [Slice::PLACEHOLDER; pos::U_BOARD_WIDTH];
+        let mut ascending_slices = [Slice::PLACEHOLDER; DIAGONAL_SLICE_AMOUNT];
+        let mut descending_slices = [Slice::PLACEHOLDER; DIAGONAL_SLICE_AMOUNT];
+
+        let mut idx = 0usize;
+        while idx < pos::U_BOARD_WIDTH {
+            horizontal_slices[idx] = Slice::empty(pos::BOARD_WIDTH, idx as u8, 0);
+            vertical_slices[idx] = Slice::empty(pos::BOARD_WIDTH, 0, idx as u8);
+
+            idx += 1;
+        }
+
+        let mut idx = 0usize;
+        while idx < DIAGONAL_SLICE_AMOUNT {
+            let seq_num = idx as isize + 5 - pos::I_BOARD_WIDTH;
+
+            ascending_slices[idx] = Slice::empty(
+                (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
+                max!(0, seq_num * -1) as u8,
+                max!(0, seq_num) as u8
+            );
+            descending_slices[idx] = Slice::empty(
+                (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
+                pos::BOARD_WIDTH - 1 - max!(0, seq_num * -1) as u8,
+                max!(0, seq_num) as u8
+            );
+
+            idx += 1;
+        }
+
+        Self {
+            horizontal_slices,
+            vertical_slices,
+            ascending_slices,
+            descending_slices,
+        }
+    };
 
     pub fn set_mut(&mut self, color: Color, pos: Pos) {
         self.horizontal_slices[pos.row_usize()].set_mut(color, pos.col());

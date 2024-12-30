@@ -9,6 +9,14 @@ pub struct SlicePattern {
     pub patterns: [u8; 16]
 }
 
+impl Default for SlicePattern {
+
+    fn default() -> Self {
+        Self::EMPTY
+    }
+
+}
+
 impl SlicePattern {
 
     pub const EMPTY: Self = Self { patterns: [0; 16] };

@@ -117,7 +117,7 @@ fn try_vcf<const C: Color>(
             tt_entry
         })
         .unwrap_or_else(|| TTEntry {
-            best_move: pos::INVALID_POS,
+            best_move: Pos::INVALID,
             depth: 0,
             flag: Default::default(),
             vc_flag: VCFlag::Cold,
@@ -131,7 +131,7 @@ fn try_vcf<const C: Color>(
 }
 
 fn find_defend_pos_unchecked<const C: Color>(board: &Board) -> Pos {
-    let mut defend_pos = pos::INVALID_POS;
+    let mut defend_pos = Pos::INVALID;
     for defend_idx in 0 .. pos::BOARD_SIZE {
         if board.patterns.field[defend_idx].player_unit::<C>().has_five() {
             defend_pos = Pos::from_index(defend_idx as u8);

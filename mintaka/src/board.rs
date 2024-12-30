@@ -4,12 +4,12 @@ use crate::memo::hash_key::HashKey;
 use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
-use crate::notation::pos::{Pos, INVALID_POS};
+use crate::notation::pos::Pos;
 use crate::pattern::Patterns;
 use crate::slice::{Slice, Slices};
 
 // 2256-bytes
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub struct Board {
     pub player_color: Color,
     pub stones: u8,
@@ -17,21 +17,6 @@ pub struct Board {
     pub patterns: Patterns,
     pub hot_field: Bitfield,
     pub hash_key: HashKey,
-}
-
-impl Default for Board {
-
-    fn default() -> Self {
-        Self {
-            player_color: Color::Black,
-            stones: 0,
-            slices: Slices::default(),
-            patterns: Patterns::default(),
-            hot_field: Bitfield::ZERO_FILLED,
-            hash_key: HashKey::default()
-        }
-    }
-
 }
 
 impl Board {
@@ -311,14 +296,14 @@ impl Board {
         for next_four_idx in 0 .. 12 {
             if next_four_idx / 3 != from_direction as u8 {
                 let four_pos = overrides.next_four[next_four_idx as usize];
-                if four_pos != INVALID_POS {
+                if four_pos != Pos::INVALID {
                     overrides.four[overrides.four_top as usize] = four_pos;
                     overrides.four_top += 1;
                 }
             }
         }
 
-        overrides.next_four = [INVALID_POS; 12];
+        overrides.next_four = [Pos::INVALID; 12];
 
         for direction in self.patterns.field[pos.idx_usize()].black_unit.iter_three_directions() {
             if direction == from_direction {
@@ -431,11 +416,11 @@ impl SetOverrideStack {
 
     fn new(root: Pos) -> Self {
         Self {
-            set: [root, INVALID_POS, INVALID_POS, INVALID_POS, INVALID_POS, INVALID_POS, INVALID_POS],
+            set: [root, Pos::INVALID, Pos::INVALID, Pos::INVALID, Pos::INVALID, Pos::INVALID, Pos::INVALID],
             set_top: 1,
-            four: [INVALID_POS; 27],
+            four: [Pos::INVALID; 27],
             four_top: 0,
-            next_four: [INVALID_POS; 12],
+            next_four: [Pos::INVALID; 12],
         }
     }
 

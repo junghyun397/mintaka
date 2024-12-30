@@ -1,10 +1,10 @@
 use std::marker::ConstParamTy;
 
 //noinspection RsUnresolvedPath
-#[derive(ConstParamTy, PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(ConstParamTy, PartialEq, Eq, Clone, Copy, Debug, Default)]
 #[repr(u8)]
 pub enum Color {
-    Black,
+    #[default] Black,
     White
 }
 

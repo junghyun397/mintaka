@@ -1,4 +1,5 @@
 use crate::memo::transposition_table::TranspositionTable;
+use crate::principal_variation::PrincipalVariation;
 use mintaka::board::Board;
 use mintaka::memo::slice_pattern_memo::SlicePatternMemo;
 use mintaka::notation::node::{Depth, Score};
@@ -30,19 +31,27 @@ impl NodeType {
 
 }
 
-pub fn iterative_deepening() {
-    todo!()
+pub fn iterative_deepening(
+    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo, board: &mut Board,
+) {
+    let mut pv = PrincipalVariation::default();
+
+    let max_depth = 0;
+    for depth in 0 ..= max_depth {
+    }
 }
 
-pub fn aspiration_search<const NT: NodeType>() {
+pub fn aspiration_search<const NT: NodeType>(
+    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo, board: &mut Board,
+    pv: &mut PrincipalVariation
+) {
     todo!()
 }
 
 // Principal Variation Search(PVS), https://www.chessprogramming.org/Principal_Variation_Search
 pub fn search<const NT: NodeType>(
-    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
-    board: &mut Board,
-    mut depth: Depth, mut alpha: Score, mut beta: Score,
+    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo, board: &mut Board,
+    pv: &mut PrincipalVariation, mut depth: Depth, mut alpha: Score, mut beta: Score,
 ) -> Score {
     0
 }
