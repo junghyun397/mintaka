@@ -1,5 +1,5 @@
 [workspace]
-members = ["rusty_renju", "mintaka_engine", "mintaka_server"]
+members = ["rusty_renju", "rusty_renju_jni", "mintaka_engine", "mintaka_server"]
 default-members = ["rusty_renju", "mintaka_engine"]
 workspace.resolver = "2"
 
