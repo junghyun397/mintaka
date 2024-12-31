@@ -5,8 +5,8 @@
 * [Principal variation search](https://en.wikipedia.org/wiki/Principal_variation_search) based strong A.I.
 * High-performance endgame VCF/VCT calculator.
 * AVX-512(512-bits), AVX2(256-bits) SIMD-accelerated.
+* Java Native Interface(JNI) support.
 * (WIP) [Solid.js](https://www.solidjs.com/)-based Web Frontend UI and REST API server.
-* (WIP) Java Native Interface support.
 * (TBD) WebAssembly and JavaScript Interface support.
 * (TBD) Efficiently updatable neural network-based evaluation function([NNUE](https://www.chessprogramming.org/NNUE)).
 * (TBD) Big-endian system compatibility.

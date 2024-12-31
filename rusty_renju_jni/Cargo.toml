@@ -4,4 +4,5 @@ version = "1.0.0"
 edition = "2021"
 
 [dependencies]
+rusty_renju = {path = "../rusty_renju" }
 jni = "0.21.1"

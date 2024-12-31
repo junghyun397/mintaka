@@ -233,6 +233,7 @@ name = "rusty_renju_jni"
 version = "1.0.0"
 dependencies = [
  "jni",
+ "rusty_renju",
 ]
 
 [[package]]

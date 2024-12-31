@@ -10,7 +10,7 @@ pub enum RuleKind {
 
 #[derive(PartialEq, Eq, Copy, Clone)]
 pub enum ForbiddenKind {
-    DoubleThree,
-    DoubleFour,
-    Overline,
+    DoubleThree = 0,
+    DoubleFour = 1,
+    Overline = 2,
 }

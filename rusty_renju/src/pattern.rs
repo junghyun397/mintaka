@@ -406,7 +406,7 @@ impl Iterator for ThreeDirectionIterator {
     type Item = Direction;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.packed_unit != 0 {
+        (self.packed_unit != 0).then(|| {
             let tails = self.packed_unit.trailing_zeros();
             self.packed_unit &= self.packed_unit - 1;
 
@@ -415,16 +415,14 @@ impl Iterator for ThreeDirectionIterator {
             const ASCENDING_N: u32 = 8 * 2 + OPEN_THREE_POSITION;
             const DESCENDING_N: u32 = 8 * 3 + OPEN_THREE_POSITION;
 
-            Some(match tails {
+            match tails {
                 HORIZONTAL_N => Direction::Horizontal,
                 VERTICAL_N => Direction::Vertical,
                 ASCENDING_N => Direction::Ascending,
                 DESCENDING_N => Direction::Descending,
                 _ => unreachable!()
-            })
-        } else {
-            None
-        }
+            }
+        })
     }
 
 }
