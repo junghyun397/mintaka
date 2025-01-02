@@ -26,7 +26,7 @@ impl Board {
     }
 
     pub fn stone_kind(&self, pos: Pos) -> Option<Color> {
-        self.slices.vertical_slices[pos.row_usize()].stone_kind(pos.col())
+        self.slices.horizontal_slices[pos.row_usize()].stone_kind(pos.col())
     }
 
     pub fn set(mut self, memo: &mut impl SlicePatternMemo, pos: Pos) -> Self {
