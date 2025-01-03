@@ -1,3 +1,5 @@
+package com.do1phin.rustyrenju;
+
 public class Pos {
 
     public static int cartesianToIdx(int row, int col) {

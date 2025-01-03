@@ -19,7 +19,7 @@ fn jbytearray_to_moves(env: &mut JNIEnv, source: JByteArray) -> Vec<Pos> { unsaf
 } }
 
 #[no_mangle]
-pub extern "system" fn Java_RustyRenju_Board_destroy(
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_drop(
     _env: JNIEnv,
     _class: JClass,
     board_ptr: jlong,
@@ -28,7 +28,7 @@ pub extern "system" fn Java_RustyRenju_Board_destroy(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_RustyRenju_Board_fromString(
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_fromString(
     mut env: JNIEnv,
     _class: JClass,
     source: JString,
@@ -43,7 +43,7 @@ pub extern "system" fn Java_RustyRenju_Board_fromString(
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn Java_RustyRenju_Board_fromMoves(
+pub unsafe extern "system" fn Java_com_do1phin_rustyrenju_Board_fromMoves(
     mut env: JNIEnv,
     _class: JClass,
     moves: JByteArray,
@@ -55,7 +55,7 @@ pub unsafe extern "system" fn Java_RustyRenju_Board_fromMoves(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_RustyRenju_Board_fromEachColorMoves(
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_fromEachColorMoves(
     mut env: JNIEnv,
     _class: JClass,
     black_moves: JByteArray,
@@ -71,16 +71,26 @@ pub extern "system" fn Java_RustyRenju_Board_fromEachColorMoves(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_RustyRenju_Board_toString(
-    mut env: JNIEnv,
-    _class: JClass,
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_toString<'a>(
+    mut env: JNIEnv<'a>,
+    _class: JClass<'a>,
     board_ptr: jlong,
-) -> JString {
+) -> JString<'a> {
     env.new_string(retrieve_ref::<Board>(board_ptr).to_string()).unwrap()
 }
 
 #[no_mangle]
-pub extern "system" fn Java_RustyRenju_Board_getStones(
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_toDetailedString<'a>(
+    mut env: JNIEnv<'a>,
+    _class: JClass<'a>,
+    board_ptr: jlong,
+) -> JString<'a> {
+    env.new_string(retrieve_ref::<Board>(board_ptr).build_detailed_string()).unwrap()
+}
+
+
+#[no_mangle]
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_getStones(
     _env: JNIEnv,
     _class: JClass,
     board_ptr: jlong,
@@ -89,7 +99,7 @@ pub extern "system" fn Java_RustyRenju_Board_getStones(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_RustyRenju_Board_set(
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_set(
     _env: JNIEnv,
     _class: JClass,
     board_ptr: jlong,
@@ -103,7 +113,7 @@ pub extern "system" fn Java_RustyRenju_Board_set(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_RustyRenju_Board_unset(
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_unset(
     _env: JNIEnv,
     _class: JClass,
     board_ptr: jlong,
@@ -117,7 +127,7 @@ pub extern "system" fn Java_RustyRenju_Board_unset(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_RustyRenju_Board_pass(
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_pass(
     _env: JNIEnv,
     _class: JClass,
     board_ptr: jlong,
@@ -130,7 +140,7 @@ pub extern "system" fn Java_RustyRenju_Board_pass(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_RustyRenju_Board_setMut(
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_setMut(
     _env: JNIEnv,
     _class: JClass,
     board_ptr: jlong,
@@ -141,7 +151,7 @@ pub extern "system" fn Java_RustyRenju_Board_setMut(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_RustyRenju_Board_unsetMut(
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_unsetMut(
     _env: JNIEnv,
     _class: JClass,
     board_ptr: jlong,
@@ -152,7 +162,7 @@ pub extern "system" fn Java_RustyRenju_Board_unsetMut(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_RustyRenju_Board_passMut(
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_passMut(
     _env: JNIEnv,
     _class: JClass,
     board_ptr: jlong,
@@ -161,7 +171,7 @@ pub extern "system" fn Java_RustyRenju_Board_passMut(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_RustyRenju_Board_getPattern(
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_getPattern(
     _env: JNIEnv,
     _class: JClass,
     board_ptr: jlong,
@@ -172,7 +182,7 @@ pub extern "system" fn Java_RustyRenju_Board_getPattern(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_RustyRenju_Board_getStoneColor(
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_getStoneColor(
     _env: JNIEnv,
     _class: JClass,
     board_ptr: jlong,
@@ -183,7 +193,7 @@ pub extern "system" fn Java_RustyRenju_Board_getStoneColor(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_RustyRenju_Board_getPlayerIsBlack(
+pub extern "system" fn Java_com_do1phin_rustyrenju_Board_getPlayerIsBlack(
     _env: JNIEnv,
     _class: JClass,
     board_ptr: jlong,
