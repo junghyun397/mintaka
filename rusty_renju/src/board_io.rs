@@ -114,8 +114,8 @@ impl Board {
         format!("{column_hint}\n{content}\n{column_hint}")
     }
 
-    pub fn build_debug_string(&self) -> String {
-        fn build_single_side_string(board: &Board, color: Color) -> String {
+    pub fn build_detailed_string(&self) -> String {
+        fn build_each_color_string(board: &Board, color: Color) -> String {
             fn render_pattern(board: &Board, color: Color, extract: fn(&PatternUnit) -> u32) -> String {
                 board.build_attribute_string(|item| {
                     match item {
@@ -144,8 +144,8 @@ impl Board {
 
         format!(
             "{}\nblack\n{}\nwhite\n{}", self,
-            build_single_side_string(self, Color::Black),
-            build_single_side_string(self, Color::White)
+            build_each_color_string(self, Color::Black),
+            build_each_color_string(self, Color::White)
         )
     }
 

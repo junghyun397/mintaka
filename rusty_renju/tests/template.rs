@@ -44,7 +44,7 @@ mod template {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        println!("{}", Board::from_str(case).unwrap().build_debug_string());
+        println!("{}", Board::from_str(case).unwrap().build_detailed_string());
 
         assert_eq!(Board::from_str(case).unwrap().to_string(), expected);
     }

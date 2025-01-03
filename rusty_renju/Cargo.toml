@@ -7,6 +7,10 @@ edition = "2021"
 default = ["strict_renju"]
 strict_renju = []
 
+[lib]
+name = "rusty_renju"
+crate-type = ["rlib", "cdylib"]
+
 [dependencies]
 ethnum = "1.5.0"
 indoc = "2.0.5"
