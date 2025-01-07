@@ -17,7 +17,6 @@ pub fn vct_sequence(
     })
 }
 
-// Proof-Number Search(PNS), https://www.chessprogramming.org/Proof-Number_Search
 pub fn try_vct<const C: Color>(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo, board: &mut Board,
     max_depth: u8, depth: u8

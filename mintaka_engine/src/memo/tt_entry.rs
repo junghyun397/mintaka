@@ -26,8 +26,8 @@ pub struct TTEntry {
     pub depth: u8, // 8
     pub flag: TTFlag, // 8
     pub vc_flag: VCFlag, // 8
-    pub score: Score, // 16
     pub eval: Eval, // 16
+    pub score: Score, // 16
 }
 
 impl From<TTEntry> for u64 {

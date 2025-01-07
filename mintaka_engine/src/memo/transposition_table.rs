@@ -1,7 +1,7 @@
 use crate::memo::tt_entry::{TTEntry, TTEntryBucket};
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
-use std::sync::atomic::AtomicU8;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 pub struct TranspositionTable {
     table: Vec<TTEntryBucket>,
@@ -51,6 +51,14 @@ impl TranspositionTable {
     ) {
         let idx = self.calculate_index(key);
         self.table[idx].store_mut(key.0 as u32, entry);
+    }
+
+    pub fn increase_age(&mut self) {
+        self.age.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn fetch_age(&self) -> u8 {
+        self.age.load(Ordering::Relaxed)
     }
 
 }

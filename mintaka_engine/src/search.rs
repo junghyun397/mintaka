@@ -29,9 +29,20 @@ impl NodeType {
         is_pv: false,
     };
 
+    pub const CHECK: NodeType = NodeType {
+        is_root: true,
+        is_pv: false,
+    };
+
 }
 
-pub fn iterative_deepening(
+//noinspection RsUnresolvedPath
+#[derive(ConstParamTy, Eq, PartialEq)]
+pub enum ThreadType {
+    MainThread, SubThread
+}
+
+pub fn iterative_deepening<const Th: ThreadType>(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo, board: &mut Board,
 ) {
     let mut pv = PrincipalVariation::default();
@@ -41,15 +52,14 @@ pub fn iterative_deepening(
     }
 }
 
-pub fn aspiration_search<const NT: NodeType>(
+pub fn aspiration_search<const Th: ThreadType>(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo, board: &mut Board,
     pv: &mut PrincipalVariation
 ) {
     todo!()
 }
 
-// Principal Variation Search(PVS), https://www.chessprogramming.org/Principal_Variation_Search
-pub fn search<const NT: NodeType>(
+pub fn search<const Nt: NodeType>(
     tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo, board: &mut Board,
     pv: &mut PrincipalVariation, mut depth: Depth, mut alpha: Score, mut beta: Score,
 ) -> Score {

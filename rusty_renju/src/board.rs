@@ -7,6 +7,7 @@ use crate::notation::direction::Direction;
 use crate::notation::pos::Pos;
 use crate::pattern::Patterns;
 use crate::slice::{Slice, Slices};
+use std::marker::ConstParamTy;
 
 // 2256-bytes
 #[derive(Copy, Clone, Default)]
@@ -49,7 +50,7 @@ impl Board {
         self.hot_field.set(pos);
         self.hash_key = self.hash_key.set(self.player_color, pos);
 
-        self.incremental_update_mut(memo, pos, Slice::set_mut);
+        self.incremental_update_mut::<{ MoveType::Set }>(memo, pos);
 
         self.switch_player_mut();
     }
@@ -62,7 +63,7 @@ impl Board {
         self.stones -= 1;
         self.switch_player_mut();
 
-        self.incremental_update_mut(memo, pos, Slice::unset_mut);
+        self.incremental_update_mut::<{ MoveType::Unset }>(memo, pos);
     }
 
     pub fn pass_mut(&mut self) {
@@ -114,13 +115,16 @@ impl Board {
         self.player_color = self.opponent_color();
     }
 
-    fn incremental_update_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos, slice_mut_op: fn(&mut Slice, Color, u8)) {
+    fn incremental_update_mut<const M: MoveType>(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos) {
         macro_rules! update_by_slice {
             ($direction:expr,$slice:expr,$slice_idx:expr) => {{
                 let black_was_available = $slice.pattern_available::<{ Color::Black }>();
                 let white_was_available = $slice.pattern_available::<{ Color::White }>();
 
-                slice_mut_op($slice, self.player_color, $slice_idx);
+                match M {
+                    MoveType::Set => $slice.set_mut(self.player_color, $slice_idx),
+                    MoveType::Unset => $slice.unset_mut(self.player_color, $slice_idx)
+                }
 
                 if black_was_available | $slice.pattern_available::< { Color::Black }>() {
                     self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, false>(memo, $slice, $slice_idx as usize, !black_was_available);
@@ -380,6 +384,12 @@ impl Board {
         (((stones << 2) >> slice_idx) & 0b11111) as u8 // 0[00V00]0
     }
 
+}
+
+//noinspection RsUnresolvedPath
+#[derive(ConstParamTy, Eq, PartialEq,)]
+enum MoveType {
+    Set, Unset
 }
 
 // 48 bytes
