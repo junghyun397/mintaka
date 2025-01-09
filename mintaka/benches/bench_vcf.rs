@@ -4,8 +4,8 @@ extern crate test;
 
 mod bench_vcf {
     use indoc::indoc;
-    use mintaka_engine::endgame::vcf;
-    use mintaka_engine::memo::transposition_table::TranspositionTable;
+    use mintaka::endgame::vcf;
+    use mintaka::memo::transposition_table::TranspositionTable;
     use rusty_renju::board::Board;
     use rusty_renju::memo::tt_slice_pattern_memo::TTSlicePatternMemo;
     use std::str::FromStr;

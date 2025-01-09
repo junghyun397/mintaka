@@ -1,6 +1,6 @@
 use crate::eval::evaluator::Evaluator;
+use crate::value::Eval;
 use rusty_renju::board::Board;
-use rusty_renju::notation::node::Score;
 
 pub struct NnueEvaluator {
     weights: (),
@@ -16,7 +16,7 @@ impl Default for NnueEvaluator {
 
 impl Evaluator for NnueEvaluator {
 
-    fn eval(&self, board: &Board) -> Score {
+    fn eval(&self, board: &Board) -> Eval {
         todo!()
     }
 

@@ -228,10 +228,17 @@ impl From<Pattern> for u64 {
 
 impl Pattern {
 
-    pub fn access_unit(&self, color: Color) -> &PatternUnit {
+    pub fn access_unit(&self, color: Color) -> PatternUnit {
         match color {
-            Color::Black => &self.black_unit,
-            Color::White => &self.white_unit
+            Color::Black => self.black_unit,
+            Color::White => self.white_unit
+        }
+    }
+
+    pub fn access_unit_pair(&self, color: Color) -> (PatternUnit, PatternUnit) {
+        match color {
+            Color::Black => (self.black_unit, self.white_unit),
+            Color::White => (self.white_unit, self.black_unit)
         }
     }
 

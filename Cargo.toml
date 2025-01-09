@@ -1,7 +1,7 @@
 [workspace]
-members = ["rusty_renju", "rusty_renju_jni", "mintaka_engine", "mintaka_server"]
-default-members = ["rusty_renju", "mintaka_engine"]
-workspace.resolver = "2"
+members = ["rusty_renju", "rusty_renju_jni", "mintaka", "mintaka_server"]
+default-members = ["rusty_renju", "mintaka"]
+resolver = "2"
 
 [profile.release]
 opt-level = 3

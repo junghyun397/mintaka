@@ -61,43 +61,47 @@ fn lookup_patterns<const C: Color>(
         Color::White => SLICE_PATTERN_LUT.vector.white[vector as usize],
     };
 
-    if patch_idx != 0 {
-        let slice_patch_data = SLICE_PATTERN_LUT.patch.black[patch_idx as usize];
+    macro_rules! apply_patch {
+        ($patch_idx:expr) => {
+            let slice_patch_data = SLICE_PATTERN_LUT.patch.black[$patch_idx as usize];
 
-        if C == Color::Black
-            && slice_patch_data.extended_match.is_some()
-            && extended_match_for_black(slice_patch_data.extended_match.unwrap(), raw, offset)
-        {
-            return;
+            if C == Color::Black
+                && slice_patch_data.extended_match.is_some()
+                && !extended_match_for_black(slice_patch_data.extended_match.unwrap(), raw, offset)
+            {
+                return;
+            }
+
+            // little-endian reverse
+            let shl = (shift as isize - 3).min(0).unsigned_abs() * 8;
+            let shr = shift.saturating_sub(3) * 8;
+
+            let mut patterns = u128::from_ne_bytes(acc.0);
+            if slice_patch_data.contains_patch_mask {
+                patterns |= ((slice_patch_data.patch_mask << shr) >> shl) as u128;
+            }
+            if slice_patch_data.contains_closed_four {
+                patterns = increase_closed_four(
+                    patterns,
+                    ((slice_patch_data.closed_four_clear_mask << shr) >> shl) as u128,
+                    ((slice_patch_data.closed_four_mask << shr) >> shl) as u128
+                )
+            }
+
+            acc.0 = patterns.to_ne_bytes();
+        };
+    }
+
+    if patch_idx.0 != 0 {
+        apply_patch!(patch_idx.0);
+
+        if patch_idx.1 != 0 {
+            apply_patch!(patch_idx.1);
         }
-
-        // little-endian reverse
-        let shl = (shift as isize - 3).min(0).unsigned_abs() * 8;
-        let shr = shift.saturating_sub(3) * 8;
-
-        let mut patterns = u128::from_ne_bytes(acc.0);
-        if slice_patch_data.contains_patch_mask {
-            patterns |= ((slice_patch_data.patch_mask << shr) >> shl) as u128;
-        }
-        if slice_patch_data.contains_closed_four {
-            patterns = increase_closed_four_multiple(
-                patterns,
-                ((slice_patch_data.closed_four_clear_mask << shr) >> shl) as u128,
-                ((slice_patch_data.closed_four_mask << shr) >> shl) as u128
-            )
-        }
-
-        acc.0 = patterns.to_ne_bytes();
     }
 }
 
-fn calculate_five_in_a_rows(mut stones: u16) -> bool {
-    stones &= stones >> 1;  // 1 1 1 1 1 0 & 0 1 1 1 1 1
-    stones &= stones >> 3;  // 0 1 1 1 1 0 & 0 0 0 0 1 1 ...
-    stones != 0             // 0 0 0 0 1 0 ...
-}
-
-fn increase_closed_four_multiple(original: u128, clear_mask: u128, mask: u128) -> u128 {
+fn increase_closed_four(original: u128, clear_mask: u128, mask: u128) -> u128 {
     let mut copied: u128 = original;     // 0 0 0 | 1 0 0 | 1 1 0
     copied >>= 1;                        // 0 0 0 | 0 1 0 | 0 1 1
     copied |= mask;                      // 1 0 0 | 1 1 0 | 1 1 1
@@ -110,10 +114,10 @@ struct SlicePatternLut {
     patch: PatchLut,
 }
 
-// 32 KiB
+// 64 KiB
 struct VectorMatchLut {
-    black:      [u8; u16::MAX as usize],
-    white:      [u8; u16::MAX as usize],
+    black:      [(u8, u8); u16::MAX as usize],
+    white:      [(u8, u8); u16::MAX as usize],
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -134,8 +138,8 @@ struct SlicePatchData {
 
 
 struct PatchLut {
-    black: [SlicePatchData; 64],
-    white: [SlicePatchData; 64],
+    black: [SlicePatchData; 128],
+    white: [SlicePatchData; 128],
 }
 
 const SLICE_PATTERN_LUT: SlicePatternLut = build_slice_pattern_lut();
@@ -153,18 +157,18 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
 
         SlicePatternLut {
             vector: VectorMatchLut {
-                black: [0; u16::MAX as usize],
-                white: [0; u16::MAX as usize],
+                black: [(0, 0); u16::MAX as usize],
+                white: [(0, 0); u16::MAX as usize],
             },
             patch: PatchLut {
-                black: [initial_patch_data; 64],
-                white: [initial_patch_data; 64],
+                black: [initial_patch_data; 128],
+                white: [initial_patch_data; 128],
             },
         }
     };
 
-    let mut patch_black_idx: usize = 1;
-    let mut patch_white_idx: usize = 1;
+    let mut patch_idx_black: usize = 0;
+    let mut patch_idx_white: usize = 0;
 
     macro_rules! sources {
         ($a:expr) => ([$a, "", "", ""]);
@@ -173,28 +177,14 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
         ($a:expr,$b:expr,$c:expr,$d:expr) => ([$a, $b, $c, $d]);
     }
 
-    macro_rules! flash_pattern {
-        ($vector_expr:expr, $idx_expr:expr, $extended_match:expr, $rev:expr, $sources:expr) => {{
-            let overlap = slice_pattern_lut.vector.black[0] != 0;
-
-            let target_idx = if overlap {
-                $vector_expr[0] as usize
-            } else {
-                $idx_expr
-            };
-
-            if !overlap {
-                $idx_expr += 1;
-            }
-
-            $vector_expr[target_idx] = build_slice_patch_data($extended_match, $rev, $sources);
-
-            target_idx
-        }};
-    }
-
     macro_rules! embed_pattern {
-        (black,asymmetry,long-pattern,$position:ident,$pattern:literal,$($patch:literal),+) => {
+        (black,asymmetry,long-pattern,left,$pattern:literal,$($patch:literal),+) => {
+            embed_pattern!(true, black, false, Some(ExtendedMatch::Left), $pattern, $($patch),+);
+            embed_pattern!(true, black, true, Some(ExtendedMatch::Right), $pattern, $($patch),+)
+        };
+        (black,asymmetry,long-pattern,right,$pattern:literal,$($patch:literal),+) => {
+            embed_pattern!(true, black, false, Some(ExtendedMatch::Right), $pattern, $($patch),+);
+            embed_pattern!(true, black, true, Some(ExtendedMatch::Left), $pattern, $($patch),+)
         };
         ($color:ident,symmetry,$pattern:literal,$($patch:literal),+) => {
             embed_pattern!($color, rev=false, $pattern, $($patch),+);
@@ -203,9 +193,26 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
             embed_pattern!($color, rev=false, $pattern, $($patch),+);
             embed_pattern!($color, rev=true, $pattern, $($patch),+)
         };
-        ($color:ident,rev=$rev:expr,$pattern:literal,$($patch:literal),+) => {
-            // let patch_idx = flash_pattern!(slice_pattern_lut.vector.black, patch_black_idx, ExtendedMatch::None, $rev, sources!($($patch),+));
-            // slice_pattern_lut.vector.black[0] = patch_idx;
+        (black,rev=$rev:expr,$pattern:literal,$($patch:literal),+) =>
+            (embed_pattern!(true, black, $rev, Option::None, $pattern, $($patch),+));
+        (white,rev=$rev:expr,$pattern:literal,$($patch:literal),+) =>
+            (embed_pattern!(false, white, $rev, Option::None, $pattern, $($patch),+));
+        ($is_black:expr,$color_expr:expr,$rev:expr,$extended_match:expr,$pattern:literal,$($patch:literal),+) => {
+            patch_idx_black += 1;
+            let patch_idx = patch_idx_black;
+
+            slice_pattern_lut.patch.black[patch_idx] = build_slice_patch_data($extended_match, $rev, sources!($($patch),+));
+
+            let vector_variants = parse_vector_variant_literal($pattern, $rev);
+
+            // build all possible vector_idx
+            let mut position: usize = 0;
+            while position < 8 {
+                let vector_idx = 0;
+                slice_pattern_lut.vector.black[vector_idx] = (patch_idx as u8, 0);
+
+                position += 1;
+            }
         };
     }
 
@@ -346,6 +353,31 @@ const fn parse_pattern_literal(kind: char, source: &str, reversed: bool) -> u8 {
             acc |= 0b1 << pos;
         }
 
+        idx += 1;
+    }
+
+    acc
+}
+
+#[derive(Copy, Clone, Default)]
+struct VectorVariantElement {
+    consist: bool,
+    opponent: bool,
+    empty: bool,
+}
+
+const fn parse_vector_variant_literal(source: &str, reversed: bool) -> [VectorVariantElement; 8] {
+    let mut acc: [VectorVariantElement; 8] = [VectorVariantElement { consist: true, opponent: true, empty: true }; 8];
+    let mut idx: usize = 0;
+    while idx < source.len() {
+        let pos = if reversed { 7 - idx } else { idx };
+        acc[pos] = match source.as_bytes()[idx] as char {
+            'O' => VectorVariantElement { consist: true, opponent: false, empty: false },
+            'X' => VectorVariantElement { consist: false, opponent: true, empty: false },
+            '!' => VectorVariantElement { consist: false, opponent: true, empty: true },
+            '.' => VectorVariantElement { consist: false, opponent: false, empty: true },
+            _ => unreachable!(),
+        };
         idx += 1;
     }
 

@@ -1,8 +1,8 @@
 use crate::memo::transposition_table::TranspositionTable;
 use crate::principal_variation::PrincipalVariation;
+use crate::value::{Depth, Score};
 use rusty_renju::board::Board;
 use rusty_renju::memo::slice_pattern_memo::SlicePatternMemo;
-use rusty_renju::notation::node::{Depth, Score};
 use std::marker::ConstParamTy;
 
 //noinspection RsUnresolvedPath

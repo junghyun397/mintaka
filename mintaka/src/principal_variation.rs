@@ -1,4 +1,4 @@
-use rusty_renju::notation::node::Score;
+use crate::value::Score;
 use rusty_renju::notation::pos::Pos;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

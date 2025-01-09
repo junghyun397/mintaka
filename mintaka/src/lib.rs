@@ -16,3 +16,5 @@ pub mod search;
 pub mod search_info;
 pub mod principal_variation;
 pub mod history_table;
+pub mod value;
+pub mod nnue;

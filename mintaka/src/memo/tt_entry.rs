@@ -1,5 +1,5 @@
+use crate::value::{Depth, Eval, Score};
 use rusty_renju::memo::abstract_transposition_table::AbstractTTEntry;
-use rusty_renju::notation::node::{Eval, Score};
 use rusty_renju::notation::pos::Pos;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -23,9 +23,9 @@ pub enum VCFlag {
 // 64 bit
 pub struct TTEntry {
     pub best_move: Pos, // 8
-    pub depth: u8, // 8
     pub flag: TTFlag, // 8
-    pub vc_flag: VCFlag, // 8
+    pub vcf_flag: VCFlag, // 8
+    pub depth: Depth, // 8
     pub eval: Eval, // 16
     pub score: Score, // 16
 }

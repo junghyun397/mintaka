@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test_size {
-    use mintaka_engine::memo::tt_entry::TTEntryBucket;
+    use mintaka::memo::tt_entry::TTEntryBucket;
 
     #[test]
     fn test_size() {
