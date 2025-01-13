@@ -1,7 +1,5 @@
 use crate::bitfield::Bitfield;
-use crate::memo::dummy_pattern_memo::DummySlicePatternMemo;
 use crate::memo::hash_key::HashKey;
-use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::Pos;
@@ -30,13 +28,13 @@ impl Board {
         self.slices.horizontal_slices[pos.row_usize()].stone_kind(pos.col())
     }
 
-    pub fn set(mut self, memo: &mut impl SlicePatternMemo, pos: Pos) -> Self {
-        self.set_mut(memo, pos);
+    pub fn set(mut self, pos: Pos) -> Self {
+        self.set_mut(pos);
         self
     }
 
-    pub fn unset(mut self, memo: &mut impl SlicePatternMemo, pos: Pos) -> Self {
-        self.unset_mut(memo, pos);
+    pub fn unset(mut self, pos: Pos) -> Self {
+        self.unset_mut(pos);
         self
     }
 
@@ -45,17 +43,17 @@ impl Board {
         self
     }
 
-    pub fn set_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos) {
+    pub fn set_mut(&mut self, pos: Pos) {
         self.stones += 1;
         self.hot_field.set(pos);
         self.hash_key = self.hash_key.set(self.player_color, pos);
 
-        self.incremental_update_mut::<{ MoveType::Set }>(memo, pos);
+        self.incremental_update_mut::<{ MoveType::Set }>(pos);
 
         self.switch_player_mut();
     }
 
-    pub fn unset_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos) {
+    pub fn unset_mut(&mut self, pos: Pos) {
         self.patterns.five_in_a_row = None;
 
         self.hash_key = self.hash_key.set(self.opponent_color(), pos);
@@ -63,7 +61,7 @@ impl Board {
         self.stones -= 1;
         self.switch_player_mut();
 
-        self.incremental_update_mut::<{ MoveType::Unset }>(memo, pos);
+        self.incremental_update_mut::<{ MoveType::Unset }>(pos);
     }
 
     pub fn pass_mut(&mut self) {
@@ -115,7 +113,7 @@ impl Board {
         self.player_color = self.opponent_color();
     }
 
-    fn incremental_update_mut<const M: MoveType>(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos) {
+    fn incremental_update_mut<const M: MoveType>(&mut self, pos: Pos) {
         macro_rules! update_by_slice {
             ($direction:expr,$slice:expr,$slice_idx:expr) => {{
                 let black_was_available = $slice.pattern_available::<{ Color::Black }>();
@@ -127,11 +125,11 @@ impl Board {
                 }
 
                 if black_was_available | $slice.pattern_available::< { Color::Black }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, false>(memo, $slice, $slice_idx as usize, !black_was_available);
+                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, false>($slice, $slice_idx as usize, !black_was_available);
                 }
 
                 if white_was_available | $slice.pattern_available::<{ Color::White }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, false>(memo, $slice, $slice_idx as usize, !white_was_available);
+                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, false>($slice, $slice_idx as usize, !white_was_available);
                 }
             }};
         }
@@ -159,11 +157,11 @@ impl Board {
         macro_rules! update_by_slice {
             ($slice:expr,$direction:expr) => {{
                 if $slice.pattern_available::<{ Color::Black }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, true>(&mut DummySlicePatternMemo, $slice, 0, false);
+                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, true>($slice, 0, false);
                 }
 
                 if $slice.pattern_available::<{ Color::White }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, true>(&mut DummySlicePatternMemo, $slice, 0, false);
+                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, true>($slice, 0, false);
                 }
             }};
         }

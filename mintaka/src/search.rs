@@ -2,7 +2,6 @@ use crate::memo::transposition_table::TranspositionTable;
 use crate::principal_variation::PrincipalVariation;
 use crate::value::{Depth, Score};
 use rusty_renju::board::Board;
-use rusty_renju::memo::slice_pattern_memo::SlicePatternMemo;
 use std::marker::ConstParamTy;
 
 //noinspection RsUnresolvedPath
@@ -43,7 +42,7 @@ pub enum ThreadType {
 }
 
 pub fn iterative_deepening<const Th: ThreadType>(
-    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo, board: &mut Board,
+    tt: &mut TranspositionTable, board: &mut Board,
 ) {
     let mut pv = PrincipalVariation::default();
 
@@ -53,14 +52,14 @@ pub fn iterative_deepening<const Th: ThreadType>(
 }
 
 pub fn aspiration_search<const Th: ThreadType>(
-    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo, board: &mut Board,
+    tt: &mut TranspositionTable, board: &mut Board,
     pv: &mut PrincipalVariation
 ) {
     todo!()
 }
 
 pub fn search<const Nt: NodeType>(
-    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo, board: &mut Board,
+    tt: &mut TranspositionTable, board: &mut Board,
     pv: &mut PrincipalVariation, mut depth: Depth, mut alpha: Score, mut beta: Score,
 ) -> Score {
     0

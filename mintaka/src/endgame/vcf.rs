@@ -2,26 +2,23 @@ use crate::memo::transposition_table::TranspositionTable;
 use crate::memo::tt_entry::{TTEntry, TTFlag, VCFlag};
 use crate::value::{Eval, Score};
 use rusty_renju::board::Board;
-use rusty_renju::memo::slice_pattern_memo::SlicePatternMemo;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::pattern::PatternCount;
 
 pub fn vcf(
-    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo,
-    board: &mut Board, max_depth: u8
+    tt: &mut TranspositionTable, board: &mut Board, max_depth: u8
 ) -> Score {
     todo!()
 }
 
 pub fn vcf_sequence(
-    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo, board: &mut Board,
-    max_depth: u8
+    tt: &mut TranspositionTable, board: &mut Board, max_depth: u8
 ) -> Option<Vec<Pos>> {
     match board.player_color {
-        Color::Black => try_vcf::<{ Color::Black }>(tt, memo, board, max_depth, 0, false),
-        Color::White => try_vcf::<{ Color::White }>(tt, memo, board, max_depth, 0, false),
+        Color::Black => try_vcf::<{ Color::Black }>(tt, board, max_depth, 0, false),
+        Color::White => try_vcf::<{ Color::White }>(tt, board, max_depth, 0, false),
     }.map(|mut result| {
         result.reverse();
         result
@@ -30,7 +27,7 @@ pub fn vcf_sequence(
 
 // Depth-First Search(DFS)
 pub fn try_vcf<const C: Color>(
-    tt: &mut TranspositionTable, memo: &mut impl SlicePatternMemo, board: &mut Board,
+    tt: &mut TranspositionTable, board: &mut Board,
     max_depth: u8, depth: u8, opponent_has_five: bool,
 ) -> Option<Vec<Pos>> {
     if depth > max_depth || board.stones > pos::U8_BOARD_SIZE - 2 {
@@ -57,7 +54,7 @@ pub fn try_vcf<const C: Color>(
             return Some(vec![four_pos]);
         }
 
-        board.set_mut(memo, four_pos);
+        board.set_mut(four_pos);
 
         let defend_pos = find_defend_pos_unchecked::<C>(board);
         let defend_pattern = board.patterns.field[defend_pos.idx_usize()];
@@ -85,16 +82,16 @@ pub fn try_vcf<const C: Color>(
             } else if !tt.probe(
                 board.hash_key.set(C.reversed(), defend_pos)
             ).is_some_and(|entry| entry.vcf_flag == VCFlag::Cold) {
-                board.set_mut(memo, defend_pos);
+                board.set_mut(defend_pos);
 
-                let maybe_vcf = try_vcf::<C>(tt, memo, board, max_depth, depth + 2, defend_four_count != PatternCount::Cold)
+                let maybe_vcf = try_vcf::<C>(tt, board, max_depth, depth + 2, defend_four_count != PatternCount::Cold)
                     .map(|mut vcf| {
                         vcf.push(defend_pos);
                         vcf.push(four_pos);
                         vcf
                     });
 
-                board.unset_mut(memo, defend_pos);
+                board.unset_mut(defend_pos);
 
                 maybe_vcf
             } else {
@@ -104,7 +101,7 @@ pub fn try_vcf<const C: Color>(
             None
         };
 
-        board.unset_mut(memo, four_pos);
+        board.unset_mut(four_pos);
 
         if maybe_vcf.is_some() {
             return maybe_vcf;

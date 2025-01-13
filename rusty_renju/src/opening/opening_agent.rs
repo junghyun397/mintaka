@@ -1,6 +1,5 @@
 use crate::game::Game;
 use crate::history::History;
-use crate::memo::dummy_pattern_memo::DummySlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
@@ -101,7 +100,7 @@ impl OpeningMove {
 
     fn set(&self, game: Game, pos: Pos) -> (Game, Option<OpeningStage>) {
         if self.validate_move(pos) {
-            let game = game.play(&mut DummySlicePatternMemo, pos);
+            let game = game.play(pos);
 
             let next = match self.opening_kind {
                 OpeningKind::Soosyrv8 => match self.moves {

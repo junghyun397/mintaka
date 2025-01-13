@@ -4,7 +4,6 @@ mod test_vcf {
     use mintaka::endgame::vcf;
     use mintaka::memo::transposition_table::TranspositionTable;
     use rusty_renju::board::Board;
-    use rusty_renju::memo::tt_slice_pattern_memo::TTSlicePatternMemo;
     use std::str::FromStr;
     use std::time::Instant;
 
@@ -12,10 +11,9 @@ mod test_vcf {
         ($case:expr) => {{
             let mut board = Board::from_str($case).unwrap();
             let mut tt = TranspositionTable::new_with_size(1);
-            let mut memo = TTSlicePatternMemo::default();
 
             let instant = Instant::now();
-            let vcf_result = vcf::vcf_sequence(&mut tt, &mut memo, &mut board, u8::MAX).unwrap();
+            let vcf_result = vcf::vcf_sequence(&mut tt, &mut board, u8::MAX).unwrap();
             let time = instant.elapsed();
 
             let final_move = vcf_result.last().copied().unwrap();

@@ -1,6 +1,5 @@
 use crate::board::Board;
 use crate::history::{Action, History};
-use crate::memo::slice_pattern_memo::SlicePatternMemo;
 use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
@@ -33,13 +32,13 @@ impl Game {
         )
     }
 
-    pub fn play(mut self, memo: &mut impl SlicePatternMemo, pos: Pos) -> Self {
-        self.play_mut(memo, pos);
+    pub fn play(mut self, pos: Pos) -> Self {
+        self.play_mut(pos);
         self
     }
 
-    pub fn undo(mut self, memo: &mut impl SlicePatternMemo) -> Self {
-        self.undo_mut(memo);
+    pub fn undo(mut self) -> Self {
+        self.undo_mut();
         self
     }
 
@@ -53,17 +52,17 @@ impl Game {
         self
     }
 
-    pub fn play_mut(&mut self, memo: &mut impl SlicePatternMemo, pos: Pos) {
-        self.board.set_mut(memo, pos);
+    pub fn play_mut(&mut self, pos: Pos) {
+        self.board.set_mut(pos);
         self.history.play_mut(pos);
         self.result = self.board.patterns.five_in_a_row
             .map(GameResult::FiveInARow)
             .or_else(|| (self.board.stones == pos::U8_BOARD_SIZE).then_some(GameResult::Full));
     }
 
-    pub fn undo_mut(&mut self, memo: &mut impl SlicePatternMemo) {
+    pub fn undo_mut(&mut self) {
         if let Action::Move(pos) = self.history.undo_mut() {
-            self.board.unset_mut(memo, pos);
+            self.board.unset_mut(pos);
         }
         self.result = None;
     }
