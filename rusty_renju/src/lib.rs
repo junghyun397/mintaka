@@ -20,4 +20,3 @@ pub mod slice_pattern;
 pub mod board_iter;
 pub mod bitfield;
 pub mod history;
-mod legacy_slice_pattern;
