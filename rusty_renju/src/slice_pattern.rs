@@ -50,7 +50,7 @@ impl Slice {
 
 }
 
-#[inline]
+#[inline(always)]
 fn lookup_patterns<const C: Color>(
     acc: &mut SlicePattern,
     shift: usize,
@@ -60,8 +60,8 @@ fn lookup_patterns<const C: Color>(
     #[cold]
     fn extended_match_for_black(direction: ExtendedMatch, b_raw: u32, shift: usize) -> bool {
         match direction {
-            ExtendedMatch::Left => b_raw & (0b1 << (shift as isize - 3 + 2)) == 0,
-            ExtendedMatch::Right => b_raw & (0b1 << (shift as isize - 3 + 11)) == 0,
+            ExtendedMatch::Left => b_raw & (0b1 << (shift.saturating_sub(1))) == 0,
+            ExtendedMatch::Right => b_raw & (0b1 << (shift + 8)) == 0
         }
     }
 
@@ -263,18 +263,18 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
     macro_rules! embed_pattern {
         (black,asymmetry,long-pattern,left,$pattern:literal,$($patch:literal),+) => {
             embed_pattern!(black, rev=false, Some(ExtendedMatch::Left), $pattern, fill_array!($($patch),+));
-            embed_pattern!(black, rev=true, Some(ExtendedMatch::Right), $pattern, fill_array!($($patch),+))
+            embed_pattern!(black, rev=true, Some(ExtendedMatch::Right), $pattern, fill_array!($($patch),+));
         };
         (black,asymmetry,long-pattern,right,$pattern:literal,$($patch:literal),+) => {
             embed_pattern!(black, rev=false, Some(ExtendedMatch::Right), $pattern, fill_array!($($patch),+));
-            embed_pattern!(black, rev=true, Some(ExtendedMatch::Left), $pattern, fill_array!($($patch),+))
+            embed_pattern!(black, rev=true, Some(ExtendedMatch::Left), $pattern, fill_array!($($patch),+));
         };
         ($color:ident,symmetry,$pattern:literal,$($patch:literal),+) => {
             embed_pattern!($color, rev=false, Option::None, $pattern, fill_array!($($patch),+));
         };
         ($color:ident,asymmetry,$pattern:literal,$($patch:literal),+) => {
             embed_pattern!($color, rev=false, Option::None, $pattern, fill_array!($($patch),+));
-            embed_pattern!($color, rev=true, Option::None, $pattern, fill_array!($($patch),+))
+            embed_pattern!($color, rev=true, Option::None, $pattern, fill_array!($($patch),+));
         };
         (black,rev=$rev:expr,$extended_match:expr,$pattern:literal,$patches:expr) => {
             embed_pattern!(rev=$rev, temp_vector_match_lut_black, slice_pattern_lut.patch.black, patch_top_black, $extended_match, $pattern, $patches);
@@ -282,13 +282,13 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
         (white,rev=$rev:expr,$extended_match:expr,$pattern:literal,$patches:expr) => {
             embed_pattern!(rev=$rev, temp_vector_match_lut_white, slice_pattern_lut.patch.white, patch_top_white, $extended_match, $pattern, $patches);
         };
-        (rev=$rev:expr,$vector_expr:expr,$patch_expr:expr,$patch_top_expr:expr,$extended_match:expr,$pattern:literal,$patches:expr) => {
+        (rev=$rev:expr,$vector_expr:expr,$patch_expr:expr,$patch_top_expr:expr,$extended_match:expr,$pattern:literal,$patches:expr) => {{
             $patch_top_expr += 1;
             $patch_expr[$patch_top_expr] = build_slice_patch_data($extended_match, $rev, $patches);
 
             let vector_variants = parse_vector_variant_literal($pattern, $rev);
             flash_vector_variants(&mut $vector_expr, $patch_top_expr, vector_variants, 0, 0);
-        };
+        }};
     }
 
     macro_rules! compress_pattern_lut {
@@ -419,16 +419,6 @@ const fn build_slice_patch_data(extended_match: Option<ExtendedMatch>, reversed:
         }
         idx += 1;
     }
-
-    let extended_match = if reversed {
-        match extended_match {
-            Some(ExtendedMatch::Left) => Some(ExtendedMatch::Right),
-            Some(ExtendedMatch::Right) => Some(ExtendedMatch::Left),
-            _ => None,
-        }
-    } else {
-        extended_match
-    };
 
     SlicePatchData {
         patch_mask: u64::from_ne_bytes(patch_mask),
