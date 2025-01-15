@@ -3,7 +3,6 @@ use jni::objects::{JByteArray, JClass, JString, ReleaseMode};
 use jni::sys::{jboolean, jbyte, jint, jlong};
 use jni::JNIEnv;
 use rusty_renju::board::Board;
-use rusty_renju::memo::dummy_pattern_memo::DummySlicePatternMemo;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::Pos;
 use std::str::FromStr;
@@ -107,7 +106,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_set(
 ) -> jlong {
     let board = retrieve_ref::<Board>(board_ptr)
         .clone()
-        .set(&mut DummySlicePatternMemo, Pos::from_index(pos as u8));
+        .set(Pos::from_index(pos as u8));
 
     value_to_ptr(board)
 }
@@ -121,7 +120,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_unset(
 ) -> jlong {
     let board = retrieve_ref::<Board>(board_ptr)
         .clone()
-        .unset(&mut DummySlicePatternMemo, Pos::from_index(pos as u8));
+        .unset(Pos::from_index(pos as u8));
 
     value_to_ptr(board)
 }
@@ -147,7 +146,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_setMut(
     pos: jbyte,
 ) {
     retrieve_ref::<Board>(board_ptr)
-        .set_mut(&mut DummySlicePatternMemo, Pos::from_index(pos as u8));
+        .set_mut(Pos::from_index(pos as u8));
 }
 
 #[no_mangle]
@@ -158,7 +157,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_unsetMut(
     pos: jbyte
 ) {
     retrieve_ref::<Board>(board_ptr)
-        .unset_mut(&mut DummySlicePatternMemo, Pos::from_index(pos as u8));
+        .unset_mut(Pos::from_index(pos as u8));
 }
 
 #[no_mangle]
@@ -167,7 +166,8 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_passMut(
     _class: JClass,
     board_ptr: jlong,
 ) {
-    retrieve_ref::<Board>(board_ptr).pass_mut();
+    retrieve_ref::<Board>(board_ptr)
+        .pass_mut();
 }
 
 #[no_mangle]

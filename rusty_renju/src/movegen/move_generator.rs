@@ -35,7 +35,6 @@ pub fn generate_defend_four_moves(board: &Board) -> Bitfield {
             pattern.black_unit.has_five()
         )
     }
-
 }
 
 pub fn generate_defend_move_by_condition<T>(board: &Board, cond: T) -> Bitfield
