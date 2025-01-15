@@ -337,17 +337,17 @@ impl Default for Patterns {
 
 impl Patterns {
 
-    pub fn update_by_slice_mut<const C: Color, const D: Direction, const FULL_WRITE: bool>(
+    pub fn update_by_slice_mut<const C: Color, const D: Direction, const FULL_UPDATE: bool>(
         &mut self, slice: &Slice, slice_idx: usize, shrink_write: bool
     ) {
         let slice_pattern = if slice.pattern_available::<C>() {
-            slice.calculate_slice_pattern::<C>()
+            slice.calculate_slice_pattern::<C, FULL_UPDATE>(slice_idx)
         } else {
             SlicePattern::EMPTY
         };
 
         for pattern_idx in
-            if FULL_WRITE { 0 .. slice.length as usize }
+            if FULL_UPDATE { 0 .. slice.length as usize }
             else if shrink_write {
                 // little-endian reverse
                 slice_idx.saturating_sub(6)
@@ -355,7 +355,7 @@ impl Patterns {
                     ..(slice_idx + 6)
                     .min(16 - (u128::from_ne_bytes(slice_pattern.patterns).leading_zeros() / 8) as usize)
             }
-            else { slice_idx.saturating_sub(6).. (slice_idx + 6).min(slice.length as usize) }
+            else { slice_idx.saturating_sub(6) .. (slice_idx + 6).min(slice.length as usize) }
         {
             let idx = match D {
                 Direction::Horizontal =>
@@ -368,14 +368,12 @@ impl Patterns {
                     cartesian_to_index!(slice.start_row as usize - pattern_idx, slice.start_col as usize + pattern_idx),
             };
 
-            let pattern = &mut self.field[idx];
-
-            pattern.apply_mask_mut::<C, D>(slice_pattern.patterns[pattern_idx]);
+            self.field[idx].apply_mask_mut::<C, D>(slice_pattern.patterns[pattern_idx]);
 
             if C == Color::Black {
                 let pos = Pos::from_index(idx as u8);
 
-                if pattern.black_unit.has_threes() {
+                if self.field[idx].black_unit.has_threes() {
                     self.unchecked_double_three_field.set(pos);
                 } else {
                     self.unchecked_double_three_field.unset(pos);

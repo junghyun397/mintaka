@@ -27,14 +27,17 @@ impl SlicePattern {
 
 impl Slice {
 
-    pub fn calculate_slice_pattern<const C: Color>(&self) -> SlicePattern {
+    pub fn calculate_slice_pattern<const C: Color, const FULL_UPDATE: bool>(&self, slice_idx: usize) -> SlicePattern {
         // padding = 3
         let block: u32 = !(!(u32::MAX << self.length as u32) << 3);
         let extended_p: u32 = (self.stones::<C>() as u32) << 3;
         let extended_q: u32 = (self.stones_reversed::<C>() as u32) << 3 | block;
 
         let mut acc: SlicePattern = SlicePattern::EMPTY;
-        for shift in 0 .. self.length as usize + 2 {
+        for shift in
+            if FULL_UPDATE { 0 .. self.length as usize - 1 }
+            else { slice_idx.saturating_sub(8) .. (slice_idx + 8).min(self.length as usize - 1) }
+        {
             let p = (extended_p >> shift) as u16 & 0x00FF;
             let q = (extended_q >> shift) as u16 & 0x00FF;
 
@@ -102,6 +105,7 @@ fn lookup_patterns<const C: Color>(
     }
 }
 
+#[inline(always)]
 fn increase_closed_four(original: u128, clear_mask: u128, mask: u128) -> u128 {
     let mut copied: u128 = original;     // 0 0 0 | 1 0 0 | 1 1 0
     copied >>= 1;                        // 0 0 0 | 0 1 0 | 0 1 1

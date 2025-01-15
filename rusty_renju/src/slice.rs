@@ -105,10 +105,6 @@ impl Slice {
         }
     }
 
-    pub fn pack_slice<const C: Color>(&self) -> u64 {
-        (C as u64) << 40 | (self.length as u64) << 32 | (self.white_stones as u64) << 16 | self.black_stones as u64
-    }
-
     pub fn calculate_idx(&self, direction: Direction, pos: Pos) -> usize {
         match direction {
             Direction::Vertical => pos.row_usize(),
@@ -126,7 +122,7 @@ impl Slice {
         const FOUR_ENCLOSED: u32    = 0b0001_1110_0000_0000_0010_0001;
         const CLEAR_FOUR_ENCLOSED: u16                    = 0b01_1110;
 
-        for shift in 0 .. self.length - 5 {
+        for shift in 0 .. 10 {
             p &= if vector & THREE_ENCLOSED == THREE_ENCLOSED {
                 !(CLEAR_THREE_ENCLOSED << shift)
             } else if vector & FOUR_ENCLOSED == FOUR_ENCLOSED {
@@ -150,11 +146,6 @@ impl Slice {
                 $p.count_ones() > 1
                     && $p & !($q << 1) & !($q >> 1) != 0
                     && $p & (($p << 3) | ($p << 2) | ($p << 1) | ($p >> 1) | ($p >> 2) | ($p >> 3)) != 0
-                    // && {
-                    // let mod_p = self.remove_enclosed_stones($p, $q);
-                    // mod_p & !($q << 1) & !($q >> 1) != 0
-                    //     && mod_p & ((mod_p << 3) | (mod_p << 2) | (mod_p << 1) | (mod_p >> 1) | (mod_p >> 2) | (mod_p >> 3)) != 0
-                    // }
             }};
         }
 
@@ -269,4 +260,5 @@ impl Slices {
         (0 .. I_DIAGONAL_SLICE_AMOUNT).contains(&idx)
             .then_some(idx as usize)
     }
+
 }
