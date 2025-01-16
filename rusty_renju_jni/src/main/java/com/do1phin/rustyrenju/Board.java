@@ -70,7 +70,7 @@ public class Board {
         unsetMut(this.boardPtr, pos.getRawValue());
     }
 
-    public void passMut(Pos pos) {
+    public void passMut() {
         passMut(this.boardPtr);
     }
 

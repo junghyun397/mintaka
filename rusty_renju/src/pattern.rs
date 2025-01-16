@@ -338,7 +338,7 @@ impl Default for Patterns {
 impl Patterns {
 
     pub fn update_by_slice_mut<const C: Color, const D: Direction, const FULL_UPDATE: bool>(
-        &mut self, slice: &Slice, slice_idx: usize, shrink_write: bool
+        &mut self, slice: &Slice, slice_idx: usize
     ) {
         let slice_pattern = if slice.pattern_available::<C>() {
             slice.calculate_slice_pattern::<C, FULL_UPDATE>(slice_idx)
@@ -348,13 +348,6 @@ impl Patterns {
 
         for pattern_idx in
             if FULL_UPDATE { 0 .. slice.length as usize }
-            else if shrink_write {
-                // little-endian reverse
-                slice_idx.saturating_sub(6)
-                    .max((u128::from_ne_bytes(slice_pattern.patterns).trailing_zeros() / 8) as usize)
-                    ..(slice_idx + 6)
-                    .min(16 - (u128::from_ne_bytes(slice_pattern.patterns).leading_zeros() / 8) as usize)
-            }
             else { slice_idx.saturating_sub(6) .. (slice_idx + 6).min(slice.length as usize) }
         {
             let idx = match D {

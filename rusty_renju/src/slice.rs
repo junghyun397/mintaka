@@ -79,7 +79,7 @@ impl Slice {
         }
     }
 
-    pub fn stones_reversed<const C: Color>(&self) -> u16 {
+    pub fn stones_reversed_color<const C: Color>(&self) -> u16 {
         match C {
             Color::Black => self.white_stones,
             Color::White => self.black_stones
@@ -179,7 +179,7 @@ impl Slices {
         let mut ascending_slices = [Slice::PLACEHOLDER; DIAGONAL_SLICE_AMOUNT];
         let mut descending_slices = [Slice::PLACEHOLDER; DIAGONAL_SLICE_AMOUNT];
 
-        let mut idx = 0usize;
+        let mut idx = 0;
         while idx < pos::U_BOARD_WIDTH {
             horizontal_slices[idx] = Slice::empty(pos::BOARD_WIDTH, idx as u8, 0);
             vertical_slices[idx] = Slice::empty(pos::BOARD_WIDTH, 0, idx as u8);
@@ -187,7 +187,7 @@ impl Slices {
             idx += 1;
         }
 
-        let mut idx = 0usize;
+        let mut idx = 0;
         while idx < DIAGONAL_SLICE_AMOUNT {
             let seq_num = idx as isize + 5 - pos::I_BOARD_WIDTH;
 

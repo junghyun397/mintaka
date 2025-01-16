@@ -14,17 +14,18 @@ pub enum TTFlag {
 
 #[derive(Eq, PartialEq, Default)]
 #[repr(u8)]
-pub enum VCFlag {
+pub enum EndgameFlag {
     #[default] Unknown,
     Cold,
-    VcWin,
+    Win,
+    Lose
 }
 
 // 64 bit
 pub struct TTEntry {
     pub best_move: Pos, // 8
     pub flag: TTFlag, // 8
-    pub vcf_flag: VCFlag, // 8
+    pub endgame_flag: EndgameFlag, // 8
     pub depth: Depth, // 8
     pub eval: Eval, // 16
     pub score: Score, // 16
@@ -48,6 +49,10 @@ impl From<u64> for TTEntry {
 
 const HI_KEY_MASK: u64 = 0x0000_0000_FFFF_FFFF;
 const LO_KEY_MASK: u64 = 0xFFFF_FFFF_0000_0000;
+
+pub enum TTEntryPosition {
+    Hi, Lo
+}
 
 pub struct TTEntryBucket {
     key_pair: AtomicU64,
@@ -96,10 +101,10 @@ impl TTEntryBucket {
         let key_pair = self.key_pair.load(Ordering::Relaxed);
 
         if key_pair == 0 || key_pair & HI_KEY_MASK == compact_key as u64 {
-            self.key_pair.store((key_pair & LO_KEY_MASK) | (compact_key as u64), Ordering::Relaxed);
+            self.key_pair.store((key_pair & HI_KEY_MASK) | (compact_key as u64), Ordering::Relaxed);
             self.hi_body.store(u64::from(entry), Ordering::Relaxed);
         } else {
-            self.key_pair.store((key_pair & HI_KEY_MASK) | ((compact_key as u64) << 32), Ordering::Relaxed);
+            self.key_pair.store((key_pair & LO_KEY_MASK) | ((compact_key as u64) << 32), Ordering::Relaxed);
             self.lo_body.store(u64::from(entry), Ordering::Relaxed);
         }
     }

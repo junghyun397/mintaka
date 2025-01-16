@@ -4,7 +4,7 @@ use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::Pos;
 use crate::pattern::Patterns;
-use crate::slice::{Slice, Slices};
+use crate::slice::Slices;
 use std::marker::ConstParamTy;
 
 // 2256-bytes
@@ -125,11 +125,11 @@ impl Board {
                 }
 
                 if black_was_available | $slice.pattern_available::< { Color::Black }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, false>($slice, $slice_idx as usize, !black_was_available);
+                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, false>($slice, $slice_idx as usize);
                 }
 
                 if white_was_available | $slice.pattern_available::<{ Color::White }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, false>($slice, $slice_idx as usize, !white_was_available);
+                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, false>($slice, $slice_idx as usize);
                 }
             }};
         }
@@ -157,11 +157,11 @@ impl Board {
         macro_rules! update_by_slice {
             ($slice:expr,$direction:expr) => {{
                 if $slice.pattern_available::<{ Color::Black }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, true>($slice, 0, false);
+                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, true>($slice, 0);
                 }
 
                 if $slice.pattern_available::<{ Color::White }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, true>($slice, 0, false);
+                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, true>($slice, 0);
                 }
             }};
         }
@@ -222,7 +222,7 @@ impl Board {
         pattern_unit.count_open_threes() > 2 && {
             let mut new_overrides = overrides;
             if !IS_NESTED {
-                self.update_four_overrides_root(&mut new_overrides);
+                self.update_root_four_overrides(&mut new_overrides);
             }
             self.update_four_overrides(&mut new_overrides, from_direction, pos);
 
@@ -286,7 +286,7 @@ impl Board {
         true
     }
 
-    fn update_four_overrides_root(&self, overrides: &mut SetOverrideStack) {
+    fn update_root_four_overrides(&self, overrides: &mut SetOverrideStack) {
         let pos = overrides.set[0];
 
         for direction in self.patterns.field[pos.idx_usize()].black_unit.iter_three_directions() {

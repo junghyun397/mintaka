@@ -1,5 +1,5 @@
 use crate::memo::transposition_table::TranspositionTable;
-use crate::memo::tt_entry::{TTEntry, TTFlag, VCFlag};
+use crate::memo::tt_entry::{EndgameFlag, TTEntry, TTFlag};
 use crate::value::{Eval, Score};
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
@@ -81,7 +81,7 @@ pub fn try_vcf<const C: Color>(
                 Some(vec![four_pos])
             } else if !tt.probe(
                 board.hash_key.set(C.reversed(), defend_pos)
-            ).is_some_and(|entry| entry.vcf_flag == VCFlag::Cold) {
+            ).is_some_and(|entry| entry.endgame_flag == EndgameFlag::Cold) {
                 board.set_mut(defend_pos);
 
                 let maybe_vcf = try_vcf::<C>(tt, board, max_depth, depth + 2, defend_four_count != PatternCount::Cold)
@@ -110,14 +110,14 @@ pub fn try_vcf<const C: Color>(
 
     let tt_entry = tt.probe(board.hash_key)
         .map(|mut tt_entry| {
-            tt_entry.vcf_flag = VCFlag::Cold;
+            tt_entry.endgame_flag = EndgameFlag::Cold;
             tt_entry
         })
         .unwrap_or_else(|| TTEntry {
             best_move: Pos::INVALID,
             depth,
             flag: Default::default(),
-            vcf_flag: VCFlag::Cold,
+            endgame_flag: EndgameFlag::Cold,
             score: 0,
             eval: 0,
         });
@@ -144,7 +144,7 @@ fn build_vcf_win_tt_entry(depth: u8, four_pos: Pos) -> TTEntry {
         best_move: four_pos,
         depth,
         flag: TTFlag::Exact,
-        vcf_flag: VCFlag::VcWin,
+        endgame_flag: EndgameFlag::Win,
         score: Score::MAX,
         eval: Eval::MAX,
     }

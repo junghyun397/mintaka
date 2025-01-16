@@ -31,12 +31,12 @@ impl Slice {
         // padding = 3
         let block: u32 = !(!(u32::MAX << self.length as u32) << 3);
         let extended_p: u32 = (self.stones::<C>() as u32) << 3;
-        let extended_q: u32 = (self.stones_reversed::<C>() as u32) << 3 | block;
+        let extended_q: u32 = (self.stones_reversed_color::<C>() as u32) << 3 | block;
 
         let mut acc: SlicePattern = SlicePattern::EMPTY;
         for shift in
-            if FULL_UPDATE { 0 .. self.length as usize - 1 }
-            else { slice_idx.saturating_sub(8) .. (slice_idx + 8).min(self.length as usize - 1) }
+            if FULL_UPDATE { 0 .. self.length as usize - 1 } // length + 3*2 - 8 = length - 2
+            else { slice_idx.saturating_sub(8) .. (slice_idx + 5).min(self.length as usize - 1) }
         {
             let p = (extended_p >> shift) as u16 & 0x00FF;
             let q = (extended_q >> shift) as u16 & 0x00FF;
