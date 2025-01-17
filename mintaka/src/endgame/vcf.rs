@@ -49,7 +49,7 @@ pub fn try_vcf<const C: Color>(
         let four_pos = Pos::from_index(idx as u8);
 
         if player_unit.has_open_four() {
-            tt.store_mut(board.hash_key, build_vcf_win_tt_entry(0, four_pos));
+            tt.store_mut(board.hash_key, build_vcf_win_tt_entry(depth, four_pos));
 
             return Some(vec![four_pos]);
         }
@@ -76,7 +76,7 @@ pub fn try_vcf<const C: Color>(
                     || (defend_four_count == PatternCount::Cold
                      && player_unit.has_three())
             } {
-                tt.store_mut(board.hash_key, build_vcf_win_tt_entry(0, four_pos));
+                tt.store_mut(board.hash_key, build_vcf_win_tt_entry(depth + 1, four_pos));
 
                 Some(vec![four_pos])
             } else if !tt.probe(

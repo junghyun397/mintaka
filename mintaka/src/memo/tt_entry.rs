@@ -50,10 +50,6 @@ impl From<u64> for TTEntry {
 const HI_KEY_MASK: u64 = 0x0000_0000_FFFF_FFFF;
 const LO_KEY_MASK: u64 = 0xFFFF_FFFF_0000_0000;
 
-pub enum TTEntryPosition {
-    Hi, Lo
-}
-
 pub struct TTEntryBucket {
     key_pair: AtomicU64,
     hi_body: AtomicU64,

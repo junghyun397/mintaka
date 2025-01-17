@@ -178,8 +178,10 @@ impl SlicePatchData {
 }
 
 struct PatchLut {
-    black: [SlicePatchData; 128],
-    white: [SlicePatchData; 128],
+    black: [SlicePatchData; 76],
+    white: [SlicePatchData; 71],
+    dbg_black_length: usize,
+    dbg_white_length: usize,
 }
 
 struct SlicePatternLut {
@@ -204,8 +206,10 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
                 white: [0; u16::MAX as usize],
             },
             patch: PatchLut {
-                black: [initial_patch_data; 128],
-                white: [initial_patch_data; 128],
+                black: [initial_patch_data; 76],
+                white: [initial_patch_data; 71],
+                dbg_black_length: 0,
+                dbg_white_length: 0,
             },
         }
     };
@@ -400,6 +404,9 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
 
     compress_pattern_lut!(temp_vector_match_lut_black, slice_pattern_lut.vector.black, slice_pattern_lut.patch.black, patch_top_black);
     compress_pattern_lut!(temp_vector_match_lut_white, slice_pattern_lut.vector.white, slice_pattern_lut.patch.white, patch_top_white);
+
+    slice_pattern_lut.patch.dbg_black_length = patch_top_black + 1;
+    slice_pattern_lut.patch.dbg_white_length = patch_top_white + 1;
 
     slice_pattern_lut
 }

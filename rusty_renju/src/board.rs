@@ -55,11 +55,11 @@ impl Board {
 
     pub fn unset_mut(&mut self, pos: Pos) {
         self.patterns.five_in_a_row = None;
-
-        self.hash_key = self.hash_key.set(self.opponent_color(), pos);
-        self.hot_field.unset(pos);
-        self.stones -= 1;
         self.switch_player_mut();
+
+        self.stones -= 1;
+        self.hot_field.unset(pos);
+        self.hash_key = self.hash_key.set(self.player_color, pos);
 
         self.incremental_update_mut::<{ MoveType::Unset }>(pos);
     }
