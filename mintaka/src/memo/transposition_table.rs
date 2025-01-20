@@ -39,9 +39,7 @@ impl TranspositionTable {
 
     pub fn probe(&self, key: HashKey) -> Option<TTEntry> {
         let idx = self.calculate_index(key);
-        let compact_key = key.0 as u32;
-
-        self.table[idx].probe(compact_key)
+        self.table[idx].probe(key.into())
     }
 
     pub fn store_mut(
@@ -50,7 +48,7 @@ impl TranspositionTable {
         entry: TTEntry,
     ) {
         let idx = self.calculate_index(key);
-        self.table[idx].store_mut(key.0 as u32, entry);
+        self.table[idx].store_mut(key.into(), entry);
     }
 
     pub fn increase_age(&mut self) {

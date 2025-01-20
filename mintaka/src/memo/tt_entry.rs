@@ -1,7 +1,26 @@
 use crate::value::{Depth, Eval, Score};
 use rusty_renju::memo::abstract_transposition_table::AbstractTTEntry;
+use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::Pos;
 use std::sync::atomic::{AtomicU64, Ordering};
+
+const KEY_OFFSET: usize = 21;
+const KEY_MASK: u64 = 0b01_1111_1111_1111_1111_1111;
+
+#[derive(Copy, Clone)]
+pub struct TTEntryKey {
+    lower_21_bits: u64
+}
+
+impl From<HashKey> for TTEntryKey {
+
+    fn from(hash_key: HashKey) -> Self {
+        Self {
+            lower_21_bits: hash_key.0 & KEY_MASK
+        }
+    }
+
+}
 
 #[derive(Eq, PartialEq, Default)]
 #[repr(u8)]
@@ -47,62 +66,86 @@ impl From<u64> for TTEntry {
 
 }
 
-const HI_KEY_MASK: u64 = 0x0000_0000_FFFF_FFFF;
-const LO_KEY_MASK: u64 = 0xFFFF_FFFF_0000_0000;
-
+// key(21 bits) * 6 = 126 bits
+// entry(64 bits) * 6 = 384 bits
+// total 510 bits / 512 bits
 pub struct TTEntryBucket {
-    key_pair: AtomicU64,
-    hi_body: AtomicU64,
-    lo_body: AtomicU64,
+    hi_keys: AtomicU64,
+    lo_keys: AtomicU64,
+    entries: [AtomicU64; 6]
 }
 
 impl AbstractTTEntry for TTEntryBucket {
 
+    const BUCKET_SIZE: usize = 6;
+
     fn clear_mut(&mut self) {
-        self.key_pair.store(0, Ordering::Relaxed);
-        self.hi_body.store(0, Ordering::Relaxed);
-        self.lo_body.store(0, Ordering::Relaxed);
+        self.hi_keys.store(0, Ordering::Relaxed);
+        self.lo_keys.store(0, Ordering::Relaxed);
+
+        self.entries[0].store(0, Ordering::Relaxed);
+        self.entries[1].store(0, Ordering::Relaxed);
+        self.entries[2].store(0, Ordering::Relaxed);
+        self.entries[3].store(0, Ordering::Relaxed);
+        self.entries[4].store(0, Ordering::Relaxed);
+        self.entries[5].store(0, Ordering::Relaxed);
     }
 
     fn usage(&self) -> usize {
-        let key_pair = self.key_pair.load(Ordering::Relaxed);
         let mut count = 0;
 
-        if key_pair & HI_KEY_MASK != 0 {
-            count += 1;
+        for idx in 0 ..6 {
+            count += self.entries[idx].load(Ordering::Relaxed).min(1);
         }
 
-        if key_pair & LO_KEY_MASK != 0 {
-            count += 1;
-        }
-
-        count
+        count as usize
     }
 
 }
 
 impl TTEntryBucket {
 
-    pub fn probe(&self, compact_key: u32) -> Option<TTEntry> {
-        let key_pair = self.key_pair.load(Ordering::Relaxed);
-
-        if key_pair & HI_KEY_MASK == compact_key as u64 {
-            Some(TTEntry::from(self.hi_body.load(Ordering::Relaxed)))
-        } else if key_pair >> 32 == compact_key as u64 {
-            Some(TTEntry::from(self.lo_body.load(Ordering::Relaxed)))
-        } else { None }
+    fn calculate_idx(&self, entry_key: TTEntryKey) -> usize {
+        (entry_key.lower_21_bits as u128 * 6 >> 64) as usize
     }
 
-    pub fn store_mut(&self, compact_key: u32, entry: TTEntry) {
-        let key_pair = self.key_pair.load(Ordering::Relaxed);
-
-        if key_pair == 0 || key_pair & HI_KEY_MASK == compact_key as u64 {
-            self.key_pair.store((key_pair & HI_KEY_MASK) | (compact_key as u64), Ordering::Relaxed);
-            self.hi_body.store(u64::from(entry), Ordering::Relaxed);
+    fn store_key_mut(&self, entry_idx: usize, entry_key: TTEntryKey) {
+        if entry_idx < 3 {
+            let hi_keys = self.hi_keys.load(Ordering::AcqRel);
+            let bit_offset = KEY_OFFSET * entry_idx;
+            let mask = KEY_MASK << bit_offset;
+            let content = (hi_keys & !mask) | (entry_key.lower_21_bits << bit_offset);
+            self.hi_keys.store(content, Ordering::AcqRel);
         } else {
-            self.key_pair.store((key_pair & LO_KEY_MASK) | ((compact_key as u64) << 32), Ordering::Relaxed);
-            self.lo_body.store(u64::from(entry), Ordering::Relaxed);
+            let lo_keys = self.lo_keys.load(Ordering::AcqRel);
+            let bit_offset = KEY_OFFSET * (entry_idx - 3);
+            let mask = KEY_MASK << bit_offset;
+            let content = (lo_keys & !mask) | (entry_key.lower_21_bits << bit_offset);
+            self.lo_keys.store(content, Ordering::AcqRel);
         }
+    }
+
+    pub fn probe(&self, entry_key: TTEntryKey) -> Option<TTEntry> {
+        let idx = self.calculate_idx(entry_key);
+        if idx < 3 {
+            let hi_keys = self.hi_keys.load(Ordering::Relaxed);
+            if (hi_keys >> (KEY_OFFSET * idx)) & KEY_MASK == entry_key.lower_21_bits {
+                return Some(self.entries[idx].load(Ordering::Relaxed).into())
+            }
+        } else {
+            let lo_keys = self.lo_keys.load(Ordering::Relaxed);
+            if (lo_keys >> (KEY_OFFSET * (idx - 3))) & KEY_MASK == entry_key.lower_21_bits {
+                return Some(self.entries[idx].load(Ordering::Relaxed).into())
+            }
+        }
+
+        None
+    }
+
+    pub fn store_mut(&self, entry_key: TTEntryKey, entry: TTEntry) {
+        let entry_idx = self.calculate_idx(entry_key);
+        self.store_key_mut(entry_idx, entry_key);
+        self.entries[entry_idx].store(entry.into(), Ordering::Relaxed);
     }
 
 }

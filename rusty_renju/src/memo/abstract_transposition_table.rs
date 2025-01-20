@@ -2,6 +2,8 @@ use crate::memo::hash_key::HashKey;
 
 pub trait AbstractTTEntry {
 
+    const BUCKET_SIZE: usize;
+
     fn clear_mut(&mut self);
 
     fn usage(&self) -> usize;
@@ -70,15 +72,13 @@ pub trait AbstractTranspositionTable<T: AbstractTTEntry> {
             .map(T::usage)
             .sum();
 
-        sum as f64 / (SAMPLES * 2) as f64
+        sum as f64 / (SAMPLES * T::BUCKET_SIZE) as f64
     }
 
     fn total_entries(&self) -> usize {
-        let sum: usize = self.internal_table().iter()
+        self.internal_table().iter()
             .map(T::usage)
-            .sum();
-
-        sum / 2
+            .sum()
     }
 
 }
