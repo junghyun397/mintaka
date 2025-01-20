@@ -2,7 +2,6 @@
 mod test_nested_forbid {
     use indoc::indoc;
     use rusty_renju::board::Board;
-    use std::str::FromStr;
 
     #[test]
     fn single_nested_double_three() {
@@ -44,7 +43,7 @@ mod test_nested_forbid {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        assert_eq!(Board::from_str(case).unwrap().to_string(), expected);
+        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
     }
 
     #[cfg(feature = "strict_renju")]
@@ -88,7 +87,7 @@ mod test_nested_forbid {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        assert_eq!(Board::from_str(case).unwrap().to_string(), expected);
+        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
 
         let case = indoc! {"
            A B C D E F G H I J K L M N O
@@ -128,7 +127,7 @@ mod test_nested_forbid {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        assert_eq!(Board::from_str(case).unwrap().to_string(), expected);
+        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
     }
 
     #[cfg(feature = "strict_renju")]
@@ -172,7 +171,7 @@ mod test_nested_forbid {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        assert_eq!(Board::from_str(case).unwrap().to_string(), expected);
+        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
     }
 
     #[cfg(feature = "strict_renju")]
@@ -216,7 +215,7 @@ mod test_nested_forbid {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        assert_eq!(Board::from_str(case).unwrap().to_string(), expected);
+        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
 
         let case = indoc! {"
            A B C D E F G H I J K L M N O
@@ -256,7 +255,7 @@ mod test_nested_forbid {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        assert_eq!(Board::from_str(case).unwrap().to_string(), expected);
+        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
     }
 
     #[test]
@@ -299,7 +298,7 @@ mod test_nested_forbid {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        assert_eq!(Board::from_str(case).unwrap().to_string(), expected);
+        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
     }
 
 }

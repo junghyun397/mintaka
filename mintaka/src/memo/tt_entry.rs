@@ -111,17 +111,17 @@ impl TTEntryBucket {
 
     fn store_key_mut(&self, entry_idx: usize, entry_key: TTEntryKey) {
         if entry_idx < 3 {
-            let hi_keys = self.hi_keys.load(Ordering::AcqRel);
+            let hi_keys = self.hi_keys.load(Ordering::Acquire);
             let bit_offset = KEY_OFFSET * entry_idx;
             let mask = KEY_MASK << bit_offset;
             let content = (hi_keys & !mask) | (entry_key.lower_21_bits << bit_offset);
-            self.hi_keys.store(content, Ordering::AcqRel);
+            self.hi_keys.store(content, Ordering::Release);
         } else {
-            let lo_keys = self.lo_keys.load(Ordering::AcqRel);
+            let lo_keys = self.lo_keys.load(Ordering::Acquire);
             let bit_offset = KEY_OFFSET * (entry_idx - 3);
             let mask = KEY_MASK << bit_offset;
             let content = (lo_keys & !mask) | (entry_key.lower_21_bits << bit_offset);
-            self.lo_keys.store(content, Ordering::AcqRel);
+            self.lo_keys.store(content, Ordering::Release);
         }
     }
 

@@ -137,6 +137,7 @@ enum ExtendedMatch {
 }
 
 #[derive(Copy, Clone, Debug)]
+#[repr(align(8))]
 struct SlicePatchData {
     patch_mask: u64,
     closed_four_clear_mask: u64,

@@ -116,7 +116,7 @@ pub fn try_vcf<const C: Color>(
         .unwrap_or_else(|| TTEntry {
             best_move: Pos::INVALID,
             depth,
-            flag: Default::default(),
+            flag: TTFlag::default(),
             endgame_flag: EndgameFlag::Cold,
             score: 0,
             eval: 0,

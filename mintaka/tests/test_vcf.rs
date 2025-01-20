@@ -4,17 +4,18 @@ mod test_vcf {
     use mintaka::endgame::vcf;
     use mintaka::memo::transposition_table::TranspositionTable;
     use rusty_renju::board::Board;
-    use std::str::FromStr;
+    use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use std::time::Instant;
 
     macro_rules! vcf {
         ($case:expr) => {{
-            let mut board = Board::from_str($case).unwrap();
+            let mut board = $case.parse::<Board>().unwrap();
             let mut tt = TranspositionTable::new_with_size(1);
 
             let instant = Instant::now();
             let vcf_result = vcf::vcf_sequence(&mut tt, &mut board, u8::MAX).unwrap();
             let time = instant.elapsed();
+
 
             let final_move = vcf_result.last().copied().unwrap();
 
@@ -23,6 +24,7 @@ mod test_vcf {
             let board_string = board.to_string_with_move_marker(final_move);
             println!("{}", board_string);
             println!("{:?}", time);
+            println!("hash usage: {}", tt.hash_usage());
 
             board_string
         }};

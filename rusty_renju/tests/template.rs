@@ -2,7 +2,6 @@
 mod template {
     use indoc::indoc;
     use rusty_renju::board::Board;
-    use std::str::FromStr;
 
     #[test]
     fn template() {
@@ -44,8 +43,8 @@ mod template {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        println!("{}", Board::from_str(case).unwrap().build_detailed_string());
+        println!("{}", case.parse::<Board>().unwrap().build_detailed_string());
 
-        assert_eq!(Board::from_str(case).unwrap().to_string(), expected);
+        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
     }
 }

@@ -36,8 +36,11 @@ fn match_symbol(c: char) -> Option<Option<Color>> {
 }
 
 fn parse_board_elements(source: &str) -> Result<Box<[Option<Color>]>, &'static str> {
-    // regex: \d[\s\[](\S[\s\[\]]){N}\d
-    let re: Regex = Regex::from_str(format!(r"\d[\s\[](\S[\s\[\]]){}{U_BOARD_WIDTH}{}\d", "{", "}").as_str()).unwrap();
+    // regex: \d[\s\[\(](\S[\s\[\]\)]){N}\d
+    static re: Regex = format!(r"\d[\s\[](\S[\s\[\]]){}{U_BOARD_WIDTH}{}\d", "{", "}")
+        .as_str()
+        .parse::<Regex>()
+        .unwrap();
 
     let elements: Box<[Option<Color>]> = re.find_iter(source)
         .map(|m| m.as_str())
@@ -45,8 +48,8 @@ fn parse_board_elements(source: &str) -> Result<Box<[Option<Color>]>, &'static s
         .iter().rev()
         .flat_map(|m| m
             .chars()
-            .skip(1) // 1> . . . . . 1
-            .take(pos::BOARD_WIDTH as usize * 2) // 1 . . . . .< 1
+            .skip(1) // N> . . . . . N
+            .take(pos::BOARD_WIDTH as usize * 2) // N . . . . .< N
         )
         .filter_map(match_symbol)
         .collect();
@@ -265,10 +268,10 @@ impl FromStr for History {
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
         // regex: [a-z][0-9][0-9]?
-        let re: Regex = Regex::from_str(r"[a-z][0-9][0-9]?").unwrap();
+        let re = Regex::from_str(r"[a-z][0-9][0-9]?").unwrap();
 
         let history: Box<[Result<Pos, &str>]> = re.find_iter(source)
-            .map(|m| Pos::from_str(m.as_str()))
+            .map(|m| m.as_str().parse())
             .collect();
 
         if let Some(result) = history.iter().find(|x| x.is_err()) {
@@ -324,7 +327,7 @@ impl FromStr for Pos {
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        u8::from_str(&source[1..])
+        (&source[1..]).parse::<u8>()
             .map_err(|_| "Invalid row charter")
             .and_then(|row| {
                 let col = source.chars().next().unwrap() as u8 - b'a';
