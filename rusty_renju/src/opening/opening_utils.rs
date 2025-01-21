@@ -1,7 +1,8 @@
 use crate::history::History;
 use crate::notation::pos;
-use crate::notation::pos::{Pos, CENTER};
+use crate::notation::pos::Pos;
 use rand::Rng;
+use smallvec::SmallVec;
 use std::collections::HashSet;
 
 fn find_symmetry_moves(ref1: Pos, ref2: Pos, m: Pos) -> HashSet<Pos> {
@@ -69,14 +70,31 @@ pub fn find_forbidden_symmetry_moves(history: &History, fifth_move: Pos) -> Hash
 }
 
 pub fn generate_random_opening_moves<const N: usize>() -> [Pos; N] {
-    let mut moves = [Pos::INVALID; N];
-    moves[0] = CENTER;
+    let mut raw_moves: [u8; N] = [0; N];
+    raw_moves[0] = pos::CENTER.idx();
 
-    let mut raw_rel_moves: [u8; N] = [0; N];
-
-    for idx in 0 .. N as u8 {
-        raw_rel_moves[idx] = rand::thread_rng().gen_range(0 .. idx * idx - idx);
+    fn calculate_abs_move(rel_move: u8, width: u8) -> u8 {
+        const HALF: u8 = pos::BOARD_WIDTH / 2;
+        let offset = HALF - width / 2;
+        (rel_move / width + offset) * pos::BOARD_WIDTH + rel_move % width + offset
     }
 
-    moves
+    for idx in 1 .. N as u8 {
+        let width = idx * 2 + 1;
+        let mut rel_move = rand::thread_rng().gen_range(0 .. width * width - idx);
+
+        for sub_idx in 0 .. idx as usize {
+            if raw_moves[sub_idx] == calculate_abs_move(rel_move, width) {
+                rel_move += 1;
+            }
+        }
+
+        raw_moves[idx as usize] = calculate_abs_move(rel_move, width);
+    }
+
+    raw_moves.map(Pos::from_index)
+}
+
+pub fn generate_zeroing_moves() -> SmallVec<[Pos; 16]> {
+    todo!()
 }

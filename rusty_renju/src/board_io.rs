@@ -37,7 +37,7 @@ fn match_symbol(c: char) -> Option<Option<Color>> {
 
 fn parse_board_elements(source: &str) -> Result<Box<[Option<Color>]>, &'static str> {
     // regex: \d[\s\[\(](\S[\s\[\]\)]){N}\d
-    static re: Regex = format!(r"\d[\s\[](\S[\s\[\]]){}{U_BOARD_WIDTH}{}\d", "{", "}")
+    let re: Regex = format!(r"\d[\s\[](\S[\s\[\]]){}{U_BOARD_WIDTH}{}\d", "{", "}")
         .as_str()
         .parse::<Regex>()
         .unwrap();

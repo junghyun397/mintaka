@@ -13,7 +13,7 @@ mod test_vcf {
             let mut tt = TranspositionTable::new_with_size(1);
 
             let instant = Instant::now();
-            let vcf_result = vcf::vcf_sequence(&mut tt, &mut board, u8::MAX).unwrap();
+            let vcf_result = vcf::vcf_sequence(&mut tt, &board, u8::MAX).unwrap();
             let time = instant.elapsed();
 
 
