@@ -4,7 +4,7 @@ mod test_size {
 
     #[test]
     fn test_size() {
-        assert_eq!(size_of::<TTEntryBucket>(), 8 * 3)
+        assert_eq!(size_of::<TTEntryBucket>(), 8 * 8)
     }
 
 }

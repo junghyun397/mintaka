@@ -4,35 +4,37 @@ use crate::value::{Depth, Score};
 use rusty_renju::board::Board;
 use std::marker::ConstParamTy;
 
-//noinspection RsUnresolvedPath
-#[derive(ConstParamTy, Eq, PartialEq)]
-pub struct NodeType {
-    pub is_root: bool,
-    pub is_pv: bool,
+pub trait NodeType {
+
+    const IS_ROOT: bool;
+    const IS_PV: bool;
+
+    type NextType: Self;
+
 }
 
-impl NodeType {
+struct RootNode {}
 
-    pub const ROOT: NodeType = NodeType {
-        is_root: true,
-        is_pv: true,
-    };
+impl NodeType for RootNode {
+    const IS_ROOT: bool = true;
+    const IS_PV: bool = true;
+    type NextType = PVNode;
+}
 
-    pub const PV: NodeType = NodeType {
-        is_root: false,
-        is_pv: true,
-    };
+struct PVNode {}
 
-    pub const OFF_PV: NodeType = NodeType {
-        is_root: false,
-        is_pv: false,
-    };
+impl NodeType for PVNode {
+    const IS_ROOT: bool = false;
+    const IS_PV: bool = true;
+    type NextType = Self;
+}
 
-    pub const CHECK: NodeType = NodeType {
-        is_root: true,
-        is_pv: false,
-    };
+struct OffPVNode {}
 
+impl NodeType for OffPVNode {
+    const IS_ROOT: bool = false;
+    const IS_PV: bool = false;
+    type NextType = Self;
 }
 
 //noinspection RsUnresolvedPath
@@ -58,9 +60,9 @@ pub fn aspiration_search<const Th: ThreadType>(
     todo!()
 }
 
-pub fn search<const Nt: NodeType>(
+pub fn search<NT: NodeType>(
     tt: &mut TranspositionTable, board: &mut Board,
     pv: &mut PrincipalVariation, mut depth: Depth, mut alpha: Score, mut beta: Score,
 ) -> Score {
-    0
+    search::<NT::NextType>(tt, board, pv, depth, alpha, beta)
 }

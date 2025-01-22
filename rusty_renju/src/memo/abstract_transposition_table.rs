@@ -10,17 +10,19 @@ pub trait AbstractTTEntry {
 
 }
 
-pub trait AbstractTranspositionTable<T: AbstractTTEntry> {
+pub trait AbstractTranspositionTable {
+
+    type EntryType: AbstractTTEntry;
 
     fn calculate_table_len_in_mib(size_in_mib: usize) -> usize {
-        size_in_mib * 1024 * 1024 / size_of::<T>()
+        size_in_mib * 1024 * 1024 / size_of::<Self::EntryType>()
     }
 
-    fn internal_table(&self) -> &Vec<T>;
+    fn internal_table(&self) -> &Vec<Self::EntryType>;
 
-    fn internal_table_mut(&mut self) -> &mut Vec<T>;
+    fn internal_table_mut(&mut self) -> &mut Vec<Self::EntryType>;
 
-    fn assign_internal_table_mut(&mut self, table: Vec<T>);
+    fn assign_internal_table_mut(&mut self, table: Vec<Self::EntryType>);
 
     fn calculate_index(&self, key: HashKey) -> usize {
         ((key.0 as u128 * (self.internal_table().len() as u128)) >> 64) as usize
@@ -37,7 +39,7 @@ pub trait AbstractTranspositionTable<T: AbstractTTEntry> {
         unsafe {
             let new_table = Vec::from_raw_parts(
                 std::alloc::alloc_zeroed(
-                    std::alloc::Layout::array::<T>(len).unwrap()
+                    std::alloc::Layout::array::<Self::EntryType>(len).unwrap()
                 ).cast(),
                 len,
                 len
@@ -60,24 +62,24 @@ pub trait AbstractTranspositionTable<T: AbstractTTEntry> {
             use std::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY0, _PREFETCH_READ};
             let idx = self.calculate_index(key);
             let entry = &self.internal_table()[idx];
-            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY0>((entry as *const T).cast());
+            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY0>((entry as *const Self::EntryType).cast());
         }
     }
 
     fn hash_usage(&self) -> f64 {
-        const SAMPLES: usize = 1000;
+        const SAMPLES: usize = 2000;
 
         let sum: usize = self.internal_table().iter()
-            .take(SAMPLES)
-            .map(T::usage)
+            .take(self.internal_table().len().min(SAMPLES))
+            .map(Self::EntryType::usage)
             .sum();
 
-        sum as f64 / (SAMPLES * T::BUCKET_SIZE) as f64
+        sum as f64 / (SAMPLES * Self::EntryType::BUCKET_SIZE) as f64 * 100f64
     }
 
     fn total_entries(&self) -> usize {
         self.internal_table().iter()
-            .map(T::usage)
+            .map(Self::EntryType::usage)
             .sum()
     }
 

@@ -8,7 +8,9 @@ pub struct TranspositionTable {
     age: AtomicU8
 }
 
-impl AbstractTranspositionTable<TTEntryBucket> for TranspositionTable {
+impl AbstractTranspositionTable for TranspositionTable {
+
+    type EntryType = TTEntryBucket;
 
     fn internal_table(&self) -> &Vec<TTEntryBucket> {
         &self.table
