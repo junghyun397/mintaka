@@ -1,3 +1,4 @@
+use crate::bitfield::Bitfield;
 use crate::board::Board;
 use crate::board_iter::BoardIterItem;
 use crate::game::Game;
@@ -6,7 +7,6 @@ use crate::impl_debug_by_display;
 use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::notation::pos::U_BOARD_WIDTH;
 use crate::notation::rule::ForbiddenKind;
 use crate::pattern::PatternUnit;
 use crate::slice::Slice;
@@ -14,6 +14,7 @@ use crate::utils::str_utils::join_str_horizontally;
 use regex_lite::Regex;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
+use std::sync::OnceLock;
 
 const SYMBOL_BLACK: char = 'X';
 const SYMBOL_WHITE: char = 'O';
@@ -36,11 +37,15 @@ fn match_symbol(c: char) -> Option<Option<Color>> {
 }
 
 fn parse_board_elements(source: &str) -> Result<Box<[Option<Color>]>, &'static str> {
-    // regex: \d[\s\[\(](\S[\s\[\]\)]){N}\d
-    let re: Regex = format!(r"\d[\s\[](\S[\s\[\]]){}{U_BOARD_WIDTH}{}\d", "{", "}")
-        .as_str()
-        .parse::<Regex>()
-        .unwrap();
+    const BOARD_WIDTH: usize = pos::U_BOARD_WIDTH;
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(||
+        // regex: \d[\s\[\(](\S[\s\[\]\)]){N}\d
+        format!(r"\d[\s\[](\S[\s\[\]]){}{BOARD_WIDTH}{}\d", "{", "}")
+            .as_str()
+            .parse::<Regex>()
+            .unwrap()
+    );
 
     let elements: Box<[Option<Color>]> = re.find_iter(source)
         .map(|m| m.as_str())
@@ -89,7 +94,7 @@ impl Board {
     {
         let content = self.iter_items()
             .collect::<Box<[_]>>()
-            .chunks(U_BOARD_WIDTH)
+            .chunks(pos::U_BOARD_WIDTH)
             .enumerate()
             .map(|(row_idx, item_row)| {
                 let content: String = item_row.iter()
@@ -109,7 +114,7 @@ impl Board {
 
         let column_hint_content: String = ('A' .. (b'A' + pos::BOARD_WIDTH) as char)
             .flat_map(|x| [x, ' '])
-            .take(U_BOARD_WIDTH * 2 - 1)
+            .take(pos::U_BOARD_WIDTH * 2 - 1)
             .collect();
 
         let column_hint = format!("   {column_hint_content}");
@@ -268,7 +273,8 @@ impl FromStr for History {
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
         // regex: [a-z][0-9][0-9]?
-        let re = Regex::from_str(r"[a-z][0-9][0-9]?").unwrap();
+        static RE: OnceLock<Regex> = OnceLock::new();
+        let re = RE.get_or_init(|| Regex::from_str(r"[a-z][0-9][0-9]?").unwrap());
 
         let history: Box<[Result<Pos, &str>]> = re.find_iter(source)
             .map(|m| m.as_str().parse())
@@ -327,7 +333,7 @@ impl FromStr for Pos {
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        (&source[1..]).parse::<u8>()
+        source[1..].parse::<u8>()
             .map_err(|_| "Invalid row charter")
             .and_then(|row| {
                 let col = source.chars().next().unwrap() as u8 - b'a';
@@ -383,15 +389,44 @@ impl Display for ForbiddenKind {
 
 }
 
+impl_debug_by_display!(Bitfield);
+
+impl Display for Bitfield {
+
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let content = self.iter()
+            .map(|is_hot|
+                if is_hot { "X" } else { "." }
+            )
+            .collect::<Box<[_]>>()
+            .chunks(pos::U_BOARD_WIDTH)
+            .map(|row|
+                row.iter()
+                    .map(|s| s.to_string())
+                    .reduce(|head, tail|
+                        format!("{head} {tail}")
+                    )
+                    .unwrap()
+            )
+            .reduce(|head, tail|
+                format!("{head}\n{tail}")
+            )
+            .unwrap();
+
+        write!(f, "{}", content)
+    }
+
+}
+
 pub fn add_move_marker(mut board_string: String, color: Color, pos: Pos, pre_marker: char, post_marker: char) -> String {
-    const COL_INDEX_OFFSET: usize = 3 + U_BOARD_WIDTH * 2; // row(2) + margin(1) + col(w*2) + br(1)
-    const LINE_OFFSET: usize = 3 + U_BOARD_WIDTH * 2 + 3; // row(2) + margin(1) + col(w*2) + row(2) + br(1)
+    const COL_INDEX_OFFSET: usize = 3 + pos::U_BOARD_WIDTH * 2; // row(2) + margin(1) + col(w*2) + br(1)
+    const LINE_OFFSET: usize = 3 + pos::U_BOARD_WIDTH * 2 + 3; // row(2) + margin(1) + col(w*2) + row(2) + br(1)
     const LINE_BEGIN_OFFSET: usize = 2; // row(2)
 
-    let reversed_row = U_BOARD_WIDTH - 1 - pos.row_usize();
+    let reversed_row = pos::U_BOARD_WIDTH - 1 - pos.row_usize();
     let offset: usize = COL_INDEX_OFFSET
         + LINE_OFFSET * reversed_row
-        - reversed_row.saturating_add_signed(-((U_BOARD_WIDTH - 9) as isize))
+        - reversed_row.saturating_add_signed(-(pos::I_BOARD_WIDTH - 9))
         + LINE_BEGIN_OFFSET + pos.col_usize() * 2;
 
     board_string.replace_range(offset .. offset + 3, &format!("{pre_marker}{}{post_marker}", char::from(color)));

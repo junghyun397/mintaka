@@ -4,7 +4,7 @@ use crate::slice::Slice;
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct SlicePattern {
-    pub patterns: [u8; 16]
+    pub patterns: [u8; 16],
 }
 
 impl Default for SlicePattern {

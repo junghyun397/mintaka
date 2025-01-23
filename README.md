@@ -7,8 +7,8 @@
 * [Lazy-SMP](https://en.wikipedia.org/wiki/Lazy_SMP) based multicore processing.
 * AVX-512(512-bits), AVX2(256-bits) SIMD-accelerated.
 * Java Native Interface(JNI) support.
+* WebAssembly and JavaScript Interface support.
 * (WIP) [Solid.js](https://www.solidjs.com/)-based Web Frontend UI and REST API server.
-* (TBD) WebAssembly and JavaScript Interface support.
 * (TBD) Efficiently updatable neural network-based evaluation function([NNUE](https://www.chessprogramming.org/NNUE)).
 * (TBD) Big-endian system compatibility.
 

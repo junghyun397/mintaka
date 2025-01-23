@@ -1,5 +1,6 @@
 use crate::bitfield::Bitfield;
 use crate::memo::hash_key::HashKey;
+use crate::movegen::move_generator;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::Pos;
@@ -14,6 +15,7 @@ pub struct Board {
     pub stones: u8,
     pub slices: Slices,
     pub patterns: Patterns,
+    pub movegen_field: Bitfield,
     pub hot_field: Bitfield,
     pub hash_key: HashKey,
 }
@@ -45,7 +47,8 @@ impl Board {
 
     pub fn set_mut(&mut self, pos: Pos) {
         self.stones += 1;
-        self.hot_field.set(pos);
+        self.hot_field.set_mut(pos);
+        self.movegen_field ^= move_generator::MOVE_SET_TABLE[pos.idx_usize()];
         self.hash_key = self.hash_key.set(self.player_color, pos);
 
         self.incremental_update_mut::<{ MoveType::Set }>(pos);
@@ -58,7 +61,8 @@ impl Board {
         self.switch_player_mut();
 
         self.stones -= 1;
-        self.hot_field.unset(pos);
+        self.hot_field.unset_mut(pos);
+        self.movegen_field ^= move_generator::MOVE_SET_TABLE[pos.idx_usize()];
         self.hash_key = self.hash_key.set(self.player_color, pos);
 
         self.incremental_update_mut::<{ MoveType::Unset }>(pos);
@@ -95,12 +99,12 @@ impl Board {
 
         for pos in blacks {
             self.slices.set_mut(Color::Black, pos);
-            self.hot_field.set(pos);
+            self.hot_field.set_mut(pos);
         }
 
         for pos in whites {
             self.slices.set_mut(Color::White, pos);
-            self.hot_field.set(pos);
+            self.hot_field.set_mut(pos);
         }
 
         self.player_color = player;
@@ -201,7 +205,7 @@ impl Board {
         let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
 
         !pattern_unit.has_three() // non-three
-            || pattern_unit.has_four() // double-four
+            || pattern_unit.has_any_four() // double-four
             || pattern_unit.has_overline() // overline
     }
 
@@ -211,7 +215,7 @@ impl Board {
         let pattern_unit = self.patterns.field[pos.idx_usize()].black_unit;
 
         if !pattern_unit.has_three() // non-three
-            || pattern_unit.has_four() || overrides.four_contains(&pos) // double-four
+            || pattern_unit.has_any_four() || overrides.four_contains(&pos) // double-four
             || pattern_unit.has_overline() // overline
             || overrides.set_contains(&pos) // recursive
         {

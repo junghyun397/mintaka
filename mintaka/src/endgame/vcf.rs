@@ -25,10 +25,12 @@ impl VCFAccumulator for SequenceVCFAccumulator {
 
     const COLD: Self = None;
 
+    #[inline]
     fn unit(pos: Pos) -> Self {
         Some(vec![pos])
     }
 
+    #[inline]
     fn append(self, defend: Pos, four: Pos) -> Self {
         self.map(|mut sequence| {
             sequence.push(defend);
@@ -37,6 +39,7 @@ impl VCFAccumulator for SequenceVCFAccumulator {
         })
     }
 
+    #[inline]
     fn has_result(&self) -> bool {
         self.is_some()
     }
@@ -47,14 +50,17 @@ impl VCFAccumulator for Score {
 
     const COLD: Self = 0;
 
+    #[inline]
     fn unit(_pos: Pos) -> Self {
         Score::MAX
     }
 
+    #[inline]
     fn append(self, _defend: Pos, _four: Pos) -> Self {
         self
     }
 
+    #[inline]
     fn has_result(&self) -> bool {
         *self != 0
     }
@@ -62,7 +68,7 @@ impl VCFAccumulator for Score {
 }
 
 pub fn vcf<Acc: VCFAccumulator>(
-    tt: &mut TranspositionTable, board: &mut Board, max_depth: u8
+    tt: &TranspositionTable, board: &mut Board, max_depth: u8
 ) -> Acc {
     match board.player_color {
         Color::Black => try_vcf::<{ Color::Black }, Acc>(tt, board, max_depth, 0, false),
@@ -71,7 +77,7 @@ pub fn vcf<Acc: VCFAccumulator>(
 }
 
 pub fn vcf_sequence(
-    tt: &mut TranspositionTable, board: &mut Board, max_depth: u8
+    tt: &TranspositionTable, board: &mut Board, max_depth: u8
 ) -> Option<Vec<Pos>> {
     vcf::<SequenceVCFAccumulator>(tt, board, max_depth)
         .map(|mut sequence| {
@@ -81,8 +87,8 @@ pub fn vcf_sequence(
 }
 
 // Depth-First Search(DFS)
-pub fn try_vcf<const C: Color, ACC: VCFAccumulator>(
-    tt: &mut TranspositionTable, board: &mut Board,
+fn try_vcf<const C: Color, ACC: VCFAccumulator>(
+    tt: &TranspositionTable, board: &mut Board,
     max_depth: u8, depth: u8, opponent_has_five: bool,
 ) -> ACC {
     if depth > max_depth || board.stones > pos::U8_BOARD_SIZE - 2 {
@@ -94,7 +100,7 @@ pub fn try_vcf<const C: Color, ACC: VCFAccumulator>(
         let player_unit = pattern.player_unit::<C>();
         let opponent_unit = pattern.opponent_unit::<C>();
 
-        if !player_unit.has_four()
+        if !player_unit.has_any_four()
             || (opponent_has_five && !opponent_unit.has_five())
             || (C == Color::Black && pattern.is_forbidden())
         {
@@ -179,15 +185,13 @@ pub fn try_vcf<const C: Color, ACC: VCFAccumulator>(
 }
 
 fn find_defend_pos_unchecked<const C: Color>(board: &Board) -> Pos {
-    let mut defend_pos = Pos::INVALID;
     for defend_idx in 0 .. pos::BOARD_SIZE {
         if board.patterns.field[defend_idx].player_unit::<C>().has_five() {
-            defend_pos = Pos::from_index(defend_idx as u8);
-            break;
+            return Pos::from_index(defend_idx as u8);
         }
     }
 
-    defend_pos
+    Pos::INVALID
 }
 
 fn build_vcf_win_tt_entry(depth: u8, four_pos: Pos) -> TTEntry {

@@ -85,7 +85,7 @@ impl PatternUnit {
         self.apply_mask(UNIT_OPEN_THREE_MASK).count_ones() > 1
     }
 
-    pub fn has_four(&self) -> bool {
+    pub fn has_any_four(&self) -> bool {
         self.apply_mask(UNIT_TOTAL_FOUR_MASK) != 0
     }
 
@@ -319,7 +319,6 @@ pub struct Patterns {
     pub field: [Pattern; pos::BOARD_SIZE],
     pub five_in_a_row: Option<Color>,
     pub unchecked_double_three_field: Bitfield,
-    pub critical_field: Bitfield,
 }
 
 impl Default for Patterns {
@@ -328,8 +327,7 @@ impl Default for Patterns {
         Self {
             field: [Pattern::default(); pos::BOARD_SIZE],
             five_in_a_row: None,
-            unchecked_double_three_field: Bitfield::ZERO_FILLED,
-            critical_field: Bitfield::ZERO_FILLED,
+            unchecked_double_three_field: Bitfield::default(),
         }
     }
 
@@ -367,18 +365,17 @@ impl Patterns {
                 let pos = Pos::from_index(idx as u8);
 
                 if self.field[idx].black_unit.has_threes() {
-                    self.unchecked_double_three_field.set(pos);
+                    self.unchecked_double_three_field.set_mut(pos);
                 } else {
-                    self.unchecked_double_three_field.unset(pos);
+                    self.unchecked_double_three_field.unset_mut(pos);
                 }
             }
         }
 
-        self.five_in_a_row = self.five_in_a_row
-            .or(
-                contains_five_in_a_row(slice.stones::<C>())
-                    .then_some(C)
-            );
+        self.five_in_a_row = self.five_in_a_row.or(
+            contains_five_in_a_row(slice.stones::<C>())
+                .then_some(C)
+        );
     }
 
 }

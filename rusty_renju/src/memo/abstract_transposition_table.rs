@@ -4,7 +4,7 @@ pub trait AbstractTTEntry {
 
     const BUCKET_SIZE: usize;
 
-    fn clear_mut(&mut self);
+    fn clear_mut(&self);
 
     fn usage(&self) -> usize;
 
@@ -28,8 +28,8 @@ pub trait AbstractTranspositionTable {
         ((key.0 as u128 * (self.internal_table().len() as u128)) >> 64) as usize
     }
 
-    fn clear_mut(&mut self) {
-        for entry in self.internal_table_mut() {
+    fn clear_mut(&self) {
+        for entry in self.internal_table() {
             entry.clear_mut();
         }
     }

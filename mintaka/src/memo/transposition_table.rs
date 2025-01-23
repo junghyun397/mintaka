@@ -45,7 +45,7 @@ impl TranspositionTable {
     }
 
     pub fn store_mut(
-        &mut self,
+        &self,
         key: HashKey,
         entry: TTEntry,
     ) {
@@ -53,7 +53,7 @@ impl TranspositionTable {
         self.table[idx].store_mut(key.into(), entry);
     }
 
-    pub fn increase_age(&mut self) {
+    pub fn increase_age(&self) {
         self.age.fetch_add(1, Ordering::Relaxed);
     }
 

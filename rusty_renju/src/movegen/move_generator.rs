@@ -1,12 +1,69 @@
 use crate::bitfield::Bitfield;
 use crate::board::Board;
 use crate::notation::color::Color;
+use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::opening::opening_agent::OpeningStage;
 use crate::pattern::Pattern;
 
-pub fn generate_moves(board: &Board) -> Bitfield {
-    todo!()
+pub const MOVE_SET_TABLE: [Bitfield; pos::BOARD_SIZE] = {
+    let mut move_set_table = [Bitfield::ZERO_FILLED; pos::BOARD_SIZE];
+
+    let mut idx = 0;
+    while idx < pos::BOARD_SIZE {
+        let base_pos = Pos::from_index(idx as u8);
+
+        let mut offset_row = -2;
+        while offset_row <= 2 {
+            let mut offset_col = -2;
+            while offset_col <= 2 {
+                if let Some(pos) = base_pos.offset(offset_row, offset_col) {
+                    move_set_table[idx].set_mut(pos);
+                }
+                offset_col += 1;
+            }
+            offset_row += 1;
+        }
+        idx += 1;
+    }
+
+    move_set_table
+};
+
+pub fn generate_moves<const C: Color>(board: &Board) -> Bitfield {
+    let mut defend_four_field = Bitfield::default();
+    let mut on_four_threat = false;
+
+    for (idx, pattern) in board.patterns.field.iter().enumerate() {
+        let player_unit = pattern.player_unit::<C>();
+        let opponent_unit = pattern.opponent_unit::<C>();
+        if player_unit.has_five() || opponent_unit.has_five() {
+            let mut result = Bitfield::default();
+            result.set_mut(Pos::from_index(idx as u8));
+            return result;
+        }
+
+        match C {
+            Color::Black => {
+                if (opponent_unit.has_open_four() || opponent_unit.has_fours()) && !pattern.is_forbidden() {
+                    defend_four_field.set_mut(Pos::from_index(idx as u8));
+                    on_four_threat = true;
+                }
+            }
+            Color::White => {
+                if opponent_unit.has_open_four() && !pattern.is_forbidden() {
+                    defend_four_field.set_mut(Pos::from_index(idx as u8));
+                    on_four_threat = true;
+                }
+            }
+        }
+    }
+
+    if on_four_threat {
+        defend_four_field
+    } else {
+        !board.hot_field
+    }
 }
 
 pub fn generate_neighborhood_moves(board: &Board) -> Bitfield {
@@ -43,7 +100,7 @@ where T : Fn(&(usize, &Pattern)) -> bool {
         .enumerate()
         .filter(cond)
         .fold(Bitfield::ZERO_FILLED, |mut acc, (idx, _)| {
-            acc.set(Pos::from_index(idx as u8));
+            acc.set_mut(Pos::from_index(idx as u8));
             acc
         })
 }

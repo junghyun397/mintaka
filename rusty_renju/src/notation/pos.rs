@@ -28,10 +28,6 @@ pub const CENTER_ROW_COL: u8 = CENTER.col();
      ($idx:expr) => ($idx % 15);
  }
 
-#[macro_export] macro_rules! check_cartesian_bound {
-    ($row:expr,$col:expr) => ($row < 15 && $col < 15);
-}
-
 macro_rules! directional_offset {
     ($op:tt,$neg_op:tt,$pos:expr,$direction:expr,$offset:expr) => {
         match $direction {
@@ -93,10 +89,17 @@ impl Pos {
         self.col() as usize
     }
 
-    pub const fn offset(&self, row: u8, col: u8) -> Pos {
-        Self::from_cartesian(self.row() + row, self.col() + col)
+    pub const fn offset(&self, offset_row: isize, offset_col: isize) -> Option<Pos> {
+        let row = self.row() as isize + offset_row;
+        let col = self.col() as isize + offset_col;
+
+        if row >= 0 && row < I_BOARD_WIDTH && col >= 0 && col < I_BOARD_WIDTH {
+            Some(Pos::from_cartesian(row as u8, col as u8))
+        } else {
+            None
+        }
     }
-    
+
     pub const fn directional_offset_positive_unchecked(&self, direction: Direction, offset: u8) -> Pos {
         directional_offset!(+, -, self, direction, offset)
     }

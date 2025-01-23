@@ -1,9 +1,11 @@
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use ethnum::{u256, uint};
-use std::simd::u8x32;
+use std::fmt::Display;
+use std::ops::{BitXor, BitXorAssign, Not};
+use std::simd::{u8x32, ToBytes};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Bitfield([u8; 32]);
 
 impl Default for Bitfield {
@@ -18,19 +20,19 @@ impl Bitfield {
 
     pub const ZERO_FILLED: Bitfield = Bitfield([0; 32]);
 
-    pub fn is_cold(&self, pos: Pos) -> bool {
+    pub const fn is_cold(&self, pos: Pos) -> bool {
         self.0[pos.idx_usize() / 8] & 0b1 << (pos.idx_usize() % 8) == 0
     }
 
-    pub fn is_hot(&self, pos: Pos) -> bool {
+    pub const fn is_hot(&self, pos: Pos) -> bool {
         self.0[pos.idx_usize() / 8] & 0b1 << (pos.idx_usize() % 8) != 0
     }
 
-    pub fn set(&mut self, pos: Pos) {
+    pub const fn set_mut(&mut self, pos: Pos) {
         self.0[pos.idx_usize() / 8] |= 0b1 << (pos.idx() % 8);
     }
 
-    pub fn unset(&mut self, pos: Pos) {
+    pub const fn unset_mut(&mut self, pos: Pos) {
         self.0[pos.idx_usize() / 8] &= !(0b1 << (pos.idx() % 8));
     }
 
@@ -54,6 +56,28 @@ impl Bitfield {
         u256::from_ne_bytes(self.0)
     }
 
+}
+
+impl Not for Bitfield {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        (!self.to_simd()).into()
+    }
+}
+
+impl BitXor for Bitfield {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        (self.to_simd() ^ rhs.to_simd()).into()
+    }
+}
+
+impl BitXorAssign for Bitfield {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        *self = self.bitxor(rhs);
+    }
 }
 
 impl From<u8x32> for Bitfield {
