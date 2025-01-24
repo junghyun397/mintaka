@@ -8,14 +8,12 @@ use crate::pattern::Patterns;
 use crate::slice::Slices;
 use std::marker::ConstParamTy;
 
-// 2256-bytes
 #[derive(Copy, Clone, Default)]
 pub struct Board {
     pub player_color: Color,
     pub stones: u8,
     pub slices: Slices,
     pub patterns: Patterns,
-    pub movegen_field: Bitfield,
     pub hot_field: Bitfield,
     pub hash_key: HashKey,
 }
@@ -48,7 +46,6 @@ impl Board {
     pub fn set_mut(&mut self, pos: Pos) {
         self.stones += 1;
         self.hot_field.set_mut(pos);
-        self.movegen_field ^= move_generator::MOVE_SET_TABLE[pos.idx_usize()];
         self.hash_key = self.hash_key.set(self.player_color, pos);
 
         self.incremental_update_mut::<{ MoveType::Set }>(pos);
@@ -62,7 +59,6 @@ impl Board {
 
         self.stones -= 1;
         self.hot_field.unset_mut(pos);
-        self.movegen_field ^= move_generator::MOVE_SET_TABLE[pos.idx_usize()];
         self.hash_key = self.hash_key.set(self.player_color, pos);
 
         self.incremental_update_mut::<{ MoveType::Unset }>(pos);

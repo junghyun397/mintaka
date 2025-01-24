@@ -66,13 +66,12 @@ fn parse_board_elements(source: &str) -> Result<Box<[Option<Color>]>, &'static s
     Ok(elements)
 }
 
-fn extract_color_stones(source: &[Option<Color>], target_color: Color) -> Box<[Pos]> {
+fn extract_stones_by_color<const C: Color>(source: &[Option<Color>]) -> Box<[Pos]> {
     source.iter()
         .enumerate()
         .filter_map(|(idx, symbol)|
             symbol.and_then(|color|
-                (color == target_color)
-                    .then(|| Pos::from_index(idx as u8))
+                (color == C).then(|| Pos::from_index(idx as u8))
             )
         )
         .collect()
@@ -99,18 +98,14 @@ impl Board {
             .map(|(row_idx, item_row)| {
                 let content: String = item_row.iter()
                     .map(&transform)
-                    .reduce(|head, tail|
-                        format!("{head} {tail}")
-                    )
-                    .unwrap();
+                    .collect::<Vec<_>>()
+                    .join(" ");
 
                 format!("{:-2} {content} {}", row_idx + 1, row_idx + 1)
             })
             .rev()
-            .reduce(|head, tail|
-                format!("{head}\n{tail}")
-            )
-            .unwrap();
+            .collect::<Vec<_>>()
+            .join("\n");
 
         let column_hint_content: String = ('A' .. (b'A' + pos::BOARD_WIDTH) as char)
             .flat_map(|x| [x, ' '])
@@ -184,8 +179,8 @@ impl FromStr for Board {
     fn from_str(source: &str) -> Result<Self, Self::Err> {
         let elements = parse_board_elements(source)?;
 
-        let blacks = extract_color_stones(&elements, Color::Black);
-        let whites = extract_color_stones(&elements, Color::White);
+        let blacks = extract_stones_by_color::<{ Color::Black }>(&elements);
+        let whites = extract_stones_by_color::<{ Color::White }>(&elements);
 
         let mut board = Board::default();
         let player_color = Color::player_color_from_each_moves(blacks.len(), whites.len());
@@ -262,6 +257,7 @@ impl Display for History {
                 format!("{head}{HISTORY_LITERAL_SEPARATOR} {tail}")
             )
             .unwrap();
+
         write!(f, "{history}")
     }
 
@@ -398,20 +394,12 @@ impl Display for Bitfield {
             .map(|is_hot|
                 if is_hot { "X" } else { "." }
             )
-            .collect::<Box<[_]>>()
+            .collect::<Vec<_>>()
             .chunks(pos::U_BOARD_WIDTH)
-            .map(|row|
-                row.iter()
-                    .map(|s| s.to_string())
-                    .reduce(|head, tail|
-                        format!("{head} {tail}")
-                    )
-                    .unwrap()
-            )
-            .reduce(|head, tail|
-                format!("{head}\n{tail}")
-            )
-            .unwrap();
+            .rev()
+            .map(|row| row.join(" "))
+            .collect::<Vec<_>>()
+            .join("\n");
 
         write!(f, "{}", content)
     }

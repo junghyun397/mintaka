@@ -2,8 +2,8 @@ use crate::notation::pos;
 use crate::notation::pos::Pos;
 use ethnum::{u256, uint};
 use std::fmt::Display;
-use std::ops::{BitXor, BitXorAssign, Not};
-use std::simd::{u8x32, ToBytes};
+use std::ops::{BitOr, BitOrAssign, BitXor, Not};
+use std::simd::{u64x4, ToBytes};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Bitfield([u8; 32]);
@@ -48,8 +48,8 @@ impl Bitfield {
         BitfieldPosIterator::from(!self.to_u256())
     }
 
-    pub fn to_simd(self) -> u8x32 {
-        u8x32::from_array(self.0)
+    pub fn to_simd(self) -> u64x4 {
+        u64x4::from_array(unsafe { std::mem::transmute::<[u8; 32], [u64; 4]>(self.0) })
     }
 
     pub fn to_u256(self) -> u256 {
@@ -66,24 +66,28 @@ impl Not for Bitfield {
     }
 }
 
-impl BitXor for Bitfield {
+impl BitOr for Bitfield {
+
     type Output = Self;
 
-    fn bitxor(self, rhs: Self) -> Self::Output {
-        (self.to_simd() ^ rhs.to_simd()).into()
+    fn bitor(self, rhs: Self) -> Self::Output {
+        (self.to_simd() | rhs.to_simd()).into()
     }
+
 }
 
-impl BitXorAssign for Bitfield {
-    fn bitxor_assign(&mut self, rhs: Self) {
-        *self = self.bitxor(rhs);
+impl BitOrAssign for Bitfield {
+
+    fn bitor_assign(&mut self, rhs: Self) {
+        *self = self.bitor(rhs);
     }
+
 }
 
-impl From<u8x32> for Bitfield {
+impl From<u64x4> for Bitfield {
 
-    fn from(x: u8x32) -> Self {
-        Self(x.to_array())
+    fn from(x: u64x4) -> Self {
+        Self(unsafe { std::mem::transmute::<[u64; 4], [u8; 32]>(x.to_array()) })
     }
 
 }

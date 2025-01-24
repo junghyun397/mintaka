@@ -55,7 +55,7 @@ pub trait AbstractTranspositionTable {
             use std::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
             let idx = self.calculate_index(key);
             let entry = &self.internal_table()[idx];
-            _mm_prefetch::<_MM_HINT_T0>((entry as *const T).cast());
+            _mm_prefetch::<_MM_HINT_T0>((entry as *const Self::EntryType).cast());
         }
         #[cfg(target_arch = "aarch64")]
         unsafe {
