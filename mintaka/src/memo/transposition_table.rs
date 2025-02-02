@@ -53,6 +53,12 @@ impl TranspositionTable {
         self.table[idx].store_mut(key.into(), entry);
     }
 
+    pub fn view(&self) -> TTView {
+        TTView {
+            table_view: &self.table,
+        }
+    }
+
     pub fn increase_age(&self) {
         self.age.fetch_add(1, Ordering::Relaxed);
     }
@@ -60,5 +66,13 @@ impl TranspositionTable {
     pub fn fetch_age(&self) -> u8 {
         self.age.load(Ordering::Relaxed)
     }
+
+}
+
+pub struct TTView<'a> {
+    table_view: &'a [TTEntryBucket],
+}
+
+impl TTView<'_> {
 
 }

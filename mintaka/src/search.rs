@@ -1,5 +1,6 @@
 use crate::memo::transposition_table::TranspositionTable;
 use crate::principal_variation::PrincipalVariation;
+use crate::thread_data::ThreadData;
 use crate::value::{Depth, Score};
 use rusty_renju::board::Board;
 use std::marker::ConstParamTy;
@@ -37,26 +38,30 @@ pub enum ThreadType {
     MainThread, SubThread
 }
 
-pub fn iterative_deepening<const THT: ThreadType>(
+pub fn iterative_deepening<const TH: ThreadType>(
     tt: &TranspositionTable, board: &mut Board,
+    td: &mut ThreadData
 ) {
     let mut pv = PrincipalVariation::default();
 
-    let max_depth = 0;
+    let max_depth: Depth = 0;
     for depth in 0 ..= max_depth {
     }
 }
 
-pub fn aspiration_search<const Th: ThreadType>(
+pub fn aspiration_search<const TH: ThreadType>(
     tt: &TranspositionTable, board: &mut Board,
-    pv: &mut PrincipalVariation
+    pv: &mut PrincipalVariation,
+    td: &mut ThreadData
 ) {
     todo!()
 }
 
 pub fn negamax<NT: NodeType>(
     tt: &TranspositionTable, board: &mut Board,
-    pv: &mut PrincipalVariation, mut depth: Depth, mut alpha: Score, mut beta: Score,
+    pv: &mut PrincipalVariation,
+    td: &mut ThreadData,
+    mut depth: Depth, mut alpha: Score, mut beta: Score,
 ) -> Score {
     if NT::IS_ROOT {
     }
@@ -64,5 +69,7 @@ pub fn negamax<NT: NodeType>(
     if NT::IS_PV {
     }
 
-    negamax::<NT::NextType>(tt, board, pv, depth, alpha, beta)
+    let beta = -negamax::<NT::NextType>(tt, board, pv, td, depth, alpha, beta);
+
+    0
 }

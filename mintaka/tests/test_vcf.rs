@@ -16,7 +16,6 @@ mod test_vcf {
             let vcf_result = vcf::vcf_sequence(&mut tt, &mut board, u8::MAX).unwrap();
             let time = instant.elapsed();
 
-
             let final_move = vcf_result.last().copied().unwrap();
 
             board.batch_set_mut(&vcf_result.into_boxed_slice());

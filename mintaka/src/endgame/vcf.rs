@@ -67,12 +67,12 @@ impl VCFAccumulator for Score {
 
 }
 
-pub fn vcf<Acc: VCFAccumulator>(
+pub fn vcf<ACC: VCFAccumulator>(
     tt: &TranspositionTable, board: &mut Board, max_depth: u8
-) -> Acc {
+) -> ACC {
     match board.player_color {
-        Color::Black => try_vcf::<{ Color::Black }, Acc>(tt, board, max_depth, 0, false),
-        Color::White => try_vcf::<{ Color::White }, Acc>(tt, board, max_depth, 0, false),
+        Color::Black => try_vcf::<{ Color::Black }, ACC>(tt, board, max_depth, 0, false),
+        Color::White => try_vcf::<{ Color::White }, ACC>(tt, board, max_depth, 0, false),
     }
 }
 
