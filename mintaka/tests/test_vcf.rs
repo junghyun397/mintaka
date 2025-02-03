@@ -16,13 +16,15 @@ mod test_vcf {
             let vcf_result = vcf::vcf_sequence(&mut tt, &mut board, u8::MAX).unwrap();
             let time = instant.elapsed();
 
+            let length = vcf_result.len();
             let final_move = vcf_result.last().copied().unwrap();
 
             board.batch_set_mut(&vcf_result.into_boxed_slice());
 
             let board_string = board.to_string_with_move_marker(final_move);
             println!("{}", board_string);
-            println!("{:?}", time);
+            println!("length: {}", length);
+            println!("time: {:?}", time);
             println!("hash usage: {}", tt.hash_usage());
 
             board_string

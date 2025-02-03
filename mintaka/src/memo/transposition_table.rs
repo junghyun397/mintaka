@@ -1,6 +1,8 @@
-use crate::memo::tt_entry::{TTEntry, TTEntryBucket};
+use crate::memo::tt_entry::{EndgameFlag, TTEntry, TTEntryBucket, TTFlag};
+use crate::value::{Depth, Eval, Score};
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::notation::pos::Pos;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 pub struct TranspositionTable {
@@ -44,13 +46,35 @@ impl TranspositionTable {
         self.table[idx].probe(key.into())
     }
 
+    pub fn store_entry_mut(&self, key: HashKey, entry: TTEntry) {
+        let idx = self.calculate_index(key);
+        self.table[idx].store_mut(key.into(), entry);
+    }
+
     pub fn store_mut(
         &self,
         key: HashKey,
-        entry: TTEntry,
+        ply: usize,
+        best_move: Pos,
+        flag: TTFlag,
+        endgame_flag: EndgameFlag,
+        depth: Depth,
+        eval: Eval,
+        mut score: Score
     ) {
         let idx = self.calculate_index(key);
-        self.table[idx].store_mut(key.into(), entry);
+        let entry = self.table[idx].probe(key.into()).unwrap_or(TTEntry::EMPTY);
+
+        let new_entry = TTEntry {
+            best_move,
+            flag,
+            endgame_flag,
+            depth,
+            eval,
+            score,
+        };
+
+        self.table[idx].store_mut(key.into(), new_entry);
     }
 
     pub fn view(&self) -> TTView {

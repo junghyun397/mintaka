@@ -22,7 +22,7 @@ impl From<HashKey> for TTEntryKey {
 
 }
 
-#[derive(Eq, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 #[repr(u8)]
 pub enum TTFlag {
     #[default] PV,
@@ -31,7 +31,7 @@ pub enum TTFlag {
     Exact,
 }
 
-#[derive(Eq, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 #[repr(u8)]
 pub enum EndgameFlag {
     #[default] Unknown,
@@ -41,6 +41,8 @@ pub enum EndgameFlag {
 }
 
 // 64 bit
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[repr(C, align(8))]
 pub struct TTEntry {
     pub best_move: Pos, // 8
     pub flag: TTFlag, // 8
@@ -63,6 +65,19 @@ impl From<u64> for TTEntry {
     fn from(value: u64) -> Self {
         unsafe { std::mem::transmute(value) }
     }
+
+}
+
+impl TTEntry {
+
+    pub const EMPTY: Self = Self {
+        best_move: Pos::INVALID,
+        flag: TTFlag::Exact,
+        endgame_flag: EndgameFlag::Unknown,
+        depth: 0,
+        eval: 0,
+        score: 0,
+    };
 
 }
 
