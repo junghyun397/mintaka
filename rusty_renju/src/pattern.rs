@@ -21,6 +21,7 @@ pub const OVERLINE: u8                  = 0b0000_0010;
 pub const MARKER: u8                    = 0b0000_0001;
 
 const OPEN_THREE_POSITION: u32          = 3;
+const CLOSE_FOUR_SINGLE_POSITION: u32   = 8;
 
 const UNIT_CLOSED_FOUR_SINGLE_MASK: u32 = repeat_4x(CLOSED_FOUR_SINGLE);
 const UNIT_CLOSED_FOUR_MASK: u32        = repeat_4x(CLOSED_FOUR_DOUBLE);
@@ -173,7 +174,11 @@ impl PatternUnit {
     }
 
     pub fn iter_three_directions(&self) -> impl Iterator<Item=Direction> + '_ {
-        ThreeDirectionIterator::from(self)
+        DirectionIterator::<OPEN_THREE_POSITION>::from(self)
+    }
+
+    pub fn iter_four_directions(&self) -> impl Iterator<Item=Direction> + '_ {
+        DirectionIterator::<CLOSE_FOUR_SINGLE_POSITION>::from(self)
     }
 
     pub fn has_invalid_double_three(&self) -> bool {
@@ -380,11 +385,20 @@ impl Patterns {
 
 }
 
-struct ThreeDirectionIterator {
+struct DirectionIterator<const P: u32> {
     packed_unit: u32
 }
 
-impl From<&PatternUnit> for ThreeDirectionIterator {
+impl<const P: u32> DirectionIterator<P> {
+
+    const HORIZONTAL_N: u32 = P;
+    const VERTICAL_N: u32 = 8 + P;
+    const ASCENDING_N: u32 = 8 * 2 + P;
+    const DESCENDING_N: u32 = 8 * 3 + P;
+
+}
+
+impl<const P: u32> From<&PatternUnit> for DirectionIterator<P> {
 
     fn from(value: &PatternUnit) -> Self {
         Self { packed_unit: value.apply_mask(UNIT_OPEN_THREE_MASK) }
@@ -392,7 +406,7 @@ impl From<&PatternUnit> for ThreeDirectionIterator {
 
 }
 
-impl Iterator for ThreeDirectionIterator {
+impl<const P: u32> Iterator for DirectionIterator<P> {
 
     type Item = Direction;
 
@@ -401,16 +415,11 @@ impl Iterator for ThreeDirectionIterator {
             let tails = self.packed_unit.trailing_zeros();
             self.packed_unit &= self.packed_unit - 1;
 
-            const HORIZONTAL_N: u32 = OPEN_THREE_POSITION;
-            const VERTICAL_N: u32 = 8 + OPEN_THREE_POSITION;
-            const ASCENDING_N: u32 = 8 * 2 + OPEN_THREE_POSITION;
-            const DESCENDING_N: u32 = 8 * 3 + OPEN_THREE_POSITION;
-
             match tails {
-                HORIZONTAL_N => Direction::Horizontal,
-                VERTICAL_N => Direction::Vertical,
-                ASCENDING_N => Direction::Ascending,
-                DESCENDING_N => Direction::Descending,
+                c if c == Self::HORIZONTAL_N => Direction::Horizontal,
+                c if c == Self::VERTICAL_N => Direction::Vertical,
+                c if c == Self::ASCENDING_N => Direction::Ascending,
+                c if c == Self::DESCENDING_N => Direction::Descending,
                 _ => unreachable!()
             }
         })

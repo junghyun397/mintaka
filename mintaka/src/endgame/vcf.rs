@@ -3,9 +3,10 @@ use crate::memo::tt_entry::{EndgameFlag, TTEntry, TTFlag};
 use crate::value::{Eval, Score};
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
+use rusty_renju::notation::direction::Direction;
 use rusty_renju::notation::pos;
-use rusty_renju::notation::pos::Pos;
-use rusty_renju::pattern::PatternCount;
+use rusty_renju::notation::pos::{Pos, BOARD_WIDTH};
+use rusty_renju::pattern::{PatternCount, PatternUnit};
 use smallvec::{smallvec, SmallVec};
 
 trait VCFAccumulator {
@@ -72,8 +73,8 @@ pub fn vcf<ACC: VCFAccumulator>(
     tt: &TranspositionTable, board: &mut Board, max_depth: u8
 ) -> ACC {
     match board.player_color {
-        Color::Black => try_vcf_flat::<{ Color::Black }, ACC>(tt, board, max_depth, 0, false),
-        Color::White => try_vcf_flat::<{ Color::White }, ACC>(tt, board, max_depth, 0, false),
+        Color::Black => try_vcf::<{ Color::Black }, ACC>(tt, board, max_depth, 0, false),
+        Color::White => try_vcf::<{ Color::White }, ACC>(tt, board, max_depth, 0, false),
     }
 }
 
@@ -135,7 +136,7 @@ fn try_vcf_flat<const C: Color, ACC: VCFAccumulator>(
 
             board.set_mut(four_pos);
 
-            let defend_pos = find_defend_pos_unchecked::<C>(board);
+            let defend_pos = find_defend_pos_unchecked::<C>(board, four_pos, player_unit);
             let defend_pattern = board.patterns.field[defend_pos.idx_usize()];
             let defend_unit = defend_pattern.opponent_unit::<C>();
             let defend_four_count = defend_unit.count_fours();
@@ -192,24 +193,27 @@ fn try_vcf_flat<const C: Color, ACC: VCFAccumulator>(
             idx += 1;
         }
 
-        let tt_entry = tt.probe(board.hash_key)
-            .map(|mut tt_entry| {
-                tt_entry.endgame_flag = EndgameFlag::Cold;
-                tt_entry
-            })
-            .unwrap_or_else(|| TTEntry {
-                best_move: Pos::INVALID,
-                depth,
-                flag: TTFlag::default(),
-                endgame_flag: EndgameFlag::Cold,
-                score: 0,
-                eval: 0,
-            });
+        if !result.has_result() {
+            let tt_entry = tt.probe(board.hash_key)
+                .map(|mut tt_entry| {
+                    tt_entry.endgame_flag = EndgameFlag::Cold;
+                    tt_entry
+                })
+                .unwrap_or_else(|| TTEntry {
+                    best_move: Pos::INVALID,
+                    depth,
+                    flag: TTFlag::default(),
+                    endgame_flag: EndgameFlag::Cold,
+                    score: 0,
+                    eval: 0,
+                });
 
-        tt.store_entry_mut(board.hash_key, tt_entry);
+            tt.store_entry_mut(board.hash_key, tt_entry);
+        }
 
         if let Some(frame) = stack.pop() {
             board.unset_mut(frame.defend_pos);
+            board.unset_mut(frame.four_pos);
 
             depth = frame.depth;
             opponent_has_five = frame.opponent_has_five;
@@ -217,8 +221,6 @@ fn try_vcf_flat<const C: Color, ACC: VCFAccumulator>(
 
             if result.has_result() {
                 result = result.append(frame.defend_pos, frame.four_pos);
-            } else {
-                board.unset_mut(frame.four_pos);
             }
         } else {
             break 'vcf_search;
@@ -259,7 +261,7 @@ fn try_vcf<const C: Color, ACC: VCFAccumulator>(
 
         board.set_mut(four_pos);
 
-        let defend_pos = find_defend_pos_unchecked::<C>(board);
+        let defend_pos = find_defend_pos_unchecked::<C>(board, four_pos, player_unit);
         let defend_pattern = board.patterns.field[defend_pos.idx_usize()];
         let defend_unit = defend_pattern.opponent_unit::<C>();
         let defend_four_count = defend_unit.count_fours();
@@ -326,14 +328,50 @@ fn try_vcf<const C: Color, ACC: VCFAccumulator>(
     ACC::COLD
 }
 
-fn find_defend_pos_unchecked<const C: Color>(board: &Board) -> Pos {
-    for defend_idx in 0 .. pos::BOARD_SIZE {
-        if board.patterns.field[defend_idx].player_unit::<C>().has_five() {
-            return Pos::from_index(defend_idx as u8);
+pub fn calculate_closed_four_window(pos: Pos, direction: Direction) -> (Pos, u8) {
+    fn saturating_sub_diff(n: u8) -> u8 {
+        n - n.saturating_sub(4)
+    }
+
+    fn saturating_add_diff(n: u8) -> u8 {
+        (n + 4).min(BOARD_WIDTH) - n
+    }
+
+    let (negative_offset, positive_offset) = match direction {
+        Direction::Horizontal => (
+            saturating_sub_diff(pos.col()),
+            saturating_add_diff(pos.col()),
+        ),
+        Direction::Vertical => (
+            saturating_sub_diff(pos.row()),
+            saturating_add_diff(pos.row())
+        ),
+        Direction::Ascending => (
+            saturating_sub_diff(pos.row()).min(saturating_sub_diff(pos.col())),
+            saturating_add_diff(pos.row()).min(saturating_add_diff(pos.col()))
+        ),
+        Direction::Descending => (
+            saturating_add_diff(pos.row()).min(saturating_sub_diff(pos.col())),
+            saturating_sub_diff(pos.row()).min(saturating_add_diff(pos.col()))
+        )
+    };
+
+    (pos.directional_offset_negative_unchecked(direction, negative_offset), negative_offset + positive_offset + 1)
+}
+
+fn find_defend_pos_unchecked<const C: Color>(board: &Board, four_pos: Pos, four_unit: PatternUnit) -> Pos {
+    let four_direction = four_unit.closed_four_direction_unchecked();
+    let (start_pos, length) = calculate_closed_four_window(four_pos, four_direction);
+
+    for slice_offset in 0 .. length {
+        let pos = start_pos.directional_offset_positive_unchecked(four_direction, slice_offset);
+
+        if board.patterns.field[pos.idx_usize()].player_unit::<C>().has_five() {
+            return pos;
         }
     }
 
-    Pos::INVALID
+    unreachable!()
 }
 
 fn build_vcf_win_tt_entry(depth: u8, four_pos: Pos) -> TTEntry {

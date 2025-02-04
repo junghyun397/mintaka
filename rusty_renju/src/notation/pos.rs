@@ -25,8 +25,8 @@ pub const CENTER_ROW_COL: u8 = CENTER.col();
 }
 
 #[macro_export] macro_rules! index_to_col {
-     ($idx:expr) => ($idx % 15);
- }
+    ($idx:expr) => ($idx % 15);
+}
 
 macro_rules! directional_offset {
     ($op:tt,$neg_op:tt,$pos:expr,$direction:expr,$offset:expr) => {
