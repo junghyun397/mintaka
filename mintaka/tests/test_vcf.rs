@@ -2,9 +2,11 @@
 mod test_vcf {
     use indoc::indoc;
     use mintaka::endgame::vcf;
+    use mintaka::endgame::vcf::COUNTER;
     use mintaka::memo::transposition_table::TranspositionTable;
     use rusty_renju::board::Board;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
+    use std::sync::atomic::Ordering;
     use std::time::Instant;
 
     macro_rules! vcf {
@@ -26,9 +28,53 @@ mod test_vcf {
             println!("length: {}", length);
             println!("time: {:?}", time);
             println!("hash usage: {}", tt.hash_usage());
+            println!("counter: {}", COUNTER.load(Ordering::Relaxed));
 
             board_string
         }};
+    }
+
+    #[test]
+    fn special_vcf() {
+        let case = indoc! {"
+           A B C D E F G H I J K L M N O
+        15 . . . . . . . . . . . . . . . 15
+        14 . . . . . . . . . . . . . . . 14
+        13 . . . . . . . . . . . . . . . 13
+        12 . . . . . . . . . . . . . . . 12
+        11 . . . . . . . . . . . . . . . 11
+        10 . . . . . . . . . . . . . . . 10
+         9 . . . . O . . . O . . . . . . 9
+         8 . . . . . . . X O O . . . . . 8
+         7 . . . . O X . X . . . . . . . 7
+         6 . . . . . X . . O X . . . . . 6
+         5 . . . . . . . . . . . . . . . 5
+         4 . . . . . . . X . . . X . . . 4
+         3 . . . . . . O . . . . . . . . 3
+         2 . . . . . . . . . . . . . . . 2
+         1 . . . . . . . . . . . . . . . 1
+           A B C D E F G H I J K L M N O"};
+
+        let expected = indoc! {"
+           A B C D E F G H I J K L M N O
+        15 . . . . . . . . . . . . . . . 15
+        14 . . . . . . . . . . . . . . . 14
+        13 . . . . . . . . . . . . . . . 13
+        12 . . . . . . . . . . . . . . . 12
+        11 . . . . . . . . . . . . . . . 11
+        10 . . . . . X . O . . . . . . . 10
+         9 . . . . O O O X O . . . . . . 9
+         8 . . . . . X[X]X O O . . . . . 8
+         7 . . . . O X X X X O . . . . . 7
+         6 . . . . . X . X O X . . . . . 6
+         5 . . . . X O X O O . O . . . . 5
+         4 . . . O . X X X O X . X . . . 4
+         3 . . . . O . O . X . . . . . . 3
+         2 . . . . . . . . . O . . . . . 2
+         1 . . . . . . . . . . . . . . . 1
+           A B C D E F G H I J K L M N O"};
+
+        assert_eq!(vcf!(case), expected);
     }
 
     #[test]
@@ -399,9 +445,6 @@ mod test_vcf {
 
         assert_eq!(vcf!(case), expected);
 
-        // 9 ms in M1 pro 10C, 24 ms in 5800X3D
-        // 110 ms without a slice memo
-        // transposition table required
         let case = indoc! {"
            A B C D E F G H I J K L M N O
         15 O . . . X . . . . . . . X . X 15

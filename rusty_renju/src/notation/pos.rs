@@ -100,11 +100,18 @@ impl Pos {
         }
     }
 
-    pub const fn directional_offset_positive_unchecked(&self, direction: Direction, offset: u8) -> Pos {
+    pub const fn offset_unchecked(&self, offset_row: isize, offset_col: isize) -> Pos {
+        Pos::from_cartesian(
+            self.row_usize().saturating_add_signed(offset_row) as u8,
+            self.col_usize().saturating_add_signed(offset_col) as u8
+        )
+    }
+
+    pub const fn offset_positive_unchecked(&self, direction: Direction, offset: u8) -> Pos {
         directional_offset!(+, -, self, direction, offset)
     }
 
-    pub const fn directional_offset_negative_unchecked(&self, direction: Direction, offset: u8) -> Pos {
+    pub const fn offset_negative_unchecked(&self, direction: Direction, offset: u8) -> Pos {
         directional_offset!(-, +, self, direction, offset)
     }
 
