@@ -124,11 +124,11 @@ impl Board {
                     MoveType::Unset => $slice.unset_mut(self.player_color, $slice_idx)
                 }
 
-                if black_was_available | $slice.pattern_available::< { Color::Black }>() {
+                if black_was_available | $slice.pattern_available::<{ Color::Black }>() {
                     self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, false>($slice, $slice_idx as usize);
                 }
 
-                if white_was_available | $slice.pattern_available::<{ Color::White }>() {
+                if white_was_available | $slice.pattern_available::<{Color::White }>() {
                     self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, false>($slice, $slice_idx as usize);
                 }
             }};
