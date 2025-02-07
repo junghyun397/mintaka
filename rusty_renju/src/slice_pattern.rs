@@ -68,16 +68,16 @@ fn lookup_patterns<const C: Color>(
         }
     }
 
-    let patch_pointer = match C {
-        Color::Black => SLICE_PATTERN_LUT.vector.black[vector as usize],
-        Color::White => SLICE_PATTERN_LUT.vector.white[vector as usize],
-    };
+    let patch_pointer = unsafe { match C {
+        Color::Black => *SLICE_PATTERN_LUT.vector.black.get_unchecked(vector as usize),
+        Color::White => *SLICE_PATTERN_LUT.vector.white.get_unchecked(vector as usize),
+    } };
 
     if patch_pointer != 0 {
-        let slice_patch_data = match C {
-            Color::Black => SLICE_PATTERN_LUT.patch.black[patch_pointer as usize],
-            Color::White => SLICE_PATTERN_LUT.patch.white[patch_pointer as usize],
-        };
+        let slice_patch_data = unsafe { match C {
+            Color::Black => SLICE_PATTERN_LUT.patch.black.get_unchecked(patch_pointer as usize),
+            Color::White => SLICE_PATTERN_LUT.patch.white.get_unchecked(patch_pointer as usize),
+        } };
 
         if C == Color::Black && slice_patch_data.extended_match.is_some_and(|extended_match|
             !extended_match_for_black(extended_match, raw, shift)

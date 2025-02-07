@@ -20,9 +20,9 @@ impl Bitfield {
 
     pub const ZERO_FILLED: Bitfield = Bitfield([0; 32]);
 
-    pub const fn is_cold(&self, pos: Pos) -> bool {
-        self.0[pos.idx_usize() / 8] & 0b1 << (pos.idx_usize() % 8) == 0
-    }
+    pub fn is_cold(&self, pos: Pos) -> bool { unsafe {
+        *self.0.get_unchecked(pos.idx_usize() / 8) & 0b1 << (pos.idx_usize() % 8) == 0
+    } }
 
     pub const fn is_hot(&self, pos: Pos) -> bool {
         self.0[pos.idx_usize() / 8] & 0b1 << (pos.idx_usize() % 8) != 0

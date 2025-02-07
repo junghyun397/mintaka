@@ -364,12 +364,13 @@ impl Patterns {
                     cartesian_to_index!(slice.start_row as usize - pattern_idx, slice.start_col as usize + pattern_idx),
             };
 
-            self.field[idx].apply_mask_mut::<C, D>(slice_pattern.patterns[pattern_idx]);
+            unsafe { self.field.get_unchecked_mut(idx) }
+                .apply_mask_mut::<C, D>(unsafe { std::ptr::read(slice_pattern.patterns.as_ptr().add(pattern_idx)) });
 
             if C == Color::Black {
                 let pos = Pos::from_index(idx as u8);
 
-                if self.field[idx].black_unit.has_threes() {
+                if unsafe { self.field.get_unchecked(idx) }.black_unit.has_threes() {
                     self.unchecked_double_three_field.set_mut(pos);
                 } else {
                     self.unchecked_double_three_field.unset_mut(pos);
