@@ -1,5 +1,6 @@
 use crate::memo::transposition_table::TranspositionTable;
 use crate::memo::tt_entry::{EndgameFlag, TTEntry, TTFlag};
+use crate::thread_data::ThreadData;
 use crate::value::{Depth, Eval, Score};
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
@@ -8,7 +9,6 @@ use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{Pos, BOARD_WIDTH};
 use rusty_renju::pattern::{PatternCount, PatternUnit};
 use smallvec::{smallvec, SmallVec};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 trait VCFAccumulator {
 
@@ -70,24 +70,22 @@ impl VCFAccumulator for Score {
 
 }
 
-// stack-vcf = 10997, 35938, 71, 131, 162, 173, 428, 612
-// flat-vcf = 10816, 36467, 71, 131, 162, 173, 424, 612
-// double-four related problems
-pub static COUNTER: AtomicUsize = AtomicUsize::new(0);
-
 pub fn vcf<ACC: VCFAccumulator>(
-    tt: &TranspositionTable, board: &mut Board, max_depth: u8
+    tt: &TranspositionTable, td: &mut ThreadData,
+    board: &Board, max_depth: u8
 ) -> ACC {
+    let mut board = board.clone();
     match board.player_color {
-        Color::Black => try_vcf_flat::<{ Color::Black }, ACC>(tt, board, max_depth, 0, false),
-        Color::White => try_vcf_flat::<{ Color::White }, ACC>(tt, board, max_depth, 0, false),
+        Color::Black => try_vcf_flat::<{ Color::Black }, ACC>(tt, td, &board, max_depth, 0, false),
+        Color::White => try_vcf_flat::<{ Color::White }, ACC>(tt, td, &board, max_depth, 0, false),
     }
 }
 
 pub fn vcf_sequence(
-    tt: &TranspositionTable, board: &mut Board, max_depth: u8
+    tt: &TranspositionTable, td: &mut ThreadData,
+    board: &Board, max_depth: u8
 ) -> Option<Vec<Pos>> {
-    vcf::<SequenceVCFAccumulator>(tt, board, max_depth)
+    vcf::<SequenceVCFAccumulator>(tt, td, board, max_depth)
         .map(|mut sequence| {
             sequence.reverse();
             sequence
@@ -95,13 +93,14 @@ pub fn vcf_sequence(
 }
 
 fn try_vcf_flat<const C: Color, ACC: VCFAccumulator>(
-    tt: &TranspositionTable, source_board: &Board,
-    max_depth: Depth,
-    mut depth: Depth, mut opponent_has_five: bool,
+    tt: &TranspositionTable, td: &mut ThreadData,
+    source_board: &Board,
+    max_depth: Depth, mut depth: Depth, mut opponent_has_five: bool,
 ) -> ACC {
     let mut idx: usize = 0;
     let mut board: Board = source_board.clone();
 
+    // 2616 bytes
     #[derive(Copy, Clone)]
     #[repr(align(8))]
     struct SearchFrame {
@@ -113,12 +112,14 @@ fn try_vcf_flat<const C: Color, ACC: VCFAccumulator>(
         defend_pos: Pos,
     }
 
-    let mut stack: SmallVec<[SearchFrame; 24]> = smallvec![];
+    // 62,784 bytes
+    let mut stack: SmallVec<[SearchFrame; 18]> = smallvec![];
 
     #[inline]
     fn backtrace_frames<ACC: VCFAccumulator>(
-        tt: &TranspositionTable, board: Board,
-        mut stack: SmallVec<[SearchFrame; 24]>, depth: Depth, four_pos: Pos
+        tt: &TranspositionTable, td: &mut ThreadData,
+        board: Board,
+        mut stack: SmallVec<[SearchFrame; 18]>, depth: Depth, four_pos: Pos
     ) -> ACC {
         let mut result = ACC::unit(four_pos);
         let mut hash_key = board.hash_key;
@@ -136,6 +137,8 @@ fn try_vcf_flat<const C: Color, ACC: VCFAccumulator>(
 
             result = result.append(frame.defend_pos, frame.four_pos);
         }
+
+        td.batch_counter.add_single_mut();
 
         result
     }
@@ -155,14 +158,12 @@ fn try_vcf_flat<const C: Color, ACC: VCFAccumulator>(
                 continue 'position_search;
             }
 
-            COUNTER.fetch_add(1, Ordering::Release); // TODO: DEBUG
-
             let four_pos = Pos::from_index(idx as u8);
 
             if player_unit.has_open_four() {
                 tt.store_entry_mut(board.hash_key, build_vcf_win_tt_entry(depth, four_pos));
 
-                return backtrace_frames(tt, board, stack, depth, four_pos);
+                return backtrace_frames(tt, td, board, stack, depth, four_pos);
             }
 
             let mut position_board = board.set(four_pos);
@@ -188,11 +189,13 @@ fn try_vcf_flat<const C: Color, ACC: VCFAccumulator>(
                 } {
                     tt.store_entry_mut(board.hash_key, build_vcf_win_tt_entry(depth, four_pos));
 
-                    return backtrace_frames(tt, board, stack, depth, four_pos);
+                    return backtrace_frames(tt, td, board, stack, depth, four_pos);
                 } else if !tt.probe(
                     position_board.hash_key.set(C.reversed(), defend_pos)
                 ).is_some_and(|entry| entry.endgame_flag == EndgameFlag::Cold) {
                     if depth + 2 > max_depth || position_board.stones + 3 >= pos::U8_BOARD_SIZE {
+                        idx += 1;
+
                         continue 'position_search;
                     }
 
@@ -212,9 +215,13 @@ fn try_vcf_flat<const C: Color, ACC: VCFAccumulator>(
                     depth = depth + 2;
                     opponent_has_five = defend_four_count != PatternCount::Cold;
 
+                    td.batch_counter.add_pair_mut();
+
                     continue 'vcf_search;
                 }
             }
+
+            td.batch_counter.add_single_mut();
 
             idx += 1;
         }
@@ -249,7 +256,8 @@ fn try_vcf_flat<const C: Color, ACC: VCFAccumulator>(
 }
 
 fn try_vcf<const C: Color, ACC: VCFAccumulator>(
-    tt: &TranspositionTable, board: &mut Board,
+    tt: &TranspositionTable, td: &mut ThreadData,
+    board: &mut Board,
     max_depth: u8, depth: u8, opponent_has_five: bool,
 ) -> ACC {
     if depth > max_depth || board.stones > pos::U8_BOARD_SIZE - 2 {
@@ -267,8 +275,6 @@ fn try_vcf<const C: Color, ACC: VCFAccumulator>(
         {
             continue;
         }
-
-        COUNTER.fetch_add(1, Ordering::Release); // todo: DEBUG
 
         let four_pos = Pos::from_index(idx as u8);
 
@@ -308,7 +314,7 @@ fn try_vcf<const C: Color, ACC: VCFAccumulator>(
             ).is_some_and(|entry| entry.endgame_flag == EndgameFlag::Cold) {
                 board.set_mut(defend_pos);
 
-                let maybe_vcf = try_vcf::<C, ACC>(tt, board, max_depth, depth + 2, defend_four_count != PatternCount::Cold)
+                let maybe_vcf = try_vcf::<C, ACC>(tt, td, board, max_depth, depth + 2, defend_four_count != PatternCount::Cold)
                     .append(defend_pos, four_pos);
 
                 board.unset_mut(defend_pos);
@@ -347,6 +353,7 @@ fn try_vcf<const C: Color, ACC: VCFAccumulator>(
     ACC::COLD
 }
 
+#[inline]
 fn calculate_closed_four_window(pos: Pos, direction: Direction) -> (u8, u8) {
     fn saturating_sub_diff(n: u8) -> u8 {
         n - n.saturating_sub(4)
@@ -378,6 +385,7 @@ fn calculate_closed_four_window(pos: Pos, direction: Direction) -> (u8, u8) {
     (negative_offset, positive_offset)
 }
 
+#[inline]
 fn find_defend_pos_unchecked<const C: Color>(board: &Board, four_pos: Pos, four_unit: PatternUnit) -> Pos {
     let four_direction = four_unit.closed_four_direction_unchecked();
 
@@ -395,6 +403,7 @@ fn find_defend_pos_unchecked<const C: Color>(board: &Board, four_pos: Pos, four_
     unreachable!()
 }
 
+#[inline]
 fn build_vcf_win_tt_entry(depth: u8, four_pos: Pos) -> TTEntry {
     TTEntry {
         best_move: four_pos,
@@ -406,6 +415,7 @@ fn build_vcf_win_tt_entry(depth: u8, four_pos: Pos) -> TTEntry {
     }
 }
 
+#[inline]
 fn build_vcf_lose_tt_entry(depth: u8) -> TTEntry {
    TTEntry {
        best_move: Pos::INVALID,

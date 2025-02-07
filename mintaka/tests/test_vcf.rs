@@ -2,20 +2,25 @@
 mod test_vcf {
     use indoc::indoc;
     use mintaka::endgame::vcf;
-    use mintaka::endgame::vcf::COUNTER;
     use mintaka::memo::transposition_table::TranspositionTable;
+    use mintaka::thread_data::ThreadData;
     use rusty_renju::board::Board;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
-    use std::sync::atomic::Ordering;
+    use std::sync::atomic::{AtomicBool, AtomicUsize};
     use std::time::Instant;
 
     macro_rules! vcf {
         ($case:expr) => {{
-            let mut board = $case.parse::<Board>().unwrap();
+            let global_counter = AtomicUsize::new(0);
+            let global_aborted = AtomicBool::new(false);
+            let mut td = ThreadData::new(&global_aborted, &global_counter);
+
             let mut tt = TranspositionTable::new_with_size(1);
 
+            let mut board = $case.parse::<Board>().unwrap();
+
             let instant = Instant::now();
-            let vcf_result = vcf::vcf_sequence(&mut tt, &mut board, u8::MAX).unwrap();
+            let vcf_result = vcf::vcf_sequence(&tt, &mut td, &&mut board, u8::MAX).unwrap();
             let time = instant.elapsed();
 
             let length = vcf_result.len();
@@ -28,7 +33,7 @@ mod test_vcf {
             println!("length: {}", length);
             println!("time: {:?}", time);
             println!("hash usage: {}", tt.hash_usage());
-            println!("counter: {}", COUNTER.load(Ordering::Relaxed));
+            println!("nodes: {}", td.batch_counter.total_local_count());
 
             board_string
         }};
@@ -405,6 +410,7 @@ mod test_vcf {
 
     #[test]
     fn deep_vcf() {
+        // 5 ms
         let case = indoc! {"
            A B C D E F G H I J K L M N O
         15 O O . . X . X . . O X O O X . 15
@@ -445,6 +451,7 @@ mod test_vcf {
 
         assert_eq!(vcf!(case), expected);
 
+        // 9 ms
         let case = indoc! {"
            A B C D E F G H I J K L M N O
         15 O . . . X . . . . . . . X . X 15
