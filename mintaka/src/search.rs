@@ -39,8 +39,8 @@ pub enum ThreadType {
 }
 
 pub fn iterative_deepening<const TH: ThreadType>(
-    tt: &TranspositionTable, board: &mut Board,
-    td: &mut ThreadData
+    td: &mut ThreadData,
+    board: &mut Board,
 ) {
     let mut pv = PrincipalVariation::default();
 
@@ -50,17 +50,17 @@ pub fn iterative_deepening<const TH: ThreadType>(
 }
 
 pub fn aspiration_search<const TH: ThreadType>(
-    tt: &TranspositionTable, board: &mut Board,
+    td: &mut ThreadData,
+    board: &mut Board,
     pv: &mut PrincipalVariation,
-    td: &mut ThreadData
 ) {
     todo!()
 }
 
 pub fn negamax<NT: NodeType>(
-    tt: &TranspositionTable, board: &mut Board,
-    pv: &mut PrincipalVariation,
     td: &mut ThreadData,
+    pv: &mut PrincipalVariation,
+    board: &mut Board,
     mut depth: Depth, mut alpha: Score, mut beta: Score,
 ) -> Score {
     if NT::IS_ROOT {
@@ -69,7 +69,7 @@ pub fn negamax<NT: NodeType>(
     if NT::IS_PV {
     }
 
-    let beta = -negamax::<NT::NextType>(tt, board, pv, td, depth, alpha, beta);
+    let beta = -negamax::<NT::NextType>(td, pv, board, depth, alpha, beta);
 
     0
 }

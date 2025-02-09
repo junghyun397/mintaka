@@ -30,13 +30,13 @@ impl AbstractTranspositionTable for TranspositionTable {
 
 impl TranspositionTable {
 
-    pub fn new_with_size(size_in_mib: usize) -> Self {
+    pub fn new_with_size(size_in_kib: usize) -> Self {
         let mut new = Self {
             table: Vec::new(),
             age: AtomicU8::new(0),
         };
 
-        new.resize_mut(size_in_mib);
+        new.resize_mut(size_in_kib);
 
         new
     }

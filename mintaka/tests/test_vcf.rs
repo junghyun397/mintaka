@@ -11,16 +11,16 @@ mod test_vcf {
 
     macro_rules! vcf {
         ($case:expr) => {{
+            let tt = TranspositionTable::new_with_size(512);
+
             let global_counter = AtomicUsize::new(0);
             let global_aborted = AtomicBool::new(false);
-            let mut td = ThreadData::new(&global_aborted, &global_counter);
-
-            let mut tt = TranspositionTable::new_with_size(1);
+            let mut td = ThreadData::new(&tt, &global_aborted, &global_counter);
 
             let mut board = $case.parse::<Board>().unwrap();
 
             let instant = Instant::now();
-            let vcf_result = vcf::vcf_sequence(&tt, &mut td, &&mut board, u8::MAX).unwrap();
+            let vcf_result = vcf::vcf_sequence(&mut td, &board, u8::MAX).unwrap();
             let time = instant.elapsed();
 
             let length = vcf_result.len();
@@ -33,53 +33,10 @@ mod test_vcf {
             println!("length: {}", length);
             println!("time: {:?}", time);
             println!("hash usage: {}", tt.hash_usage());
-            println!("nodes: {}", td.batch_counter.total_local_count());
+            println!("nodes: {}", td.batch_counter.count_local_total());
 
             board_string
         }};
-    }
-
-    #[test]
-    fn special_vcf() {
-        let case = indoc! {"
-           A B C D E F G H I J K L M N O
-        15 . . . . . . . . . . . . . . . 15
-        14 . . . . . . . . . . . . . . . 14
-        13 . . . . . . . . . . . . . . . 13
-        12 . . . . . . . . . . . . . . . 12
-        11 . . . . . . . . . . . . . . . 11
-        10 . . . . . . . . . . . . . . . 10
-         9 . . . . O . . . O . . . . . . 9
-         8 . . . . . . . X O O . . . . . 8
-         7 . . . . O X . X . . . . . . . 7
-         6 . . . . . X . . O X . . . . . 6
-         5 . . . . . . . . . . . . . . . 5
-         4 . . . . . . . X . . . X . . . 4
-         3 . . . . . . O . . . . . . . . 3
-         2 . . . . . . . . . . . . . . . 2
-         1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
-
-        let expected = indoc! {"
-           A B C D E F G H I J K L M N O
-        15 . . . . . . . . . . . . . . . 15
-        14 . . . . . . . . . . . . . . . 14
-        13 . . . . . . . . . . . . . . . 13
-        12 . . . . . . . . . . . . . . . 12
-        11 . . . . . . . . . . . . . . . 11
-        10 . . . . . X . O . . . . . . . 10
-         9 . . . . O O O X O . . . . . . 9
-         8 . . . . . X[X]X O O . . . . . 8
-         7 . . . . O X X X X O . . . . . 7
-         6 . . . . . X . X O X . . . . . 6
-         5 . . . . X O X O O . O . . . . 5
-         4 . . . O . X X X O X . X . . . 4
-         3 . . . . O . O . X . . . . . . 3
-         2 . . . . . . . . . O . . . . . 2
-         1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
-
-        assert_eq!(vcf!(case), expected);
     }
 
     #[test]

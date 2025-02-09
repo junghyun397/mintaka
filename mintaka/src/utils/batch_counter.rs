@@ -24,7 +24,7 @@ impl<'a> BatchCounter<'a> {
         self.add_amount_mut(2);
     }
 
-    pub fn add_amount_mut(&mut self, amount: usize) {
+    fn add_amount_mut(&mut self, amount: usize) {
         self.buffer += amount;
         if self.buffer >= 1024 {
             self.global_counter_in_1k.fetch_add(1, Ordering::Relaxed);
@@ -38,7 +38,7 @@ impl<'a> BatchCounter<'a> {
         self.local_counter_in_1k = 0;
     }
 
-    pub fn total_local_count(&self) -> usize {
+    pub fn count_local_total(&self) -> usize {
         self.local_counter_in_1k * 1000 + self.buffer
     }
 

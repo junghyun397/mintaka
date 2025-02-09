@@ -14,8 +14,8 @@ pub trait AbstractTranspositionTable {
 
     type EntryType: AbstractTTEntry;
 
-    fn calculate_table_len_in_mib(size_in_mib: usize) -> usize {
-        size_in_mib * 1024 * 1024 / size_of::<Self::EntryType>()
+    fn calculate_table_len_in_mib(size_in_kib: usize) -> usize {
+        size_in_kib * 1024 / size_of::<Self::EntryType>()
     }
 
     fn internal_table(&self) -> &Vec<Self::EntryType>;
@@ -34,8 +34,8 @@ pub trait AbstractTranspositionTable {
         }
     }
 
-    fn resize_mut(&mut self, size_in_mib: usize) {
-        let len = Self::calculate_table_len_in_mib(size_in_mib);
+    fn resize_mut(&mut self, size_in_kib: usize) {
+        let len = Self::calculate_table_len_in_mib(size_in_kib);
         unsafe {
             let new_table = Vec::from_raw_parts(
                 std::alloc::alloc_zeroed(
@@ -67,14 +67,14 @@ pub trait AbstractTranspositionTable {
     }
 
     fn hash_usage(&self) -> f64 {
-        const SAMPLES: usize = 2000;
+        const SAMPLES: usize = 1000;
 
         let sum: usize = self.internal_table().iter()
             .take(self.internal_table().len().min(SAMPLES))
             .map(Self::EntryType::usage)
             .sum();
 
-        sum as f64 / (SAMPLES * Self::EntryType::BUCKET_SIZE) as f64 * 100f64
+        sum as f64 / (SAMPLES * Self::EntryType::BUCKET_SIZE) as f64 * 100.0
     }
 
     fn total_entries(&self) -> usize {

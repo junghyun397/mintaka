@@ -21,7 +21,7 @@ pub const OVERLINE: u8                  = 0b0000_0010;
 pub const MARKER: u8                    = 0b0000_0001;
 
 const OPEN_THREE_POSITION: u32          = 3;
-const CLOSE_FOUR_SINGLE_POSITION: u32   = 8;
+const CLOSED_FOUR_SINGLE_POSITION: u32  = 8;
 
 const UNIT_CLOSED_FOUR_SINGLE_MASK: u32 = repeat_4x(CLOSED_FOUR_SINGLE);
 const UNIT_CLOSED_FOUR_MASK: u32        = repeat_4x(CLOSED_FOUR_DOUBLE);
@@ -178,7 +178,7 @@ impl PatternUnit {
     }
 
     pub fn iter_four_directions(&self) -> impl Iterator<Item=Direction> + '_ {
-        DirectionIterator::<CLOSE_FOUR_SINGLE_POSITION>::from(self)
+        DirectionIterator::<CLOSED_FOUR_SINGLE_POSITION>::from(self)
     }
 
     pub fn has_invalid_double_three(&self) -> bool {
