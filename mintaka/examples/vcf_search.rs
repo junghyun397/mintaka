@@ -1,5 +1,7 @@
+use mintaka::config::Config;
 use mintaka::endgame;
 use mintaka::memo::transposition_table::TranspositionTable;
+use mintaka::protocol::dummy_gama_manager::DummyGameManager;
 use mintaka::thread_data::ThreadData;
 use rusty_renju::board::Board;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
@@ -15,10 +17,13 @@ fn main() -> Result<(), &'static str> {
         .map_err(|_| "invalid argument")
         ?;
 
+    let config = Config::default();
+    let manager = DummyGameManager;
+
     let tt = TranspositionTable::new_with_size(512);
-    let global_counter = AtomicUsize::new(0);
+    let global_counter_in_1k = AtomicUsize::new(0);
     let global_aborted = AtomicBool::new(false);
-    let mut td = ThreadData::new(&tt, &global_aborted, &global_counter);
+    let mut td = ThreadData::new(&manager, config, &tt, &global_aborted, &global_counter_in_1k);
 
     let instant = Instant::now();
     let vcf_result = endgame::vcf::vcf_sequence(&mut td, &board, pos::U8_BOARD_SIZE)

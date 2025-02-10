@@ -7,7 +7,7 @@ pub trait EndgameAccumulator {
 
     fn unit(pos: Pos) -> Self;
 
-    fn append(self, defend: Pos, attack: Pos) -> Self;
+    fn append(self, defend: Pos, threat: Pos) -> Self;
 
     fn has_result(&self) -> bool;
 

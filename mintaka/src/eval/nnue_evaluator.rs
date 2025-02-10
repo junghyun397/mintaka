@@ -3,7 +3,9 @@ use crate::value::Eval;
 use rusty_renju::board::Board;
 
 pub struct NnueEvaluator {
-    weights: (),
+    black_weights: (),
+    white_weights: (),
+    general_weights: (),
 }
 
 impl Default for NnueEvaluator {

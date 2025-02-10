@@ -135,7 +135,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 } else if !td.tt.probe(
                     position_board.hash_key.set(C.reversed(), defend_pos)
                 ).is_some_and(|entry| entry.endgame_flag == EndgameFlag::Cold) {
-                    if depth + 2 > max_depth || position_board.stones + 3 >= pos::U8_BOARD_SIZE {
+                    if depth + 2 > td.config.max_vcf_depth || position_board.stones + 3 >= pos::U8_BOARD_SIZE {
                         idx += 1;
 
                         continue 'position_search;

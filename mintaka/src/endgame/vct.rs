@@ -15,7 +15,7 @@ pub(crate) struct VCTFrame {
     depth: Depth,
     opponent_has_open_four: bool,
     opponent_has_five: bool,
-    attack_pos: Pos,
+    threat_pos: Pos,
     defend_pos: Pos,
 }
 
@@ -73,10 +73,10 @@ fn try_vct<const C: Color, ACC: EndgameAccumulator>(
             hash_key = hash_key.set(opponent_color, frame.defend_pos);
             tt.store_entry_mut(hash_key, build_vcf_lose_tt_entry(depth));
 
-            hash_key = hash_key.set(board.player_color, frame.attack_pos);
-            tt.store_entry_mut(hash_key, build_vct_win_tt_entry(depth, frame.attack_pos));
+            hash_key = hash_key.set(board.player_color, frame.threat_pos);
+            tt.store_entry_mut(hash_key, build_vct_win_tt_entry(depth, frame.threat_pos));
 
-            result = result.append(frame.defend_pos, frame.attack_pos);
+            result = result.append(frame.defend_pos, frame.threat_pos);
         }
 
         td.batch_counter.add_single_mut();
