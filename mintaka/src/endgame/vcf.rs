@@ -107,6 +107,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             }
 
             let mut position_board = board.set(four_pos);
+            td.batch_counter.add_single_mut();
 
             let defend_pos = find_defend_five_pos_unchecked::<C>(&position_board, four_pos, player_unit);
             let defend_pattern = position_board.patterns.field[defend_pos.idx_usize()];
@@ -115,55 +116,53 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             let defend_is_forbidden = C == Color::White && defend_pattern.is_forbidden();
 
             if match C {
-                Color::Black => defend_four_count != PatternCount::Multiple
-                    && !defend_unit.has_open_four(),
-                Color::White => !defend_unit.has_open_four()
-                    || defend_is_forbidden
+                Color::Black => defend_four_count == PatternCount::Multiple
+                    || defend_unit.has_open_four(),
+                Color::White => defend_unit.has_open_four()
+                    && !defend_is_forbidden
             } {
-                if match C {
-                    Color::Black => defend_four_count == PatternCount::Cold
-                        && player_unit.has_three(),
-                    Color::White => defend_is_forbidden
-                        || (defend_four_count == PatternCount::Cold
-                            && player_unit.has_three())
-                } {
-                    td.tt.store_entry_mut(board.hash_key, build_vcf_win_tt_entry(depth, four_pos));
-
-                    return backtrace_frames(td, board, depth, four_pos);
-                } else if !td.tt.probe(
-                    position_board.hash_key.set(C.reversed(), defend_pos)
-                ).is_some_and(|entry| entry.endgame_flag == EndgameFlag::Cold) {
-                    if depth + 2 > max_depth || position_board.stones + 3 >= pos::U8_BOARD_SIZE {
-                        idx += 1;
-
-                        continue 'position_search;
-                    }
-
-                    position_board.set_mut(defend_pos);
-
-                    td.vcf_stack.push(VCFFrame {
-                        board,
-                        next_idx: idx + 1,
-                        depth,
-                        opponent_has_five,
-                        four_pos,
-                        defend_pos,
-                    });
-
-                    board = position_board;
-                    idx = 0;
-                    depth = depth + 2;
-                    opponent_has_five = defend_four_count != PatternCount::Cold;
-
-                    td.batch_counter.add_pair_mut();
-
-                    continue 'vcf_search;
-                }
+                idx += 1;
+                continue 'position_search;
             }
 
+            if match C {
+                Color::Black => defend_four_count == PatternCount::Cold
+                    && player_unit.has_three(),
+                Color::White => defend_is_forbidden
+                    || (defend_four_count == PatternCount::Cold
+                    && player_unit.has_three())
+            } {
+                td.tt.store_entry_mut(board.hash_key, build_vcf_win_tt_entry(depth, four_pos));
+
+                return backtrace_frames(td, board, depth, four_pos);
+            }
+
+            if td.tt.probe(position_board.hash_key.set(C.reversed(), defend_pos))
+                .is_some_and(|entry| entry.endgame_flag == EndgameFlag::Cold)
+                || depth + 2 > max_depth || position_board.stones + 3 >= pos::U8_BOARD_SIZE
+            {
+                idx += 1;
+                continue 'position_search;
+            }
+
+            position_board.set_mut(defend_pos);
             td.batch_counter.add_single_mut();
 
-            idx += 1;
+            td.vcf_stack.push(VCFFrame {
+                board,
+                next_idx: idx + 1,
+                depth,
+                opponent_has_five,
+                four_pos,
+                defend_pos,
+            });
+
+            board = position_board;
+            idx = 0;
+            depth = depth + 2;
+            opponent_has_five = defend_four_count != PatternCount::Cold;
+
+            continue 'vcf_search;
         }
 
         let tt_entry = td.tt.probe(board.hash_key)
