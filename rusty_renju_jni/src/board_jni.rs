@@ -17,7 +17,7 @@ fn jbytearray_to_moves(env: &mut JNIEnv, source: JByteArray) -> Vec<Pos> { unsaf
         .collect()
 } }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_drop(
     _env: JNIEnv,
     _class: JClass,
@@ -26,7 +26,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_drop(
     let _ = unsafe { Box::from_raw(board_ptr as *mut Board) };
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_fromString(
     mut env: JNIEnv,
     _class: JClass,
@@ -41,7 +41,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_fromString(
         .unwrap_or(jlong::MIN)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_com_do1phin_rustyrenju_Board_fromMoves(
     mut env: JNIEnv,
     _class: JClass,
@@ -53,7 +53,7 @@ pub unsafe extern "system" fn Java_com_do1phin_rustyrenju_Board_fromMoves(
     board_to_ptr(board)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_fromEachColorMoves(
     mut env: JNIEnv,
     _class: JClass,
@@ -69,7 +69,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_fromEachColorMoves(
     board_to_ptr(board)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_toString<'a>(
     mut env: JNIEnv<'a>,
     _class: JClass<'a>,
@@ -78,7 +78,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_toString<'a>(
     env.new_string(retrieve_ref::<Board>(board_ptr).to_string()).unwrap()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_toDetailedString<'a>(
     mut env: JNIEnv<'a>,
     _class: JClass<'a>,
@@ -88,7 +88,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_toDetailedString<'a>(
 }
 
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_getStones(
     _env: JNIEnv,
     _class: JClass,
@@ -97,7 +97,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_getStones(
     retrieve_ref::<Board>(board_ptr).stones as jint
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_set(
     _env: JNIEnv,
     _class: JClass,
@@ -111,7 +111,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_set(
     value_to_ptr(board)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_unset(
     _env: JNIEnv,
     _class: JClass,
@@ -125,7 +125,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_unset(
     value_to_ptr(board)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_pass(
     _env: JNIEnv,
     _class: JClass,
@@ -138,7 +138,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_pass(
     value_to_ptr(board)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_setMut(
     _env: JNIEnv,
     _class: JClass,
@@ -149,7 +149,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_setMut(
         .set_mut(Pos::from_index(pos as u8));
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_unsetMut(
     _env: JNIEnv,
     _class: JClass,
@@ -160,7 +160,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_unsetMut(
         .unset_mut(Pos::from_index(pos as u8));
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_passMut(
     _env: JNIEnv,
     _class: JClass,
@@ -170,7 +170,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_passMut(
         .pass_mut();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_getPattern(
     _env: JNIEnv,
     _class: JClass,
@@ -181,7 +181,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_getPattern(
     value_to_ptr(pattern)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_getStoneColor(
     _env: JNIEnv,
     _class: JClass,
@@ -192,7 +192,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_getStoneColor(
     color_to_jint(color)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_getPlayerIsBlack(
     _env: JNIEnv,
     _class: JClass,

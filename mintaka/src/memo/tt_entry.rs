@@ -121,7 +121,7 @@ impl AbstractTTEntry for TTEntryBucket {
 impl TTEntryBucket {
 
     fn calculate_entry_index(&self, entry_key: TTEntryKey) -> usize {
-        ((entry_key.lower_21_bits << 11) * 6 >> 32) as usize
+        (((entry_key.lower_21_bits << 11) * 6) >> 32) as usize
     }
 
     fn store_key_mut(&self, entry_idx: usize, entry_key: TTEntryKey) {

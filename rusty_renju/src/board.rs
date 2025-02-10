@@ -1,6 +1,5 @@
 use crate::bitfield::Bitfield;
 use crate::memo::hash_key::HashKey;
-use crate::movegen::move_generator;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::Pos;

@@ -15,7 +15,7 @@ fn count_pattern<F>(board_ptr: jlong, pos: jint, is_black: jboolean, count: F) -
     count(&unit) as jint
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_isForbidden(
     _env: JNIEnv,
     _class: JClass,
@@ -25,7 +25,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_isForbidden(
     retrieve_ref::<Board>(board_ptr).patterns.field[pos as usize].is_forbidden() as jboolean
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_forbiddenKind(
     _env: JNIEnv,
     _class: JClass,
@@ -38,7 +38,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_forbiddenKind(
         .unwrap_or(0)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countOpenThree(
     _env: JNIEnv,
     _class: JClass,
@@ -49,7 +49,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countOpenThree(
     count_pattern(board_ptr, pos, is_black, PatternUnit::count_open_threes)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countOpenFour(
     _env: JNIEnv,
     _class: JClass,
@@ -60,7 +60,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countOpenFour(
     count_pattern(board_ptr, pos, is_black, PatternUnit::count_open_fours)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countCloseThree(
     _env: JNIEnv,
     _class: JClass,
@@ -71,7 +71,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countCloseThree(
     count_pattern(board_ptr, pos, is_black, PatternUnit::count_close_threes)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countClosedFour(
     _env: JNIEnv,
     _class: JClass,
@@ -82,7 +82,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countClosedFour(
     count_pattern(board_ptr, pos, is_black, PatternUnit::count_closed_fours)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countTotalFour(
     _env: JNIEnv,
     _class: JClass,
@@ -93,7 +93,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countTotalFour(
     count_pattern(board_ptr, pos, is_black, PatternUnit::count_total_fours)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countFive(
     _env: JNIEnv,
     _class: JClass,

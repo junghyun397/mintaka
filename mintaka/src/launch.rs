@@ -3,6 +3,7 @@ use crate::memo::transposition_table::TranspositionTable;
 use crate::protocol::game_manager::GameManager;
 use crate::search;
 use crate::thread_data::ThreadData;
+use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 
@@ -15,5 +16,5 @@ pub fn launch(manager: impl GameManager, default_config: Config) {
 
     let mut board = Board::default();
 
-    let (best_move, score) = search::iterative_deepening(&mut td, &mut board);
+    let (best_move, score) = search::iterative_deepening::<{ ThreadType::Main }>(&mut td, &mut board);
 }

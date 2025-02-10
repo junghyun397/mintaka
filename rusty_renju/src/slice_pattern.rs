@@ -31,7 +31,7 @@ impl Slice {
         // padding = 3
         let block: u32 = !(!(u32::MAX << self.length as u32) << 3);
         let extended_p: u32 = (self.stones::<C>() as u32) << 3;
-        let extended_q: u32 = (self.stones_reversed_color::<C>() as u32) << 3 | block;
+        let extended_q: u32 = ((self.stones_reversed_color::<C>() as u32) << 3) | block;
 
         let mut acc: SlicePattern = SlicePattern::EMPTY;
         for shift in
@@ -43,7 +43,7 @@ impl Slice {
 
             lookup_patterns::<C>(
                 &mut acc, shift,
-                p | q << 8,
+                p | (q << 8),
                 extended_p
             );
         }

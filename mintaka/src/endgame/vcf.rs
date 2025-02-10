@@ -12,7 +12,7 @@ use rusty_renju::pattern::{PatternCount, PatternUnit};
 // 2616 bytes
 #[derive(Copy, Clone)]
 #[repr(align(8))]
-pub(crate) struct VCFFrame {
+pub struct VCFFrame {
     board: Board,
     next_idx: usize,
     depth: Depth,
@@ -43,7 +43,7 @@ fn vcf<ACC: EndgameAccumulator>(
     td: &mut ThreadData,
     board: &Board, max_depth: Depth
 ) -> ACC {
-    let mut board = board.clone();
+    let board = *board;
     match board.player_color {
         Color::Black => try_vcf::<{ Color::Black }, ACC>(td, board, max_depth, 0, false),
         Color::White => try_vcf::<{ Color::White }, ACC>(td, board, max_depth, 0, false),
@@ -68,9 +68,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
         let opponent_color = board.opponent_color();
 
-        while !td.vcf_stack.is_empty() {
-            let frame = td.vcf_stack.pop().unwrap();
-
+        while let Some(frame) = td.vcf_stack.pop() {
             hash_key = hash_key.set(opponent_color, frame.defend_pos);
             td.tt.store_entry_mut(hash_key, build_vcf_lose_tt_entry(depth));
 
@@ -135,7 +133,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 } else if !td.tt.probe(
                     position_board.hash_key.set(C.reversed(), defend_pos)
                 ).is_some_and(|entry| entry.endgame_flag == EndgameFlag::Cold) {
-                    if depth + 2 > td.config.max_vcf_depth || position_board.stones + 3 >= pos::U8_BOARD_SIZE {
+                    if depth + 2 > max_depth || position_board.stones + 3 >= pos::U8_BOARD_SIZE {
                         idx += 1;
 
                         continue 'position_search;

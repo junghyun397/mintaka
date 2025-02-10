@@ -1,9 +1,8 @@
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use ethnum::{u256, uint};
-use std::fmt::Display;
-use std::ops::{BitOr, BitOrAssign, BitXor, Not};
-use std::simd::{u64x4, ToBytes};
+use std::ops::{BitOr, BitOrAssign, Not};
+use std::simd::u64x4;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Bitfield([u8; 32]);

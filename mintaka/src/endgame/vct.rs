@@ -41,7 +41,7 @@ fn vct<ACC: EndgameAccumulator>(
     tt: &TranspositionTable, td: &mut ThreadData,
     board: &Board, max_depth: Depth
 ) -> ACC {
-    let mut board = board.clone();
+    let mut board = *board;
     match board.player_color {
         Color::Black => try_vct::<{ Color::Black }, ACC>(tt, td, board, max_depth, 0, false, false),
         Color::White => try_vct::<{ Color::White }, ACC>(tt, td, board, max_depth, 0, false, false),
@@ -68,8 +68,7 @@ fn try_vct<const C: Color, ACC: EndgameAccumulator>(
 
         let opponent_color = board.opponent_color();
 
-        while !stack.is_empty() {
-            let frame = stack.pop().unwrap();
+        while let Some(frame) = stack.pop() {
             hash_key = hash_key.set(opponent_color, frame.defend_pos);
             tt.store_entry_mut(hash_key, build_vcf_lose_tt_entry(depth));
 
@@ -86,7 +85,7 @@ fn try_vct<const C: Color, ACC: EndgameAccumulator>(
 
     'vct_search: loop {
         'position_search: while idx < pos::BOARD_SIZE {
-
+            idx += 1;
         }
     }
 

@@ -136,6 +136,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "mintaka_pbrain"
+version = "0.1.0"
+dependencies = [
+ "mintaka",
+]
+
+[[package]]
 name = "mintaka_server"
 version = "0.1.0"
 dependencies = [
