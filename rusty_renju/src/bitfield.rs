@@ -1,6 +1,6 @@
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use ethnum::{u256, uint};
+use ethnum::u256;
 use std::ops::{BitOr, BitOrAssign, Not};
 use std::simd::u64x4;
 
@@ -19,9 +19,9 @@ impl Bitfield {
 
     pub const ZERO_FILLED: Bitfield = Bitfield([0; 32]);
 
-    pub fn is_cold(&self, pos: Pos) -> bool { unsafe {
-        *self.0.get_unchecked(pos.idx_usize() / 8) & (0b1 << (pos.idx_usize() % 8)) == 0
-    } }
+    pub fn is_cold(&self, pos: Pos) -> bool {
+        self.0[pos.idx_usize() / 8] & (0b1 << (pos.idx_usize() % 8)) == 0
+    }
 
     pub const fn is_hot(&self, pos: Pos) -> bool {
         self.0[pos.idx_usize() / 8] & (0b1 << (pos.idx_usize() % 8)) != 0
@@ -130,7 +130,7 @@ impl Iterator for BitfieldIterator {
         if self.position == pos::U8_BOARD_SIZE {
             None
         } else {
-            let result = self.value & uint!("0b1") == 1;
+            let result = self.value.as_u8() & 0b1 == 1;
             self.position += 1;
             self.value >>= 1;
             Some(result)

@@ -13,8 +13,8 @@ mod test_slice_pattern {
             let black_patterns = slice.calculate_slice_pattern::<{ Color::Black }, true>(0);
             let white_patterns = slice.calculate_slice_pattern::<{ Color::White }, true>(0);
 
-            let content_pattern = black_patterns.patterns.iter()
-                .zip(white_patterns.patterns.iter())
+            let content_pattern = black_patterns.patterns.to_ne_bytes().iter()
+                .zip(white_patterns.patterns.to_ne_bytes().iter())
                 .take(slice.length as usize)
                 .enumerate()
                 .map(|(idx, (black, white))| {

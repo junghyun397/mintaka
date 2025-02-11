@@ -5,7 +5,7 @@ use crate::{const_for, pattern};
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct SlicePattern {
-    pub patterns: [u8; 16],
+    pub patterns: u128,
 }
 
 impl Default for SlicePattern {
@@ -18,10 +18,10 @@ impl Default for SlicePattern {
 
 impl SlicePattern {
 
-    pub const EMPTY: Self = Self { patterns: [0; 16] };
+    pub const EMPTY: Self = Self { patterns: 0 };
 
     pub fn is_empty(&self) -> bool {
-        u128::from_ne_bytes(self.patterns) == 0
+        self.patterns == 0
     }
 
 }
@@ -69,10 +69,10 @@ fn lookup_patterns<const C: Color>(
         }
     }
 
-    let patch_pointer = unsafe { match C {
-        Color::Black => *SLICE_PATTERN_LUT.vector.black.get_unchecked(vector as usize),
-        Color::White => *SLICE_PATTERN_LUT.vector.white.get_unchecked(vector as usize),
-    } };
+    let patch_pointer = match C {
+        Color::Black => SLICE_PATTERN_LUT.vector.black[vector as usize],
+        Color::White => SLICE_PATTERN_LUT.vector.white[vector as usize],
+    };
 
     if patch_pointer != 0 {
         let slice_patch_data = unsafe { match C {
@@ -90,19 +90,17 @@ fn lookup_patterns<const C: Color>(
         let shl = (shift as isize - 3).min(0).unsigned_abs() * 8;
         let shr = shift.saturating_sub(3) * 8;
 
-        let mut patterns = u128::from_ne_bytes(acc.patterns);
         if slice_patch_data.patch_mask != 0 {
-            patterns |= ((slice_patch_data.patch_mask as u128) << shr) >> shl;
+            acc.patterns |= ((slice_patch_data.patch_mask as u128) << shr) >> shl;
         }
+
         if slice_patch_data.closed_four_mask != 0 {
-            patterns = increase_closed_four(
-                patterns,
+            acc.patterns = increase_closed_four(
+                acc.patterns,
                 ((slice_patch_data.closed_four_clear_mask as u128) << shr) >> shl,
                 ((slice_patch_data.closed_four_mask as u128) << shr) >> shl
             );
         }
-
-        acc.patterns = patterns.to_ne_bytes();
     }
 }
 

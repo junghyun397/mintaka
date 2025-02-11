@@ -343,11 +343,18 @@ impl Patterns {
     pub fn update_by_slice_mut<const C: Color, const D: Direction, const FULL_UPDATE: bool>(
         &mut self, slice: &Slice, slice_idx: usize
     ) {
-        let slice_pattern = if slice.pattern_available::<C>() {
-            slice.calculate_slice_pattern::<C, FULL_UPDATE>(slice_idx)
+        if slice.pattern_available::<C>() {
+            self.update_by_slice_pattern_mut::<C, D, FULL_UPDATE, false>(slice, slice_idx, slice.calculate_slice_pattern::<C, FULL_UPDATE>(slice_idx));
         } else {
-            SlicePattern::EMPTY
+            self.update_by_slice_pattern_mut::<C, D, FULL_UPDATE, true>(slice, slice_idx, SlicePattern::EMPTY);
         };
+    }
+
+    #[inline(always)]
+    fn update_by_slice_pattern_mut<const C: Color, const D: Direction, const FULL_UPDATE: bool, const IS_EMPTY: bool>(
+        &mut self, slice: &Slice, slice_idx: usize, slice_pattern: SlicePattern
+    ) {
+        let slice_pattern = unsafe { std::mem::transmute::<SlicePattern, [u8; 16]>(slice_pattern) };
 
         for pattern_idx in
             if FULL_UPDATE { 0 .. slice.length as usize }
@@ -364,13 +371,17 @@ impl Patterns {
                     cartesian_to_index!(slice.start_row as usize - pattern_idx, slice.start_col as usize + pattern_idx),
             };
 
-            unsafe { self.field.get_unchecked_mut(idx) }
-                .apply_mask_mut::<C, D>(unsafe { std::ptr::read(slice_pattern.patterns.as_ptr().add(pattern_idx)) });
+            if IS_EMPTY {
+                self.field[idx].apply_mask_mut::<C, D>(0);
+                continue;
+            }
+
+            self.field[idx].apply_mask_mut::<C, D>(unsafe { std::ptr::read(slice_pattern.as_ptr().add(pattern_idx)) });
 
             if C == Color::Black {
                 let pos = Pos::from_index(idx as u8);
 
-                if unsafe { self.field.get_unchecked(idx) }.black_unit.has_threes() {
+                if self.field[idx].black_unit.has_threes() {
                     self.unchecked_double_three_field.set_mut(pos);
                 } else {
                     self.unchecked_double_three_field.unset_mut(pos);
@@ -378,10 +389,12 @@ impl Patterns {
             }
         }
 
-        self.five_in_a_row = self.five_in_a_row.or(
-            contains_five_in_a_row(slice.stones::<C>())
-                .then_some(C)
-        );
+        if !IS_EMPTY {
+            self.five_in_a_row = self.five_in_a_row.or(
+                contains_five_in_a_row(slice.stones::<C>())
+                    .then_some(C)
+            );
+        }
     }
 
 }
