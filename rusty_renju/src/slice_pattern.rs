@@ -1,6 +1,7 @@
 use crate::notation::color::Color;
-use crate::pattern;
 use crate::slice::Slice;
+use crate::slice_pattern::ExtendedMatch::{Left, Right};
+use crate::{const_for, pattern};
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct SlicePattern {
@@ -63,8 +64,8 @@ fn lookup_patterns<const C: Color>(
     #[cold]
     fn extended_match_for_black(direction: ExtendedMatch, b_raw: u32, shift: usize) -> bool {
         match direction {
-            ExtendedMatch::Left => b_raw & (0b1 << (shift.saturating_sub(1))) == 0,
-            ExtendedMatch::Right => b_raw & (0b1 << (shift + 8)) == 0
+            Left => b_raw & (0b1 << (shift.saturating_sub(1))) == 0,
+            Right => b_raw & (0b1 << (shift + 8)) == 0
         }
     }
 
@@ -136,6 +137,17 @@ enum ExtendedMatch {
     Right
 }
 
+impl ExtendedMatch {
+
+    const fn reverse(&self) -> Self {
+        match self {
+            Right => Left,
+            Left => Right
+        }
+    }
+
+}
+
 #[derive(Copy, Clone, Debug)]
 #[repr(align(8))]
 struct SlicePatchData {
@@ -158,15 +170,13 @@ impl SlicePatchData {
         let other_fours: [u8; 8] = other.closed_four_mask.to_ne_bytes();
         let mut double_four_mask: [u8; 8] = [0; 8];
 
-        let mut idx = 0;
-        while idx < 8 {
+        const_for!(idx in 0, 8; {
             if self_fours[idx] == pattern::CLOSED_FOUR_SINGLE
                 && other_fours[idx] == pattern::CLOSED_FOUR_SINGLE
             {
                 double_four_mask[idx] = pattern::CLOSED_FOUR_DOUBLE;
             }
-            idx += 1;
-        }
+        });
 
         Self {
             patch_mask: self.patch_mask | other.patch_mask | u64::from_ne_bytes(double_four_mask),
@@ -192,6 +202,7 @@ struct SlicePatternLut {
 
 const SLICE_PATTERN_LUT: SlicePatternLut = build_slice_pattern_lut();
 
+#[allow(unused_mut)]
 const fn build_slice_pattern_lut() -> SlicePatternLut {
     let mut slice_pattern_lut = {
         let initial_patch_data = SlicePatchData {
@@ -215,52 +226,11 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
         }
     };
 
-    let mut temp_vector_match_lut_black: [(u8, u8, u8, u8); u16::MAX as usize] = [(0, 0, 0, 0); u16::MAX as usize];
-    let mut temp_vector_match_lut_white: [(u8, u8, u8, u8); u16::MAX as usize] = [(0, 0, 0, 0); u16::MAX as usize];
+    let mut temp_vector_match_lut_black: [[u8; 4]; u16::MAX as usize] = [[0; 4]; u16::MAX as usize];
+    let mut temp_vector_match_lut_white: [[u8; 4]; u16::MAX as usize] = [[0; 4]; u16::MAX as usize];
 
     let mut patch_top_black: usize = 0;
     let mut patch_top_white: usize = 0;
-
-    const fn flash_vector_variants(
-        each_vector_match_lut: &mut [(u8, u8, u8, u8); u16::MAX as usize], patch_pointer: usize,
-        vector_variants: VectorVariants, depth: usize, vector: u16
-    ) {
-        macro_rules! flash_each_vector_variant {
-            ($new_vector:expr) => {
-                if depth < 7 {
-                    flash_vector_variants(each_vector_match_lut, patch_pointer, vector_variants, depth + 1, $new_vector);
-                } else {
-                    let mut patch_pointer_bucket = each_vector_match_lut[$new_vector as usize];
-
-                    if patch_pointer_bucket.0 == 0 {
-                        patch_pointer_bucket.0 = patch_pointer as u8;
-                    } else if patch_pointer_bucket.1 == 0 {
-                        patch_pointer_bucket.1 = patch_pointer as u8;
-                    } else if patch_pointer_bucket.2 == 0 {
-                        patch_pointer_bucket.2 = patch_pointer as u8;
-                    } else {
-                        patch_pointer_bucket.3 = patch_pointer as u8;
-                    }
-
-                    each_vector_match_lut[$new_vector as usize] = patch_pointer_bucket;
-                }
-            };
-        }
-
-        if vector_variants[depth].stone {
-            let new_vector: u16 = (0b0000_0000_0000_0001 << depth) | vector;
-            flash_each_vector_variant!(new_vector);
-        }
-
-        if vector_variants[depth].block {
-            let new_vector: u16 = (0b0000_0001_0000_0000 << depth) | vector;
-            flash_each_vector_variant!(new_vector);
-        }
-
-        if vector_variants[depth].empty {
-            flash_each_vector_variant!(vector);
-        }
-    }
 
     macro_rules! fill_array {
         ($a:expr) => ([$a, "", "", ""]);
@@ -270,13 +240,9 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
     }
 
     macro_rules! embed_pattern {
-        (black,asymmetry,long-pattern,left,$pattern:literal,$($patch:literal),+) => {
-            embed_pattern!(black, rev=false, Some(ExtendedMatch::Left), $pattern, fill_array!($($patch),+));
-            embed_pattern!(black, rev=true, Some(ExtendedMatch::Right), $pattern, fill_array!($($patch),+));
-        };
-        (black,asymmetry,long-pattern,right,$pattern:literal,$($patch:literal),+) => {
-            embed_pattern!(black, rev=false, Some(ExtendedMatch::Right), $pattern, fill_array!($($patch),+));
-            embed_pattern!(black, rev=true, Some(ExtendedMatch::Left), $pattern, fill_array!($($patch),+));
+        (black,asymmetry,long-pattern,$direction:expr,$pattern:literal,$($patch:literal),+) => {
+            embed_pattern!(black, rev=false, Some($direction), $pattern, fill_array!($($patch),+));
+            embed_pattern!(black, rev=true, Some($direction.reverse()), $pattern, fill_array!($($patch),+));
         };
         ($color:ident,symmetry,$pattern:literal,$($patch:literal),+) => {
             embed_pattern!($color, rev=false, Option::None, $pattern, fill_array!($($patch),+));
@@ -300,35 +266,13 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
         }};
     }
 
-    macro_rules! compress_pattern_lut {
-        ($temp_vector_expr:expr,$vector_expr:expr,$patch_expr:expr,$patch_top_expr:expr) => {
-            let mut idx: usize = 0;
-            while idx < $temp_vector_expr.len() {
-                let patch_pointer_bucket = $temp_vector_expr[idx];
-                $vector_expr[idx] = if patch_pointer_bucket.1 != 0 {
-                    $patch_top_expr += 1;
-                    $patch_expr[$patch_top_expr] = $patch_expr[patch_pointer_bucket.0 as usize]
-                        .merge($patch_expr[patch_pointer_bucket.1 as usize])
-                        .merge($patch_expr[patch_pointer_bucket.2 as usize])
-                        .merge($patch_expr[patch_pointer_bucket.3 as usize]);
-
-                    $patch_top_expr as u8
-                } else {
-                    patch_pointer_bucket.0
-                };
-
-                idx += 1;
-            }
-        };
-    }
-
     // black-open-three
 
     embed_pattern!(black, asymmetry, "!.OO...!", "!.OO3..!", "!.OO.3.!");
     embed_pattern!(black, asymmetry, "X..OO..!", "X.3OO..!");
     embed_pattern!(black, asymmetry, "!.O.O..!", "!.O3O..!", "!.O.O3.!");
     embed_pattern!(black, symmetry, "!.O..O.!", "!.O3.O.!", "!.O.3O.!");
-    embed_pattern!(black, asymmetry, long-pattern, left, "..OO...O", "..OO3..O"); // [!]..OO...O
+    embed_pattern!(black, asymmetry, long-pattern, Left, "..OO...O", "..OO3..O"); // [!]..OO...O
 
     // white-open-three
 
@@ -356,7 +300,7 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
 
     embed_pattern!(black, asymmetry, "O.O.OO.!", "O.OFOO.!");
     embed_pattern!(black, asymmetry, "O.OO.O.!", "O.OOFO.!");
-    embed_pattern!(black, asymmetry, long-pattern, left, "..OOO..O", "..OOOF.O", "C.OOO..O"); // [!]..OOO..O
+    embed_pattern!(black, asymmetry, long-pattern, Left, "..OOO..O", "..OOOF.O", "C.OOO..O"); // [!]..OOO..O
 
     // white-closed-four
 
@@ -403,22 +347,88 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
     embed_pattern!(black, asymmetry, "O.OOOO", "O6OOOO");
     embed_pattern!(black, asymmetry, "OO.OOO", "OO6OOO");
 
-    compress_pattern_lut!(temp_vector_match_lut_black, slice_pattern_lut.vector.black, slice_pattern_lut.patch.black, patch_top_black);
-    compress_pattern_lut!(temp_vector_match_lut_white, slice_pattern_lut.vector.white, slice_pattern_lut.patch.white, patch_top_white);
-
-    slice_pattern_lut.patch.dbg_black_length = patch_top_black + 1;
-    slice_pattern_lut.patch.dbg_white_length = patch_top_white + 1;
+    compress_pattern_lut(temp_vector_match_lut_black, &mut slice_pattern_lut.vector.black, &mut slice_pattern_lut.patch.black, patch_top_black);
+    compress_pattern_lut(temp_vector_match_lut_white, &mut slice_pattern_lut.vector.white, &mut slice_pattern_lut.patch.white, patch_top_white);
 
     slice_pattern_lut
 }
+
+const fn flash_vector_variant(
+    lut: &mut [[u8; 4]; u16::MAX as usize],
+    patch_pointer: usize,
+    variants: VectorVariants,
+    depth: usize,
+    new_vector: u16,
+) {
+    if depth < 7 {
+        flash_vector_variants(lut, patch_pointer, variants, depth + 1, new_vector)
+    } else {
+        let idx = new_vector as usize;
+        let mut bucket = lut[idx];
+        if bucket[0] == 0 {
+            bucket[0] = patch_pointer as u8;
+        } else if bucket[1] == 0 {
+            bucket[1] = patch_pointer as u8;
+        } else if bucket[2] == 0 {
+            bucket[2] = patch_pointer as u8;
+        } else {
+            bucket[3] = patch_pointer as u8;
+        }
+        lut[idx] = bucket;
+    }
+}
+
+const fn flash_vector_variants(
+    lut: &mut [[u8; 4]; u16::MAX as usize],
+    patch_pointer: usize,
+    variants: VectorVariants,
+    depth: usize,
+    vector: u16,
+) {
+    if variants[depth].stone {
+        let new_vector = (0b0000_0000_0000_0001 << depth) | vector;
+        flash_vector_variant(lut, patch_pointer, variants, depth, new_vector);
+    }
+    if variants[depth].block {
+        let new_vector = (0b0000_0001_0000_0000 << depth) | vector;
+        flash_vector_variant(lut, patch_pointer, variants, depth, new_vector);
+    }
+    if variants[depth].empty {
+        flash_vector_variant(lut, patch_pointer, variants, depth, vector);
+    }
+}
+
+const fn compress_pattern_lut<const N: usize>(
+    temp_vector: [[u8; 4]; u16::MAX as usize],
+    vector: &mut [u8; u16::MAX as usize],
+    patch: &mut [SlicePatchData; N],
+    mut patch_top: usize
+) -> usize {
+    const_for!(idx in 0, temp_vector.len(); {
+        let patch_pointer_bucket = temp_vector[idx];
+        vector[idx] = if patch_pointer_bucket[1] != 0 {
+            patch_top += 1;
+            patch[patch_top] = patch[patch_pointer_bucket[0] as usize]
+                .merge(patch[patch_pointer_bucket[1] as usize])
+                .merge(patch[patch_pointer_bucket[2] as usize])
+                .merge(patch[patch_pointer_bucket[3] as usize]);
+
+            patch_top as u8
+        } else {
+            patch_pointer_bucket[0]
+        };
+    });
+
+    patch_top
+}
+
 
 const fn build_slice_patch_data(extended_match: Option<ExtendedMatch>, reversed: bool, sources: [&str; 4]) -> SlicePatchData {
     let mut patch_mask: [u8; 8] = [0; 8];
     let mut closed_four_clear_mask: [u8; 8] = [0; 8];
     let mut closed_four_mask: [u8; 8] = [0; 8];
 
-    let mut idx: usize = 0;
-    while idx < 4 {
+    const_for!(idx in 0, 4; {
         if !sources[idx].is_empty() {
             let (pos, kind) = parse_patch_literal(sources[idx], reversed);
 
@@ -429,8 +439,7 @@ const fn build_slice_patch_data(extended_match: Option<ExtendedMatch>, reversed:
                 patch_mask[pos] |= kind;
             }
         }
-        idx += 1;
-    }
+    });
 
     SlicePatchData {
         patch_mask: u64::from_ne_bytes(patch_mask),
@@ -451,8 +460,8 @@ type VectorVariants = [VectorVariantElement; 8];
 
 const fn parse_vector_variant_literal(source: &str, reversed: bool) -> VectorVariants {
     let mut acc: VectorVariants = [VectorVariantElement { stone: true, block: true, empty: true }; 8];
-    let mut idx: usize = 0;
-    while idx < source.len() {
+
+    const_for!(idx in 0, source.len(); {
         let pos = if reversed { 7 - idx } else { idx };
         acc[pos] = match source.as_bytes()[idx] as char {
             'O' => VectorVariantElement { stone: true, block: false, empty: false },
@@ -461,15 +470,13 @@ const fn parse_vector_variant_literal(source: &str, reversed: bool) -> VectorVar
             '.' => VectorVariantElement { stone: false, block: false, empty: true },
             _ => unreachable!(),
         };
-        idx += 1;
-    }
+    });
 
     acc
 }
 
 const fn parse_patch_literal(source: &str, reversed: bool) -> (usize, u8) {
-    let mut idx: usize = 0;
-    while idx < source.len() {
+    const_for!(idx in 0, source.len(); {
         let pos = if reversed { 7 - idx } else { idx };
         match source.as_bytes()[idx] as char {
             '3' => return (pos, pattern::OPEN_THREE),
@@ -480,8 +487,7 @@ const fn parse_patch_literal(source: &str, reversed: bool) -> (usize, u8) {
             '6' => return (pos, pattern::OVERLINE),
             _ => {}
         }
-        idx += 1;
-    }
+    });
 
     unreachable!()
 }

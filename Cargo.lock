@@ -128,7 +128,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
 name = "mintaka"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
  "indoc",
  "rusty_renju",
@@ -136,15 +136,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "mintaka_pbrain"
-version = "0.1.0"
+name = "mintaka_interface"
+version = "0.9.0"
 dependencies = [
  "mintaka",
+ "rusty_renju",
 ]
 
 [[package]]
 name = "mintaka_server"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
  "time",
  "tiny_http",
@@ -228,7 +229,7 @@ checksum = "53a49587ad06b26609c52e423de037e7f57f20d53535d66e08c695f347df952a"
 
 [[package]]
 name = "rusty_renju"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
  "ethnum",
  "indoc",
@@ -239,7 +240,7 @@ dependencies = [
 
 [[package]]
 name = "rusty_renju_jni"
-version = "1.0.0"
+version = "0.9.0"
 dependencies = [
  "jni",
  "rusty_renju",

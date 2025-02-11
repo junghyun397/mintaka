@@ -1,4 +1,4 @@
 [workspace]
-members = ["rusty_renju", "rusty_renju_jni", "mintaka", "mintaka_server", "mintaka_pbrain"]
+members = ["rusty_renju", "rusty_renju_jni", "mintaka", "mintaka_server", "mintaka_interface"]
 default-members = ["rusty_renju", "mintaka"]
 resolver = "2"

@@ -1,5 +1,6 @@
 use crate::bitfield::Bitfield;
 use crate::board::Board;
+use crate::const_for;
 use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
@@ -8,23 +9,17 @@ use std::simd::u64x64;
 const MOVE_SET_TABLE: [Bitfield; pos::BOARD_SIZE] = {
     let mut move_set_table = [Bitfield::ZERO_FILLED; pos::BOARD_SIZE];
 
-    let mut idx = 0;
-    while idx < pos::BOARD_SIZE {
-        let base_pos = Pos::from_index(idx as u8);
+    const_for!(idx in 0, pos::U8_BOARD_SIZE; {
+        let base_pos = Pos::from_index(idx);
 
-        let mut offset_row = -2;
-        while offset_row <= 2 {
-            let mut offset_col = -2;
-            while offset_col <= 2 {
+        const_for!(offset_row in -2, 3; {
+            const_for!(offset_col in -2, 3; {
                 if let Some(pos) = base_pos.offset(offset_row, offset_col) {
-                    move_set_table[idx].set_mut(pos);
+                    move_set_table[idx as usize].set_mut(pos);
                 }
-                offset_col += 1;
-            }
-            offset_row += 1;
-        }
-        idx += 1;
-    }
+            });
+        });
+    });
 
     move_set_table
 };

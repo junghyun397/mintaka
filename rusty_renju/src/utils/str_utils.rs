@@ -1,3 +1,5 @@
+use crate::const_for;
+
 pub fn join_str_horizontally(sources: &[&str]) -> String {
     let split = sources.iter()
         .map(|source|
@@ -35,18 +37,15 @@ pub fn join_str_horizontally(sources: &[&str]) -> String {
 pub const fn u8_from_str(source: &str, skip: usize) -> u8 {
     let bytes = source.as_bytes();
     let mut result = 0u8;
-    let mut i = skip;
 
-    while i < bytes.len() {
-        let byte = bytes[i];
+    const_for!(idx in skip, bytes.len(); {
+        let byte = bytes[idx];
         if byte >= b'0' && byte <= b'9' {
             result = result * 10 + (byte - b'0');
         } else {
             panic!("Invalid character in source");
         }
-
-        i += 1;
-    }
+    });
 
     result
 }

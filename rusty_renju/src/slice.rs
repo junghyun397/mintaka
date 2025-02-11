@@ -1,8 +1,8 @@
-use crate::max;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
+use crate::{const_for, max};
 
 const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
@@ -113,7 +113,7 @@ impl Slice {
         }
     }
 
-    pub fn remove_enclosed_stones(&self, mut p: u16, q: u16) -> u16 {
+    fn remove_enclosed_stones(&self, mut p: u16, q: u16) -> u16 {
         // filter X O O O X, filter X O O O O X
         let mut vector = q as u32 | ((p as u32) << 16);
 
@@ -179,16 +179,12 @@ impl Slices {
         let mut ascending_slices = [Slice::PLACEHOLDER; DIAGONAL_SLICE_AMOUNT];
         let mut descending_slices = [Slice::PLACEHOLDER; DIAGONAL_SLICE_AMOUNT];
 
-        let mut idx = 0;
-        while idx < pos::U_BOARD_WIDTH {
+        const_for!(idx in 0, pos::U_BOARD_WIDTH; {
             horizontal_slices[idx] = Slice::empty(pos::BOARD_WIDTH, idx as u8, 0);
             vertical_slices[idx] = Slice::empty(pos::BOARD_WIDTH, 0, idx as u8);
+        });
 
-            idx += 1;
-        }
-
-        let mut idx = 0;
-        while idx < DIAGONAL_SLICE_AMOUNT {
+        const_for!(idx in 0, DIAGONAL_SLICE_AMOUNT; {
             let seq_num = idx as isize + 5 - pos::I_BOARD_WIDTH;
 
             ascending_slices[idx] = Slice::empty(
@@ -201,9 +197,7 @@ impl Slices {
                 pos::BOARD_WIDTH - 1 - max!(0, -seq_num) as u8,
                 max!(0, seq_num) as u8
             );
-
-            idx += 1;
-        }
+        });
 
         Self {
             horizontal_slices,

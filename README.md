@@ -24,8 +24,8 @@ Java Native Interface implementation for rusty-renju.
 ## mintaka
 PVS-based renju engine.
 
-## mintaka-pbrain
-Gomocup/GUI Protocol implementation for mintaka.
+## mintaka-interface
+Gomocup/GUI Protocol and CLI implementation for mintaka.
 
 ## mintaka-server
 REST API backend server for web-ui frontend.

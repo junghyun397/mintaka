@@ -1,3 +1,15 @@
+#[macro_export] macro_rules! const_for {
+    ($idx:ident in $start:expr, $end:expr; $body:block) => {
+        {
+            let mut $idx = $start;
+            while $idx < $end {
+                $body
+                $idx += 1;
+            }
+        }
+    };
+}
+
 #[macro_export] macro_rules! min {
     ($a:expr,$b:expr) => ({ if $a < $b { $a } else { $b } });
 }
