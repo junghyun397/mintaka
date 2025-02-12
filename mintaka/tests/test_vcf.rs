@@ -19,9 +19,9 @@ mod test_vcf {
 
             let tt = TranspositionTable::new_with_size(512);
             let ht = HistoryTable {};
-            let global_counter = AtomicUsize::new(0);
+            let global_counter_in_1k = AtomicUsize::new(0);
             let global_aborted = AtomicBool::new(false);
-            let mut td = ThreadData::new(0, config, search_limit, &tt, ht, &global_aborted, &global_counter);
+            let mut td = ThreadData::new(0, config, search_limit, &tt, ht, &global_aborted, &global_counter_in_1k);
 
             let mut board = $case.parse::<Board>().unwrap();
 

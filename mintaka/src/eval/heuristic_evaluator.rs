@@ -70,7 +70,7 @@ impl HeuristicEvaluator {
 
 impl Evaluator for HeuristicEvaluator {
 
-    fn eval(&self, board: &Board) -> Eval {
+    fn static_eval(&self, board: &Board) -> Eval {
         let mut score: Eval = 0;
 
         for item in board.iter_items() {

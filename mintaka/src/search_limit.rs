@@ -1,4 +1,5 @@
 use rusty_renju::notation::value::Depth;
+use std::time::Duration;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct NodeCount {
@@ -7,7 +8,7 @@ pub struct NodeCount {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct TimeBound {
-    pub epoch_time_lower_64: usize,
+    pub duration: Duration,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

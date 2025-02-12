@@ -6,6 +6,7 @@ use crate::memo::transposition_table::TranspositionTable;
 use crate::search_limit::{NodeCount, SearchLimit, TimeBound};
 use rusty_renju::notation::value::Depth;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::time::Instant;
 
 #[derive(Clone)]
 pub struct ThreadData<'a> {
@@ -19,6 +20,8 @@ pub struct ThreadData<'a> {
 
     pub batch_counter: BatchCounter<'a>,
     global_aborted: &'a AtomicBool,
+
+    start_time: Instant,
 }
 
 impl<'a> ThreadData<'a> {
@@ -34,6 +37,7 @@ impl<'a> ThreadData<'a> {
             vcf_stack: Vec::with_capacity(32),
             batch_counter: BatchCounter::new(global_counter),
             global_aborted,
+            start_time: Instant::now(),
         }
     }
 
@@ -47,10 +51,16 @@ impl<'a> ThreadData<'a> {
                 current_depth >= depth,
             SearchLimit::Nodes(NodeCount { nodes_in_1k }) =>
                 self.batch_counter.count_global() >= nodes_in_1k,
-            SearchLimit::Time(TimeBound { epoch_time_lower_64 }) =>
-                32 >= epoch_time_lower_64,
+            SearchLimit::Time(TimeBound { duration }) =>
+                self.start_time.elapsed() >= duration,
             SearchLimit::Infinite => false
         }
+    }
+
+    pub fn calculate_tps(&self) -> f64 {
+        let elapsed = self.start_time.elapsed().as_secs_f64();
+        let nodes = self.batch_counter.count_global() as f64;
+        nodes / elapsed
     }
 
 }

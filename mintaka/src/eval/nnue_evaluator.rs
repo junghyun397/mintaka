@@ -18,7 +18,7 @@ impl Default for NnueEvaluator {
 
 impl Evaluator for NnueEvaluator {
 
-    fn eval(&self, board: &Board) -> Eval {
+    fn static_eval(&self, board: &Board) -> Eval {
         todo!()
     }
 

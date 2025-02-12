@@ -4,7 +4,7 @@ use crate::notation::color::Color;
 use crate::notation::pos::Pos;
 use smallvec::{smallvec, SmallVec};
 
-pub type Moves = SmallVec<[Pos; 16]>;
+pub type Moves = SmallVec<[Pos; 32]>;
 
 pub fn sort_moves(recent_move: Pos, moves: &mut Moves) {
     fn distance_to_recent_move(recent_move: Pos, pos: Pos) -> u8 {
