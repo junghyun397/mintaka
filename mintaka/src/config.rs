@@ -1,5 +1,5 @@
-use crate::value::Depth;
 use rusty_renju::notation::pos;
+use rusty_renju::notation::value::Depth;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Config {

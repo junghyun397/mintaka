@@ -10,6 +10,7 @@ enum PBrainCommand {
     Command(Command),
     Info(&'static str),
     Error(&'static str),
+    Ok,
     None
 }
 
@@ -20,17 +21,17 @@ fn main() {
         let arg = "";
 
         // https://plastovicka.github.io/protocl2en.htm
-        let maybe_command = match arg {
+        let pbrain_command = match arg {
             "START" => {
                 let size = 15;
                 if size == pos::U_BOARD_WIDTH {
-                    PBrainCommand::None
+                    PBrainCommand::Ok
                 } else {
-                    PBrainCommand::Error("ERROR message - unsupported size or other error")
+                    PBrainCommand::Error("ERROR unsupported size or other error")
                 }
             },
             "RECTSTART" => {
-                PBrainCommand::Error("ERROR message - rectangular board is not supported or other error")
+                PBrainCommand::Error("ERROR rectangular board is not supported or other error")
             }
             "BEGIN" => {
                 PBrainCommand::None
@@ -72,14 +73,23 @@ fn main() {
             },
             "ABOUT" =>
                 PBrainCommand::Info("name=\"mintaka\", author=\"JeongHyeon Choi\", version=\"0.1\", country=\"UNK\""),
-            &_ => PBrainCommand::Info("Unknown command.")
+            &_ => PBrainCommand::Info("ERROR unknown command.")
         };
 
-        match maybe_command {
-            PBrainCommand::Command(command) => {},
-            PBrainCommand::Info(_) => {}
-            PBrainCommand::Error(_) => {}
-            PBrainCommand::None => {}
-        }
+        match pbrain_command {
+            PBrainCommand::Command(command) => {
+                manager.command(command);
+            },
+            PBrainCommand::Info(message) => {
+                println!("INFO {}", message);
+            },
+            PBrainCommand::Error(message) => {
+                println!("ERROR {}", message);
+            },
+            PBrainCommand::Ok => {
+                println!("OK");
+            },
+            PBrainCommand::None => {},
+        };
     }
 }

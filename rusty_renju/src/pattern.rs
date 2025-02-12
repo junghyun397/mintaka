@@ -1,5 +1,4 @@
 use crate::bitfield::Bitfield;
-use crate::cartesian_to_index;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
@@ -108,6 +107,10 @@ impl PatternUnit {
 
     pub fn has_overline(&self) -> bool {
         self.apply_mask(UNIT_OVERLINE_MASK) != 0
+    }
+
+    pub fn has_three_four_fork(&self) -> bool {
+        self.apply_mask(UNIT_TOTAL_FOUR_MASK) != 0 && self.apply_mask(UNIT_OPEN_THREE_MASK) != 0
     }
 
     pub fn count_threes(&self) -> PatternCount {
@@ -344,14 +347,26 @@ impl Patterns {
         &mut self, slice: &Slice, slice_idx: usize
     ) {
         if slice.pattern_available::<C>() {
-            self.update_by_slice_pattern_mut::<C, D, FULL_UPDATE, false>(slice, slice_idx, slice.calculate_slice_pattern::<C, FULL_UPDATE>(slice_idx));
+            self.update_by_slice_pattern_mut::<C, D, FULL_UPDATE>(slice, slice_idx, slice.calculate_slice_pattern::<C, FULL_UPDATE>(slice_idx));
         } else {
-            self.update_by_slice_pattern_mut::<C, D, FULL_UPDATE, true>(slice, slice_idx, SlicePattern::EMPTY);
+            self.clear_by_slice_mut::<C, D, FULL_UPDATE>(slice, slice_idx);
         };
     }
 
     #[inline(always)]
-    fn update_by_slice_pattern_mut<const C: Color, const D: Direction, const FULL_UPDATE: bool, const IS_EMPTY: bool>(
+    fn clear_by_slice_mut<const C: Color, const D: Direction, const FULL_UPDATE: bool>(&mut self, slice: &Slice, slice_idx: usize) {
+        for pattern_idx in
+            if FULL_UPDATE { 0 .. slice.length as usize }
+            else { slice_idx.saturating_sub(6) .. (slice_idx + 6).min(slice.length as usize) }
+        {
+            self.field[slice.calculate_slice_offset::<D>(pattern_idx)].apply_mask_mut::<C, D>(0);
+        }
+
+        self.five_in_a_row = None;
+    }
+
+    #[inline(always)]
+    fn update_by_slice_pattern_mut<const C: Color, const D: Direction, const FULL_UPDATE: bool>(
         &mut self, slice: &Slice, slice_idx: usize, slice_pattern: SlicePattern
     ) {
         let slice_pattern = unsafe { std::mem::transmute::<SlicePattern, [u8; 16]>(slice_pattern) };
@@ -360,21 +375,7 @@ impl Patterns {
             if FULL_UPDATE { 0 .. slice.length as usize }
             else { slice_idx.saturating_sub(6) .. (slice_idx + 6).min(slice.length as usize) }
         {
-            let idx = match D {
-                Direction::Horizontal =>
-                    cartesian_to_index!(slice.start_row as usize, slice.start_col as usize + pattern_idx),
-                Direction::Vertical =>
-                    cartesian_to_index!(slice.start_row as usize + pattern_idx, slice.start_col as usize),
-                Direction::Ascending =>
-                    cartesian_to_index!(slice.start_row as usize + pattern_idx, slice.start_col as usize + pattern_idx),
-                Direction::Descending =>
-                    cartesian_to_index!(slice.start_row as usize - pattern_idx, slice.start_col as usize + pattern_idx),
-            };
-
-            if IS_EMPTY {
-                self.field[idx].apply_mask_mut::<C, D>(0);
-                continue;
-            }
+            let idx = slice.calculate_slice_offset::<D>(pattern_idx);
 
             self.field[idx].apply_mask_mut::<C, D>(unsafe { std::ptr::read(slice_pattern.as_ptr().add(pattern_idx)) });
 
@@ -389,12 +390,10 @@ impl Patterns {
             }
         }
 
-        if !IS_EMPTY {
-            self.five_in_a_row = self.five_in_a_row.or(
-                contains_five_in_a_row(slice.stones::<C>())
-                    .then_some(C)
-            );
-        }
+        self.five_in_a_row = self.five_in_a_row.or(
+            contains_five_in_a_row(slice.stones::<C>())
+                .then_some(C)
+        );
     }
 
 }

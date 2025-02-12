@@ -1,7 +1,7 @@
-use crate::value::{Depth, Eval, Score};
 use rusty_renju::memo::abstract_transposition_table::AbstractTTEntry;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::value::{Depth, Eval, Score};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const KEY_OFFSET: usize = 21;

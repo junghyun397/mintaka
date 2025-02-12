@@ -1,9 +1,9 @@
 use crate::principal_variation::PrincipalVariation;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
-use crate::value::{Depth, Eval, Score};
 use rusty_renju::board::Board;
 use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::value::{Depth, Eval, Score};
 
 pub trait NodeType {
 
@@ -61,8 +61,14 @@ pub fn pvs<NT: NodeType>(
     td: &mut ThreadData,
     pv: &mut PrincipalVariation,
     board: &mut Board,
-    mut depth: Depth, mut alpha: Score, mut beta: Score,
+    mut depth: Depth,
+    mut alpha: Score,
+    mut beta: Score,
 ) -> Score {
+    if td.is_aborted() || td.limit_reached(depth) {
+        return 0;
+    }
+
     if NT::IS_ROOT {
     }
 

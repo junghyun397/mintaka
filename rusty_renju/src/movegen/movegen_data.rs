@@ -1,13 +1,14 @@
-use crate::bitfield::Bitfield;
+use crate::notation::pos;
 use crate::notation::pos::Pos;
 
-pub struct MovegenAgent {
-    neighborhood_field: Bitfield,
+pub struct MovegenData {
+    score_field: [u8; pos::BOARD_SIZE],
+    total_score: i16,
     begin: Pos,
     end: Pos
 }
 
-impl MovegenAgent {
+impl MovegenData {
 
     pub fn set_mut(&mut self, pos: Pos) {
     }

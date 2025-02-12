@@ -1,2 +1,2 @@
 pub mod move_generator;
-pub mod movegen_agent;
+pub mod movegen_data;

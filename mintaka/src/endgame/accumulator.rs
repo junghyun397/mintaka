@@ -1,5 +1,5 @@
-use crate::value::Score;
 use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::value::Score;
 
 pub trait EndgameAccumulator {
 

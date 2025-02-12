@@ -2,7 +2,7 @@ use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::{const_for, max};
+use crate::{cartesian_to_index, const_for, max};
 
 const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
@@ -105,11 +105,25 @@ impl Slice {
         }
     }
 
-    pub fn calculate_idx(&self, direction: Direction, pos: Pos) -> usize {
+    pub fn calculate_slice_idx(&self, direction: Direction, pos: Pos) -> usize {
         match direction {
             Direction::Vertical => pos.row_usize(),
             Direction::Horizontal => pos.col_usize(),
             _ => pos.col_usize() - self.start_col as usize
+        }
+    }
+
+    #[inline(always)]
+    pub fn calculate_slice_offset<const D: Direction>(&self, offset: usize) -> usize {
+        match D {
+            Direction::Horizontal =>
+                cartesian_to_index!(self.start_row as usize, self.start_col as usize + offset),
+            Direction::Vertical =>
+                cartesian_to_index!(self.start_row as usize + offset, self.start_col as usize),
+            Direction::Ascending =>
+                cartesian_to_index!(self.start_row as usize + offset, self.start_col as usize + offset),
+            Direction::Descending =>
+                cartesian_to_index!(self.start_row as usize - offset, self.start_col as usize + offset),
         }
     }
 

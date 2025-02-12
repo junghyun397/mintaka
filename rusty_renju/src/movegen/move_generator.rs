@@ -1,41 +1,30 @@
 use crate::bitfield::Bitfield;
 use crate::board::Board;
-use crate::const_for;
 use crate::notation::color::Color;
-use crate::notation::pos;
 use crate::notation::pos::Pos;
-use std::simd::u64x64;
+use smallvec::{smallvec, SmallVec};
 
-const MOVE_SET_TABLE: [Bitfield; pos::BOARD_SIZE] = {
-    let mut move_set_table = [Bitfield::ZERO_FILLED; pos::BOARD_SIZE];
+pub type Moves = SmallVec<[Pos; 16]>;
 
-    const_for!(idx in 0, pos::U8_BOARD_SIZE; {
-        let base_pos = Pos::from_index(idx);
+pub fn sort_moves(recent_move: Pos, moves: &mut Moves) {
+    fn distance_to_recent_move(recent_move: Pos, pos: Pos) -> u8 {
+        let row_diff = (recent_move.row() as i16 - pos.row() as i16).unsigned_abs();
+        let col_diff = (recent_move.col() as i16 - pos.col() as i16).unsigned_abs();
 
-        const_for!(offset_row in -2, 3; {
-            const_for!(offset_col in -2, 3; {
-                if let Some(pos) = base_pos.offset(offset_row, offset_col) {
-                    move_set_table[idx as usize].set_mut(pos);
-                }
-            });
-        });
+        row_diff.max(col_diff) as u8
+    }
+
+    moves.sort_by(|a, b| {
+        distance_to_recent_move(recent_move, *a).cmp(&distance_to_recent_move(recent_move, *b))
     });
-
-    move_set_table
-};
-
-pub fn threat_available(pattern_vector: u64x64) -> bool {
-    false
 }
 
-pub fn generate_moves<const C: Color>(board: &Board) -> Bitfield {
-    // if open_four or five is available...
-
-    let mut defend_five_field = Bitfield::default();
+pub fn generate_moves<const C: Color>(board: &Board) -> Moves {
+    let mut defend_five_pos = Pos::INVALID;
     let mut on_defend_five_position = false;
 
-    let mut defend_open_four_field = Bitfield::default();
-    let mut on_defend_open_four_position = false;
+    let mut defend_threat_moves = smallvec![];
+    let mut on_defend_threat_position = false;
 
     for (idx, pattern) in board.patterns.field.iter().enumerate() {
         if pattern.is_empty() {
@@ -45,53 +34,44 @@ pub fn generate_moves<const C: Color>(board: &Board) -> Bitfield {
         let player_unit = pattern.player_unit::<C>();
 
         if player_unit.has_five() {
-            let mut result = Bitfield::default();
-            result.set_mut(Pos::from_index(idx as u8));
-            return result;
+            return smallvec![Pos::from_index(idx as u8)];
         }
 
         let opponent_unit = pattern.opponent_unit::<C>();
 
         if opponent_unit.has_five() && !pattern.is_forbidden() {
-            defend_five_field.set_mut(Pos::from_index(idx as u8));
+            defend_five_pos = Pos::from_index(idx as u8);
             on_defend_five_position = true;
+            continue;
         }
 
         if !on_defend_five_position
-            && player_unit.has_any_four()
+            && (player_unit.has_any_four() || player_unit.has_close_three())
             && !(C == Color::Black && pattern.is_forbidden())
         {
-            defend_open_four_field.set_mut(Pos::from_index(idx as u8));
+            defend_threat_moves.push(Pos::from_index(idx as u8));
+            continue;
         }
 
-        match C {
-            Color::Black => {
-                if !on_defend_five_position
-                    && (opponent_unit.has_open_four() || opponent_unit.has_fours())
-                    && !pattern.is_forbidden()
-                {
-                    defend_open_four_field.set_mut(Pos::from_index(idx as u8));
-                    on_defend_open_four_position = true;
-                }
-            }
-            Color::White => {
-                if !on_defend_five_position
-                    && opponent_unit.has_open_four()
-                    && !pattern.is_forbidden()
-                {
-                    defend_open_four_field.set_mut(Pos::from_index(idx as u8));
-                    on_defend_open_four_position = true;
-                }
-            }
+        if match C {
+            Color::Black => !on_defend_five_position
+                && (opponent_unit.has_open_four() || opponent_unit.has_fours())
+                && !pattern.is_forbidden(),
+            Color::White => !on_defend_five_position
+                && opponent_unit.has_open_four()
+                && !pattern.is_forbidden()
+        } {
+            defend_threat_moves.push(Pos::from_index(idx as u8));
+            on_defend_threat_position = true;
         }
     }
 
     if on_defend_five_position {
-        defend_five_field
-    } else if on_defend_open_four_position {
-        defend_open_four_field
+        smallvec![defend_five_pos]
+    } else if on_defend_threat_position {
+        defend_threat_moves
     } else {
-        !board.hot_field
+        todo!()
     }
 }
 

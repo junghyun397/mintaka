@@ -5,5 +5,3 @@ pub struct TimeManager {
     instant: Instant,
     aborted: AtomicBool,
 }
-
-

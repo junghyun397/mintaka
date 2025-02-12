@@ -1,9 +1,9 @@
 use crate::eval::evaluator::Evaluator;
-use crate::value::Eval;
 use rusty_renju::board::Board;
 use rusty_renju::board_iter::BoardIterItem;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::rule::ForbiddenKind;
+use rusty_renju::notation::value::Eval;
 use rusty_renju::pattern::PatternUnit;
 
 pub struct HeuristicWeights {

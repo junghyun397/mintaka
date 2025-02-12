@@ -1,12 +1,12 @@
 use crate::endgame::accumulator::{EndgameAccumulator, SequenceEndgameAccumulator};
 use crate::memo::tt_entry::{EndgameFlag, TTEntry, TTFlag};
 use crate::thread_data::ThreadData;
-use crate::value::{Depth, Eval, Score};
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::direction::Direction;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{Pos, BOARD_WIDTH};
+use rusty_renju::notation::value::{Depth, Eval, Score};
 use rusty_renju::pattern::{PatternCount, PatternUnit};
 
 // 2616 bytes

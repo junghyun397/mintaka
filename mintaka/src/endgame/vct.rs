@@ -2,11 +2,11 @@ use crate::endgame::accumulator::{EndgameAccumulator, SequenceEndgameAccumulator
 use crate::memo::transposition_table::TranspositionTable;
 use crate::memo::tt_entry::TTEntry;
 use crate::thread_data::ThreadData;
-use crate::value::{Depth, Score};
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::value::{Depth, Score};
 use smallvec::{smallvec, SmallVec};
 
 pub(crate) struct VCTFrame {

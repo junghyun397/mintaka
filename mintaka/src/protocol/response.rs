@@ -1,4 +1,5 @@
 use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::value::Score;
 
 #[derive(Debug)]
 pub enum Response {
@@ -9,7 +10,7 @@ pub enum Response {
     Status(Box<Status>),
     Board(String),
 
-    BestMove(Pos),
+    BestMove(Pos, Score),
     Switched,
     Aborted,
 }

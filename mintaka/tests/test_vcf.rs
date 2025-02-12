@@ -3,8 +3,9 @@ mod test_vcf {
     use indoc::indoc;
     use mintaka::config::Config;
     use mintaka::endgame::vcf;
+    use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
-    use mintaka::protocol::dummy_gama_manager::DummyGameManager;
+    use mintaka::search_limit::SearchLimit;
     use mintaka::thread_data::ThreadData;
     use rusty_renju::board::Board;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
@@ -14,12 +15,13 @@ mod test_vcf {
     macro_rules! vcf {
         ($case:expr) => {{
             let config = Config::default();
-            let manager = DummyGameManager;
+            let search_limit = SearchLimit::Infinite;
 
             let tt = TranspositionTable::new_with_size(512);
+            let ht = HistoryTable {};
             let global_counter = AtomicUsize::new(0);
             let global_aborted = AtomicBool::new(false);
-            let mut td = ThreadData::new(&manager, config, &tt, &global_aborted, &global_counter);
+            let mut td = ThreadData::new(0, config, search_limit, &tt, ht, &global_aborted, &global_counter);
 
             let mut board = $case.parse::<Board>().unwrap();
 

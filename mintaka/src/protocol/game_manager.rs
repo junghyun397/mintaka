@@ -5,8 +5,8 @@ pub trait GameManager {
 
     fn response(&self, response: Response);
 
-    fn command(&self, command: Command) -> Option<Response> {
-        None
+    fn command(&self, command: Command) {
+        todo!()
     }
 
 }
