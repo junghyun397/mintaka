@@ -65,7 +65,7 @@ pub fn pvs<NT: NodeType>(
     mut alpha: Score,
     mut beta: Score,
 ) -> Score {
-    if td.is_aborted() || td.limit_reached(depth) {
+    if td.is_aborted() || td.limit_reached() {
         return 0;
     }
 

@@ -1,4 +1,3 @@
-use rusty_renju::notation::value::Depth;
 use std::time::Duration;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -12,9 +11,15 @@ pub struct TimeBound {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct ComplexBound {
+    pub node_count: NodeCount,
+    pub time_bound: TimeBound,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum SearchLimit {
-    Depth(Depth),
     Nodes(NodeCount),
     Time(TimeBound),
+    Complex(ComplexBound),
     Infinite,
 }

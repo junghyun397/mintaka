@@ -1,27 +1,24 @@
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::value::Score;
+use smallvec::SmallVec;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PrincipalVariation {
     pub score: Score,
-    pub moves: [Pos; 64],
-    pub moves_top: usize,
+    pub moves: SmallVec<[Pos; 128]>,
 }
 
 impl Default for PrincipalVariation {
 
     fn default() -> Self {
-        Self::EMPTY
+        Self {
+            score: 0,
+            moves: SmallVec::new(),
+        }
     }
 
 }
 
 impl PrincipalVariation {
-
-    const EMPTY: Self = Self {
-        score: 0,
-        moves: [Pos::INVALID; 64],
-        moves_top: 0,
-    };
 
 }

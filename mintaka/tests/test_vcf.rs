@@ -3,6 +3,7 @@ mod test_vcf {
     use indoc::indoc;
     use mintaka::config::Config;
     use mintaka::endgame::vcf;
+    use mintaka::eval::heuristic_evaluator::HeuristicEvaluator;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
     use mintaka::search_limit::SearchLimit;
@@ -17,11 +18,13 @@ mod test_vcf {
             let config = Config::default();
             let search_limit = SearchLimit::Infinite;
 
+            let evaluator = HeuristicEvaluator::default();
+
             let tt = TranspositionTable::new_with_size(512);
             let ht = HistoryTable {};
             let global_counter_in_1k = AtomicUsize::new(0);
             let global_aborted = AtomicBool::new(false);
-            let mut td = ThreadData::new(0, config, search_limit, &tt, ht, &global_aborted, &global_counter_in_1k);
+            let mut td = ThreadData::new(0, config, search_limit, &evaluator, &tt, ht, &global_aborted, &global_counter_in_1k);
 
             let mut board = $case.parse::<Board>().unwrap();
 

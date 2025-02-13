@@ -18,5 +18,6 @@ pub mod thread_data;
 pub mod launch;
 pub mod thread_type;
 pub mod batch_counter;
-pub mod time_manager;
 pub mod search_limit;
+pub mod aspiration_window;
+pub mod search_frame;

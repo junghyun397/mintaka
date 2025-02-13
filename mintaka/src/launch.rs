@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::protocol::game_manager::GameManager;
@@ -15,6 +16,7 @@ pub fn launch(
     config: Config,
     threads: usize,
     search_limit: SearchLimit,
+    evaluator: &HeuristicEvaluator,
     tt: &TranspositionTable,
     ht: &mut HistoryTable,
 ) {
@@ -23,6 +25,7 @@ pub fn launch(
 
     let mut td = ThreadData::new(
         0, config, search_limit,
+        &evaluator,
         &tt, ht.clone(),
         &global_aborted, &global_counter_in_1k
     );
@@ -39,6 +42,7 @@ pub fn launch(
         for tid in 1 .. threads {
             let mut worker_td = ThreadData::new(
                 tid, config, search_limit,
+                &evaluator,
                 &tt, ht.clone(),
                 &global_aborted, &global_counter_in_1k
             );
