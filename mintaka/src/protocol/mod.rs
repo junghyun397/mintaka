@@ -1,4 +1,4 @@
 pub mod game_manager;
 pub mod command;
 pub mod response;
-pub mod dummy_gama_manager;
+pub mod dummy_game_manager;

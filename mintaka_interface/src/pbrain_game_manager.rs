@@ -3,8 +3,6 @@ use mintaka::protocol::response::Response;
 
 pub struct PBrainGameManager {}
 
-impl PBrainGameManager {}
-
 impl GameManager for PBrainGameManager {
 
     fn response(&self, response: Response) {
@@ -14,7 +12,7 @@ impl GameManager for PBrainGameManager {
             Response::Error(_) => {}
             Response::Status(_) => {}
             Response::Board(_) => {}
-            Response::BestMove(_) => {}
+            Response::BestMove(_, _) => {}
             Response::Switched => {}
             Response::Aborted => {}
         }

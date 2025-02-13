@@ -12,7 +12,7 @@ impl GameManager for CommandLineGameManager {
             Response::Error(_) => {}
             Response::Status(_) => {}
             Response::Board(_) => {}
-            Response::BestMove(_) => {}
+            Response::BestMove(_, _) => {}
             Response::Switched => {}
             Response::Aborted => {}
         }
