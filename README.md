@@ -1,37 +1,44 @@
 # mintaka
-(WIP) PVS-based Renju engine with strict Renju-rule implementation.
+(WIP) A high-performance PVS-based Renju engine with strict rule implementation.
 
-* Strict [Renju-rule](https://www.renju.net/rules/) support w/ [single line/nested forbidden moves](./documents/renju.md).
-* [Principal variation search](https://en.wikipedia.org/wiki/Principal_variation_search) based strong search algorithm.
-* High-performance endgame VCF calculator.
-* [Lazy-SMP](https://en.wikipedia.org/wiki/Lazy_SMP) based multicore processing.
-* AVX-512(512-bits), AVX2(256-bits) SIMD-accelerated.
-* Java Native Interface(JNI) support.
-* (WIP) WebAssembly and JavaScript Interface support.
-* (WIP) [Gomocup](http://gomocup.org/)/GUI Protocol support.
-* (WIP) [Solid.js](https://www.solidjs.com/)-based Web Frontend UI and REST API server.
-* (TBD) Efficiently updatable neural network-based evaluation function([NNUE](https://www.chessprogramming.org/NNUE)).
-* (TBD) Seperated NNUE networks for black and white.
-* (TBD) Big-endian system compatibility.
+## Features
 
-## rusty-renju
-Renju-Board Implementation.
- * ``strict-renju``: Enable nesting double-three checks.
+- **Core Engine**
+  - Full [Renju-rule](https://www.renju.net/rules/) implementation featuring strict forbidden move detection:
+    - Accurate detection of single-line and nested forbidden moves (overlines, double-threes, double-fours)
+    - See [detailed examples](./documents/renju.md) for complete specifications
+  - Advanced tree search algorithm based on Principal Variation Search (PVS) with dedicated VCF solver
+  - [Lazy-SMP](https://en.wikipedia.org/wiki/Lazy_SMP) parallel processing
+  - SIMD acceleration (AVX-512, AVX2, SSE2)
 
-## rusty-renju-jni
-Java Native Interface implementation for rusty-renju.
+- **Interfaces**
+  - Protocol: [Gomocup (pbrain)](https://plastovicka.github.io/protocl2en.htm), [GUI (Yixin-board)](https://github.com/accreator/Yixin-Board)
+  - Language Bindings: Java (JNI), WebAssembly/JavaScript (WIP)
+  - Web Frontend: Solid.js Web UI and REST API server (WIP)
 
-## mintaka
-PVS-based renju engine.
+- **Planned**
+  - [NNUE](https://www.chessprogramming.org/NNUE) based evaluation with separate black/white networks
+  - Big-endian system support
 
-## mintaka-interface
-Gomocup/GUI Protocol and CLI implementation for mintaka.
+## Project Structure
 
-## mintaka-server
-REST API backend server for web-ui frontend.
+### rusty-renju
+Core Renju rule implementation
 
-## mintaka-js
-TypeScript/Webassembly Interface implementation for mintaka.
+### mintaka
+PVS-based search engine core
 
-## mintaka-webui
-Web-frontends built with Solid.js.
+### mintaka-interface
+Protocol implementations ([Gomocup](https://plastovicka.github.io/protocl2en.htm), [Yixin-board](https://github.com/accreator/Yixin-Board), CLI)
+
+### mintaka-server
+REST API backend
+
+### mintaka-webui
+Solid.js frontend
+
+### mintaka-js
+TypeScript/WebAssembly bindings
+
+### rusty-renju-jni
+Java Native Interface bindings
