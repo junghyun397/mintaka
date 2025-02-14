@@ -19,6 +19,8 @@ pub enum Response {
 pub struct Status {
     pub nps: f64,
     pub total_nodes_in_1k: usize,
+    pub tt_size_in_kib: usize,
+    pub hash_usage: f64,
     pub best_moves: Vec<(Pos, Score)>,
     pub depth: Depth,
 }

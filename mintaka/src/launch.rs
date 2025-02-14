@@ -50,16 +50,12 @@ pub fn launch(
 
     let mut board = Board::default();
 
-    let mut handles = vec![];
-
     std::thread::scope(|s| {
-        let main_handle = s.spawn(|| {
+        s.spawn(|| {
             let (best_move, score) =
                 search::iterative_deepening::<{ ThreadType::Main }>(&mut td, &mut board.clone());
             manager.response(Response::BestMove(best_move, score));
         });
-
-        handles.push(main_handle);
 
         for tid in 1 .. threads {
             let mut worker_td = ThreadData::new(
@@ -69,17 +65,11 @@ pub fn launch(
                 &global_aborted, &global_counter_in_1k
             );
 
-            let worker_handle = s.spawn(move || {
+            s.spawn(move || {
                 search::iterative_deepening::<{ ThreadType::Worker }>(&mut worker_td, &mut board.clone());
             });
-
-            handles.push(worker_handle);
         }
     });
-
-    for handle in handles {
-        handle.join().unwrap();
-    }
 
     *ht = td.ht;
     tt.increase_age();

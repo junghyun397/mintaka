@@ -41,6 +41,10 @@ impl TranspositionTable {
         new
     }
 
+    pub fn size_in_kib(&self) -> usize {
+        size_of_val(&self.table) / 1024
+    }
+
     pub fn probe(&self, key: HashKey) -> Option<TTEntry> {
         let idx = self.calculate_index(key);
         self.table[idx].probe(key.into())

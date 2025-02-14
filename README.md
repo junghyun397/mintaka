@@ -43,3 +43,6 @@ WebAssembly bindings for JavaScript/TypeScript
 
 ### rusty-renju-jni
 Java Native Interface (JNI) bindings
+
+### mintaka-trainer
+Machine learning pipeline for NNUE training

@@ -2,10 +2,11 @@
 members = [
     "rusty_renju",
     "mintaka",
+    "mintaka_trainer",
     "mintaka_interface",
     "mintaka_server",
     "mintaka_wasm",
-    "rusty_renju_jni"
+    "rusty_renju_jni",
 ]
 default-members = ["rusty_renju", "mintaka"]
 resolver = "2"

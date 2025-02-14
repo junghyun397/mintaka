@@ -1,0 +1,8 @@
+[package]
+name = "mintaka_trainer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rusty_renju = { path = "../rusty_renju" }
+mintaka = { path = "../mintaka" }
