@@ -9,16 +9,17 @@
     - See [detailed examples](./documents/renju.md) for complete specifications
   - Advanced tree search algorithm based on Principal Variation Search (PVS) with dedicated VCF solver
   - [Lazy-SMP](https://en.wikipedia.org/wiki/Lazy_SMP) parallel processing
-  - SIMD acceleration (AVX-512, AVX2, SSE2)
+  - Hardware acceleration with SIMD instructions (AVX-512, AVX2, SSE2, Neon) and bit-manipulation instructions (BMI2)
 
 - **Interfaces**
-  - Protocol: [Gomocup (pbrain)](https://plastovicka.github.io/protocl2en.htm), [GUI (Yixin-board)](https://github.com/accreator/Yixin-Board)
-  - Language Bindings: Java (JNI), WebAssembly/JavaScript (WIP)
-  - Web Frontend: Solid.js Web UI and REST API server (WIP)
+  - Protocol Support: [Piskvork(Gomocup)](https://plastovicka.github.io/protocl2en.htm), [Yixin-board](https://github.com/accreator/Yixin-Board)
+  - FFI Bindings: Java (JNI), WebAssembly (JavaScript/TypeScript)
+  - Web Interface: Solid.js frontend with REST API backend
 
 - **Planned**
-  - [NNUE](https://www.chessprogramming.org/NNUE) based evaluation with separate black/white networks
-  - Big-endian system support
+  - [NNUE](https://en.wikipedia.org/wiki/Efficiently_updatable_neural_network)-based evaluation with separate networks for black/white pieces
+  - Opening book support for early game optimization
+  - Big-endian architecture support
 
 ## Project Structure
 
@@ -26,19 +27,19 @@
 Core Renju rule implementation
 
 ### mintaka
-PVS-based search engine core
+Principal Variation Search (PVS) based engine core
 
 ### mintaka-interface
-Protocol implementations ([Gomocup](https://plastovicka.github.io/protocl2en.htm), [Yixin-board](https://github.com/accreator/Yixin-Board), CLI)
+Protocol adapters for [Gomocup](https://plastovicka.github.io/protocl2en.htm), [Yixin-board](https://github.com/accreator/Yixin-Board) and CLI
 
 ### mintaka-server
-REST API backend
+REST API service for web integration
 
 ### mintaka-webui
-Solid.js frontend
+Solid.js based web frontend
 
-### mintaka-js
-TypeScript/WebAssembly bindings
+### mintaka-wasm
+WebAssembly bindings for JavaScript/TypeScript
 
 ### rusty-renju-jni
-Java Native Interface bindings
+Java Native Interface (JNI) bindings

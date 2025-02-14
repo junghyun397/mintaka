@@ -121,37 +121,6 @@ impl PatternUnit {
         PatternCount::from_masked_unit(self.apply_mask(UNIT_TOTAL_FOUR_MASK))
     }
 
-    pub fn open_three_at<const D: Direction>(&self) -> bool {
-        self.with_mask_at::<D>(OPEN_THREE)
-    }
-
-    pub fn close_three_at<const D: Direction>(&self) -> bool {
-        self.with_mask_at::<D>(CLOSE_THREE)
-    }
-
-    pub fn closed_four_at<const D: Direction>(&self) -> bool {
-        self.with_mask_at::<D>(CLOSED_FOUR_SINGLE)
-    }
-
-    pub fn open_four_at<const D: Direction>(&self) -> bool {
-        self.with_mask_at::<D>(OPEN_FOUR)
-    }
-
-    pub fn five_at<const D: Direction>(&self) -> bool {
-        self.with_mask_at::<D>(FIVE)
-    }
-
-    fn with_mask_at<const D: Direction>(&self, mask: u8) -> bool {
-        let packed = match D {
-            Direction::Horizontal => self.horizontal,
-            Direction::Vertical => self.vertical,
-            Direction::Ascending => self.ascending,
-            Direction::Descending => self.descending
-        };
-
-        packed & mask == mask
-    }
-
     pub fn count_open_threes(&self) -> u32 {
         self.apply_mask(UNIT_OPEN_THREE_MASK).count_ones()
     }
