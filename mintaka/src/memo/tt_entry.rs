@@ -25,10 +25,10 @@ impl From<HashKey> for TTEntryKey {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 #[repr(u8)]
-pub enum TTFlag {
-    #[default] PV = 0,
-    Lower = 1,
-    Upper = 2,
+pub enum ScoreKind {
+    #[default] None = 0,
+    Upper = 1,
+    Lower = 2,
     Exact = 3,
 }
 
@@ -41,13 +41,58 @@ pub enum EndgameFlag {
     Lose = 3,
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct TTFlag(u8);
+
+impl Default for TTFlag {
+
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+
+}
+
+impl TTFlag {
+
+    const DEFAULT: Self = Self(0);
+
+    pub fn new(score_kind: ScoreKind, endgame_flag: EndgameFlag, is_pv: bool) -> Self {
+        Self((score_kind as u8) | ((endgame_flag as u8) << 2) | ((is_pv as u8) << 4))
+    }
+
+    pub fn score_kind(&self) -> ScoreKind {
+        unsafe { std::mem::transmute(self.0 & 0b11) }
+    }
+
+    pub fn endgame_flag(&self) -> EndgameFlag {
+        unsafe { std::mem::transmute((self.0 >> 2) & 0b11) }
+    }
+
+    pub fn is_pv(&self) -> bool {
+        (self.0 >> 4) & 1 == 1
+    }
+
+    pub fn set_score_kind(&mut self, score_kind: ScoreKind) {
+        self.0 = (self.0 & !0b11) | score_kind as u8;
+    }
+
+    pub fn set_endgame_flag(&mut self, endgame_flag: EndgameFlag) {
+        self.0 = (self.0 & !(0b11 << 2)) | ((endgame_flag as u8) << 2);
+    }
+
+    pub fn set_pv(&mut self, is_pv: bool) {
+        self.0 = (self.0 & !(1 << 4)) | ((is_pv as u8) << 4);
+    }
+
+}
+
 // 64 bit
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(C, align(8))]
 pub struct TTEntry {
     pub best_move: Pos, // 8
-    pub flag: TTFlag, // 8
-    pub endgame_flag: EndgameFlag, // 8
+    pub tt_flag: TTFlag, // 8
+    pub age: u8, // 8
     pub depth: Depth, // 8
     pub eval: Eval, // 16
     pub score: Score, // 16
@@ -75,8 +120,8 @@ impl TTEntry {
 
     pub const EMPTY: Self = Self {
         best_move: Pos::INVALID,
-        flag: TTFlag::Exact,
-        endgame_flag: EndgameFlag::Unknown,
+        tt_flag: TTFlag::DEFAULT,
+        age: 0,
         depth: 0,
         eval: 0,
         score: 0,
@@ -84,9 +129,6 @@ impl TTEntry {
 
 }
 
-// key(21 bits) * 6 = 126 bits
-// entry(64 bits) * 6 = 384 bits
-// total 510 bits / 512 bits
 pub struct TTEntryBucket {
     hi_keys: AtomicU64,
     lo_keys: AtomicU64,

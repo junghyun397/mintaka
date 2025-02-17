@@ -361,18 +361,15 @@ const fn flash_vector_variant(
     if depth < 7 {
         flash_vector_variants(lut, patch_pointer, variants, depth + 1, new_vector)
     } else {
-        let idx = new_vector as usize;
-        let mut bucket = lut[idx];
-        if bucket[0] == 0 {
-            bucket[0] = patch_pointer as u8;
-        } else if bucket[1] == 0 {
-            bucket[1] = patch_pointer as u8;
-        } else if bucket[2] == 0 {
-            bucket[2] = patch_pointer as u8;
-        } else {
-            bucket[3] = patch_pointer as u8;
-        }
-        lut[idx] = bucket;
+        let mut bucket = lut[new_vector as usize];
+
+        const_for!(idx in 0, 4; {
+            if bucket[idx] == 0 {
+                bucket[idx] = patch_pointer as u8;
+                lut[new_vector as usize] = bucket;
+                return;
+            }
+        });
     }
 }
 
@@ -406,10 +403,10 @@ const fn compress_pattern_lut<const N: usize>(
         let patch_pointer_bucket = temp_vector[idx];
         vector[idx] = if patch_pointer_bucket[1] != 0 {
             patch_top += 1;
-            patch[patch_top] = patch[patch_pointer_bucket[0] as usize]
-                .merge(patch[patch_pointer_bucket[1] as usize])
-                .merge(patch[patch_pointer_bucket[2] as usize])
-                .merge(patch[patch_pointer_bucket[3] as usize]);
+
+            const_for!(i in 0, 4; {
+                patch[patch_top] = patch[patch_top].merge(patch[patch_pointer_bucket[i] as usize]);
+            });
 
             patch_top as u8
         } else {

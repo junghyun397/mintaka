@@ -6,8 +6,8 @@ mod test_vcf {
     use mintaka::eval::heuristic_evaluator::HeuristicEvaluator;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
-    use mintaka::search_limit::SearchLimit;
     use mintaka::thread_data::ThreadData;
+    use mintaka::thread_type::ThreadType;
     use rusty_renju::board::Board;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
@@ -16,15 +16,14 @@ mod test_vcf {
     macro_rules! vcf {
         ($case:expr) => {{
             let config = Config::default();
-            let search_limit = SearchLimit::Infinite;
 
             let evaluator = HeuristicEvaluator::default();
-
             let tt = TranspositionTable::new_with_size(512);
             let ht = HistoryTable {};
+
             let global_counter_in_1k = AtomicUsize::new(0);
             let global_aborted = AtomicBool::new(false);
-            let mut td = ThreadData::new(0, config, search_limit, &evaluator, &tt, ht, &global_aborted, &global_counter_in_1k);
+            let mut td = ThreadData::new(ThreadType::Main, 0, config, &evaluator, &tt, ht, &global_aborted, &global_counter_in_1k);
 
             let mut board = $case.parse::<Board>().unwrap();
 

@@ -6,17 +6,17 @@ use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::search_frame::SearchFrame;
 use crate::search_limit::{NodeCount, SearchLimit, TimeBound};
+use crate::thread_type::ThreadType;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Instant;
 
 #[derive(Clone)]
 pub struct ThreadData<'a> {
+    pub thread_type: ThreadType,
     pub tid: usize,
-    config: Config,
-    pub search_limit: SearchLimit,
+    pub config: Config,
 
     pub evaluator: &'a HeuristicEvaluator,
-
     pub tt: &'a TranspositionTable,
     pub ht: HistoryTable,
     pub search_stack: [SearchFrame; 128],
@@ -30,13 +30,16 @@ pub struct ThreadData<'a> {
 impl<'a> ThreadData<'a> {
 
     pub fn new(
-        tid: usize, config: Config, search_limit: SearchLimit,
+        thread_type: ThreadType, tid: usize,
+        config: Config,
         evaluator: &'a HeuristicEvaluator,
         tt: &'a TranspositionTable, ht: HistoryTable,
         global_aborted: &'a AtomicBool, global_counter: &'a AtomicUsize
     ) -> Self {
         Self {
-            tid, config, search_limit,
+            thread_type,
+            tid,
+            config,
             evaluator,
             tt, ht,
             search_stack: [SearchFrame::default(); 128],
@@ -52,7 +55,7 @@ impl<'a> ThreadData<'a> {
     }
 
     pub fn limit_reached(&self) -> bool {
-        match self.search_limit {
+        match self.config.search_limit {
             SearchLimit::Nodes(NodeCount { nodes_in_1k }) =>
                 self.batch_counter.count_global() >= nodes_in_1k,
             SearchLimit::Time(TimeBound { duration }) =>

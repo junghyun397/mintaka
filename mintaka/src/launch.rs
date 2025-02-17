@@ -22,7 +22,6 @@ pub fn eager_launch(
         manager,
         Config::default(),
         1,
-        search_limit,
         &HeuristicEvaluator::default(),
         &tt,
         &mut ht,
@@ -32,8 +31,7 @@ pub fn eager_launch(
 pub fn launch(
     manager: &(impl GameManager + Sync),
     config: Config,
-    threads: usize,
-    search_limit: SearchLimit,
+    workers: usize,
     evaluator: &HeuristicEvaluator,
     tt: &TranspositionTable,
     ht: &mut HistoryTable,
@@ -42,9 +40,8 @@ pub fn launch(
     let global_aborted = AtomicBool::new(false);
 
     let mut td = ThreadData::new(
-        0, config, search_limit,
-        &evaluator,
-        &tt, ht.clone(),
+        ThreadType::Main, 0, config,
+        &evaluator, &tt, ht.clone(),
         &global_aborted, &global_counter_in_1k
     );
 
@@ -57,11 +54,10 @@ pub fn launch(
             manager.response(Response::BestMove(best_move, score));
         });
 
-        for tid in 1 .. threads {
+        for tid in 1 ..workers {
             let mut worker_td = ThreadData::new(
-                tid, config, search_limit,
-                &evaluator,
-                &tt, ht.clone(),
+                ThreadType::Worker, tid, config,
+                &evaluator, &tt, ht.clone(),
                 &global_aborted, &global_counter_in_1k
             );
 

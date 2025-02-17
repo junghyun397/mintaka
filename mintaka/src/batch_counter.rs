@@ -34,11 +34,6 @@ impl<'a> BatchCounter<'a> {
         }
     }
 
-    pub fn clear_local(&mut self) {
-        self.buffer = 0;
-        self.local_counter_in_1k = 0;
-    }
-
     pub fn count_global(&self) -> usize {
         self.global_counter_in_1k.load(Ordering::Relaxed)
     }

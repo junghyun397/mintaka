@@ -1,4 +1,4 @@
-use crate::memo::tt_entry::{EndgameFlag, TTEntry, TTEntryBucket, TTFlag};
+use crate::memo::tt_entry::{EndgameFlag, ScoreKind, TTEntry, TTEntryBucket, TTFlag};
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::Pos;
@@ -52,8 +52,7 @@ impl TranspositionTable {
     }
 
     #[inline]
-    pub fn store_entry_mut(&self, key: HashKey, mut entry: TTEntry) {
-        entry.depth = self.fetch_age();
+    pub fn store_entry_mut(&self, key: HashKey, entry: TTEntry) {
         let idx = self.calculate_index(key);
         self.table[idx].store_mut(key.into(), entry);
     }
@@ -63,48 +62,46 @@ impl TranspositionTable {
         key: HashKey,
         ply: usize,
         best_move: Pos,
-        flag: TTFlag,
+        score_kind: ScoreKind,
+        endgame_flag: EndgameFlag,
         depth: Depth,
         eval: Eval,
-        mut score: Score
+        mut score: Score,
+        is_pv: bool,
     ) {
         let idx = self.calculate_index(key);
 
-        let new_entry = if let Some(mut entry) = self.table[idx].probe(key.into()) {
-            if entry.depth != self.fetch_age()
-                || flag == TTFlag::Exact
+        if let Some(mut entry) = self.table[idx].probe(key.into()) {
+            if self.fetch_age() > entry.age
+                || score_kind == ScoreKind::Exact
                 || entry.depth.saturating_add(5) > entry.depth
             {
                 if best_move != Pos::INVALID {
                     entry.best_move = best_move;
                 }
 
-                entry.flag = flag;
-                entry.endgame_flag = EndgameFlag::Unknown;
+                entry.tt_flag = TTFlag::new(score_kind, endgame_flag, is_pv);
+                entry.age = self.fetch_age();
                 entry.depth = depth;
                 entry.eval = eval;
                 entry.score = score;
+
+                self.table[idx].store_mut(key.into(), entry);
             }
 
-            entry
-        } else {
-            TTEntry {
-                best_move,
-                flag,
-                endgame_flag: EndgameFlag::Unknown,
-                depth,
-                eval,
-                score,
-            }
+            return;
+        }
+
+        let entry = TTEntry {
+            best_move,
+            tt_flag: TTFlag::new(score_kind, endgame_flag, false),
+            age: self.fetch_age(),
+            depth,
+            eval,
+            score,
         };
 
-        self.table[idx].store_mut(key.into(), new_entry);
-    }
-
-    pub fn view(&self) -> TTView {
-        TTView {
-            table_view: &self.table,
-        }
+        self.table[idx].store_mut(key.into(), entry);
     }
 
     pub fn increase_age(&self) {
@@ -114,13 +111,5 @@ impl TranspositionTable {
     pub fn fetch_age(&self) -> u8 {
         self.age.load(Ordering::Relaxed)
     }
-
-}
-
-pub struct TTView<'a> {
-    table_view: &'a [TTEntryBucket],
-}
-
-impl TTView<'_> {
 
 }
