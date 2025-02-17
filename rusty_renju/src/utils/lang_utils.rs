@@ -10,6 +10,13 @@
     };
 }
 
+#[macro_export] macro_rules! assert_struct_sizes {
+    ($t:ty, size=$size:expr, align=$align:expr) => {
+        const _: () = assert!(std::mem::size_of::<$t>() == $size);
+        const _: () = assert!(std::mem::align_of::<$t>() == $align);
+    };
+}
+
 #[macro_export] macro_rules! min {
     ($a:expr,$b:expr) => ({ if $a < $b { $a } else { $b } });
 }

@@ -1,11 +1,12 @@
+use rusty_renju::assert_struct_sizes;
 use rusty_renju::memo::abstract_transposition_table::AbstractTTEntry;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::value::{Depth, Eval, Score};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-const KEY_OFFSET: usize = 21;
-const KEY_MASK: u64 = 0b01_1111_1111_1111_1111_1111;
+const KEY_SIZE: usize = 21;
+const KEY_MASK: u64 = !(u64::MAX << KEY_SIZE as u64);
 
 #[derive(Copy, Clone)]
 pub struct TTEntryKey {
@@ -25,19 +26,19 @@ impl From<HashKey> for TTEntryKey {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 #[repr(u8)]
 pub enum TTFlag {
-    #[default] PV,
-    Lower,
-    Upper,
-    Exact,
+    #[default] PV = 0,
+    Lower = 1,
+    Upper = 2,
+    Exact = 3,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 #[repr(u8)]
 pub enum EndgameFlag {
-    #[default] Unknown,
-    Cold,
-    Win,
-    Lose
+    #[default] Unknown = 0,
+    Cold = 1,
+    Win = 2,
+    Lose = 3,
 }
 
 // 64 bit
@@ -51,6 +52,8 @@ pub struct TTEntry {
     pub eval: Eval, // 16
     pub score: Score, // 16
 }
+
+assert_struct_sizes!(TTEntry, size=8, align=8);
 
 impl From<TTEntry> for u64 {
 
@@ -90,6 +93,8 @@ pub struct TTEntryBucket {
     entries: [AtomicU64; 6]
 }
 
+assert_struct_sizes!(TTEntryBucket, size=64, align=8);
+
 impl AbstractTTEntry for TTEntryBucket {
 
     const BUCKET_SIZE: usize = 6;
@@ -98,12 +103,9 @@ impl AbstractTTEntry for TTEntryBucket {
         self.hi_keys.store(0, Ordering::Relaxed);
         self.lo_keys.store(0, Ordering::Relaxed);
 
-        self.entries[0].store(0, Ordering::Relaxed);
-        self.entries[1].store(0, Ordering::Relaxed);
-        self.entries[2].store(0, Ordering::Relaxed);
-        self.entries[3].store(0, Ordering::Relaxed);
-        self.entries[4].store(0, Ordering::Relaxed);
-        self.entries[5].store(0, Ordering::Relaxed);
+        for entry in &self.entries {
+            entry.store(0, Ordering::Relaxed);
+        }
     }
 
     fn usage(&self) -> usize {
@@ -120,36 +122,39 @@ impl AbstractTTEntry for TTEntryBucket {
 
 impl TTEntryBucket {
 
+    #[inline]
     fn calculate_entry_index(&self, entry_key: TTEntryKey) -> usize {
         (((entry_key.lower_21_bits << 11) * 6) >> 32) as usize
     }
 
+    #[inline]
     fn store_key_mut(&self, entry_idx: usize, entry_key: TTEntryKey) {
         if entry_idx < 3 {
             let hi_keys = self.hi_keys.load(Ordering::Acquire);
-            let bit_offset = KEY_OFFSET * entry_idx;
+            let bit_offset = KEY_SIZE * entry_idx;
             let mask = KEY_MASK << bit_offset;
             let content = (hi_keys & !mask) | (entry_key.lower_21_bits << bit_offset);
             self.hi_keys.store(content, Ordering::Release);
         } else {
             let lo_keys = self.lo_keys.load(Ordering::Acquire);
-            let bit_offset = KEY_OFFSET * (entry_idx - 3);
+            let bit_offset = KEY_SIZE * (entry_idx - 3);
             let mask = KEY_MASK << bit_offset;
             let content = (lo_keys & !mask) | (entry_key.lower_21_bits << bit_offset);
             self.lo_keys.store(content, Ordering::Release);
         }
     }
 
+    #[inline]
     pub fn probe(&self, entry_key: TTEntryKey) -> Option<TTEntry> {
         let entry_idx = self.calculate_entry_index(entry_key);
         if entry_idx < 3 {
             let hi_keys = self.hi_keys.load(Ordering::Relaxed);
-            if (hi_keys >> (KEY_OFFSET * entry_idx)) & KEY_MASK == entry_key.lower_21_bits {
+            if (hi_keys >> (KEY_SIZE * entry_idx)) & KEY_MASK == entry_key.lower_21_bits {
                 return Some(self.entries[entry_idx].load(Ordering::Relaxed).into())
             }
         } else {
             let lo_keys = self.lo_keys.load(Ordering::Relaxed);
-            if (lo_keys >> (KEY_OFFSET * (entry_idx - 3))) & KEY_MASK == entry_key.lower_21_bits {
+            if (lo_keys >> (KEY_SIZE * (entry_idx - 3))) & KEY_MASK == entry_key.lower_21_bits {
                 return Some(self.entries[entry_idx].load(Ordering::Relaxed).into())
             }
         }
@@ -157,6 +162,7 @@ impl TTEntryBucket {
         None
     }
 
+    #[inline]
     pub fn store_mut(&self, entry_key: TTEntryKey, entry: TTEntry) {
         let entry_idx = self.calculate_entry_index(entry_key);
         self.store_key_mut(entry_idx, entry_key);

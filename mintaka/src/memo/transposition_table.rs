@@ -45,12 +45,15 @@ impl TranspositionTable {
         size_of_val(&self.table) / 1024
     }
 
+    #[inline]
     pub fn probe(&self, key: HashKey) -> Option<TTEntry> {
         let idx = self.calculate_index(key);
         self.table[idx].probe(key.into())
     }
 
-    pub fn store_entry_mut(&self, key: HashKey, entry: TTEntry) {
+    #[inline]
+    pub fn store_entry_mut(&self, key: HashKey, mut entry: TTEntry) {
+        entry.depth = self.fetch_age();
         let idx = self.calculate_index(key);
         self.table[idx].store_mut(key.into(), entry);
     }
@@ -61,21 +64,38 @@ impl TranspositionTable {
         ply: usize,
         best_move: Pos,
         flag: TTFlag,
-        endgame_flag: EndgameFlag,
         depth: Depth,
         eval: Eval,
         mut score: Score
     ) {
         let idx = self.calculate_index(key);
-        let entry = self.table[idx].probe(key.into()).unwrap_or(TTEntry::EMPTY);
 
-        let new_entry = TTEntry {
-            best_move,
-            flag,
-            endgame_flag,
-            depth,
-            eval,
-            score,
+        let new_entry = if let Some(mut entry) = self.table[idx].probe(key.into()) {
+            if entry.depth != self.fetch_age()
+                || flag == TTFlag::Exact
+                || entry.depth.saturating_add(5) > entry.depth
+            {
+                if best_move != Pos::INVALID {
+                    entry.best_move = best_move;
+                }
+
+                entry.flag = flag;
+                entry.endgame_flag = EndgameFlag::Unknown;
+                entry.depth = depth;
+                entry.eval = eval;
+                entry.score = score;
+            }
+
+            entry
+        } else {
+            TTEntry {
+                best_move,
+                flag,
+                endgame_flag: EndgameFlag::Unknown,
+                depth,
+                eval,
+                score,
+            }
         };
 
         self.table[idx].store_mut(key.into(), new_entry);
