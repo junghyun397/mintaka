@@ -1,11 +1,9 @@
 use crate::config::Config;
-use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::protocol::game_manager::GameManager;
 use crate::protocol::response::Response;
 use crate::search;
-use crate::search_limit::SearchLimit;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
@@ -13,16 +11,15 @@ use std::sync::atomic::{AtomicBool, AtomicUsize};
 
 pub fn eager_launch(
     manager: &(impl GameManager + Sync),
-    search_limit: SearchLimit,
+    config: Config,
 ) {
     let tt = TranspositionTable::new_with_size(1024 * 16);
     let mut ht = HistoryTable {};
 
     launch(
         manager,
-        Config::default(),
+        config,
         1,
-        &HeuristicEvaluator::default(),
         &tt,
         &mut ht,
     );
@@ -32,7 +29,6 @@ pub fn launch(
     manager: &(impl GameManager + Sync),
     config: Config,
     workers: usize,
-    evaluator: &HeuristicEvaluator,
     tt: &TranspositionTable,
     ht: &mut HistoryTable,
 ) {
@@ -40,9 +36,11 @@ pub fn launch(
     let global_aborted = AtomicBool::new(false);
 
     let mut td = ThreadData::new(
-        ThreadType::Main, 0, config,
-        &evaluator, &tt, ht.clone(),
-        &global_aborted, &global_counter_in_1k
+        ThreadType::Main, 0,
+        config,
+        &tt,
+        ht.clone(),
+        &global_aborted, &global_counter_in_1k,
     );
 
     let mut board = Board::default();
@@ -56,8 +54,10 @@ pub fn launch(
 
         for tid in 1 ..workers {
             let mut worker_td = ThreadData::new(
-                ThreadType::Worker, tid, config,
-                &evaluator, &tt, ht.clone(),
+                ThreadType::Worker, tid,
+                config,
+                &tt,
+                ht.clone(),
                 &global_aborted, &global_counter_in_1k
             );
 

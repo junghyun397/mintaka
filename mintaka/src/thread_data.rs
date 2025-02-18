@@ -1,22 +1,21 @@
 use crate::batch_counter::BatchCounter;
 use crate::config::Config;
 use crate::endgame::vcf::VCFFrame;
-use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::search_frame::SearchFrame;
 use crate::search_limit::{NodeCount, SearchLimit, TimeBound};
 use crate::thread_type::ThreadType;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 #[derive(Clone)]
 pub struct ThreadData<'a> {
     pub thread_type: ThreadType,
     pub tid: usize,
+
     pub config: Config,
 
-    pub evaluator: &'a HeuristicEvaluator,
     pub tt: &'a TranspositionTable,
     pub ht: HistoryTable,
     pub search_stack: [SearchFrame; 128],
@@ -32,22 +31,26 @@ impl<'a> ThreadData<'a> {
     pub fn new(
         thread_type: ThreadType, tid: usize,
         config: Config,
-        evaluator: &'a HeuristicEvaluator,
-        tt: &'a TranspositionTable, ht: HistoryTable,
-        global_aborted: &'a AtomicBool, global_counter: &'a AtomicUsize
+        tt: &'a TranspositionTable,
+        ht: HistoryTable,
+        global_aborted: &'a AtomicBool,
+        global_counter_in_1k: &'a AtomicUsize
     ) -> Self {
         Self {
             thread_type,
             tid,
             config,
-            evaluator,
             tt, ht,
             search_stack: [SearchFrame::default(); 128],
             vcf_stack: Vec::with_capacity(32),
-            batch_counter: BatchCounter::new(global_counter),
+            batch_counter: BatchCounter::new(global_counter_in_1k),
             global_aborted,
             created_time: Instant::now(),
         }
+    }
+
+    pub fn running_time(&self) -> Duration {
+        self.created_time.elapsed()
     }
 
     pub fn is_aborted(&self) -> bool {
@@ -61,8 +64,8 @@ impl<'a> ThreadData<'a> {
             SearchLimit::Time(TimeBound { duration }) =>
                 self.created_time.elapsed() >= duration,
             SearchLimit::Complex(complex) =>
-                    self.batch_counter.count_global() >= complex.node_count.nodes_in_1k ||
-                    self.created_time.elapsed() >= complex.time_bound.duration,
+                self.batch_counter.count_global() >= complex.node_count.nodes_in_1k ||
+                self.created_time.elapsed() >= complex.time_bound.duration,
             SearchLimit::Infinite => false,
         }
     }

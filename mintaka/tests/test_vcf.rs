@@ -3,7 +3,6 @@ mod test_vcf {
     use indoc::indoc;
     use mintaka::config::Config;
     use mintaka::endgame::vcf;
-    use mintaka::eval::heuristic_evaluator::HeuristicEvaluator;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
     use mintaka::thread_data::ThreadData;
@@ -11,25 +10,22 @@ mod test_vcf {
     use rusty_renju::board::Board;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
-    use std::time::Instant;
 
     macro_rules! vcf {
         ($case:expr) => {{
+            let mut board = $case.parse::<Board>().unwrap();
+
             let config = Config::default();
 
-            let evaluator = HeuristicEvaluator::default();
             let tt = TranspositionTable::new_with_size(512);
             let ht = HistoryTable {};
 
             let global_counter_in_1k = AtomicUsize::new(0);
             let global_aborted = AtomicBool::new(false);
-            let mut td = ThreadData::new(ThreadType::Main, 0, config, &evaluator, &tt, ht, &global_aborted, &global_counter_in_1k);
 
-            let mut board = $case.parse::<Board>().unwrap();
-
-            let instant = Instant::now();
+            let mut td = ThreadData::new(ThreadType::Main, 0, config, &tt, ht, &global_aborted, &global_counter_in_1k);
             let vcf_result = vcf::vcf_sequence(&mut td, &board, u8::MAX).unwrap();
-            let time = instant.elapsed();
+            let time = td.running_time();
 
             let length = vcf_result.len();
             let final_move = vcf_result.last().copied().unwrap();
