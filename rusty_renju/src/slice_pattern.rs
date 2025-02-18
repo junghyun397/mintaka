@@ -42,10 +42,18 @@ impl Slice {
             let p = (extended_p >> shift) as u16 & 0x00FF;
             let q = (extended_q >> shift) as u16 & 0x00FF;
 
+            // little-endian
+            let shift_comp = (shift as isize).saturating_sub(3) * 8;
+            let shl = shift_comp.min(0).unsigned_abs();
+            let shr = shift_comp.max(0) as usize;
+
             lookup_patterns::<C>(
-                &mut acc, shift,
+                &mut acc,
+                shift,
                 p | (q << 8),
-                extended_p
+                extended_p,
+                shl,
+                shr
             );
         }
 
@@ -60,6 +68,8 @@ fn lookup_patterns<const C: Color>(
     shift: usize,
     vector: u16,
     raw: u32,
+    shl: usize,
+    shr: usize
 ) {
     #[cold]
     fn extended_match_for_black(direction: ExtendedMatch, b_raw: u32, shift: usize) -> bool {
@@ -85,10 +95,6 @@ fn lookup_patterns<const C: Color>(
         ) {
             return;
         }
-
-        // little-endian reverse
-        let shl = (shift as isize - 3).min(0).unsigned_abs() * 8;
-        let shr = shift.saturating_sub(3) * 8;
 
         if slice_patch_data.patch_mask != 0 {
             acc.patterns |= ((slice_patch_data.patch_mask as u128) << shr) >> shl;
