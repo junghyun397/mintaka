@@ -4,22 +4,29 @@ use crate::memo::transposition_table::TranspositionTable;
 use crate::protocol::game_manager::GameManager;
 use crate::protocol::response::Response;
 use crate::search;
+use crate::search_state::SearchState;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
+use rusty_renju::notation::pos::Pos;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 
 pub fn eager_launch(
     manager: &(impl GameManager + Sync),
     config: Config,
+    board: Board,
 ) {
-    let tt = TranspositionTable::new_with_size(1024 * 16);
+    let tt = TranspositionTable::new_with_size(1024 * 256);
     let mut ht = HistoryTable {};
 
     launch(
         manager,
         config,
-        1,
+        SearchState {
+            board,
+            recent_move: Pos::INVALID,
+            movegen_window: Default::default(),
+        },
         &tt,
         &mut ht,
     );
@@ -28,7 +35,7 @@ pub fn eager_launch(
 pub fn launch(
     manager: &(impl GameManager + Sync),
     config: Config,
-    workers: usize,
+    mut state: SearchState,
     tt: &TranspositionTable,
     ht: &mut HistoryTable,
 ) {
@@ -43,16 +50,13 @@ pub fn launch(
         &global_aborted, &global_counter_in_1k,
     );
 
-    let mut board = Board::default();
-
     std::thread::scope(|s| {
         s.spawn(|| {
-            let (best_move, score) =
-                search::iterative_deepening::<{ ThreadType::Main }>(&mut td, &mut board.clone());
+            let (best_move, score) = search::iterative_deepening::<{ ThreadType::Main }>(&mut td, &mut state.clone());
             manager.response(Response::BestMove(best_move, score));
         });
 
-        for tid in 1 ..workers {
+        for tid in 1 .. config.workers.get() {
             let mut worker_td = ThreadData::new(
                 ThreadType::Worker, tid,
                 config,
@@ -62,7 +66,7 @@ pub fn launch(
             );
 
             s.spawn(move || {
-                search::iterative_deepening::<{ ThreadType::Worker }>(&mut worker_td, &mut board.clone());
+                search::iterative_deepening::<{ ThreadType::Worker }>(&mut worker_td, &mut state.clone());
             });
         }
     });

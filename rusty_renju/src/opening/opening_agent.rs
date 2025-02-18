@@ -9,7 +9,8 @@ use std::collections::HashSet;
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub enum OpeningKind {
     Soosyrv8,
-    Taraguchi10
+    Taraguchi10,
+    Zeroed,
 }
 
 pub enum OpeningStage {
@@ -134,6 +135,7 @@ impl OpeningMove {
                     }),
                     _ => OpeningStage::Finish
                 },
+                OpeningKind::Zeroed => unreachable!()
             };
 
             (game, Some(next))
@@ -189,7 +191,8 @@ impl OpeningSwap {
                     move_window_width: 0,
                 }),
                 _ => OpeningStage::Finish
-            }
+            },
+            OpeningKind::Zeroed => unreachable!()
         }
     }
 
@@ -220,7 +223,8 @@ impl OpeningDeclare {
                     }),
                 )
             }
-            OpeningKind::Taraguchi10 => None
+            OpeningKind::Taraguchi10 => unreachable!(),
+            OpeningKind::Zeroed => unreachable!(),
         }
     }
 
@@ -302,7 +306,8 @@ impl OpeningSelect {
         self.validate_move(pos).then(||
             match self.opening_kind {
                 OpeningKind::Soosyrv8 => OpeningStage::Finish,
-                OpeningKind::Taraguchi10 => OpeningStage::Finish
+                OpeningKind::Taraguchi10 => OpeningStage::Finish,
+                OpeningKind::Zeroed => OpeningStage::Finish,
             }
         )
     }
@@ -321,7 +326,6 @@ impl OpeningBranch {
 
     fn branch(&self, make_offer: bool) -> OpeningStage {
         match self.opening_kind {
-            OpeningKind::Soosyrv8 => OpeningStage::Finish,
             OpeningKind::Taraguchi10 =>
                 if make_offer {
                     OpeningStage::Swap(OpeningSwap {
@@ -341,7 +345,9 @@ impl OpeningBranch {
                         symmetry_moves: HashSet::new(),
                         offers: vec![],
                     })
-                }
+                },
+            OpeningKind::Soosyrv8 => unreachable!(),
+            OpeningKind::Zeroed => unreachable!(),
         }
     }
 

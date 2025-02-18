@@ -23,25 +23,25 @@
 ## Project Structure
 
 ### rusty-renju
-Core Renju rule implementation
+Renju rule implementation with forbidden move detection and move generation
 
 ### mintaka
 Principal Variation Search (PVS) based engine core
 
 ### mintaka-interface
-Protocol adapters for [Gomocup](https://plastovicka.github.io/protocl2en.htm), [Yixin-board](https://github.com/accreator/Yixin-Board) and CLI
+Protocol adapters for [Piskvork(Gomocup)](https://plastovicka.github.io/protocl2en.htm), [Yixin-board](https://github.com/accreator/Yixin-Board) and CLI
 
 ### mintaka-server
-REST API service for web integration
+(TBD) REST API service for web integration
 
 ### mintaka-webui
-Solid.js based web frontend
+(TBD) Solid.js based web frontend
 
 ### mintaka-wasm
-WebAssembly bindings for JavaScript/TypeScript
+(TBD) WebAssembly bindings for JavaScript/TypeScript
 
 ### rusty-renju-jni
 Java Native Interface (JNI) bindings
 
 ### mintaka-trainer
-Machine learning pipeline for NNUE training
+(WIP) Machine learning pipeline for NNUE training

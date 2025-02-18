@@ -4,8 +4,8 @@ pub struct AspirationWindow {
     pub mid: Score,
     pub alpha: Score,
     pub beta: Score,
-    pub alpha_fails: Score,
-    pub beta_fails: Score
+    pub alpha_fails: usize,
+    pub beta_fails: usize
 }
 
 impl AspirationWindow {

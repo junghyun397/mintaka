@@ -86,7 +86,6 @@ impl TTFlag {
 
 }
 
-// 64 bit
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(C, align(8))]
 pub struct TTEntry {
@@ -130,8 +129,7 @@ impl TTEntry {
 }
 
 pub struct TTEntryBucket {
-    hi_keys: AtomicU64,
-    lo_keys: AtomicU64,
+    keys: [AtomicU64; 2],
     entries: [AtomicU64; 6]
 }
 
@@ -142,8 +140,9 @@ impl AbstractTTEntry for TTEntryBucket {
     const BUCKET_SIZE: usize = 6;
 
     fn clear_mut(&self) {
-        self.hi_keys.store(0, Ordering::Relaxed);
-        self.lo_keys.store(0, Ordering::Relaxed);
+        for keys in &self.keys {
+            keys.store(0, Ordering::Relaxed);
+        }
 
         for entry in &self.entries {
             entry.store(0, Ordering::Relaxed);
@@ -169,40 +168,23 @@ impl TTEntryBucket {
         (((entry_key.lower_21_bits << 11) * 6) >> 32) as usize
     }
 
-    #[inline(always)]
-    fn calculate_key_content(keys: u64, lower_21_bits: u64, internal_idx: usize) -> u64 {
-        let bit_offset = KEY_SIZE * internal_idx;
-        let mask = KEY_MASK << bit_offset;
-        (keys & !mask) | (lower_21_bits << bit_offset)
-    }
-
     #[inline]
     fn store_key_mut(&self, bucket_idx: usize, entry_key: TTEntryKey) {
-        if bucket_idx < 3 {
-            let content = Self::calculate_key_content(
-                self.hi_keys.load(Ordering::Acquire),
-                entry_key.lower_21_bits, bucket_idx
-            );
-            self.hi_keys.store(content, Ordering::Release);
-        } else {
-            let content = Self::calculate_key_content(
-                self.lo_keys.load(Ordering::Acquire),
-                entry_key.lower_21_bits, bucket_idx - 3
-            );
-            self.lo_keys.store(content, Ordering::Release);
-        }
+        let bit_offset = KEY_SIZE * (bucket_idx % 3);
+        let key_position = bucket_idx / 3;
+        let mask = KEY_MASK << bit_offset;
+
+        let keys = self.keys[key_position].load(Ordering::Acquire);
+        let content = (keys & !mask) | (entry_key.lower_21_bits << bit_offset);
+        self.keys[key_position].store(content, Ordering::Release);
     }
 
     #[inline]
     pub fn probe(&self, entry_key: TTEntryKey) -> Option<TTEntry> {
         let bucket_idx = Self::calculate_entry_index(entry_key);
-        let (keys, internal_idx) = if bucket_idx < 3 {
-            (self.hi_keys.load(Ordering::Relaxed), bucket_idx)
-        } else {
-            (self.lo_keys.load(Ordering::Relaxed), bucket_idx - 3)
-        };
 
-        ((keys >> (KEY_SIZE * internal_idx)) & KEY_MASK == entry_key.lower_21_bits)
+        let keys = self.keys[bucket_idx / 3].load(Ordering::Relaxed);
+        ((keys >> (KEY_SIZE * (bucket_idx % 3))) & KEY_MASK == entry_key.lower_21_bits)
             .then(|| self.entries[bucket_idx].load(Ordering::Relaxed).into())
     }
 

@@ -1,7 +1,11 @@
 [package]
 name = "mintaka_interface"
-version = "0.9.0"
+version = "0.1.0-pre-alpha"
 edition = "2021"
+
+[[bin]]
+name = "pbrain_mintaka"
+path = "src/piskvork.rs"
 
 [dependencies]
 rusty_renju = { path = "../rusty_renju" }

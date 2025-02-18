@@ -27,14 +27,12 @@ mod test_vcf {
             let vcf_result = vcf::vcf_sequence(&mut td, &board, u8::MAX).unwrap();
             let time = td.running_time();
 
-            let length = vcf_result.len();
-            let final_move = vcf_result.last().copied().unwrap();
+            board.batch_set_mut(&vcf_result.clone().into_boxed_slice());
+            let board_string = board.to_string_with_move_marker(vcf_result.last().copied().unwrap());
 
-            board.batch_set_mut(&vcf_result.into_boxed_slice());
-
-            let board_string = board.to_string_with_move_marker(final_move);
             println!("{}", board_string);
-            println!("length: {}", length);
+            println!("length: {}", vcf_result.len());
+            println!("sequence: {:?}", vcf_result);
             println!("time: {:?}", time);
             println!("hash usage: {}", tt.hash_usage());
             println!("nodes: {}", td.batch_counter.count_local_total());

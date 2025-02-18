@@ -1,7 +1,7 @@
 use crate::notation::color::Color;
 use crate::slice::Slice;
 use crate::slice_pattern::ExtendedMatch::{Left, Right};
-use crate::{const_for, pattern};
+use crate::{assert_struct_sizes, const_for, pattern};
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct SlicePattern {
@@ -157,6 +157,8 @@ struct SlicePatchData {
     closed_four_mask: u64,
     extended_match: Option<ExtendedMatch>,
 }
+
+assert_struct_sizes!(SlicePatchData, size=32, align=8);
 
 impl SlicePatchData {
 
@@ -387,10 +389,12 @@ const fn flash_vector_variants(
         let new_vector = (0b0000_0000_0000_0001 << depth) | vector;
         flash_vector_variant(lut, patch_pointer, variants, depth, new_vector);
     }
+
     if variants[depth].block {
         let new_vector = (0b0000_0001_0000_0000 << depth) | vector;
         flash_vector_variant(lut, patch_pointer, variants, depth, new_vector);
     }
+
     if variants[depth].empty {
         flash_vector_variant(lut, patch_pointer, variants, depth, vector);
     }

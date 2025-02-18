@@ -1,7 +1,7 @@
 use crate::principal_variation::PrincipalVariation;
+use crate::search_state::SearchState;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
-use rusty_renju::board::Board;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::value::{Depth, Eval, Score};
 
@@ -34,7 +34,7 @@ struct OffPVNode {} impl NodeType for OffPVNode {
 
 pub fn iterative_deepening<const TH: ThreadType>(
     td: &mut ThreadData,
-    board: &mut Board,
+    state: &mut SearchState,
 ) -> (Pos, Score) {
     let mut best_move = Pos::INVALID;
     let mut eval: Eval = 0;
@@ -51,7 +51,7 @@ pub fn iterative_deepening<const TH: ThreadType>(
 
 pub fn aspiration<const TH: ThreadType>(
     td: &mut ThreadData,
-    board: &mut Board,
+    state: &mut SearchState,
     pv: &mut PrincipalVariation,
 ) {
     todo!()
@@ -60,7 +60,7 @@ pub fn aspiration<const TH: ThreadType>(
 pub fn pvs<NT: NodeType>(
     td: &mut ThreadData,
     pv: &mut PrincipalVariation,
-    board: &mut Board,
+    state: &mut SearchState,
     mut depth: Depth,
     mut alpha: Score,
     mut beta: Score,
@@ -75,7 +75,7 @@ pub fn pvs<NT: NodeType>(
     if NT::IS_PV {
     }
 
-    let beta = -pvs::<NT::NextType>(td, pv, board, depth, alpha, beta);
+    let beta = -pvs::<NT::NextType>(td, pv, state, depth, alpha, beta);
 
     0
 }

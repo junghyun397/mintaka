@@ -1,10 +1,9 @@
-use crate::pbrain_game_manager::PBrainGameManager;
+use crate::piskvork_game_manager::PiskvorkGameManager;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::game_manager::GameManager;
 use rusty_renju::notation::pos;
 
-mod pbrain_game_manager;
-mod commandline_game_manager;
+mod piskvork_game_manager;
 
 enum PBrainCommand {
     Command(Command),
@@ -15,7 +14,7 @@ enum PBrainCommand {
 }
 
 fn main() {
-    let manager = PBrainGameManager {};
+    let manager = PiskvorkGameManager {};
 
     loop {
         let arg = "";

@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 use std::simd::num::SimdUint;
 use std::simd::u64x8;
 
-pub type Moves = SmallVec<[Pos; 32]>;
+pub type Moves = SmallVec<[Pos; 64]>;
 
 impl From<Moves> for Bitfield {
 
@@ -33,11 +33,11 @@ pub fn generate_moves<const C: Color>(board: &Board, movegen_window: &MovegenWin
     }
 }
 
-pub fn generate_neighborhood_moves(board: &Board, movegen_window: MovegenWindow) -> Moves {
+pub fn generate_neighborhood_moves(board: &Board, movegen_window: &MovegenWindow) -> Moves {
     SmallVec::from_iter((!board.hot_field & movegen_window.movegen_field).iter_hot_pos())
 }
 
-pub fn generate_threat_moves<const C: Color>(board: &Board) -> Moves {
+fn generate_threat_moves<const C: Color>(board: &Board) -> Moves {
     let mut defend_threat_moves = SmallVec::new();
 
     for (idx, pattern) in board.patterns.field.iter().enumerate() {
@@ -91,8 +91,10 @@ pub fn is_threat_available(board: &Board) -> bool {
         acc |= u64x8::from_slice(&patterns[idx .. idx + 8]);
     }
 
-    const TAIL_SIZE: usize = pos::BOARD_SIZE - pos::BOARD_SIZE % 8;
-    acc |= u64x8::from_slice(&patterns[TAIL_SIZE .. pos::BOARD_SIZE]);
+    const TAIL_BEGIN: usize = pos::BOARD_SIZE - pos::BOARD_SIZE % 8;
+    let mut tail = [0; 8];
+    tail[.. TAIL_BEGIN].copy_from_slice(&patterns[TAIL_BEGIN ..]);
+    acc |= u64x8::from_array(tail);
 
     let merged_pattern = unsafe { std::mem::transmute::<u64, Pattern>(acc.reduce_or()) };
     merged_pattern.black.has_open_four() || merged_pattern.white.has_open_four()

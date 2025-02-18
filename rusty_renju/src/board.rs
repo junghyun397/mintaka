@@ -157,7 +157,7 @@ impl Board {
         self.validate_double_three_mut();
     }
 
-    pub fn full_update_mut(&mut self) {
+    fn full_update_mut(&mut self) {
         macro_rules! update_by_slice {
             ($slice:expr,$direction:expr) => {{
                 if $slice.pattern_available::<{ Color::Black }>() {
@@ -374,7 +374,7 @@ impl Board {
         }
     }
 
-    pub fn calculate_near_four_window<const C: Color>(&self, direction: Direction, pos: Pos) -> u8 {
+    fn calculate_near_four_window<const C: Color>(&self, direction: Direction, pos: Pos) -> u8 {
         let slice = self.slices.access_slice_unchecked(direction, pos);
         let slice_idx = slice.calculate_slice_idx(direction, pos);
 

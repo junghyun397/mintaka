@@ -20,6 +20,10 @@ impl Default for MovegenWindow {
 
 }
 
+const MOVEGEN_WINDOW_MARGIN: u8 = 3;
+
+const MOVEGEN_IMPRINT_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_movegen_imprint_mask_lut();
+
 impl MovegenWindow {
 
     pub const EMPTY: MovegenWindow = MovegenWindow {
@@ -60,23 +64,19 @@ impl MovegenWindow {
     }
 
     pub fn imprint_window_mut(&mut self, pos: Pos) {
-        self.movegen_field |= MOVEGEN_WINDOW_MASK_LUT[pos.idx_usize()];
+        self.movegen_field |= MOVEGEN_IMPRINT_MASK_LUT[pos.idx_usize()];
     }
 
     pub fn batch_imprint_window_mut(&mut self, moves: &[Pos]) {
         for pos in moves {
-            self.movegen_field |= MOVEGEN_WINDOW_MASK_LUT[pos.idx_usize()];
+            self.movegen_field |= MOVEGEN_IMPRINT_MASK_LUT[pos.idx_usize()];
         }
     }
 
 }
 
-const MOVEGEN_WINDOW_MARGIN: u8 = 3;
-
-const MOVEGEN_WINDOW_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_movegen_window_mask_lut();
-
-const fn build_movegen_window_mask_lut() -> [Bitfield; pos::BOARD_SIZE] {
-    let window_mask_pattern: [u16; 7] = [
+const fn build_movegen_imprint_mask_lut() -> [Bitfield; pos::BOARD_SIZE] {
+    let imprint_mask_pattern: [u16; 7] = [
         0b1001001,
         0b0111110,
         0b0111110,
@@ -97,7 +97,7 @@ const fn build_movegen_window_mask_lut() -> [Bitfield; pos::BOARD_SIZE] {
 
             const_for!(row_offset in row_begin - row, row_end - row + 1; {
                 const_for!(col_offset in col_begin - col, col_end - col + 1; {
-                    if (window_mask_pattern[(row_offset + 3) as usize] >> (col_offset + 3)) & 0b1 == 0b1 {
+                    if (imprint_mask_pattern[(row_offset + 3) as usize] >> (col_offset + 3)) & 0b1 == 0b1 {
                         let pos_idx = (row + row_offset) as usize * pos::U_BOARD_WIDTH + (col + col_offset) as usize;
                         lut[cartesian_to_index!(row, col) as usize].0[pos_idx / 8] |= 0b1 << (pos_idx % 8);
                     }

@@ -21,3 +21,4 @@ pub mod batch_counter;
 pub mod search_limit;
 pub mod aspiration_window;
 pub mod search_frame;
+pub mod search_state;
