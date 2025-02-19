@@ -177,17 +177,17 @@ impl TTEntryBucket {
     }
 
     #[inline]
-    fn store_key_mut(&self, entry_idx: usize, entry_key: TTEntryKey) {
-        if entry_idx < 3 {
+    fn store_key_mut(&self, bucket_idx: usize, entry_key: TTEntryKey) {
+        if bucket_idx < 3 {
             let content = Self::calculate_key_content(
                 self.hi_keys.load(Ordering::Acquire),
-                entry_key.lower_21_bits, entry_idx
+                entry_key.lower_21_bits, bucket_idx
             );
             self.hi_keys.store(content, Ordering::Release);
         } else {
             let content = Self::calculate_key_content(
                 self.lo_keys.load(Ordering::Acquire),
-                entry_key.lower_21_bits, entry_idx - 3
+                entry_key.lower_21_bits, bucket_idx - 3
             );
             self.lo_keys.store(content, Ordering::Release);
         }
@@ -195,22 +195,22 @@ impl TTEntryBucket {
 
     #[inline]
     pub fn probe(&self, entry_key: TTEntryKey) -> Option<TTEntry> {
-        let entry_idx = Self::calculate_entry_index(entry_key);
-        let (keys, internal_idx) = if entry_idx < 3 {
-            (self.hi_keys.load(Ordering::Relaxed), entry_idx)
+        let bucket_idx = Self::calculate_entry_index(entry_key);
+        let (keys, internal_idx) = if bucket_idx < 3 {
+            (self.hi_keys.load(Ordering::Relaxed), bucket_idx)
         } else {
-            (self.lo_keys.load(Ordering::Relaxed), entry_idx - 3)
+            (self.lo_keys.load(Ordering::Relaxed), bucket_idx - 3)
         };
 
         ((keys >> (KEY_SIZE * internal_idx)) & KEY_MASK == entry_key.lower_21_bits)
-            .then(|| self.entries[entry_idx].load(Ordering::Relaxed).into())
+            .then(|| self.entries[bucket_idx].load(Ordering::Relaxed).into())
     }
 
     #[inline]
     pub fn store_mut(&self, entry_key: TTEntryKey, entry: TTEntry) {
-        let entry_idx = Self::calculate_entry_index(entry_key);
-        self.store_key_mut(entry_idx, entry_key);
-        self.entries[entry_idx].store(entry.into(), Ordering::Relaxed);
+        let bucket_idx = Self::calculate_entry_index(entry_key);
+        self.store_key_mut(bucket_idx, entry_key);
+        self.entries[bucket_idx].store(entry.into(), Ordering::Relaxed);
     }
 
 }

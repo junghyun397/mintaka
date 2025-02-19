@@ -1,15 +1,14 @@
 use crate::bitfield::Bitfield;
 use crate::board::Board;
+use crate::movegen::movegen_window::MovegenWindow;
 use crate::notation::color::Color;
 use crate::notation::pos::Pos;
 use smallvec::{smallvec, SmallVec};
 
 pub type Moves = SmallVec<[Pos; 32]>;
 
-pub fn generate_neighborhood_moves(board: &Board, recent_move: Pos) -> Moves {
-    let mut moves = SmallVec::new();
-
-    moves
+pub fn generate_neighborhood_moves(board: &Board, movegen_window: MovegenWindow) -> Moves {
+    SmallVec::from_iter((!board.hot_field & movegen_window.into()).iter_hot_pos())
 }
 
 pub fn generate_threat_moves<const C: Color>(board: &Board) -> Moves {

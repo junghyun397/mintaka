@@ -7,8 +7,8 @@
   - Full [Renju-rule](https://www.renju.net/rules/) implementation featuring strict forbidden move detection:
     - Accurate detection of single-line and nested forbidden moves (overlines, double-threes, double-fours)
     - See [detailed examples](./documents/renju.md) for complete specifications
-  - Advanced tree search algorithm based on Principal Variation Search (PVS) with dedicated VCF solver
-  - [Lazy-SMP](https://en.wikipedia.org/wiki/Lazy_SMP) parallel processing
+  - Advanced tree search algorithm based on [Principal Variation Search](https://en.wikipedia.org/wiki/Principal_variation_search) (PVS) with dedicated VCF solver
+  - [Lazy-SMP](https://en.wikipedia.org/wiki/Lazy_SMP) parallel processing for multithreaded search
   - Hardware acceleration with SIMD instructions (AVX-512, AVX2, SSE2, Neon) and bit-manipulation instructions (BMI2)
 
 - **Interfaces**
@@ -19,7 +19,6 @@
 - **Planned**
   - [NNUE](https://en.wikipedia.org/wiki/Efficiently_updatable_neural_network)-based evaluation with separate networks for black/white pieces
   - Opening book support for early game optimization
-  - Big-endian architecture support
 
 ## Project Structure
 
