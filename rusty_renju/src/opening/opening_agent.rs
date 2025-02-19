@@ -40,7 +40,7 @@ pub trait OpeningAgent {
     fn opener_color(&self) -> Color;
 
     fn opponent_color(&self) -> Color {
-        self.opener_color().reversed()
+        !self.opener_color()
     }
 
     fn openers_turn(&self) -> bool {
@@ -158,7 +158,7 @@ impl OpeningSwap {
 
     fn swap(&self, do_swap: bool) -> OpeningStage {
         let opener_color = if do_swap {
-            self.opener_color.reversed()
+            !self.opener_color
         } else {
             self.opener_color
         };

@@ -3,13 +3,11 @@ use crate::memo::tt_entry::{EndgameFlag, ScoreKind, TTEntry, TTFlag};
 use crate::thread_data::ThreadData;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
-use rusty_renju::notation::direction::Direction;
 use rusty_renju::notation::pos;
-use rusty_renju::notation::pos::{Pos, BOARD_WIDTH};
+use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::value::{Depth, Eval, Score};
 use rusty_renju::pattern::PatternCount;
 
-// 2616 bytes
 #[derive(Copy, Clone)]
 #[repr(align(8))]
 pub struct VCFFrame {
@@ -109,7 +107,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             let mut position_board = board.set(four_pos);
             td.batch_counter.add_single_mut();
 
-            let defend_pos = find_defend_five_pos_unchecked::<C>(&position_board, four_pos, player_unit.closed_four_direction_unchecked());
+            let defend_pos = position_board.patterns.unchecked_five_pos.player_unit::<C>().unwrap();
             let defend_pattern = position_board.patterns.field[defend_pos.idx_usize()];
             let defend_unit = defend_pattern.opponent_unit::<C>();
             let defend_four_count = defend_unit.count_fours();
@@ -192,54 +190,6 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
     }
 
     ACC::COLD
-}
-
-#[inline]
-fn calculate_closed_four_window(pos: Pos, direction: Direction) -> (u8, u8) {
-    fn saturating_sub_diff(n: u8) -> u8 {
-        n - n.saturating_sub(4)
-    }
-
-    fn saturating_add_diff(n: u8) -> u8 {
-        (n + 4).min(BOARD_WIDTH - 1) - n
-    }
-
-    let (negative_offset, positive_offset) = match direction {
-        Direction::Horizontal => (
-            saturating_sub_diff(pos.col()),
-            saturating_add_diff(pos.col()),
-        ),
-        Direction::Vertical => (
-            saturating_sub_diff(pos.row()),
-            saturating_add_diff(pos.row())
-        ),
-        Direction::Ascending => (
-            saturating_sub_diff(pos.row()).min(saturating_sub_diff(pos.col())),
-            saturating_add_diff(pos.row()).min(saturating_add_diff(pos.col()))
-        ),
-        Direction::Descending => (
-            saturating_add_diff(pos.row()).min(saturating_sub_diff(pos.col())),
-            saturating_sub_diff(pos.row()).min(saturating_add_diff(pos.col()))
-        )
-    };
-
-    (negative_offset, positive_offset)
-}
-
-#[inline]
-fn find_defend_five_pos_unchecked<const C: Color>(board: &Board, four_pos: Pos, direction: Direction) -> Pos {
-    let (negative_offset, positive_offset) = calculate_closed_four_window(four_pos, direction);
-    let start_pos = four_pos.offset_negative_unchecked(direction, negative_offset);
-
-    for slice_offset in 0 ..= negative_offset + positive_offset {
-        let pos = start_pos.offset_positive_unchecked(direction, slice_offset);
-
-        if board.patterns.field[pos.idx_usize()].player_unit::<C>().has_five() {
-            return pos;
-        }
-    }
-
-    unreachable!()
 }
 
 #[inline]

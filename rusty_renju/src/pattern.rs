@@ -1,12 +1,12 @@
 use crate::bitfield::Bitfield;
-use crate::notation::color::Color;
+use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slice;
 use crate::slice_pattern::{contains_five_in_a_row, SlicePattern};
-use crate::utils::lang_utils::repeat_4x;
+use crate::utils::lang_utils::{repeat_16x, repeat_4x};
 
 pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
@@ -31,6 +31,8 @@ const UNIT_FIVE_MASK: u32               = repeat_4x(FIVE);
 const UNIT_OPEN_THREE_MASK: u32         = repeat_4x(OPEN_THREE);
 const UNIT_CLOSE_THREE_MASK: u32        = repeat_4x(CLOSE_THREE);
 const UNIT_OVERLINE_MASK: u32           = repeat_4x(OVERLINE);
+
+pub const SLICE_PATTERN_FIVE_MASK: u128 = repeat_16x(FIVE);
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub enum PatternCount {
@@ -296,6 +298,7 @@ pub struct Patterns {
     pub field: [Pattern; pos::BOARD_SIZE],
     pub five_in_a_row: Option<Color>,
     pub unchecked_double_three_field: Bitfield,
+    pub unchecked_five_pos: ColorContainer<Option<Pos>>,
 }
 
 impl Default for Patterns {
@@ -305,12 +308,21 @@ impl Default for Patterns {
             field: [Pattern::default(); pos::BOARD_SIZE],
             five_in_a_row: None,
             unchecked_double_three_field: Bitfield::default(),
+            unchecked_five_pos: ColorContainer {
+                black: None,
+                white: None
+            }
         }
     }
 
 }
 
 impl Patterns {
+
+    pub const EMPTY_UNCHECKED_FIVE_POS: ColorContainer<Option<Pos>> = ColorContainer {
+        black: None,
+        white: None
+    };
 
     pub fn update_by_slice_mut<const C: Color, const D: Direction, const FULL_UPDATE: bool>(
         &mut self, slice: &Slice, slice_idx: usize
@@ -338,6 +350,13 @@ impl Patterns {
     fn update_by_slice_pattern_mut<const C: Color, const D: Direction, const FULL_UPDATE: bool>(
         &mut self, slice: &Slice, slice_idx: usize, slice_pattern: SlicePattern
     ) {
+        *self.unchecked_five_pos.player_unit_mut::<C>() = self.unchecked_five_pos.player_unit::<C>().or(
+            (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK != 0)
+                .then(|| Pos::from_index(
+                    slice.calculate_slice_offset::<D>(((slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8) as usize) as u8
+                ))
+        );
+
         let slice_pattern = unsafe { std::mem::transmute::<SlicePattern, [u8; 16]>(slice_pattern) };
 
         for pattern_idx in

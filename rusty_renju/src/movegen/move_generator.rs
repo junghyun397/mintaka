@@ -7,14 +7,19 @@ use smallvec::{smallvec, SmallVec};
 
 pub type Moves = SmallVec<[Pos; 32]>;
 
+pub fn generate_moves<const C: Color>(board: &Board, movegen_window: MovegenWindow) -> Moves {
+    if is_threat_available(board) {
+        generate_threat_moves::<C>(board)
+    } else {
+        generate_neighborhood_moves(board, movegen_window)
+    }
+}
+
 pub fn generate_neighborhood_moves(board: &Board, movegen_window: MovegenWindow) -> Moves {
     SmallVec::from_iter((!board.hot_field & movegen_window.into()).iter_hot_pos())
 }
 
 pub fn generate_threat_moves<const C: Color>(board: &Board) -> Moves {
-    let mut defend_five_pos = Pos::INVALID;
-    let mut on_defend_five_position = false;
-
     let mut defend_threat_moves = SmallVec::new();
     let mut on_defend_threat_position = false;
 
@@ -31,14 +36,7 @@ pub fn generate_threat_moves<const C: Color>(board: &Board) -> Moves {
 
         let opponent_unit = pattern.opponent_unit::<C>();
 
-        if opponent_unit.has_five() && !pattern.is_forbidden() {
-            defend_five_pos = Pos::from_index(idx as u8);
-            on_defend_five_position = true;
-            continue;
-        }
-
-        if !on_defend_five_position
-            && (player_unit.has_any_four() || player_unit.has_close_three())
+        if (player_unit.has_any_four() || player_unit.has_close_three())
             && !(C == Color::Black && pattern.is_forbidden())
         {
             defend_threat_moves.push(Pos::from_index(idx as u8));
@@ -46,11 +44,9 @@ pub fn generate_threat_moves<const C: Color>(board: &Board) -> Moves {
         }
 
         if match C {
-            Color::Black => !on_defend_five_position
-                && (opponent_unit.has_open_four() || opponent_unit.has_fours())
+            Color::Black => (opponent_unit.has_open_four() || opponent_unit.has_fours())
                 && !pattern.is_forbidden(),
-            Color::White => !on_defend_five_position
-                && opponent_unit.has_open_four()
+            Color::White => opponent_unit.has_open_four()
                 && !pattern.is_forbidden()
         } {
             defend_threat_moves.push(Pos::from_index(idx as u8));
@@ -58,13 +54,7 @@ pub fn generate_threat_moves<const C: Color>(board: &Board) -> Moves {
         }
     }
 
-    if on_defend_five_position {
-        smallvec![defend_five_pos]
-    } else if on_defend_threat_position {
-        defend_threat_moves
-    } else {
-        todo!()
-    }
+    defend_threat_moves
 }
 
 fn sort_moves(recent_move: Pos, moves: &mut Moves) {
@@ -82,4 +72,8 @@ fn sort_moves(recent_move: Pos, moves: &mut Moves) {
 
 pub fn generate_opening_moves(board: &Board, ) -> Bitfield {
     todo!()
+}
+
+fn is_threat_available(board: &Board) -> bool {
+    false
 }

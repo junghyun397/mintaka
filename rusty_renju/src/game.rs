@@ -73,7 +73,7 @@ impl Game {
     }
 
     pub fn resign_mut(&mut self, resigned_player: Color) {
-        self.result = Some(GameResult::Resign(resigned_player.reversed()));
+        self.result = Some(GameResult::Resign(!resigned_player));
     }
 
     pub fn batch_set_each_mut(&mut self, blacks: Box<[Pos]>, whites: Box<[Pos]>) {

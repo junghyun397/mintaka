@@ -3,7 +3,8 @@ use crate::memo::hash_key::HashKey;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::Pos;
-use crate::pattern::Patterns;
+use crate::pattern;
+use crate::pattern::{Pattern, Patterns};
 use crate::slice::Slices;
 use std::marker::ConstParamTy;
 
@@ -20,7 +21,7 @@ pub struct Board {
 impl Board {
 
     pub fn opponent_color(&self) -> Color {
-        self.player_color.reversed()
+        !self.player_color
     }
 
     pub fn stone_kind(&self, pos: Pos) -> Option<Color> {
@@ -43,6 +44,8 @@ impl Board {
     }
 
     pub fn set_mut(&mut self, pos: Pos) {
+        self.patterns.unchecked_five_pos = Patterns::EMPTY_UNCHECKED_FIVE_POS;
+
         self.stones += 1;
         self.hot_field.set_mut(pos);
         self.hash_key = self.hash_key.set(self.player_color, pos);
@@ -54,6 +57,8 @@ impl Board {
 
     pub fn unset_mut(&mut self, pos: Pos) {
         self.patterns.five_in_a_row = None;
+        self.patterns.unchecked_five_pos = Patterns::EMPTY_UNCHECKED_FIVE_POS;
+
         self.switch_player_mut();
 
         self.stones -= 1;

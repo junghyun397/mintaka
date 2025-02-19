@@ -1,4 +1,5 @@
 use std::marker::ConstParamTy;
+use std::ops::Not;
 
 //noinspection RsUnresolvedPath
 #[derive(ConstParamTy, PartialEq, Eq, Clone, Copy, Debug, Default)]
@@ -30,6 +31,62 @@ impl Color {
             Color::White
         } else {
             Color::Black
+        }
+    }
+
+}
+
+impl Not for Color {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Color::Black => Color::White,
+            Color::White => Color::Black
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ColorContainer<T: Copy> {
+    pub black: T,
+    pub white: T,
+}
+
+impl<T: Copy> ColorContainer<T> {
+
+    pub fn access(&self, color: Color) -> &T {
+        match color {
+            Color::Black => &self.black,
+            Color::White => &self.white
+        }
+    }
+
+    pub fn player_unit<const C: Color>(&self) -> &T {
+        match C {
+            Color::Black => &self.black,
+            Color::White => &self.white
+        }
+    }
+
+    pub fn opponent_unit<const C: Color>(&self) -> &T {
+        match C {
+            Color::Black => &self.white,
+            Color::White => &self.black
+        }
+    }
+
+    pub fn player_unit_mut<const C: Color>(&mut self) -> &mut T {
+        match C {
+            Color::Black => &mut self.black,
+            Color::White => &mut self.white
+        }
+    }
+
+    pub fn opponent_unit_mut<const C: Color>(&mut self) -> &mut T {
+        match C {
+            Color::Black => &mut self.white,
+            Color::White => &mut self.black
         }
     }
 
