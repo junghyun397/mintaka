@@ -3,6 +3,7 @@ use crate::board::Board;
 use crate::movegen::movegen_window::MovegenWindow;
 use crate::notation::color::Color;
 use crate::notation::pos::Pos;
+use crate::opening::opening_agent::OpeningAgent;
 use smallvec::{smallvec, SmallVec};
 
 pub type Moves = SmallVec<[Pos; 32]>;
@@ -16,7 +17,7 @@ pub fn generate_moves<const C: Color>(board: &Board, movegen_window: MovegenWind
 }
 
 pub fn generate_neighborhood_moves(board: &Board, movegen_window: MovegenWindow) -> Moves {
-    SmallVec::from_iter((!board.hot_field & movegen_window.into()).iter_hot_pos())
+    SmallVec::from_iter((!board.hot_field & movegen_window.movegen_field).iter_hot_pos())
 }
 
 pub fn generate_threat_moves<const C: Color>(board: &Board) -> Moves {
@@ -70,7 +71,7 @@ fn sort_moves(recent_move: Pos, moves: &mut Moves) {
     });
 }
 
-pub fn generate_opening_moves(board: &Board, ) -> Bitfield {
+pub fn generate_opening_moves(board: &Board, opening_agent: &dyn OpeningAgent) -> Bitfield {
     todo!()
 }
 

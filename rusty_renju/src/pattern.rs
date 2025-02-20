@@ -190,11 +190,7 @@ impl PatternUnit {
 
 }
 
-#[derive(Debug, Copy, Clone, Default)]
-pub struct Pattern {
-    pub black_unit: PatternUnit,
-    pub white_unit: PatternUnit
-}
+pub type Pattern = ColorContainer<PatternUnit>;
 
 impl From<Pattern> for u64 {
 
@@ -205,34 +201,6 @@ impl From<Pattern> for u64 {
 }
 
 impl Pattern {
-
-    pub fn access_unit(&self, color: Color) -> PatternUnit {
-        match color {
-            Color::Black => self.black_unit,
-            Color::White => self.white_unit
-        }
-    }
-
-    pub fn access_unit_pair(&self, color: Color) -> (PatternUnit, PatternUnit) {
-        match color {
-            Color::Black => (self.black_unit, self.white_unit),
-            Color::White => (self.white_unit, self.black_unit)
-        }
-    }
-
-    pub fn player_unit<const C: Color>(&self) -> PatternUnit {
-        match C {
-            Color::Black => self.black_unit,
-            Color::White => self.white_unit
-        }
-    }
-
-    pub fn opponent_unit<const C: Color>(&self) -> PatternUnit {
-        match C {
-            Color::Black => self.white_unit,
-            Color::White => self.black_unit
-        }
-    }
 
     pub fn is_empty(&self) -> bool {
         u64::from(*self) == 0
@@ -245,25 +213,25 @@ impl Pattern {
     pub fn is_forbidden(&self) -> bool {
         self.is_not_empty()
             && (
-                self.black_unit.has_fours()
-                    || (self.black_unit.has_threes() && !self.black_unit.has_invalid_double_three())
+                self.black.has_fours()
+                    || (self.black.has_threes() && !self.black.has_invalid_double_three())
                     || self.has_overline()
             )
-            && !self.black_unit.has_five()
+            && !self.black.has_five()
     }
 
     pub fn unit_by_color(&self, color: Color) -> PatternUnit {
         match color {
-            Color::Black => self.black_unit,
-            Color::White => self.white_unit,
+            Color::Black => self.black,
+            Color::White => self.white,
         }
     }
 
     pub fn forbidden_kind(&self) -> Option<ForbiddenKind> {
         if self.is_forbidden() {
-            if self.black_unit.has_threes() {
+            if self.black.has_threes() {
                 Some(ForbiddenKind::DoubleThree)
-            } else if self.black_unit.has_fours() {
+            } else if self.black.has_fours() {
                 Some(ForbiddenKind::DoubleFour)
             } else {
                 Some(ForbiddenKind::Overline)
@@ -276,19 +244,19 @@ impl Pattern {
     #[inline(always)]
     pub fn apply_mask_mut<const C: Color, const D: Direction>(&mut self, pattern: u8) {
         match (C, D) {
-            (Color::Black, Direction::Horizontal) => self.black_unit.horizontal = pattern,
-            (Color::Black, Direction::Vertical) => self.black_unit.vertical = pattern,
-            (Color::Black, Direction::Ascending) => self.black_unit.ascending = pattern,
-            (Color::Black, Direction::Descending) => self.black_unit.descending = pattern,
-            (Color::White, Direction::Horizontal) => self.white_unit.horizontal = pattern,
-            (Color::White, Direction::Vertical) => self.white_unit.vertical = pattern,
-            (Color::White, Direction::Ascending) => self.white_unit.ascending = pattern,
-            (Color::White, Direction::Descending) => self.white_unit.descending = pattern,
+            (Color::Black, Direction::Horizontal) => self.black.horizontal = pattern,
+            (Color::Black, Direction::Vertical) => self.black.vertical = pattern,
+            (Color::Black, Direction::Ascending) => self.black.ascending = pattern,
+            (Color::Black, Direction::Descending) => self.black.descending = pattern,
+            (Color::White, Direction::Horizontal) => self.white.horizontal = pattern,
+            (Color::White, Direction::Vertical) => self.white.vertical = pattern,
+            (Color::White, Direction::Ascending) => self.white.ascending = pattern,
+            (Color::White, Direction::Descending) => self.white.descending = pattern,
         }
     }
 
     pub fn has_overline(&self) -> bool {
-        self.black_unit.has_overline()
+        self.black.has_overline()
     }
 
 }
@@ -370,7 +338,7 @@ impl Patterns {
             if C == Color::Black {
                 let pos = Pos::from_index(idx as u8);
 
-                if self.field[idx].black_unit.has_threes() {
+                if self.field[idx].black.has_threes() {
                     self.unchecked_double_three_field.set_mut(pos);
                 } else {
                     self.unchecked_double_three_field.unset_mut(pos);

@@ -53,6 +53,17 @@ pub struct ColorContainer<T: Copy> {
     pub white: T,
 }
 
+impl<T: Copy + Default> Default for ColorContainer<T> {
+
+    fn default() -> Self {
+        Self {
+            black: T::default(),
+            white: T::default()
+        }
+    }
+
+}
+
 impl<T: Copy> ColorContainer<T> {
 
     pub fn access(&self, color: Color) -> &T {

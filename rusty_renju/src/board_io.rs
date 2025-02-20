@@ -124,7 +124,7 @@ impl Board {
                     match item {
                         BoardIterItem::Stone(color) => char::from(*color).to_string(),
                         BoardIterItem::Pattern(pattern) => {
-                            let count = extract(&pattern.access_unit(color));
+                            let count = extract(&pattern.access(color));
 
                             if count > 0 {
                                 count.to_string()

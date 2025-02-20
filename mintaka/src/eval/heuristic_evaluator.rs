@@ -79,11 +79,11 @@ impl Evaluator for HeuristicEvaluator {
                     let eval_black = match pattern.forbidden_kind() {
                         Some(ForbiddenKind::DoubleFour | ForbiddenKind::Overline) =>
                             Self::WEIGHTS.forbidden,
-                        None => Self::eval_pattern::<{ Color::Black }>(&pattern.black_unit),
+                        None => Self::eval_pattern::<{ Color::Black }>(&pattern.black),
                         _ => 0
                     };
 
-                    let eval_white = Self::eval_pattern::<{ Color::White }>(&pattern.white_unit);
+                    let eval_white = Self::eval_pattern::<{ Color::White }>(&pattern.white);
 
                     match board.player_color {
                         Color::Black => eval_black - eval_white,

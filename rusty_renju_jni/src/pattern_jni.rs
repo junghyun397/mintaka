@@ -8,8 +8,8 @@ use rusty_renju::pattern::PatternUnit;
 fn count_pattern<F>(board_ptr: jlong, pos: jint, is_black: jboolean, count: F) -> jint where F: FnOnce(&PatternUnit) -> u32 {
     let pattern = &retrieve_ref::<Board>(board_ptr).patterns.field[pos as usize];
     let unit = match is_black {
-        1 => pattern.black_unit,
-        _ => pattern.white_unit
+        1 => pattern.black,
+        _ => pattern.white
     };
 
     count(&unit) as jint
