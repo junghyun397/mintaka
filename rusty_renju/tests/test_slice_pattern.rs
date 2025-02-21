@@ -10,8 +10,8 @@ mod test_slice_pattern {
             assert_eq!($case.len(), $expected.len());
 
             let slice = Slice::from_str($case).unwrap();
-            let black_patterns = slice.calculate_slice_pattern::<{ Color::Black }, true>(0);
-            let white_patterns = slice.calculate_slice_pattern::<{ Color::White }, true>(0);
+            let black_patterns = slice.calculate_slice_pattern::<{ Color::Black }>();
+            let white_patterns = slice.calculate_slice_pattern::<{ Color::White }>();
 
             let content_pattern = black_patterns.patterns.to_ne_bytes().iter()
                 .zip(white_patterns.patterns.to_ne_bytes().iter())

@@ -2,17 +2,34 @@ use crate::bitfield::Bitfield;
 use crate::board::Board;
 use crate::movegen::movegen_window::MovegenWindow;
 use crate::notation::color::Color;
+use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::opening::opening_agent::OpeningAgent;
-use smallvec::{smallvec, SmallVec};
+use crate::pattern::Pattern;
+use smallvec::SmallVec;
+use std::simd::num::SimdUint;
+use std::simd::u64x8;
 
 pub type Moves = SmallVec<[Pos; 32]>;
 
-pub fn generate_moves<const C: Color>(board: &Board, movegen_window: MovegenWindow) -> Moves {
+impl From<Moves> for Bitfield {
+
+    fn from(moves: Moves) -> Self {
+        let mut bitfield = Bitfield::ZERO_FILLED;
+
+        for pos in moves {
+            bitfield.set_mut(pos);
+        }
+
+        bitfield
+    }
+
+}
+
+pub fn generate_moves<const C: Color>(board: &Board, movegen_window: &MovegenWindow) -> Moves {
     if is_threat_available(board) {
         generate_threat_moves::<C>(board)
     } else {
-        generate_neighborhood_moves(board, movegen_window)
+        SmallVec::from_iter((!board.hot_field & movegen_window.movegen_field).iter_hot_pos())
     }
 }
 
@@ -22,7 +39,6 @@ pub fn generate_neighborhood_moves(board: &Board, movegen_window: MovegenWindow)
 
 pub fn generate_threat_moves<const C: Color>(board: &Board) -> Moves {
     let mut defend_threat_moves = SmallVec::new();
-    let mut on_defend_threat_position = false;
 
     for (idx, pattern) in board.patterns.field.iter().enumerate() {
         if pattern.is_empty() {
@@ -30,11 +46,6 @@ pub fn generate_threat_moves<const C: Color>(board: &Board) -> Moves {
         }
 
         let player_unit = pattern.player_unit::<C>();
-
-        if player_unit.has_five() {
-            return smallvec![Pos::from_index(idx as u8)];
-        }
-
         let opponent_unit = pattern.opponent_unit::<C>();
 
         if (player_unit.has_any_four() || player_unit.has_close_three())
@@ -51,7 +62,6 @@ pub fn generate_threat_moves<const C: Color>(board: &Board) -> Moves {
                 && !pattern.is_forbidden()
         } {
             defend_threat_moves.push(Pos::from_index(idx as u8));
-            on_defend_threat_position = true;
         }
     }
 
@@ -71,10 +81,19 @@ fn sort_moves(recent_move: Pos, moves: &mut Moves) {
     });
 }
 
-pub fn generate_opening_moves(board: &Board, opening_agent: &dyn OpeningAgent) -> Bitfield {
-    todo!()
-}
+pub fn is_threat_available(board: &Board) -> bool {
+    let patterns = unsafe {
+        &*(&board.patterns.field as *const [Pattern; pos::BOARD_SIZE] as *const [u64; pos::BOARD_SIZE])
+    };
 
-fn is_threat_available(board: &Board) -> bool {
-    false
+    let mut acc = u64x8::from_slice(&patterns[0 .. 8]);
+    for idx in (8 .. pos::BOARD_SIZE / 8).step_by(8) {
+        acc |= u64x8::from_slice(&patterns[idx .. idx + 8]);
+    }
+
+    const TAIL_SIZE: usize = pos::BOARD_SIZE - pos::BOARD_SIZE % 8;
+    acc |= u64x8::from_slice(&patterns[TAIL_SIZE .. pos::BOARD_SIZE]);
+
+    let merged_pattern = unsafe { std::mem::transmute::<u64, Pattern>(acc.reduce_or()) };
+    merged_pattern.black.has_open_four() || merged_pattern.white.has_open_four()
 }

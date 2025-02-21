@@ -1,7 +1,7 @@
 use crate::bitfield::Bitfield;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::{const_for, max, min};
+use crate::{cartesian_to_index, const_for, max, min};
 
 #[derive(Debug, Copy, Clone)]
 pub struct MovegenWindow {
@@ -30,19 +30,43 @@ impl MovegenWindow {
         movegen_field: Bitfield::ZERO_FILLED,
     };
 
-    pub fn expand_window_mut(&mut self, pos: Pos) {
+    fn expand_bounds_mut(&mut self, pos: Pos) {
         let row = pos.row();
         let col = pos.col();
-        let max_bound = pos::U8_BOARD_SIZE - 1;
+        const MAX_BOUND: u8 = pos::U8_BOARD_SIZE - 1;
 
         self.start_row = self.start_row.min(row.saturating_sub(MOVEGEN_WINDOW_MARGIN));
         self.start_col = self.start_col.min(col.saturating_sub(MOVEGEN_WINDOW_MARGIN));
-        self.end_row = self.end_row.max((row + MOVEGEN_WINDOW_MARGIN).min(max_bound));
-        self.end_col = self.end_col.max((col + MOVEGEN_WINDOW_MARGIN).min(max_bound));
+        self.end_row = self.end_row.max((row + MOVEGEN_WINDOW_MARGIN).min(MAX_BOUND));
+        self.end_col = self.end_col.max((col + MOVEGEN_WINDOW_MARGIN).min(MAX_BOUND));
+    }
+
+    fn fill_bounds_mut(&mut self) {
+        todo!()
+    }
+
+    pub fn expand_window_mut(&mut self, pos: Pos) {
+        self.expand_bounds_mut(pos);
+
+        self.fill_bounds_mut();
+    }
+
+    pub fn batch_expand_window_mut(&mut self, moves: &[Pos]) {
+        for pos in moves {
+            self.expand_bounds_mut(*pos);
+        }
+
+        self.fill_bounds_mut();
     }
 
     pub fn imprint_window_mut(&mut self, pos: Pos) {
         self.movegen_field |= MOVEGEN_WINDOW_MASK_LUT[pos.idx_usize()];
+    }
+
+    pub fn batch_imprint_window_mut(&mut self, moves: &[Pos]) {
+        for pos in moves {
+            self.movegen_field |= MOVEGEN_WINDOW_MASK_LUT[pos.idx_usize()];
+        }
     }
 
 }
@@ -53,44 +77,30 @@ const MOVEGEN_WINDOW_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_movegen_windo
 
 const fn build_movegen_window_mask_lut() -> [Bitfield; pos::BOARD_SIZE] {
     let window_mask_pattern: [u16; 7] = [
-        0b10010010_00000000,
-        0b0111110_00000000,
-        0b0111110_00000000,
-        0b1110111_00000000,
-        0b0111110_00000000,
-        0b0111110_00000000,
-        0b1001001_00000000,
+        0b1001001,
+        0b0111110,
+        0b0111110,
+        0b1110111,
+        0b0111110,
+        0b0111110,
+        0b1001001,
     ];
 
     let mut lut = [Bitfield::ZERO_FILLED; pos::BOARD_SIZE];
 
-    const_for!(row in 0, pos::U_BOARD_WIDTH; {
-        const_for!(col in 0, pos::U_BOARD_WIDTH; {
-            let col_shl = -min!(col as isize - 3, 0);
-            let col_shr = min!(col + 3, pos::U_BOARD_WIDTH - 1) as isize;
+    const_for!(row in 0, pos::I_BOARD_WIDTH; {
+        const_for!(col in 0, pos::I_BOARD_WIDTH; {
+            let row_begin = max!(row - 3, 0);
+            let row_end = min!(row + 3, pos::I_BOARD_WIDTH - 1);
+            let col_begin = max!(col - 3, 0);
+            let col_end = min!(col + 3, pos::I_BOARD_WIDTH - 1);
 
-            let row_begin = max!(row as isize - 3, 0);
-            let row_end = min!(row + 3, pos::U_BOARD_WIDTH - 1) as isize;
-
-            const_for!(row_offset in 0, row_end - row_begin; {
-                let mut mask = window_mask_pattern[row_offset as usize];
-                mask <<= col_shl;
-                mask >>= col_shr;
-                mask &= !0b1;
-
-                let shift = (row_begin + row_offset) as usize * pos::U_BOARD_WIDTH + col;
-
-                let bitfield_idx = shift / 8;
-                let bitfield_shift = shift % 8;
-
-                let bitfield_segments = [
-                    (mask >> (8 + bitfield_shift)) as u8,
-                    (mask >> bitfield_shift) as u8,
-                    (mask << (8 - bitfield_shift)) as u8
-                ];
-
-                const_for!(segment_idx in 0, 3; {
-                    lut[row * pos::U_BOARD_WIDTH + col].0[bitfield_idx + segment_idx] |= bitfield_segments[segment_idx];
+            const_for!(row_offset in row_begin - row, row_end - row + 1; {
+                const_for!(col_offset in col_begin - col, col_end - col + 1; {
+                    if (window_mask_pattern[(row_offset + 3) as usize] >> (col_offset + 3)) & 0b1 == 0b1 {
+                        let pos_idx = (row + row_offset) as usize * pos::U_BOARD_WIDTH + (col + col_offset) as usize;
+                        lut[cartesian_to_index!(row, col) as usize].0[pos_idx / 8] |= 0b1 << (pos_idx % 8);
+                    }
                 });
             });
         })

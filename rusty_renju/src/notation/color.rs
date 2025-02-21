@@ -48,6 +48,7 @@ impl Not for Color {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(C)]
 pub struct ColorContainer<T: Copy> {
     pub black: T,
     pub white: T,
