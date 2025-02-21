@@ -129,11 +129,11 @@ impl Board {
                 }
 
                 if black_was_available | $slice.pattern_available::<{ Color::Black }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, false>($slice, $slice_idx as usize);
+                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }>($slice);
                 }
 
                 if white_was_available | $slice.pattern_available::<{Color::White }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, false>($slice, $slice_idx as usize);
+                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }>($slice);
                 }
             }};
         }
@@ -161,11 +161,11 @@ impl Board {
         macro_rules! update_by_slice {
             ($slice:expr,$direction:expr) => {{
                 if $slice.pattern_available::<{ Color::Black }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }, true>($slice, 0);
+                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }>($slice);
                 }
 
                 if $slice.pattern_available::<{ Color::White }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }, true>($slice, 0);
+                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }>($slice);
                 }
             }};
         }

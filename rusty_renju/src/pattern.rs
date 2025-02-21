@@ -58,6 +58,7 @@ impl PatternCount {
 // packed in 8-bit: closed-4-1 closed-4-2 open-4 five open-3 close-3 overline open-3-direction
 // total 32bit
 #[derive(Debug, Copy, Clone, Default)]
+#[repr(C)]
 pub struct PatternUnit {
     horizontal: u8,
     vertical: u8,
@@ -220,13 +221,6 @@ impl Pattern {
             && !self.black.has_five()
     }
 
-    pub fn unit_by_color(&self, color: Color) -> PatternUnit {
-        match color {
-            Color::Black => self.black,
-            Color::White => self.white,
-        }
-    }
-
     pub fn forbidden_kind(&self) -> Option<ForbiddenKind> {
         if self.is_forbidden() {
             if self.black.has_threes() {
@@ -292,31 +286,27 @@ impl Patterns {
         white: None
     };
 
-    pub fn update_by_slice_mut<const C: Color, const D: Direction, const FULL_UPDATE: bool>(
-        &mut self, slice: &Slice, slice_idx: usize
-    ) {
+    #[inline]
+    pub fn update_by_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &Slice) {
         if slice.pattern_available::<C>() {
-            self.update_by_slice_pattern_mut::<C, D, FULL_UPDATE>(slice, slice_idx, slice.calculate_slice_pattern::<C, FULL_UPDATE>(slice_idx));
+            self.update_by_slice_pattern_mut::<C, D>(slice, slice.calculate_slice_pattern::<C>());
         } else {
-            self.clear_by_slice_mut::<C, D, FULL_UPDATE>(slice, slice_idx);
+            self.clear_by_slice_mut::<C, D>(slice);
         };
     }
 
-    #[inline(always)]
-    fn clear_by_slice_mut<const C: Color, const D: Direction, const FULL_UPDATE: bool>(&mut self, slice: &Slice, slice_idx: usize) {
-        for pattern_idx in
-            if FULL_UPDATE { 0 .. slice.length as usize }
-            else { slice_idx.saturating_sub(6) .. (slice_idx + 6).min(slice.length as usize) }
-        {
+    #[inline]
+    fn clear_by_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &Slice) {
+        for pattern_idx in 0 .. slice.length as usize {
             self.field[slice.calculate_slice_offset::<D>(pattern_idx)].apply_mask_mut::<C, D>(0);
         }
 
         self.five_in_a_row = None;
     }
 
-    #[inline(always)]
-    fn update_by_slice_pattern_mut<const C: Color, const D: Direction, const FULL_UPDATE: bool>(
-        &mut self, slice: &Slice, slice_idx: usize, slice_pattern: SlicePattern
+    #[inline]
+    fn update_by_slice_pattern_mut<const C: Color, const D: Direction>(
+        &mut self, slice: &Slice, slice_pattern: SlicePattern
     ) {
         *self.unchecked_five_pos.player_unit_mut::<C>() = self.unchecked_five_pos.player_unit::<C>().or(
             (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK != 0)
@@ -327,10 +317,7 @@ impl Patterns {
 
         let slice_pattern = unsafe { std::mem::transmute::<SlicePattern, [u8; 16]>(slice_pattern) };
 
-        for pattern_idx in
-            if FULL_UPDATE { 0 .. slice.length as usize }
-            else { slice_idx.saturating_sub(6) .. (slice_idx + 6).min(slice.length as usize) }
-        {
+        for pattern_idx in 0 .. slice.length as usize {
             let idx = slice.calculate_slice_offset::<D>(pattern_idx);
 
             self.field[idx].apply_mask_mut::<C, D>(unsafe { std::ptr::read(slice_pattern.as_ptr().add(pattern_idx)) });
