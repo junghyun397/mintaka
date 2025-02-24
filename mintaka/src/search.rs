@@ -14,19 +14,19 @@ pub trait NodeType {
 
 }
 
-struct RootNode {} impl NodeType for RootNode {
+struct RootNode; impl NodeType for RootNode {
     const IS_ROOT: bool = true;
     const IS_PV: bool = true;
     type NextType = PVNode;
 }
 
-struct PVNode {} impl NodeType for PVNode {
+struct PVNode; impl NodeType for PVNode {
     const IS_ROOT: bool = false;
     const IS_PV: bool = true;
     type NextType = Self;
 }
 
-struct OffPVNode {} impl NodeType for OffPVNode {
+struct OffPVNode; impl NodeType for OffPVNode {
     const IS_ROOT: bool = false;
     const IS_PV: bool = false;
     type NextType = Self;

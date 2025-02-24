@@ -7,6 +7,10 @@ edition = "2021"
 name = "pbrain_mintaka"
 path = "src/piskvork.rs"
 
+[[bin]]
+name = "mintaka_command_line"
+path = "src/command_line.rs"
+
 [dependencies]
 rusty_renju = { path = "../rusty_renju" }
 mintaka = { path = "../mintaka" }

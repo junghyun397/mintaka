@@ -35,7 +35,7 @@ impl MovegenWindow {
     };
 
     fn expand_bounds_mut(&mut self, pos: Pos) {
-        const MAX_BOUND: u8 = pos::U8_BOARD_SIZE - 1;
+        const MAX_BOUND: u8 = pos::BOARD_WIDTH - 1;
 
         let row = pos.row();
         let col = pos.col();
@@ -58,13 +58,10 @@ impl MovegenWindow {
             let end_bit = end_idx % 8;
 
             if start_byte == end_byte {
-                let mask: u16 = (0b1 << ((end_bit - start_bit) + 1)) << start_bit;
-                self.movegen_field.0[start_byte] |= mask as u8;
+                self.movegen_field.0[start_byte] |= (u8::MAX >> (7 - end_bit + start_bit)) << start_bit;
             } else {
                 self.movegen_field.0[start_byte] |= u8::MAX << start_bit;
-
-                let end_mask: u16 = (0b1 << (end_bit + 1)) - 1;
-                self.movegen_field.0[end_byte] |= end_mask as u8;
+                self.movegen_field.0[end_byte]   |= u8::MAX >> (7 - end_bit);
             }
         }
     }

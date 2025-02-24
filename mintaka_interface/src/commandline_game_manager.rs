@@ -1,9 +1,9 @@
 use mintaka::protocol::game_manager::GameManager;
 use mintaka::protocol::response::Response;
 
-pub struct PiskvorkGameManager;
+pub struct CommandLineGameManager;
 
-impl GameManager for PiskvorkGameManager {
+impl GameManager for CommandLineGameManager {
 
     fn response(&self, response: Response) {
         match response {
