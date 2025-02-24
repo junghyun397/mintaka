@@ -3,7 +3,7 @@ use crate::board::Board;
 use crate::board_iter::BoardIterItem;
 use crate::game::Game;
 use crate::history::{Action, History};
-use crate::impl_debug_by_display;
+use crate::impl_debug_from_display;
 use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
@@ -170,7 +170,7 @@ impl Display for Board {
 
 }
 
-impl_debug_by_display!(Board);
+impl_debug_from_display!(Board);
 
 impl FromStr for Board {
 
@@ -350,7 +350,7 @@ impl Display for Pos {
 
 }
 
-impl_debug_by_display!(Pos);
+impl_debug_from_display!(Pos);
 
 impl From<Color> for char {
 
@@ -375,7 +375,7 @@ impl From<ForbiddenKind> for char {
 
 }
 
-impl_debug_by_display!(ForbiddenKind);
+impl_debug_from_display!(ForbiddenKind);
 
 impl Display for ForbiddenKind {
 
@@ -385,7 +385,7 @@ impl Display for ForbiddenKind {
 
 }
 
-impl_debug_by_display!(Bitfield);
+impl_debug_from_display!(Bitfield);
 
 impl Display for Bitfield {
 

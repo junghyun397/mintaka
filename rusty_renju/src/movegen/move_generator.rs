@@ -37,7 +37,7 @@ pub fn generate_neighborhood_moves(board: &Board, movegen_window: &MovegenWindow
     SmallVec::from_iter((!board.hot_field & movegen_window.movegen_field).iter_hot_pos())
 }
 
-fn generate_threat_moves<const C: Color>(board: &Board) -> Moves {
+pub fn generate_threat_moves<const C: Color>(board: &Board) -> Moves {
     let mut defend_threat_moves = SmallVec::new();
 
     for (idx, pattern) in board.patterns.field.iter().enumerate() {

@@ -34,7 +34,7 @@
     };
 }
 
-#[macro_export] macro_rules! impl_debug_by_display {
+#[macro_export] macro_rules! impl_debug_from_display {
     ($name:ident) => {
         impl Debug for $name {
 

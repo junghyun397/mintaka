@@ -19,7 +19,7 @@ impl Bitfield {
 
     pub const ZERO_FILLED: Bitfield = Bitfield([0; 32]);
 
-    pub fn is_cold(&self, pos: Pos) -> bool {
+    pub const fn is_cold(&self, pos: Pos) -> bool {
         self.0[pos.idx_usize() / 8] & (0b1 << (pos.idx_usize() % 8)) == 0
     }
 

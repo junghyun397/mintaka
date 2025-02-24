@@ -40,7 +40,7 @@ impl Slice {
             let q = (extended_q >> shift) as u16 & 0x00FF;
 
             // little-endian
-            let shift_comp = (shift as isize).saturating_sub(3) * 8;
+            let shift_comp = (shift as isize - 3) * 8;
             let shl = shift_comp.min(0).unsigned_abs();
             let shr = shift_comp.max(0) as usize;
 

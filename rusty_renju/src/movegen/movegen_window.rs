@@ -35,9 +35,10 @@ impl MovegenWindow {
     };
 
     fn expand_bounds_mut(&mut self, pos: Pos) {
+        const MAX_BOUND: u8 = pos::U8_BOARD_SIZE - 1;
+
         let row = pos.row();
         let col = pos.col();
-        const MAX_BOUND: u8 = pos::U8_BOARD_SIZE - 1;
 
         self.start_row = self.start_row.min(row.saturating_sub(MOVEGEN_WINDOW_MARGIN));
         self.start_col = self.start_col.min(col.saturating_sub(MOVEGEN_WINDOW_MARGIN));
@@ -46,7 +47,26 @@ impl MovegenWindow {
     }
 
     fn fill_bounds_mut(&mut self) {
-        todo!()
+        for row in self.start_row ..= self.end_row {
+            let row_idx = row as usize * pos::U_BOARD_WIDTH;
+            let start_idx = row_idx + self.start_col as usize;
+            let end_idx = row_idx + self.end_col as usize;
+
+            let start_byte = start_idx / 8;
+            let end_byte = end_idx / 8;
+            let start_bit = start_idx % 8;
+            let end_bit = end_idx % 8;
+
+            if start_byte == end_byte {
+                let mask: u16 = (0b1 << ((end_bit - start_bit) + 1)) << start_bit;
+                self.movegen_field.0[start_byte] |= mask as u8;
+            } else {
+                self.movegen_field.0[start_byte] |= u8::MAX << start_bit;
+
+                let end_mask: u16 = (0b1 << (end_bit + 1)) - 1;
+                self.movegen_field.0[end_byte] |= end_mask as u8;
+            }
+        }
     }
 
     pub fn expand_window_mut(&mut self, pos: Pos) {
