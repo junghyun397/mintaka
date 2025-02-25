@@ -26,7 +26,7 @@ impl From<Moves> for Bitfield {
 }
 
 pub fn generate_moves<const C: Color>(board: &Board, movegen_window: &MovegenWindow) -> Moves {
-    if is_threat_available(board) {
+    if is_threat_available::<C>(board) {
         generate_threat_moves::<C>(board)
     } else {
         SmallVec::from_iter((!board.hot_field & movegen_window.movegen_field).iter_hot_pos())
@@ -81,9 +81,13 @@ fn sort_moves(recent_move: Pos, moves: &mut Moves) {
     });
 }
 
-pub fn is_threat_available(board: &Board) -> bool {
+pub fn is_threat_available<const C: Color>(board: &Board) -> bool {
+    // core::intrinsics::simd::simd_cttz()
+
+    const THREAT_MASK: u64x8 = u64x8::from_array([0, 0, 0, 0, 0, 0, 0, 0]);
+
     let patterns = unsafe {
-        &*(&board.patterns.field as *const [Pattern; pos::BOARD_SIZE] as *const [u64; pos::BOARD_SIZE])
+        std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u64; pos::BOARD_SIZE]>(board.patterns.field)
     };
 
     let mut acc = u64x8::from_slice(&patterns[0 .. 8]);
@@ -91,9 +95,9 @@ pub fn is_threat_available(board: &Board) -> bool {
         acc |= u64x8::from_slice(&patterns[idx .. idx + 8]);
     }
 
-    const TAIL_BEGIN: usize = pos::BOARD_SIZE - pos::BOARD_SIZE % 8;
+    const TAIL_BEGIN: usize = ((pos::BOARD_SIZE + 1) % 8) - 1;
     let mut tail = [0; 8];
-    tail[.. TAIL_BEGIN].copy_from_slice(&patterns[TAIL_BEGIN ..]);
+    tail[TAIL_BEGIN ..].copy_from_slice(&patterns[(pos::BOARD_SIZE - TAIL_BEGIN) ..]);
     acc |= u64x8::from_array(tail);
 
     let merged_pattern = unsafe { std::mem::transmute::<u64, Pattern>(acc.reduce_or()) };

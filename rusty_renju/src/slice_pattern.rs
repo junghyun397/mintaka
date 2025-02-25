@@ -98,7 +98,7 @@ fn lookup_patterns<const C: Color>(
         }
 
         if slice_patch_data.closed_four_mask != 0 {
-            acc.patterns = increase_closed_four(
+            acc.patterns |= increase_closed_four(
                 acc.patterns,
                 ((slice_patch_data.closed_four_clear_mask as u128) << shr) >> shl,
                 ((slice_patch_data.closed_four_mask as u128) << shr) >> shl
@@ -108,12 +108,11 @@ fn lookup_patterns<const C: Color>(
 }
 
 #[inline(always)]
-fn increase_closed_four(original: u128, clear_mask: u128, mask: u128) -> u128 {
-    let mut copied: u128 = original;     // 0 0 0 | 1 0 0 | 1 1 0
+fn increase_closed_four(mut copied: u128, clear_mask: u128, mask: u128) -> u128 {
     copied >>= 1;                        // 0 0 0 | 0 1 0 | 0 1 1
     copied |= mask;                      // 1 0 0 | 1 1 0 | 1 1 1
     copied &= clear_mask;                // 1 0 0 | 1 1 0 | 1 1 0
-    original | copied                    // empty   slot 1  slot 2
+    copied                               // 0 0 0 | 1 0 0 | 1 1 0
 }
 
 fn calculate_five_in_a_rows(mut stones: u16) -> u16 {
