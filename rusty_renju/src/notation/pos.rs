@@ -3,11 +3,13 @@ use crate::utils::str_utils::u8_from_str;
 
 pub const BOARD_WIDTH: u8 = 15;
 pub const BOARD_SIZE: usize = U_BOARD_WIDTH * U_BOARD_WIDTH;
+pub const BOARD_BOUND: usize = BOARD_SIZE - 1;
 
 pub const U_BOARD_WIDTH: usize = BOARD_WIDTH as usize;
 pub const I_BOARD_WIDTH: isize = BOARD_WIDTH as isize;
 
 pub const U8_BOARD_SIZE: u8 = BOARD_SIZE as u8;
+pub const U8_BOARD_BOUND: u8 = BOARD_BOUND as u8;
 
 pub const CENTER: Pos = Pos::from_index(U8_BOARD_SIZE / 2);
 pub const CENTER_ROW_COL: u8 = CENTER.col();
