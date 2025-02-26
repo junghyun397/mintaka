@@ -24,7 +24,7 @@ const CLOSED_FOUR_SINGLE_POSITION: u32  = 8;
 
 const UNIT_CLOSED_FOUR_SINGLE_MASK: u32 = repeat_4x(CLOSED_FOUR_SINGLE);
 const UNIT_CLOSED_FOUR_MASK: u32        = repeat_4x(CLOSED_FOUR_DOUBLE);
-const UNIT_OPEN_FOUR_MASK: u32          = repeat_4x(OPEN_FOUR);
+pub const UNIT_OPEN_FOUR_MASK: u32      = repeat_4x(OPEN_FOUR);
 const UNIT_TOTAL_FOUR_MASK: u32         = repeat_4x(TOTAL_FOUR);
 const UNIT_FIVE_MASK: u32               = repeat_4x(FIVE);
 

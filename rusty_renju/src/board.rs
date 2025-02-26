@@ -3,7 +3,6 @@ use crate::memo::hash_key::HashKey;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::Pos;
-use crate::pattern;
 use crate::pattern::Patterns;
 use crate::slice::Slices;
 use std::marker::ConstParamTy;
@@ -20,8 +19,8 @@ pub struct Board {
 
 impl Board {
 
-    pub fn opponent_color(&self) -> Color {
-        !self.player_color
+    pub const fn opponent_color(&self) -> Color {
+        self.player_color.reversed()
     }
 
     pub fn stone_kind(&self, pos: Pos) -> Option<Color> {
