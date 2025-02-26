@@ -4,7 +4,7 @@ use rusty_renju::board_iter::BoardIterItem;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::rule::ForbiddenKind;
 use rusty_renju::notation::value::Eval;
-use rusty_renju::pattern::PatternUnit;
+use rusty_renju::pattern::Pattern;
 
 pub struct HeuristicWeights {
     pub three: Eval,
@@ -38,7 +38,7 @@ impl HeuristicEvaluator {
         forbidden: -15,
     };
 
-    fn eval_pattern<const C: Color>(unit: &PatternUnit) -> Eval {
+    fn eval_pattern<const C: Color>(unit: &Pattern) -> Eval {
         if unit.has_five() {
             return Self::WEIGHTS.five;
         }
@@ -76,7 +76,7 @@ impl Evaluator for HeuristicEvaluator {
         for item in board.iter_items() {
             score = score.saturating_add(match item {
                 BoardIterItem::Pattern(pattern) => {
-                    let eval_black = match pattern.forbidden_kind() {
+                    let eval_black = match pattern.black.forbidden_kind() {
                         Some(ForbiddenKind::DoubleFour | ForbiddenKind::Overline) =>
                             Self::WEIGHTS.forbidden,
                         None => Self::eval_pattern::<{ Color::Black }>(&pattern.black),

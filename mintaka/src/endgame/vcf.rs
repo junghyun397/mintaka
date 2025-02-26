@@ -83,13 +83,12 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
     'vcf_search: loop {
         'position_search: while idx < pos::BOARD_SIZE {
-            let pattern = board.patterns.field[idx];
-            let player_unit = pattern.player_unit::<C>();
-            let opponent_unit = pattern.opponent_unit::<C>();
+            let player_pattern = board.patterns.field.player_unit::<C>()[idx];
+            let opponent_pattern = board.patterns.field.opponent_unit::<C>()[idx];
 
-            if !player_unit.has_any_four()
-                || (opponent_has_five && !opponent_unit.has_five())
-                || (C == Color::Black && pattern.is_forbidden())
+            if !player_pattern.has_any_four()
+                || (opponent_has_five && !opponent_pattern.has_five())
+                || (C == Color::Black && player_pattern.is_forbidden())
             {
                 idx += 1;
 
@@ -98,7 +97,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
             let four_pos = Pos::from_index(idx as u8);
 
-            if player_unit.has_open_four() {
+            if player_pattern.has_open_four() {
                 td.tt.store_entry_mut(board.hash_key, build_vcf_win_tt_entry(vcf_ply, four_pos));
 
                 return backtrace_frames(td, board, vcf_ply, four_pos);
@@ -108,15 +107,14 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             td.batch_counter.add_single_mut();
 
             let defend_pos = position_board.patterns.unchecked_five_pos.player_unit::<C>().unwrap();
-            let defend_pattern = position_board.patterns.field[defend_pos.idx_usize()];
-            let defend_unit = defend_pattern.opponent_unit::<C>();
-            let defend_four_count = defend_unit.count_fours();
+            let defend_pattern = position_board.patterns.field.opponent_unit::<C>()[defend_pos.idx_usize()];
+            let defend_four_count = defend_pattern.count_fours();
             let defend_is_forbidden = C == Color::White && defend_pattern.is_forbidden();
 
             if match C {
                 Color::Black => defend_four_count == PatternCount::Multiple
-                    || defend_unit.has_open_four(),
-                Color::White => defend_unit.has_open_four()
+                    || defend_pattern.has_open_four(),
+                Color::White => defend_pattern.has_open_four()
                     && !defend_is_forbidden
             } {
                 idx += 1;
@@ -125,10 +123,10 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
             if match C {
                 Color::Black => defend_four_count == PatternCount::Cold
-                    && player_unit.has_three(),
+                    && player_pattern.has_three(),
                 Color::White => defend_is_forbidden
                     || (defend_four_count == PatternCount::Cold
-                    && player_unit.has_three())
+                    && player_pattern.has_three())
             } {
                 td.tt.store_entry_mut(board.hash_key, build_vcf_win_tt_entry(vcf_ply, four_pos));
 

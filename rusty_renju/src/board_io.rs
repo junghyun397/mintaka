@@ -8,7 +8,7 @@ use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::notation::rule::ForbiddenKind;
-use crate::pattern::PatternUnit;
+use crate::pattern::Pattern;
 use crate::slice::Slice;
 use crate::utils::str_utils::join_str_horizontally;
 use regex_lite::Regex;
@@ -119,7 +119,7 @@ impl Board {
 
     pub fn build_detailed_string(&self) -> String {
         fn build_each_color_string(board: &Board, color: Color) -> String {
-            fn render_pattern(board: &Board, color: Color, extract: fn(&PatternUnit) -> u32) -> String {
+            fn render_pattern(board: &Board, color: Color, extract: fn(&Pattern) -> u32) -> String {
                 board.build_attribute_string(|item| {
                     match item {
                         BoardIterItem::Stone(color) => char::from(*color).to_string(),
@@ -136,11 +136,11 @@ impl Board {
                 })
             }
 
-            let open_three = format!("open_three\n{}", render_pattern(board, color, PatternUnit::count_open_threes));
-            let closed_four = format!("closed_four\n{}", render_pattern(board, color, PatternUnit::count_closed_fours));
-            let open_four = format!("open_four\n{}", render_pattern(board, color, PatternUnit::count_open_fours));
-            let close_three = format!("close_three\n{}", render_pattern(board, color, PatternUnit::count_close_threes));
-            let five = format!("five\n{}", render_pattern(board, color, PatternUnit::count_fives));
+            let open_three = format!("open_three\n{}", render_pattern(board, color, Pattern::count_open_threes));
+            let closed_four = format!("closed_four\n{}", render_pattern(board, color, Pattern::count_closed_fours));
+            let open_four = format!("open_four\n{}", render_pattern(board, color, Pattern::count_open_fours));
+            let close_three = format!("close_three\n{}", render_pattern(board, color, Pattern::count_close_threes));
+            let five = format!("five\n{}", render_pattern(board, color, Pattern::count_fives));
 
             join_str_horizontally(&[&open_three, &closed_four, &open_four, &close_three, &five])
         }
@@ -161,7 +161,7 @@ impl Display for Board {
             match item {
                 BoardIterItem::Stone(color) => char::from(*color),
                 BoardIterItem::Pattern(pattern) =>
-                    pattern.forbidden_kind()
+                    pattern.black.forbidden_kind()
                         .map(char::from)
                         .unwrap_or(SYMBOL_EMPTY)
             }.to_string()

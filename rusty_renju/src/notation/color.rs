@@ -67,6 +67,13 @@ impl<T: Copy + Default> Default for ColorContainer<T> {
 
 impl<T: Copy> ColorContainer<T> {
 
+    pub fn new(black: T, white: T) -> Self {
+        Self {
+            black,
+            white
+        }
+    }
+
     pub fn access(&self, color: Color) -> &T {
         match color {
             Color::Black => &self.black,

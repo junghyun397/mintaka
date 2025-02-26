@@ -3,9 +3,9 @@ use jni::objects::JClass;
 use jni::sys::{jboolean, jint, jlong};
 use jni::JNIEnv;
 use rusty_renju::board::Board;
-use rusty_renju::pattern::PatternUnit;
+use rusty_renju::pattern::Pattern;
 
-fn count_pattern<F>(board_ptr: jlong, pos: jint, is_black: jboolean, count: F) -> jint where F: FnOnce(&PatternUnit) -> u32 {
+fn count_pattern<F>(board_ptr: jlong, pos: jint, is_black: jboolean, count: F) -> jint where F: FnOnce(&Pattern) -> u32 {
     let pattern = &retrieve_ref::<Board>(board_ptr).patterns.field[pos as usize];
     let unit = match is_black {
         1 => pattern.black,
@@ -46,7 +46,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countOpenThree(
     pos: jint,
     is_black: jboolean,
 ) -> jint {
-    count_pattern(board_ptr, pos, is_black, PatternUnit::count_open_threes)
+    count_pattern(board_ptr, pos, is_black, Pattern::count_open_threes)
 }
 
 #[unsafe(no_mangle)]
@@ -57,7 +57,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countOpenFour(
     pos: jint,
     is_black: jboolean,
 ) -> jint {
-    count_pattern(board_ptr, pos, is_black, PatternUnit::count_open_fours)
+    count_pattern(board_ptr, pos, is_black, Pattern::count_open_fours)
 }
 
 #[unsafe(no_mangle)]
@@ -68,7 +68,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countCloseThree(
     pos: jint,
     is_black: jboolean,
 ) -> jint {
-    count_pattern(board_ptr, pos, is_black, PatternUnit::count_close_threes)
+    count_pattern(board_ptr, pos, is_black, Pattern::count_close_threes)
 }
 
 #[unsafe(no_mangle)]
@@ -79,7 +79,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countClosedFour(
     pos: jint,
     is_black: jboolean,
 ) -> jint {
-    count_pattern(board_ptr, pos, is_black, PatternUnit::count_closed_fours)
+    count_pattern(board_ptr, pos, is_black, Pattern::count_closed_fours)
 }
 
 #[unsafe(no_mangle)]
@@ -90,7 +90,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countTotalFour(
     pos: jint,
     is_black: jboolean,
 ) -> jint {
-    count_pattern(board_ptr, pos, is_black, PatternUnit::count_total_fours)
+    count_pattern(board_ptr, pos, is_black, Pattern::count_total_fours)
 }
 
 #[unsafe(no_mangle)]
@@ -101,5 +101,5 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_countFive(
     pos: jint,
     is_black: jboolean,
 ) -> jint {
-    count_pattern(board_ptr, pos, is_black, PatternUnit::count_fives)
+    count_pattern(board_ptr, pos, is_black, Pattern::count_fives)
 }

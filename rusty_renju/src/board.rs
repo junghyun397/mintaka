@@ -4,7 +4,7 @@ use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::Pos;
 use crate::pattern;
-use crate::pattern::{Pattern, Patterns};
+use crate::pattern::Patterns;
 use crate::slice::Slices;
 use std::marker::ConstParamTy;
 
@@ -192,9 +192,9 @@ impl Board {
     fn validate_double_three_mut(&mut self) {
         for double_three_pos in self.patterns.unchecked_double_three_field.iter_hot_pos() {
             if self.is_valid_double_three::<false>(SetOverrideStack::new(double_three_pos), Direction::Vertical, double_three_pos) {
-                self.patterns.field[double_three_pos.idx_usize()].black.unmark_invalid_double_three();
+                self.patterns.field.black[double_three_pos.idx_usize()].unmark_invalid_double_three();
             } else {
-                self.patterns.field[double_three_pos.idx_usize()].black.mark_invalid_double_three();
+                self.patterns.field.black[double_three_pos.idx_usize()].mark_invalid_double_three();
             }
         }
     }
@@ -212,7 +212,7 @@ impl Board {
     #[cfg(feature = "strict_renju")]
     #[inline(always)]
     fn is_invalid_three_component<const IS_NESTED: bool>(&self, overrides: SetOverrideStack, from_direction: Direction, pos: Pos) -> bool {
-        let pattern_unit = self.patterns.field[pos.idx_usize()].black;
+        let pattern_unit = self.patterns.field.black[pos.idx_usize()];
 
         if !pattern_unit.has_three() // non-three
             || pattern_unit.has_any_four() || overrides.four_contains(&pos) // double-four
@@ -235,7 +235,7 @@ impl Board {
     }
 
     fn is_valid_double_three<const IS_NESTED: bool>(&self, overrides: SetOverrideStack, from_direction: Direction, pos: Pos) -> bool {
-        let pattern_unit = self.patterns.field[pos.idx_usize()].black;
+        let pattern_unit = self.patterns.field.black[pos.idx_usize()];
         let mut total_threes = if IS_NESTED {
             pattern_unit.count_open_threes() - 1
         } else {
@@ -293,7 +293,7 @@ impl Board {
     fn update_root_four_overrides(&self, overrides: &mut SetOverrideStack) {
         let pos = overrides.set[0];
 
-        for direction in self.patterns.field[pos.idx_usize()].black.iter_three_directions() {
+        for direction in self.patterns.field.black[pos.idx_usize()].iter_three_directions() {
             self.update_four_overrides_each_direction(overrides, direction, pos);
         }
     }
@@ -311,7 +311,7 @@ impl Board {
 
         overrides.next_four = [Pos::INVALID; 12];
 
-        for direction in self.patterns.field[pos.idx_usize()].black.iter_three_directions() {
+        for direction in self.patterns.field.black[pos.idx_usize()].iter_three_directions() {
             if direction == from_direction {
                 continue;
             }

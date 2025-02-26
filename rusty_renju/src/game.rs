@@ -27,7 +27,7 @@ impl Game {
     pub fn validate_move(&self, pos: Pos) -> bool {
         !(self.result.is_some()
             || self.board.hot_field.is_hot(pos)
-            || (self.board.player_color == Color::Black && self.board.patterns.field[pos.idx_usize()].is_forbidden())
+            || (self.board.player_color == Color::Black && self.board.patterns.field.black[pos.idx_usize()].is_forbidden())
             || self.moves() == pos::BOARD_SIZE
         )
     }

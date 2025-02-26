@@ -59,22 +59,22 @@ impl PatternCount {
 // total 32bit
 #[derive(Debug, Copy, Clone, Default)]
 #[repr(C)]
-pub struct PatternUnit {
+pub struct Pattern {
     horizontal: u8,
     vertical: u8,
     ascending: u8,
     descending: u8
 }
 
-impl From<PatternUnit> for u32 {
+impl From<Pattern> for u32 {
 
-    fn from(value: PatternUnit) -> Self {
-        unsafe { std::mem::transmute::<PatternUnit, u32>(value) }
+    fn from(value: Pattern) -> Self {
+        unsafe { std::mem::transmute::<Pattern, u32>(value) }
     }
 
 }
 
-impl PatternUnit {
+impl Pattern {
 
     pub fn is_empty(&self) -> bool {
         u32::from(*self) == 0
@@ -167,7 +167,17 @@ impl PatternUnit {
     pub fn unmark_invalid_double_three(&mut self) {
         self.horizontal &= !MARKER;
     }
-    
+
+    #[inline(always)]
+    pub fn apply_mask_mut<const D: Direction>(&mut self, pattern: u8) {
+        match D {
+            Direction::Horizontal => self.horizontal = pattern,
+            Direction::Vertical => self.vertical = pattern,
+            Direction::Ascending => self.ascending = pattern,
+            Direction::Descending => self.descending = pattern,
+        }
+    }
+
     pub fn closed_four_direction_unchecked(&self) -> Direction {
         let masked = self.apply_mask(UNIT_CLOSED_FOUR_SINGLE_MASK);
         
@@ -185,47 +195,20 @@ impl PatternUnit {
         }
     }
 
-    fn apply_mask(&self, mask: u32) -> u32 {
-        u32::from(*self) & mask
-    }
-
-}
-
-pub type Pattern = ColorContainer<PatternUnit>;
-
-impl From<Pattern> for u64 {
-
-    fn from(value: Pattern) -> Self {
-        unsafe { std::mem::transmute::<Pattern, u64>(value) }
-    }
-
-}
-
-impl Pattern {
-
-    pub fn is_empty(&self) -> bool {
-        u64::from(*self) == 0
-    }
-
-    pub fn is_not_empty(&self) -> bool {
-        u64::from(*self) != 0
-    }
-
     pub fn is_forbidden(&self) -> bool {
-        self.is_not_empty()
-            && (
-                self.black.has_fours()
-                    || (self.black.has_threes() && !self.black.has_invalid_double_three())
-                    || self.has_overline()
+        !self.is_empty()
+            && (self.has_fours()
+                || (self.has_threes() && !self.has_invalid_double_three())
+                || self.has_overline()
             )
-            && !self.black.has_five()
+            && !self.has_five()
     }
 
     pub fn forbidden_kind(&self) -> Option<ForbiddenKind> {
         if self.is_forbidden() {
-            if self.black.has_threes() {
+            if self.has_threes() {
                 Some(ForbiddenKind::DoubleThree)
-            } else if self.black.has_fours() {
+            } else if self.has_fours() {
                 Some(ForbiddenKind::DoubleFour)
             } else {
                 Some(ForbiddenKind::Overline)
@@ -235,29 +218,17 @@ impl Pattern {
         }
     }
 
-    #[inline(always)]
-    pub fn apply_mask_mut<const C: Color, const D: Direction>(&mut self, pattern: u8) {
-        match (C, D) {
-            (Color::Black, Direction::Horizontal) => self.black.horizontal = pattern,
-            (Color::Black, Direction::Vertical) => self.black.vertical = pattern,
-            (Color::Black, Direction::Ascending) => self.black.ascending = pattern,
-            (Color::Black, Direction::Descending) => self.black.descending = pattern,
-            (Color::White, Direction::Horizontal) => self.white.horizontal = pattern,
-            (Color::White, Direction::Vertical) => self.white.vertical = pattern,
-            (Color::White, Direction::Ascending) => self.white.ascending = pattern,
-            (Color::White, Direction::Descending) => self.white.descending = pattern,
-        }
-    }
-
-    pub fn has_overline(&self) -> bool {
-        self.black.has_overline()
+    fn apply_mask(&self, mask: u32) -> u32 {
+        u32::from(*self) & mask
     }
 
 }
 
+pub type PatternField = ColorContainer<[Pattern; pos::BOARD_SIZE]>;
+
 #[derive(Debug, Copy, Clone)]
 pub struct Patterns {
-    pub field: [Pattern; pos::BOARD_SIZE],
+    pub field: PatternField,
     pub five_in_a_row: Option<Color>,
     pub unchecked_double_three_field: Bitfield,
     pub unchecked_five_pos: ColorContainer<Option<Pos>>,
@@ -267,7 +238,7 @@ impl Default for Patterns {
 
     fn default() -> Self {
         Self {
-            field: [Pattern::default(); pos::BOARD_SIZE],
+            field: unsafe { std::mem::zeroed() },
             five_in_a_row: None,
             unchecked_double_three_field: Bitfield::default(),
             unchecked_five_pos: ColorContainer {
@@ -298,7 +269,7 @@ impl Patterns {
     #[inline]
     fn clear_by_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &Slice) {
         for pattern_idx in 0 .. slice.length as usize {
-            self.field[slice.calculate_slice_offset::<D>(pattern_idx)].apply_mask_mut::<C, D>(0);
+            self.field.player_unit_mut::<C>()[slice.calculate_slice_offset::<D>(pattern_idx)].apply_mask_mut::<D>(0);
         }
 
         self.five_in_a_row = None;
@@ -320,12 +291,12 @@ impl Patterns {
         for pattern_idx in 0 .. slice.length as usize {
             let idx = slice.calculate_slice_offset::<D>(pattern_idx);
 
-            self.field[idx].apply_mask_mut::<C, D>(unsafe { std::ptr::read(slice_pattern.as_ptr().add(pattern_idx)) });
+            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(unsafe { std::ptr::read(slice_pattern.as_ptr().add(pattern_idx)) });
 
             if C == Color::Black {
                 let pos = Pos::from_index(idx as u8);
 
-                if self.field[idx].black.has_threes() {
+                if self.field.black[idx].has_threes() {
                     self.unchecked_double_three_field.set_mut(pos);
                 } else {
                     self.unchecked_double_three_field.unset_mut(pos);
@@ -354,9 +325,9 @@ impl<const P: u32> DirectionIterator<P> {
 
 }
 
-impl<const P: u32> From<&PatternUnit> for DirectionIterator<P> {
+impl<const P: u32> From<&Pattern> for DirectionIterator<P> {
 
-    fn from(value: &PatternUnit) -> Self {
+    fn from(value: &Pattern) -> Self {
         Self { packed_unit: value.apply_mask(UNIT_OPEN_THREE_MASK) }
     }
 
