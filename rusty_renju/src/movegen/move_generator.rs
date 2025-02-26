@@ -8,7 +8,6 @@ use crate::pattern;
 use crate::pattern::Pattern;
 use smallvec::SmallVec;
 use std::simd::cmp::SimdPartialEq;
-use std::simd::num::SimdUint;
 use std::simd::u32x16;
 
 pub type Moves = SmallVec<[Pos; 64]>;
@@ -29,44 +28,19 @@ impl From<Moves> for Bitfield {
 
 pub fn generate_moves(board: &Board, movegen_window: &MovegenWindow) -> Moves {
     match board.player_color {
-        Color::Black => generate_moves_with_color::<{ Color::Black }>(board, movegen_window),
-        Color::White => generate_moves_with_color::<{ Color::White }>(board, movegen_window),
-    }
-}
-
-fn generate_moves_with_color<const C: Color>(board: &Board, movegen_window: &MovegenWindow) -> Moves {
-    // if is_open_four_available(board, !C) {
-    //     generate_defend_three_moves::<C>(board)
-    // } else {
-    //     SmallVec::from_iter((!board.hot_field & movegen_window.movegen_field).iter_hot_pos())
-    // }
-    todo!()
-}
-
-pub fn generate_neighborhood_moves(board: &Board, movegen_window: &MovegenWindow) -> Moves {
-    SmallVec::from_iter((!board.hot_field & movegen_window.movegen_field).iter_hot_pos())
-}
-
-pub fn generate_defend_three_moves<const C: Color>(board: &Board) -> Moves {
-    let mut defend_threat_moves = SmallVec::new();
-
-    for idx in 0 .. pos::BOARD_SIZE {
-        let player_pattern = board.patterns.field.player_unit::<C>()[idx];
-        let opponent_pattern = board.patterns.field.opponent_unit::<C>()[idx];
-
-        if player_pattern.is_empty() && opponent_pattern.is_empty() {
-            continue;
-        }
-
-        if (player_pattern.has_any_four() || opponent_pattern.has_close_three())
-            && !(C == Color::Black && player_pattern.is_forbidden())
-        {
-            defend_threat_moves.push(Pos::from_index(idx as u8));
-            continue;
+        Color::Black => {
+            if is_open_four_available_white(board) {
+                return generate_defend_three_moves::<{ Color::Black }>(board);
+            }
+        },
+        Color::White => {
+            if is_open_four_available_black(board) {
+                return generate_defend_three_moves::<{ Color::White }>(board);
+            }
         }
     }
 
-    defend_threat_moves
+    generate_neighborhood_moves(board, movegen_window)
 }
 
 fn sort_moves(recent_move: Pos, moves: &mut Moves) {
@@ -82,50 +56,107 @@ fn sort_moves(recent_move: Pos, moves: &mut Moves) {
     });
 }
 
-pub fn open_four_positions(board: &Board, color: Color) -> SmallVec<[Pos; 4]> {
-    let mut acc = SmallVec::new();
-    let mask = u32x16::splat(pattern::UNIT_OPEN_FOUR_MASK);
-    let zeros = u32x16::splat(0);
+fn generate_neighborhood_moves(board: &Board, movegen_window: &MovegenWindow) -> Moves {
+    SmallVec::from_iter((board.hot_field ^ movegen_window.movegen_field).iter_hot_pos())
+}
 
-    let patterns = unsafe {
-        std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(*board.patterns.field.access(color))
+fn generate_defend_three_moves<const C: Color>(board: &Board) -> Moves {
+    const ANY_FOUR_CLOSE_THREE_MASK: u32 = pattern::UNIT_ANY_FOUR_MASK | pattern::UNIT_CLOSE_THREE_MASK;
+
+    let mut defend_threat_moves = SmallVec::new();
+
+    let player_patterns = unsafe {
+        std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(
+            *board.patterns.field.player_unit::<C>()
+        )
     };
 
-    for vector_idx in 0 .. pos::BOARD_SIZE / 16 {
-        let vector = u32x16::from_slice(&patterns[vector_idx * 16..vector_idx * 16 + 16]);
+    let opponent_patterns = unsafe {
+        std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(
+            *board.patterns.field.opponent_unit::<C>()
+        )
+    };
 
-        let masked = unsafe {
-            // core::intrinsics::simd::simd_select_bitmask(mask, vector, mask)
-            vector
-        };
+    for start_idx in (0..pos::BOARD_BOUND).step_by(16) {
+        let mut player_vector = u32x16::from_slice(&player_patterns[start_idx..start_idx + 16]);
+        let mut opponent_vector = u32x16::from_slice(&opponent_patterns[start_idx..start_idx + 16]);
 
-        let mut bitmask = masked
-            .simd_ne(zeros)
+        player_vector &= u32x16::splat(ANY_FOUR_CLOSE_THREE_MASK);
+        opponent_vector &= u32x16::splat(ANY_FOUR_CLOSE_THREE_MASK);
+
+        let mut bitmask = (
+            player_vector.simd_ne(u32x16::splat(0))
+                | opponent_vector.simd_ne(u32x16::splat(0))
+        ).to_bitmask();
+
+        while bitmask != 0 {
+            let lane_position = bitmask.trailing_zeros() as usize;
+            bitmask &= bitmask - 1;
+
+            let idx = start_idx + lane_position;
+            let player_pattern = board.patterns.field.player_unit::<C>()[idx];
+            let opponent_pattern = board.patterns.field.opponent_unit::<C>()[idx];
+
+            if (player_pattern.has_any_four() || opponent_pattern.has_close_three())
+                && (C == Color::White || !player_pattern.is_forbidden())
+            {
+                defend_threat_moves.push(Pos::from_index(idx as u8));
+            }
+        }
+    }
+
+    let player_pattern = board.patterns.field.player_unit::<C>()[pos::BOARD_BOUND];
+    let opponent_pattern = board.patterns.field.opponent_unit::<C>()[pos::BOARD_BOUND];
+
+    if (player_pattern.has_any_four() || opponent_pattern.has_close_three())
+        && !(C == Color::Black && player_pattern.is_forbidden())
+    {
+        defend_threat_moves.push(Pos::from_index(pos::U8_BOARD_BOUND));
+    }
+
+    defend_threat_moves
+}
+
+fn is_open_four_available_black(board: &Board) -> bool {
+    let patterns = unsafe {
+        std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(board.patterns.field.black)
+    };
+
+    for start_idx in (0 ..pos::BOARD_BOUND).step_by(16) {
+        let mut vector = u32x16::from_slice(&patterns[start_idx .. start_idx + 16]);
+
+        vector &= u32x16::splat(pattern::UNIT_OPEN_FOUR_MASK);
+        let mut bitmask = vector
+            .simd_ne(u32x16::splat(0))
             .to_bitmask();
 
         while bitmask != 0 {
             let lane_position = bitmask.trailing_zeros() as usize;
-            acc.push(Pos::from_index((vector_idx * 16 + lane_position) as u8));
             bitmask &= bitmask - 1;
+
+            if !board.patterns.field.black[start_idx + lane_position].is_forbidden() {
+                return true;
+            }
         }
     }
 
-    acc
+    board.patterns.field.black[pos::BOARD_BOUND].has_open_four()
+        && !board.patterns.field.black[pos::BOARD_BOUND].is_forbidden()
 }
 
-fn is_open_four_available_white(board: &Board, color: Color) -> bool {
+fn is_open_four_available_white(board: &Board) -> bool {
     let patterns = unsafe {
-        std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(*board.patterns.field.access(color))
+        std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(board.patterns.field.white)
     };
 
-    let mut acc = u32x16::from_slice(&patterns[0 .. 16]);
+    for start_idx in (0 ..pos::BOARD_BOUND).step_by(16) {
+        let mut vector = u32x16::from_slice( &patterns[start_idx .. start_idx + 16]);
 
-    // total 12 iterations
-    for chunk in patterns.chunks_exact(16).skip(1) {
-        acc |= u32x16::from_slice(chunk);
+        vector &= u32x16::splat(pattern::UNIT_OPEN_FOUR_MASK);
+        if vector.simd_ne(u32x16::splat(0)).any() {
+            return true;
+        }
     }
 
-    // (15 * 15) mod 16 = 1
-    let merged_pattern = unsafe { std::mem::transmute::<u32, Pattern>(acc.reduce_or()) };
-    merged_pattern.has_open_four() | board.patterns.field.access(color)[pos::BOARD_BOUND].has_open_four()
+    board.patterns.field.white[pos::BOARD_BOUND].has_open_four()
 }

@@ -11,7 +11,7 @@ use crate::utils::lang_utils::{repeat_16x, repeat_4x};
 pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
 pub const OPEN_FOUR: u8                 = 0b0010_0000;
-pub const TOTAL_FOUR: u8                = 0b1110_0000;
+pub const ANY_FOUR: u8                  = 0b1110_0000;
 pub const FIVE: u8                      = 0b0001_0000;
 
 pub const OPEN_THREE: u8                = 0b0000_1000;
@@ -22,17 +22,17 @@ pub const MARKER: u8                    = 0b0000_0001;
 const OPEN_THREE_POSITION: u32          = 3;
 const CLOSED_FOUR_SINGLE_POSITION: u32  = 8;
 
-const UNIT_CLOSED_FOUR_SINGLE_MASK: u32 = repeat_4x(CLOSED_FOUR_SINGLE);
-const UNIT_CLOSED_FOUR_MASK: u32        = repeat_4x(CLOSED_FOUR_DOUBLE);
-pub const UNIT_OPEN_FOUR_MASK: u32      = repeat_4x(OPEN_FOUR);
-const UNIT_TOTAL_FOUR_MASK: u32         = repeat_4x(TOTAL_FOUR);
-const UNIT_FIVE_MASK: u32               = repeat_4x(FIVE);
+pub const UNIT_CLOSED_FOUR_SINGLE_MASK: u32 = repeat_4x(CLOSED_FOUR_SINGLE);
+pub const UNIT_CLOSED_FOUR_MASK: u32        = repeat_4x(CLOSED_FOUR_DOUBLE);
+pub const UNIT_OPEN_FOUR_MASK: u32          = repeat_4x(OPEN_FOUR);
+pub const UNIT_ANY_FOUR_MASK: u32           = repeat_4x(ANY_FOUR);
+pub const UNIT_FIVE_MASK: u32               = repeat_4x(FIVE);
 
-const UNIT_OPEN_THREE_MASK: u32         = repeat_4x(OPEN_THREE);
-const UNIT_CLOSE_THREE_MASK: u32        = repeat_4x(CLOSE_THREE);
-const UNIT_OVERLINE_MASK: u32           = repeat_4x(OVERLINE);
+pub const UNIT_OPEN_THREE_MASK: u32         = repeat_4x(OPEN_THREE);
+pub const UNIT_CLOSE_THREE_MASK: u32        = repeat_4x(CLOSE_THREE);
+pub const UNIT_OVERLINE_MASK: u32           = repeat_4x(OVERLINE);
 
-pub const SLICE_PATTERN_FIVE_MASK: u128 = repeat_16x(FIVE);
+pub const SLICE_PATTERN_FIVE_MASK: u128     = repeat_16x(FIVE);
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub enum PatternCount {
@@ -89,7 +89,7 @@ impl Pattern {
     }
 
     pub fn has_any_four(&self) -> bool {
-        self.apply_mask(UNIT_TOTAL_FOUR_MASK) != 0
+        self.apply_mask(UNIT_ANY_FOUR_MASK) != 0
     }
 
     pub fn has_open_four(&self) -> bool {
@@ -97,7 +97,7 @@ impl Pattern {
     }
 
     pub fn has_fours(&self) -> bool {
-        self.apply_mask(UNIT_TOTAL_FOUR_MASK).count_ones() > 1
+        self.apply_mask(UNIT_ANY_FOUR_MASK).count_ones() > 1
     }
 
     pub fn has_close_three(&self) -> bool {
@@ -113,7 +113,7 @@ impl Pattern {
     }
 
     pub fn has_three_four_fork(&self) -> bool {
-        self.apply_mask(UNIT_TOTAL_FOUR_MASK) != 0 && self.apply_mask(UNIT_OPEN_THREE_MASK) != 0
+        self.apply_mask(UNIT_ANY_FOUR_MASK) != 0 && self.apply_mask(UNIT_OPEN_THREE_MASK) != 0
     }
 
     pub fn count_threes(&self) -> PatternCount {
@@ -121,7 +121,7 @@ impl Pattern {
     }
 
     pub fn count_fours(&self) -> PatternCount {
-        PatternCount::from_masked_unit(self.apply_mask(UNIT_TOTAL_FOUR_MASK))
+        PatternCount::from_masked_unit(self.apply_mask(UNIT_ANY_FOUR_MASK))
     }
 
     pub fn count_open_threes(&self) -> u32 {
@@ -141,7 +141,7 @@ impl Pattern {
     }
 
     pub fn count_total_fours(&self) -> u32 {
-        self.apply_mask(UNIT_TOTAL_FOUR_MASK).count_ones()
+        self.apply_mask(UNIT_ANY_FOUR_MASK).count_ones()
     }
 
     pub fn count_fives(&self) -> u32 {

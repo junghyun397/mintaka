@@ -1,7 +1,7 @@
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use ethnum::u256;
-use std::ops::{BitAnd, BitOr, BitOrAssign, Not};
+use std::ops::{BitAnd, BitOr, BitOrAssign, BitXor, Not};
 use std::simd::u64x4;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -74,13 +74,19 @@ impl BitAnd for Bitfield {
 }
 
 impl BitOr for Bitfield {
-
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
         (self.to_simd() | rhs.to_simd()).into()
     }
+}
 
+impl BitXor for Bitfield {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        (self.to_simd() ^ rhs.to_simd()).into()
+    }
 }
 
 impl BitOrAssign for Bitfield {

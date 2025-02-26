@@ -92,6 +92,20 @@ impl MovegenWindow {
 
 }
 
+impl From<&Bitfield> for MovegenWindow {
+
+    fn from(value: &Bitfield) -> Self {
+        let mut acc = Self::default();
+
+        for pos in value.iter_hot_pos() {
+            acc.imprint_window_mut(pos);
+        }
+
+        acc
+    }
+
+}
+
 const fn build_movegen_imprint_mask_lut() -> [Bitfield; pos::BOARD_SIZE] {
     let imprint_mask_pattern: [u16; 7] = [
         0b1001001,

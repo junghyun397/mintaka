@@ -127,30 +127,6 @@ impl Slice {
         }
     }
 
-    fn remove_enclosed_stones(&self, mut p: u16, q: u16) -> u16 {
-        // filter X O O O X, filter X O O O O X
-        let mut vector = q as u32 | ((p as u32) << 16);
-
-        const THREE_ENCLOSED: u32   = 0b0000_1110_0000_0000_0001_0001;
-        const CLEAR_THREE_ENCLOSED: u16                    = 0b0_1110;
-        const FOUR_ENCLOSED: u32    = 0b0001_1110_0000_0000_0010_0001;
-        const CLEAR_FOUR_ENCLOSED: u16                    = 0b01_1110;
-
-        for shift in 0 .. 10 {
-            p &= if vector & THREE_ENCLOSED == THREE_ENCLOSED {
-                !(CLEAR_THREE_ENCLOSED << shift)
-            } else if vector & FOUR_ENCLOSED == FOUR_ENCLOSED {
-                !(CLEAR_FOUR_ENCLOSED << shift)
-            } else {
-                u16::MAX
-            };
-
-            vector >>= 1;
-        }
-
-        p
-    }
-
     fn calculate_available_pattern_mut(&mut self) {
         // filter . . O . . . .
         // filter O X . . O X .
