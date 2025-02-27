@@ -2,10 +2,14 @@ use crate::bitfield::Bitfield;
 use crate::memo::hash_key::HashKey;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
+use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::pattern::Patterns;
+use crate::pattern;
+use crate::pattern::{Pattern, Patterns};
 use crate::slice::Slices;
 use std::marker::ConstParamTy;
+use std::simd::cmp::SimdPartialEq;
+use std::simd::u32x16;
 
 #[derive(Copy, Clone, Default)]
 pub struct Board {
@@ -119,20 +123,35 @@ impl Board {
     fn incremental_update_mut<const M: MoveType>(&mut self, pos: Pos) {
         macro_rules! update_by_slice {
             ($direction:expr,$slice:expr,$slice_idx:expr) => {{
-                let black_was_available = $slice.pattern_available::<{ Color::Black }>();
-                let white_was_available = $slice.pattern_available::<{ Color::White }>();
-
                 match M {
                     MoveType::Set => $slice.set_mut(self.player_color, $slice_idx),
                     MoveType::Unset => $slice.unset_mut(self.player_color, $slice_idx)
                 }
 
-                if black_was_available | $slice.pattern_available::<{ Color::Black }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }>($slice);
+                match (
+                    $slice.pattern_available.player_unit::<{ Color::Black }>(),
+                    $slice.has_potential_pattern::<{ Color::Black }>()
+                ) {
+                    (_, true) => {
+                        self.patterns.update_with_slice_mut::<{ Color::Black }, { $direction }>($slice);
+                    },
+                    (true, false) => {
+                        self.patterns.clear_with_slice_mut::<{ Color::Black }, { $direction }>($slice);
+                    },
+                    _ => {}
                 }
 
-                if white_was_available | $slice.pattern_available::<{Color::White }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }>($slice);
+                match (
+                    $slice.pattern_available.player_unit::<{ Color::White }>(),
+                    $slice.has_potential_pattern::<{ Color::White }>()
+                ) {
+                    (_, true) => {
+                        self.patterns.update_with_slice_mut::<{ Color::White }, { $direction }>($slice);
+                    },
+                    (true, false) => {
+                        self.patterns.clear_with_slice_mut::<{ Color::White }, { $direction }>($slice);
+                    },
+                    _ => {}
                 }
             }};
         }
@@ -159,29 +178,29 @@ impl Board {
     fn full_update_mut(&mut self) {
         macro_rules! update_by_slice {
             ($slice:expr,$direction:expr) => {{
-                if $slice.pattern_available::<{ Color::Black }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::Black }, { $direction }>($slice);
+                if $slice.has_potential_pattern::<{ Color::Black }>() {
+                    self.patterns.update_with_slice_mut::<{ Color::Black }, { $direction }>($slice);
                 }
 
-                if $slice.pattern_available::<{ Color::White }>() {
-                    self.patterns.update_by_slice_mut::<{ Color::White }, { $direction }>($slice);
+                if $slice.has_potential_pattern::<{ Color::White }>() {
+                    self.patterns.update_with_slice_mut::<{ Color::White }, { $direction }>($slice);
                 }
             }};
         }
 
-        for horizontal_slice in self.slices.horizontal_slices.iter() {
+        for horizontal_slice in self.slices.horizontal_slices.iter_mut() {
             update_by_slice!(horizontal_slice, Direction::Horizontal);
         }
 
-        for vertical_slice in self.slices.vertical_slices.iter() {
+        for vertical_slice in self.slices.vertical_slices.iter_mut() {
             update_by_slice!(vertical_slice, Direction::Vertical);
         }
 
-        for ascending_slice in self.slices.ascending_slices.iter() {
+        for ascending_slice in self.slices.ascending_slices.iter_mut() {
             update_by_slice!(ascending_slice, Direction::Ascending);
         }
 
-        for descending_slice in self.slices.descending_slices.iter() {
+        for descending_slice in self.slices.descending_slices.iter_mut() {
             update_by_slice!(descending_slice, Direction::Descending);
         }
 
@@ -189,6 +208,19 @@ impl Board {
     }
 
     fn validate_double_three_mut(&mut self) {
+        let patterns = unsafe {
+            std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(self.patterns.field.black)
+        };
+
+        for start_idx in (0 .. pos::BOARD_BOUND).step_by(16) {
+            let mut vector = u32x16::from_slice( &patterns[start_idx .. start_idx + 16]);
+
+            vector &= u32x16::splat(pattern::UNIT_OPEN_THREE_MASK);
+
+            if vector.simd_ne(u32x16::splat(0)).any() {
+            }
+        }
+
         for double_three_pos in self.patterns.unchecked_double_three_field.iter_hot_pos() {
             if self.is_valid_double_three::<false>(SetOverrideStack::new(double_three_pos), Direction::Vertical, double_three_pos) {
                 self.patterns.field.black[double_three_pos.idx_usize()].unmark_invalid_double_three();

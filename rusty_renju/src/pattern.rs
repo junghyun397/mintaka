@@ -32,6 +32,7 @@ pub const UNIT_OPEN_THREE_MASK: u32         = repeat_4x(OPEN_THREE);
 pub const UNIT_CLOSE_THREE_MASK: u32        = repeat_4x(CLOSE_THREE);
 pub const UNIT_OVERLINE_MASK: u32           = repeat_4x(OVERLINE);
 
+pub const SLICE_PATTERN_THREE_MASK: u128    = repeat_16x(OPEN_THREE);
 pub const SLICE_PATTERN_FIVE_MASK: u128     = repeat_16x(FIVE);
 
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -258,26 +259,31 @@ impl Patterns {
     };
 
     #[inline]
-    pub fn update_by_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &Slice) {
-        if slice.pattern_available::<C>() {
-            self.update_by_slice_pattern_mut::<C, D>(slice, slice.calculate_slice_pattern::<C>());
+    pub fn update_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
+        let slice_pattern = slice.calculate_slice_pattern::<C>();
+
+        if slice_pattern.is_empty() {
+            self.clear_with_slice_mut::<C, D>(slice);
         } else {
-            self.clear_by_slice_mut::<C, D>(slice);
-        };
+            self.update_with_slice_pattern_mut::<C, D>(slice, slice_pattern);
+        }
     }
 
     #[inline]
-    fn clear_by_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &Slice) {
+    pub fn clear_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
         for pattern_idx in 0 .. slice.length as usize {
-            self.field.player_unit_mut::<C>()[slice.calculate_slice_offset::<D>(pattern_idx)].apply_mask_mut::<D>(0);
+            let idx = slice.calculate_slice_offset::<D>(pattern_idx);
+            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(0);
         }
 
         self.five_in_a_row = None;
+
+        *slice.pattern_available.player_unit_mut::<C>() = false;
     }
 
     #[inline]
-    fn update_by_slice_pattern_mut<const C: Color, const D: Direction>(
-        &mut self, slice: &Slice, slice_pattern: SlicePattern
+    fn update_with_slice_pattern_mut<const C: Color, const D: Direction>(
+        &mut self, slice: &mut Slice, slice_pattern: SlicePattern
     ) {
         *self.unchecked_five_pos.player_unit_mut::<C>() = self.unchecked_five_pos.player_unit::<C>().or(
             (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK != 0)
@@ -290,24 +296,15 @@ impl Patterns {
 
         for pattern_idx in 0 .. slice.length as usize {
             let idx = slice.calculate_slice_offset::<D>(pattern_idx);
-
-            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(unsafe { std::ptr::read(slice_pattern.as_ptr().add(pattern_idx)) });
-
-            if C == Color::Black {
-                let pos = Pos::from_index(idx as u8);
-
-                if self.field.black[idx].has_threes() {
-                    self.unchecked_double_three_field.set_mut(pos);
-                } else {
-                    self.unchecked_double_three_field.unset_mut(pos);
-                }
-            }
+            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(slice_pattern[pattern_idx]);
         }
 
         self.five_in_a_row = self.five_in_a_row.or(
             contains_five_in_a_row(slice.stones::<C>())
                 .then_some(C)
         );
+
+        *slice.pattern_available.player_unit_mut::<C>() = true;
     }
 
 }

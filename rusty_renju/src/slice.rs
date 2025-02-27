@@ -1,4 +1,4 @@
-use crate::notation::color::Color;
+use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
@@ -14,8 +14,7 @@ pub struct Slice {
     pub start_col: u8,
     pub black_stones: u16,
     pub white_stones: u16,
-    pub black_pattern_available: bool,
-    pub white_pattern_available: bool,
+    pub pattern_available: ColorContainer<bool>,
 }
 
 impl Slice {
@@ -26,8 +25,7 @@ impl Slice {
         start_col: 0,
         black_stones: 0,
         white_stones: 0,
-        black_pattern_available: false,
-        white_pattern_available: false,
+        pattern_available: ColorContainer::new(false, false),
     };
 
     pub const fn empty(length: u8, start_row: u8, start_col: u8) -> Self {
@@ -37,8 +35,7 @@ impl Slice {
             start_col,
             black_stones: 0,
             white_stones: 0,
-            black_pattern_available: false,
-            white_pattern_available: false,
+            pattern_available: ColorContainer::new(false, false),
         }
     }
 
@@ -58,8 +55,6 @@ impl Slice {
             Color::Black => self.black_stones |= mask,
             Color::White => self.white_stones |= mask
         };
-
-        self.calculate_available_pattern_mut();
     }
 
     pub fn unset_mut(&mut self, color: Color, idx: u8) {
@@ -68,8 +63,6 @@ impl Slice {
             Color::Black => self.black_stones &= mask,
             Color::White => self.white_stones &= mask
         };
-
-        self.calculate_available_pattern_mut();
     }
 
     pub fn stones<const C: Color>(&self) -> u16 {
@@ -83,13 +76,6 @@ impl Slice {
         match C {
             Color::Black => self.white_stones,
             Color::White => self.black_stones
-        }
-    }
-
-    pub fn pattern_available<const C: Color>(&self) -> bool {
-        match C {
-            Color::Black => self.black_pattern_available,
-            Color::White => self.white_pattern_available
         }
     }
 
@@ -127,20 +113,21 @@ impl Slice {
         }
     }
 
-    fn calculate_available_pattern_mut(&mut self) {
+    pub fn has_potential_pattern<const C: Color>(&self) -> bool {
         // filter . . O . . . .
         // filter O X . . O X .
         // filter O . . . O . .
-        macro_rules! calculate_available_pattern {
-            ($p:expr,$q:expr) => {{
-                $p.count_ones() > 1
-                    && $p & !($q << 1) & !($q >> 1) != 0
-                    && $p & (($p << 3) | ($p << 2) | ($p << 1) | ($p >> 1) | ($p >> 2) | ($p >> 3)) != 0
-            }};
+        #[inline(always)]
+        fn is_pattern_available(p: u16, q: u16) -> bool {
+            p.count_ones() > 1
+                && p & !(q << 1) & !(q >> 1) != 0
+                && p & ((p << 3) | (p << 2) | (p << 1) | (p >> 1) | (p >> 2) | (p >> 3)) != 0
         }
 
-        self.black_pattern_available = calculate_available_pattern!(self.black_stones, self.white_stones);
-        self.white_pattern_available = calculate_available_pattern!(self.white_stones, self.black_stones);
+        match C {
+            Color::Black => is_pattern_available(self.black_stones, self.white_stones),
+            Color::White => is_pattern_available(self.white_stones, self.black_stones),
+        }
     }
 
 }
