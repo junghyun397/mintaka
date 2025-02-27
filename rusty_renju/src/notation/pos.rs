@@ -41,6 +41,16 @@ macro_rules! directional_offset {
     };
 }
 
+#[inline(always)]
+pub const fn step_idx_usize<const D: Direction>(idx: usize) -> usize {
+    match D {
+        Direction::Horizontal => idx + 1,
+        Direction::Vertical => idx + U_BOARD_WIDTH,
+        Direction::Ascending => idx + U_BOARD_WIDTH + 1,
+        Direction::Descending => idx - U_BOARD_WIDTH + 1
+    }
+}
+
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub struct Pos(u8);
 

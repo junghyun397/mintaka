@@ -1,8 +1,9 @@
 use crate::bitfield::Bitfield;
+use crate::cartesian_to_index;
 use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
-use crate::notation::pos::Pos;
+use crate::notation::pos::{step_idx_usize, Pos};
 use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slice;
 use crate::slice_pattern::{contains_five_in_a_row, SlicePattern};
@@ -271,9 +272,10 @@ impl Patterns {
 
     #[inline]
     pub fn clear_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
-        for pattern_idx in 0 .. slice.length as usize {
-            let idx = slice.calculate_slice_offset::<D>(pattern_idx);
+        let mut idx = cartesian_to_index!(slice.start_row, slice.start_col) as usize;
+        for _ in 0 .. slice.length as usize {
             self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(0);
+            idx = step_idx_usize::<D>(idx);
         }
 
         self.five_in_a_row = None;
@@ -294,9 +296,10 @@ impl Patterns {
 
         let slice_pattern = unsafe { std::mem::transmute::<SlicePattern, [u8; 16]>(slice_pattern) };
 
+        let mut idx = cartesian_to_index!(slice.start_row, slice.start_col) as usize;
         for pattern_idx in 0 .. slice.length as usize {
-            let idx = slice.calculate_slice_offset::<D>(pattern_idx);
             self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(slice_pattern[pattern_idx]);
+            idx = step_idx_usize::<D>(idx);
         }
 
         self.five_in_a_row = self.five_in_a_row.or(
