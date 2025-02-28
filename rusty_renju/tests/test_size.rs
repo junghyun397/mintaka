@@ -10,9 +10,9 @@ mod test_size {
         assert_eq!(size_of::<Slice>(), 10);
         assert_eq!(size_of::<Slices>(), 720);
         assert_eq!(size_of::<Pattern>(), 4);
-        assert_eq!(size_of::<Patterns>(), 1837);
+        assert_eq!(size_of::<Patterns>(), 1805);
         assert_eq!(size_of::<SlicePattern>(), 16);
-        assert_eq!(size_of::<Board>(), 2600);
+        assert_eq!(size_of::<Board>(), 2568);
     }
 
 }

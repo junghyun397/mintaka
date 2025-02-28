@@ -1,4 +1,3 @@
-use crate::bitfield::Bitfield;
 use crate::cartesian_to_index;
 use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
@@ -170,33 +169,6 @@ impl Pattern {
         self.horizontal &= !MARKER;
     }
 
-    #[inline(always)]
-    pub fn apply_mask_mut<const D: Direction>(&mut self, pattern: u8) {
-        match D {
-            Direction::Horizontal => self.horizontal = pattern,
-            Direction::Vertical => self.vertical = pattern,
-            Direction::Ascending => self.ascending = pattern,
-            Direction::Descending => self.descending = pattern,
-        }
-    }
-
-    pub fn closed_four_direction_unchecked(&self) -> Direction {
-        let masked = self.apply_mask(UNIT_CLOSED_FOUR_SINGLE_MASK);
-        
-        const HORIZONTAL: u32 = CLOSED_FOUR_SINGLE as u32;
-        const VERTICAL: u32 = (CLOSED_FOUR_SINGLE as u32) << 8;
-        const ASCENDING: u32 = (CLOSED_FOUR_SINGLE as u32) << 16;
-        const DESCENDING: u32 = (CLOSED_FOUR_SINGLE as u32) << 24;
-
-        match masked { 
-            HORIZONTAL => Direction::Horizontal,
-            VERTICAL => Direction::Vertical,
-            ASCENDING => Direction::Ascending,
-            DESCENDING => Direction::Descending,
-            _ => unreachable!()
-        }
-    }
-
     pub fn is_forbidden(&self) -> bool {
         !self.is_empty()
             && (self.has_fours()
@@ -220,7 +192,17 @@ impl Pattern {
         }
     }
 
-    fn apply_mask(&self, mask: u32) -> u32 {
+    #[inline(always)]
+    pub fn apply_mask_mut<const D: Direction>(&mut self, pattern: u8) {
+        match D {
+            Direction::Horizontal => self.horizontal = pattern,
+            Direction::Vertical => self.vertical = pattern,
+            Direction::Ascending => self.ascending = pattern,
+            Direction::Descending => self.descending = pattern,
+        }
+    }
+
+    pub fn apply_mask(&self, mask: u32) -> u32 {
         u32::from(*self) & mask
     }
 
@@ -232,7 +214,6 @@ pub type PatternField = ColorContainer<[Pattern; pos::BOARD_SIZE]>;
 pub struct Patterns {
     pub field: PatternField,
     pub five_in_a_row: Option<Color>,
-    pub unchecked_double_three_field: Bitfield,
     pub unchecked_five_pos: ColorContainer<Option<Pos>>,
 }
 
@@ -242,7 +223,6 @@ impl Default for Patterns {
         Self {
             field: unsafe { std::mem::zeroed() },
             five_in_a_row: None,
-            unchecked_double_three_field: Bitfield::default(),
             unchecked_five_pos: ColorContainer {
                 black: None,
                 white: None
@@ -273,9 +253,10 @@ impl Patterns {
     #[inline]
     pub fn clear_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
         let mut idx = cartesian_to_index!(slice.start_row, slice.start_col) as usize;
-        for _ in 0 .. slice.length as usize {
-            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(0);
+        self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(0);
+        for _ in 1 .. slice.length as usize {
             idx = step_idx_usize::<D>(idx);
+            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(0);
         }
 
         self.five_in_a_row = None;
@@ -297,9 +278,10 @@ impl Patterns {
         let slice_pattern = unsafe { std::mem::transmute::<SlicePattern, [u8; 16]>(slice_pattern) };
 
         let mut idx = cartesian_to_index!(slice.start_row, slice.start_col) as usize;
-        for pattern_idx in 0 .. slice.length as usize {
-            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(slice_pattern[pattern_idx]);
+        self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(slice_pattern[0]);
+        for pattern_idx in 1 .. slice.length as usize {
             idx = step_idx_usize::<D>(idx);
+            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(slice_pattern[pattern_idx]);
         }
 
         self.five_in_a_row = self.five_in_a_row.or(

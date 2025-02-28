@@ -6,9 +6,10 @@ use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::pattern;
 use crate::pattern::Pattern;
+use crate::utils::platform;
 use smallvec::SmallVec;
 use std::simd::cmp::SimdPartialEq;
-use std::simd::u32x16;
+use std::simd::Simd;
 
 pub type Moves = SmallVec<[Pos; 64]>;
 
@@ -61,8 +62,6 @@ fn generate_neighborhood_moves(board: &Board, movegen_window: &MovegenWindow) ->
 }
 
 fn generate_defend_three_moves<const C: Color>(board: &Board) -> Moves {
-    const ANY_FOUR_CLOSE_THREE_MASK: u32 = pattern::UNIT_ANY_FOUR_MASK | pattern::UNIT_CLOSE_THREE_MASK;
-
     let mut defend_threat_moves = SmallVec::new();
 
     let player_patterns = unsafe {
@@ -77,16 +76,19 @@ fn generate_defend_three_moves<const C: Color>(board: &Board) -> Moves {
         )
     };
 
-    for start_idx in (0..pos::BOARD_BOUND).step_by(16) {
-        let mut player_vector = u32x16::from_slice(&player_patterns[start_idx..start_idx + 16]);
-        let mut opponent_vector = u32x16::from_slice(&opponent_patterns[start_idx..start_idx + 16]);
+    for start_idx in (0..pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
+        let mut player_vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
+            &player_patterns[start_idx..start_idx + 16]
+        );
+        let mut opponent_vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
+            &opponent_patterns[start_idx..start_idx + 16]
+        );
 
-        player_vector &= u32x16::splat(ANY_FOUR_CLOSE_THREE_MASK);
-        opponent_vector &= u32x16::splat(ANY_FOUR_CLOSE_THREE_MASK);
+        player_vector &= Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
+        opponent_vector &= Simd::splat(pattern::UNIT_CLOSE_THREE_MASK | pattern::UNIT_OPEN_FOUR_MASK);
 
         let mut bitmask = (
-            player_vector.simd_ne(u32x16::splat(0))
-                | opponent_vector.simd_ne(u32x16::splat(0))
+            player_vector.simd_ne(Simd::splat(0)) | opponent_vector.simd_ne(Simd::splat(0))
         ).to_bitmask();
 
         while bitmask != 0 {
@@ -122,12 +124,14 @@ fn is_open_four_available_black(board: &Board) -> bool {
         std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(board.patterns.field.black)
     };
 
-    for start_idx in (0 ..pos::BOARD_BOUND).step_by(16) {
-        let mut vector = u32x16::from_slice(&patterns[start_idx .. start_idx + 16]);
+    for start_idx in (0 ..pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
+        let mut vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
+            &patterns[start_idx .. start_idx + platform::U32_LANE_N]
+        );
 
-        vector &= u32x16::splat(pattern::UNIT_OPEN_FOUR_MASK);
+        vector &= Simd::splat(pattern::UNIT_OPEN_FOUR_MASK);
         let mut bitmask = vector
-            .simd_ne(u32x16::splat(0))
+            .simd_ne(Simd::splat(0))
             .to_bitmask();
 
         while bitmask != 0 {
@@ -140,8 +144,7 @@ fn is_open_four_available_black(board: &Board) -> bool {
         }
     }
 
-    board.patterns.field.black[pos::BOARD_BOUND].has_open_four()
-        && !board.patterns.field.black[pos::BOARD_BOUND].is_forbidden()
+    false
 }
 
 fn is_open_four_available_white(board: &Board) -> bool {
@@ -149,11 +152,13 @@ fn is_open_four_available_white(board: &Board) -> bool {
         std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(board.patterns.field.white)
     };
 
-    for start_idx in (0 ..pos::BOARD_BOUND).step_by(16) {
-        let mut vector = u32x16::from_slice( &patterns[start_idx .. start_idx + 16]);
+    for start_idx in (0 ..pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
+        let mut vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
+            &patterns[start_idx .. start_idx + platform::U32_LANE_N]
+        );
 
-        vector &= u32x16::splat(pattern::UNIT_OPEN_FOUR_MASK);
-        if vector.simd_ne(u32x16::splat(0)).any() {
+        vector &= Simd::splat(pattern::UNIT_OPEN_FOUR_MASK);
+        if vector.simd_ne(Simd::splat(0)).any() {
             return true;
         }
     }

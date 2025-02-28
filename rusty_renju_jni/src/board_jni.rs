@@ -175,10 +175,11 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_getPattern(
     _env: JNIEnv,
     _class: JClass,
     board_ptr: jlong,
+    color: jlong,
     pos: jbyte,
-) -> jlong {
-    let pattern = retrieve_ref::<Board>(board_ptr).patterns.field[pos as u8 as usize].clone();
-    value_to_ptr(pattern)
+) -> jint {
+    let pattern = retrieve_ref::<Board>(board_ptr).patterns.field.black[pos as u8 as usize].clone();
+    0
 }
 
 #[unsafe(no_mangle)]

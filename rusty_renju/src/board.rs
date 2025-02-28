@@ -4,12 +4,13 @@ use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::pattern;
 use crate::pattern::{Pattern, Patterns};
 use crate::slice::Slices;
+use crate::utils::platform;
+use crate::{assert_struct_sizes, pattern};
 use std::marker::ConstParamTy;
 use std::simd::cmp::SimdPartialEq;
-use std::simd::u32x16;
+use std::simd::Simd;
 
 #[derive(Copy, Clone, Default)]
 pub struct Board {
@@ -212,20 +213,30 @@ impl Board {
             std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(self.patterns.field.black)
         };
 
-        for start_idx in (0 .. pos::BOARD_BOUND).step_by(16) {
-            let mut vector = u32x16::from_slice( &patterns[start_idx .. start_idx + 16]);
+        for start_idx in (0 .. pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
+            let mut vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
+                &patterns[start_idx .. start_idx + platform::U32_LANE_N]
+            );
 
-            vector &= u32x16::splat(pattern::UNIT_OPEN_THREE_MASK);
+            vector &= Simd::splat(pattern::UNIT_OPEN_THREE_MASK);
+            vector &= vector - Simd::splat(1); // n &= n - 1
 
-            if vector.simd_ne(u32x16::splat(0)).any() {
-            }
-        }
+            let mut bitmask = vector
+                .simd_ne(Simd::splat(0))
+                .to_bitmask();
 
-        for double_three_pos in self.patterns.unchecked_double_three_field.iter_hot_pos() {
-            if self.is_valid_double_three::<false>(SetOverrideStack::new(double_three_pos), Direction::Vertical, double_three_pos) {
-                self.patterns.field.black[double_three_pos.idx_usize()].unmark_invalid_double_three();
-            } else {
-                self.patterns.field.black[double_three_pos.idx_usize()].mark_invalid_double_three();
+            while bitmask != 0 {
+                let lane_position = bitmask.trailing_zeros() as usize;
+                bitmask &= bitmask - 1;
+
+                let idx = start_idx + lane_position;
+                let pos = Pos::from_index(idx as u8);
+
+                if self.is_valid_double_three::<false>(SetOverrideStack::new(pos), Direction::Horizontal, pos) {
+                    self.patterns.field.black[idx].unmark_invalid_double_three();
+                } else {
+                    self.patterns.field.black[idx].mark_invalid_double_three();
+                }
             }
         }
     }
@@ -243,18 +254,20 @@ impl Board {
     #[cfg(feature = "strict_renju")]
     #[inline(always)]
     fn is_invalid_three_component<const IS_NESTED: bool>(&self, overrides: SetOverrideStack, from_direction: Direction, pos: Pos) -> bool {
-        let pattern_unit = self.patterns.field.black[pos.idx_usize()];
+        const ANY_FOUR_OVERLINE_MASK: u32 = pattern::UNIT_ANY_FOUR_MASK | pattern::UNIT_OVERLINE_MASK;
 
-        if !pattern_unit.has_three() // non-three
-            || pattern_unit.has_any_four() || overrides.four_contains(&pos) // double-four
-            || pattern_unit.has_overline() // overline
-            || overrides.set_contains(&pos) // recursive
+        let pattern = self.patterns.field.black[pos.idx_usize()];
+
+        if !pattern.has_three() // non-three
+            || pattern.apply_mask(ANY_FOUR_OVERLINE_MASK) != 0 // double-four or overline
+            || (IS_NESTED && overrides.four_contains(&pos)) // double-four
+            || (IS_NESTED && overrides.set_contains(&pos)) // recursive
         {
             return true;
         }
 
         // nested double-three
-        pattern_unit.count_open_threes() > 2 && {
+        pattern.count_open_threes() > 2 && {
             let mut new_overrides = overrides;
             if !IS_NESTED {
                 self.update_root_four_overrides(&mut new_overrides);
@@ -434,6 +447,8 @@ struct SetOverrideStack {
     four_top: u8,
     next_four: [Pos; 12],
 }
+
+assert_struct_sizes!(SetOverrideStack, size=48, align=1);
 
 impl SetOverrideStack {
 
