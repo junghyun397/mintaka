@@ -209,13 +209,11 @@ impl Board {
     }
 
     fn validate_double_three_mut(&mut self) {
-        let patterns = unsafe {
-            std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(self.patterns.field.black)
-        };
+        let field_ptr = self.patterns.field.black.as_ptr() as *const u32;
 
         for start_idx in (0 .. pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
             let mut vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
-                &patterns[start_idx .. start_idx + platform::U32_LANE_N]
+                unsafe { std::slice::from_raw_parts(field_ptr.add(start_idx), platform::U32_LANE_N) }
             );
 
             vector &= Simd::splat(pattern::UNIT_OPEN_THREE_MASK);
@@ -242,7 +240,6 @@ impl Board {
     }
 
     #[cfg(not(feature = "strict_renju"))]
-    #[inline(always)]
     fn is_invalid_three_component<const IS_NESTED: bool>(&self, _overrides: SetOverrideStack, _from_direction: Direction, pos: Pos) -> bool {
         let pattern_unit = self.patterns.field[pos.idx_usize()].black;
 
@@ -252,7 +249,6 @@ impl Board {
     }
 
     #[cfg(feature = "strict_renju")]
-    #[inline(always)]
     fn is_invalid_three_component<const IS_NESTED: bool>(&self, overrides: SetOverrideStack, from_direction: Direction, pos: Pos) -> bool {
         const ANY_FOUR_OVERLINE_MASK: u32 = pattern::UNIT_ANY_FOUR_MASK | pattern::UNIT_OVERLINE_MASK;
 
@@ -367,7 +363,6 @@ impl Board {
         overrides.set_top += 1;
     }
 
-    #[inline(always)]
     fn update_four_overrides_each_direction(&self, overrides: &mut SetOverrideStack, direction: Direction, pos: Pos) {
         let direction_offset = direction as usize * 3;
 
@@ -438,17 +433,26 @@ enum MoveType {
     Set, Unset
 }
 
-// 48 bytes
+trait ValidateThreeStack {
+}
+
+struct ValidateThreeRoot {
+}
+
+struct ValidateThreeNode {
+}
+
 #[derive(Copy, Clone)]
+#[repr(align(32))]
 struct SetOverrideStack {
-    set: [Pos; 7],
+    set: [Pos; 5],
     set_top: u8,
-    four: [Pos; 27],
+    four: [Pos; 13],
     four_top: u8,
     next_four: [Pos; 12],
 }
 
-assert_struct_sizes!(SetOverrideStack, size=48, align=1);
+assert_struct_sizes!(SetOverrideStack, size=32, align=32);
 
 impl SetOverrideStack {
 
@@ -474,9 +478,9 @@ impl SetOverrideStack {
 
     fn new(root: Pos) -> Self {
         Self {
-            set: [root, Pos::INVALID, Pos::INVALID, Pos::INVALID, Pos::INVALID, Pos::INVALID, Pos::INVALID],
+            set: [root, Pos::INVALID, Pos::INVALID, Pos::INVALID, Pos::INVALID],
             set_top: 1,
-            four: [Pos::INVALID; 27],
+            four: [Pos::INVALID; 13],
             four_top: 0,
             next_four: [Pos::INVALID; 12],
         }

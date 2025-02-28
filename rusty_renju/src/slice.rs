@@ -2,20 +2,23 @@ use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::{cartesian_to_index, const_for, max};
+use crate::{assert_struct_sizes, cartesian_to_index, const_for, max};
 
 const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
 
 #[derive(Debug, Copy, Clone)]
+#[repr(align(16))]
 pub struct Slice {
+    pub black_stones: u16,
+    pub white_stones: u16,
     pub length: u8,
     pub start_row: u8,
     pub start_col: u8,
-    pub black_stones: u16,
-    pub white_stones: u16,
     pub pattern_available: ColorContainer<bool>,
 }
+
+assert_struct_sizes!(Slice, size=16, align=16);
 
 impl Slice {
 

@@ -47,6 +47,67 @@ impl Not for Color {
     }
 }
 
+macro_rules! impl_color_container {
+    ($name:ident) => {
+        impl<T: Copy + Default> Default for $name<T> {
+
+            fn default() -> Self {
+                Self {
+                    black: T::default(),
+                    white: T::default()
+                }
+            }
+
+        }
+
+        impl<T: Copy> $name<T> {
+
+            pub const fn new(black: T, white: T) -> Self {
+                Self {
+                    black,
+                    white
+                }
+            }
+
+            pub const fn access(&self, color: Color) -> &T {
+                match color {
+                    Color::Black => &self.black,
+                    Color::White => &self.white
+                }
+            }
+
+            pub const fn player_unit<const C: Color>(&self) -> &T {
+                match C {
+                    Color::Black => &self.black,
+                    Color::White => &self.white
+                }
+            }
+
+            pub const fn opponent_unit<const C: Color>(&self) -> &T {
+                match C {
+                    Color::Black => &self.white,
+                    Color::White => &self.black
+                }
+            }
+
+            pub const fn player_unit_mut<const C: Color>(&mut self) -> &mut T {
+                match C {
+                    Color::Black => &mut self.black,
+                    Color::White => &mut self.white
+                }
+            }
+
+            pub const fn opponent_unit_mut<const C: Color>(&mut self) -> &mut T {
+                match C {
+                    Color::Black => &mut self.white,
+                    Color::White => &mut self.black
+                }
+            }
+
+        }
+    };
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
 pub struct ColorContainer<T: Copy> {
@@ -54,59 +115,13 @@ pub struct ColorContainer<T: Copy> {
     pub white: T,
 }
 
-impl<T: Copy + Default> Default for ColorContainer<T> {
+impl_color_container!(ColorContainer);
 
-    fn default() -> Self {
-        Self {
-            black: T::default(),
-            white: T::default()
-        }
-    }
-
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(align(64))]
+pub struct AlignedColorContainer<T: Copy> {
+    pub black: T,
+    pub white: T,
 }
 
-impl<T: Copy> ColorContainer<T> {
-
-    pub const fn new(black: T, white: T) -> Self {
-        Self {
-            black,
-            white
-        }
-    }
-
-    pub const fn access(&self, color: Color) -> &T {
-        match color {
-            Color::Black => &self.black,
-            Color::White => &self.white
-        }
-    }
-
-    pub const fn player_unit<const C: Color>(&self) -> &T {
-        match C {
-            Color::Black => &self.black,
-            Color::White => &self.white
-        }
-    }
-
-    pub const fn opponent_unit<const C: Color>(&self) -> &T {
-        match C {
-            Color::Black => &self.white,
-            Color::White => &self.black
-        }
-    }
-
-    pub const fn player_unit_mut<const C: Color>(&mut self) -> &mut T {
-        match C {
-            Color::Black => &mut self.black,
-            Color::White => &mut self.white
-        }
-    }
-
-    pub const fn opponent_unit_mut<const C: Color>(&mut self) -> &mut T {
-        match C {
-            Color::Black => &mut self.white,
-            Color::White => &mut self.black
-        }
-    }
-
-}
+impl_color_container!(AlignedColorContainer);

@@ -5,7 +5,6 @@ use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::pattern;
-use crate::pattern::Pattern;
 use crate::utils::platform;
 use smallvec::SmallVec;
 use std::simd::cmp::SimdPartialEq;
@@ -64,24 +63,15 @@ fn generate_neighborhood_moves(board: &Board, movegen_window: &MovegenWindow) ->
 fn generate_defend_three_moves<const C: Color>(board: &Board) -> Moves {
     let mut defend_threat_moves = SmallVec::new();
 
-    let player_patterns = unsafe {
-        std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(
-            *board.patterns.field.player_unit::<C>()
-        )
-    };
-
-    let opponent_patterns = unsafe {
-        std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(
-            *board.patterns.field.opponent_unit::<C>()
-        )
-    };
+    let player_ptr = board.patterns.field.player_unit::<C>().as_ptr() as *const u32;
+    let opponent_ptr = board.patterns.field.opponent_unit::<C>().as_ptr() as *const u32;
 
     for start_idx in (0..pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
         let mut player_vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
-            &player_patterns[start_idx..start_idx + 16]
+            unsafe { std::slice::from_raw_parts(player_ptr.add(start_idx), platform::U32_LANE_N) }
         );
         let mut opponent_vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
-            &opponent_patterns[start_idx..start_idx + 16]
+            unsafe { std::slice::from_raw_parts(opponent_ptr.add(start_idx), platform::U32_LANE_N) }
         );
 
         player_vector &= Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
@@ -120,13 +110,11 @@ fn generate_defend_three_moves<const C: Color>(board: &Board) -> Moves {
 }
 
 fn is_open_four_available_black(board: &Board) -> bool {
-    let patterns = unsafe {
-        std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(board.patterns.field.black)
-    };
+    let field_ptr = board.patterns.field.black.as_ptr() as *const u32;
 
     for start_idx in (0 ..pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
         let mut vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
-            &patterns[start_idx .. start_idx + platform::U32_LANE_N]
+            unsafe { std::slice::from_raw_parts(field_ptr.add(start_idx), platform::U32_LANE_N) }
         );
 
         vector &= Simd::splat(pattern::UNIT_OPEN_FOUR_MASK);
@@ -148,13 +136,11 @@ fn is_open_four_available_black(board: &Board) -> bool {
 }
 
 fn is_open_four_available_white(board: &Board) -> bool {
-    let patterns = unsafe {
-        std::mem::transmute::<[Pattern; pos::BOARD_SIZE], [u32; pos::BOARD_SIZE]>(board.patterns.field.white)
-    };
+    let field_ptr = board.patterns.field.white.as_ptr() as *const u32;
 
     for start_idx in (0 ..pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
         let mut vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
-            &patterns[start_idx .. start_idx + platform::U32_LANE_N]
+            unsafe { std::slice::from_raw_parts(field_ptr.add(start_idx), platform::U32_LANE_N) }
         );
 
         vector &= Simd::splat(pattern::UNIT_OPEN_FOUR_MASK);

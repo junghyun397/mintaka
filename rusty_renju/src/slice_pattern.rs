@@ -5,7 +5,7 @@ use crate::{assert_struct_sizes, const_for, pattern};
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct SlicePattern {
-    pub patterns: u128,
+    pub patterns: u128
 }
 
 impl Default for SlicePattern {
@@ -149,7 +149,7 @@ impl ExtendedMatch {
 }
 
 #[derive(Copy, Clone, Debug)]
-#[repr(align(8))]
+#[repr(align(32))]
 struct SlicePatchData {
     patch_mask: u64,
     closed_four_clear_mask: u64,
@@ -157,7 +157,7 @@ struct SlicePatchData {
     extended_match: Option<ExtendedMatch>,
 }
 
-assert_struct_sizes!(SlicePatchData, size=32, align=8);
+assert_struct_sizes!(SlicePatchData, size=32, align=32);
 
 impl SlicePatchData {
 

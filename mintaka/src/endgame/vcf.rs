@@ -9,7 +9,6 @@ use rusty_renju::notation::value::{Depth, Eval, Score};
 use rusty_renju::pattern::PatternCount;
 
 #[derive(Copy, Clone)]
-#[repr(align(8))]
 pub struct VCFFrame {
     board: Board,
     next_idx: usize,

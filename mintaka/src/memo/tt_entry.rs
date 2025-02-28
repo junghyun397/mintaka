@@ -128,12 +128,13 @@ impl TTEntry {
 
 }
 
+#[repr(align(64))]
 pub struct TTEntryBucket {
     keys: [AtomicU64; 2],
     entries: [AtomicU64; 6]
 }
 
-assert_struct_sizes!(TTEntryBucket, size=64, align=8);
+assert_struct_sizes!(TTEntryBucket, size=64, align=64);
 
 impl AbstractTTEntry for TTEntryBucket {
 

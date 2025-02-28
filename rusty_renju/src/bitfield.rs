@@ -5,6 +5,7 @@ use std::ops::{BitAnd, BitOr, BitOrAssign, BitXor, Not};
 use std::simd::u64x4;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
+#[repr(align(32))]
 pub struct Bitfield(pub [u8; 32]);
 
 impl Default for Bitfield {

@@ -1,5 +1,5 @@
 use crate::cartesian_to_index;
-use crate::notation::color::{Color, ColorContainer};
+use crate::notation::color::{AlignedColorContainer, Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::{step_idx_usize, Pos};
@@ -208,11 +208,9 @@ impl Pattern {
 
 }
 
-pub type PatternField = ColorContainer<[Pattern; pos::BOARD_SIZE]>;
-
 #[derive(Debug, Copy, Clone)]
 pub struct Patterns {
-    pub field: PatternField,
+    pub field: AlignedColorContainer<[Pattern; pos::BOARD_SIZE]>,
     pub five_in_a_row: Option<Color>,
     pub unchecked_five_pos: ColorContainer<Option<Pos>>,
 }
