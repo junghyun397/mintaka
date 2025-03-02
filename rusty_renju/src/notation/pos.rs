@@ -30,16 +30,7 @@ pub const CENTER_ROW_COL: u8 = CENTER.col();
     ($idx:expr) => ($idx % 15);
 }
 
-macro_rules! directional_offset {
-    ($op:tt,$neg_op:tt,$pos:expr,$direction:expr,$offset:expr) => {
-        match $direction {
-            Direction::Vertical => Pos::from_cartesian($pos.row() $op $offset, $pos.col()),
-            Direction::Horizontal => Pos::from_cartesian($pos.row(), $pos.col() $op $offset),
-            Direction::Ascending => Pos::from_cartesian($pos.row() $op $offset, $pos.col() $op $offset),
-            Direction::Descending => Pos::from_cartesian($pos.row() $neg_op $offset, $pos.col() $op $offset)
-        }
-    };
-}
+const STEP_TABLE: [isize; 4] = [1, BOARD_WIDTH as isize, BOARD_WIDTH as isize + 1, -(BOARD_WIDTH as isize - 1)];
 
 #[inline(always)]
 pub const fn step_idx_usize<const D: Direction>(idx: usize) -> usize {
@@ -119,12 +110,8 @@ impl Pos {
         )
     }
 
-    pub const fn offset_positive_unchecked(&self, direction: Direction, offset: u8) -> Pos {
-        directional_offset!(+, -, self, direction, offset)
-    }
-
-    pub const fn offset_negative_unchecked(&self, direction: Direction, offset: u8) -> Pos {
-        directional_offset!(-, +, self, direction, offset)
+    pub const fn directional_offset_unchecked(&self, direction: Direction, offset: isize) -> Pos {
+        Self::from_index((self.0 as isize + (STEP_TABLE[direction as usize] * offset)) as u8)
     }
 
 }

@@ -1,13 +1,14 @@
+use crate::assert_struct_sizes;
 use crate::bitfield::Bitfield;
 use crate::memo::hash_key::HashKey;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::pattern::{Pattern, Patterns};
+use crate::pattern;
+use crate::pattern::Patterns;
 use crate::slice::Slices;
 use crate::utils::platform;
-use crate::{assert_struct_sizes, pattern};
 use std::marker::ConstParamTy;
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
@@ -228,9 +229,8 @@ impl Board {
                 bitmask &= bitmask - 1;
 
                 let idx = start_idx + lane_position;
-                let pos = Pos::from_index(idx as u8);
 
-                if self.is_valid_double_three::<false>(SetOverrideStack::new(pos), Direction::Horizontal, pos) {
+                if self.is_valid_double_three(ValidateThreeRoot { root_pos: Pos::from_index(idx as u8) }) {
                     self.patterns.field.black[idx].unmark_invalid_double_three();
                 } else {
                     self.patterns.field.black[idx].mark_invalid_double_three();
@@ -240,83 +240,92 @@ impl Board {
     }
 
     #[cfg(not(feature = "strict_renju"))]
-    fn is_invalid_three_component<const IS_NESTED: bool>(&self, _overrides: SetOverrideStack, _from_direction: Direction, pos: Pos) -> bool {
-        let pattern_unit = self.patterns.field[pos.idx_usize()].black;
+    fn is_invalid_three_component<C>(&self, _context: ValidateThreeRoot, _from_direction: Direction, pos: Pos) -> bool {
+        const ANY_FOUR_OR_OVERLINE_MASK: u32 = pattern::UNIT_ANY_FOUR_MASK | pattern::UNIT_OVERLINE_MASK;
 
-        !pattern_unit.has_three() // non-three
-            || pattern_unit.has_any_four() // double-four
-            || pattern_unit.has_overline() // overline
+        let pattern = self.patterns.field.black[pos.idx_usize()];
+
+        !pattern.has_three() // non-three
+            || pattern.apply_mask(ANY_FOUR_OR_OVERLINE_MASK) != 0 // double-four or overline
     }
 
     #[cfg(feature = "strict_renju")]
-    fn is_invalid_three_component<const IS_NESTED: bool>(&self, overrides: SetOverrideStack, from_direction: Direction, pos: Pos) -> bool {
-        const ANY_FOUR_OVERLINE_MASK: u32 = pattern::UNIT_ANY_FOUR_MASK | pattern::UNIT_OVERLINE_MASK;
+    fn is_invalid_three_component<C: ValidateThreeContext>(&self, mut context: C, from_direction: Direction, pos: Pos) -> bool {
+        const ANY_FOUR_OR_OVERLINE_MASK: u32 = pattern::UNIT_ANY_FOUR_MASK | pattern::UNIT_OVERLINE_MASK;
 
         let pattern = self.patterns.field.black[pos.idx_usize()];
 
         if !pattern.has_three() // non-three
-            || pattern.apply_mask(ANY_FOUR_OVERLINE_MASK) != 0 // double-four or overline
-            || (IS_NESTED && overrides.four_contains(&pos)) // double-four
-            || (IS_NESTED && overrides.set_contains(&pos)) // recursive
+            || pattern.apply_mask(ANY_FOUR_OR_OVERLINE_MASK) != 0 // double-four or overline
+            || (C::IS_NESTED && context.overrides().four_contains(pos)) // double-four
+            || (C::IS_NESTED && context.overrides().set_contains(pos)) // recursive
         {
             return true;
         }
 
         // nested double-three
         pattern.count_open_threes() > 2 && {
-            let mut new_overrides = overrides;
-            if !IS_NESTED {
+            let mut new_overrides = context.branch_overrides();
+
+            if !C::IS_NESTED {
                 self.update_root_four_overrides(&mut new_overrides);
             }
+
             self.update_four_overrides(&mut new_overrides, from_direction, pos);
 
-            self.is_valid_double_three::<true>(new_overrides, from_direction, pos)
+            self.is_valid_double_three(ValidateThreeNode {
+                overrides: new_overrides,
+                parent_direction: from_direction,
+                parent_pos: pos,
+            })
         }
     }
 
-    fn is_valid_double_three<const IS_NESTED: bool>(&self, overrides: SetOverrideStack, from_direction: Direction, pos: Pos) -> bool {
+    fn is_valid_double_three<C: ValidateThreeContext>(&self, context: C) -> bool {
+        let pos = context.parent_pos();
         let pattern_unit = self.patterns.field.black[pos.idx_usize()];
-        let mut total_threes = if IS_NESTED {
+
+        let mut total_threes = if C::IS_NESTED {
             pattern_unit.count_open_threes() - 1
         } else {
             pattern_unit.count_open_threes()
         };
 
         for direction in pattern_unit.iter_three_directions() {
-            if IS_NESTED && direction == from_direction {
+            if C::IS_NESTED && direction == context.parent_direction() {
                 continue;
             }
 
             if match self.calculate_near_four_window::<{ Color::Black }>(direction, pos) {
                 /* .VOO. */ 0b11000 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.offset_negative_unchecked(direction, 1)) &&
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.offset_positive_unchecked(direction, 3))
+                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, -1)) &&
+                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, 3))
                 },
                 /* .OOV. */ 0b00011 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.offset_negative_unchecked(direction, 3)) &&
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.offset_positive_unchecked(direction, 1))
+                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, -3)) &&
+                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, 1))
                 },
                 /* V.OO  */ 0b10000 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.offset_positive_unchecked(direction, 1))
+                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, 1))
                 }
                 /* OO.V  */ 0b00001 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.offset_negative_unchecked(direction, 1))
+                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, -1))
                 }
                 /* VO.O  */ 0b01000 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.offset_positive_unchecked(direction, 2))
+                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, 2))
                 },
                 /* .OVO. */ 0b01010 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.offset_negative_unchecked(direction, 2)) &&
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.offset_positive_unchecked(direction, 2))
+                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, -2)) &&
+                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, 2))
                 },
                 /* O.OV  */ 0b00010 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.offset_negative_unchecked(direction, 2))
+                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, -2))
                 },
                 /* OV.O  */ 0b10010 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.offset_positive_unchecked(direction, 1))
+                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, 1))
                 },
                 /* O.VO  */ 0b01001 => {
-                    self.is_invalid_three_component::<IS_NESTED>(overrides, direction, pos.offset_negative_unchecked(direction, 1))
+                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, -1))
                 },
                 _ => unreachable!()
             } {
@@ -330,6 +339,7 @@ impl Board {
         true
     }
 
+    #[inline(always)]
     fn update_root_four_overrides(&self, overrides: &mut SetOverrideStack) {
         let pos = overrides.set[0];
 
@@ -338,6 +348,7 @@ impl Board {
         }
     }
 
+    #[inline(always)]
     fn update_four_overrides(&self, overrides: &mut SetOverrideStack, from_direction: Direction, pos: Pos) {
         for next_four_idx in 0 .. 12 {
             if next_four_idx / 3 != from_direction as u8 {
@@ -368,46 +379,46 @@ impl Board {
 
         match self.calculate_near_four_window::<{ Color::Black }>(direction, pos) {
             /* .VOO.  */ 0b11000 => {
-                overrides.next_four[direction_offset] = pos.offset_negative_unchecked(direction, 1);
-                overrides.next_four[direction_offset + 1] = pos.offset_positive_unchecked(direction, 3);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -1);
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 3);
             },
             /* .OOV.  */ 0b00011 => {
-                overrides.next_four[direction_offset] = pos.offset_negative_unchecked(direction, 3);
-                overrides.next_four[direction_offset + 1] = pos.offset_positive_unchecked(direction, 1);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -3);
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 1);
             },
             /* .V.OO. */ 0b10000 => {
-                overrides.next_four[direction_offset] = pos.offset_negative_unchecked(direction, 1);
-                overrides.next_four[direction_offset + 1] = pos.offset_positive_unchecked(direction, 1);
-                overrides.next_four[direction_offset + 2] = pos.offset_positive_unchecked(direction, 3);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -1);
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 1);
+                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 3);
             }
             /* .OO.V. */ 0b00001 => {
-                overrides.next_four[direction_offset] = pos.offset_negative_unchecked(direction, 3);
-                overrides.next_four[direction_offset + 1] = pos.offset_negative_unchecked(direction, 1);
-                overrides.next_four[direction_offset + 2] = pos.offset_positive_unchecked(direction, 1);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -3);
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, -1);
+                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 1);
             }
             /* .VO.O. */ 0b01000 => {
-                overrides.next_four[direction_offset] = pos.offset_negative_unchecked(direction, 1);
-                overrides.next_four[direction_offset + 1] = pos.offset_positive_unchecked(direction, 2);
-                overrides.next_four[direction_offset + 2] = pos.offset_positive_unchecked(direction, 4);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -1);
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 2);
+                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 4);
             },
             /* .OVO.  */ 0b01010 => {
-                overrides.next_four[direction_offset] = pos.offset_negative_unchecked(direction, 2);
-                overrides.next_four[direction_offset + 1] = pos.offset_positive_unchecked(direction, 2);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -2);
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 2);
             },
             /* .O.OV. */ 0b00010 => {
-                overrides.next_four[direction_offset] = pos.offset_negative_unchecked(direction, 4);
-                overrides.next_four[direction_offset + 1] = pos.offset_negative_unchecked(direction, 2);
-                overrides.next_four[direction_offset + 2] = pos.offset_positive_unchecked(direction, 1);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -4);
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, -2);
+                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 1);
             },
             /* .OV.O. */ 0b10010 => {
-                overrides.next_four[direction_offset] = pos.offset_negative_unchecked(direction, 2);
-                overrides.next_four[direction_offset + 1] = pos.offset_positive_unchecked(direction, 1);
-                overrides.next_four[direction_offset + 2] = pos.offset_positive_unchecked(direction, 3);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -2);
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 1);
+                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 3);
             },
             /* .O.VO. */ 0b01001 => {
-                overrides.next_four[direction_offset] = pos.offset_negative_unchecked(direction, 3);
-                overrides.next_four[direction_offset + 1] = pos.offset_negative_unchecked(direction, 1);
-                overrides.next_four[direction_offset + 2] = pos.offset_positive_unchecked(direction, 2);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -3);
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, -1);
+                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 2);
             },
             _ => unreachable!()
         }
@@ -433,13 +444,71 @@ enum MoveType {
     Set, Unset
 }
 
-trait ValidateThreeStack {
+trait ValidateThreeContext : Copy {
+
+    const IS_NESTED: bool;
+
+    fn parent_pos(&self) -> Pos;
+
+    fn parent_direction(&self) -> Direction;
+
+    fn overrides(&self) -> &SetOverrideStack;
+
+    fn branch_overrides(&self) -> SetOverrideStack;
+
 }
 
+#[derive(Copy, Clone)]
 struct ValidateThreeRoot {
+    root_pos: Pos
 }
 
+impl ValidateThreeContext for ValidateThreeRoot {
+    const IS_NESTED: bool = false;
+
+    fn parent_pos(&self) -> Pos {
+        self.root_pos
+    }
+
+    fn parent_direction(&self) -> Direction {
+        unreachable!()
+    }
+
+    fn overrides(&self) -> &SetOverrideStack {
+        unreachable!()
+    }
+
+    fn branch_overrides(&self) -> SetOverrideStack {
+        SetOverrideStack::new(self.root_pos)
+    }
+}
+
+#[derive(Copy, Clone)]
+#[repr(align(8))]
 struct ValidateThreeNode {
+    overrides: SetOverrideStack,
+    parent_direction: Direction,
+    parent_pos: Pos,
+}
+
+impl ValidateThreeContext for ValidateThreeNode {
+    const IS_NESTED: bool = true;
+
+    fn parent_pos(&self) -> Pos {
+        self.parent_pos
+    }
+
+    fn parent_direction(&self) -> Direction {
+        self.parent_direction
+    }
+
+    fn overrides(&self) -> &SetOverrideStack {
+        &self.overrides
+    }
+
+    fn branch_overrides(&self) -> SetOverrideStack {
+        self.overrides
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -456,24 +525,12 @@ assert_struct_sizes!(SetOverrideStack, size=32, align=32);
 
 impl SetOverrideStack {
 
-    fn set_contains(&self, pos: &Pos) -> bool {
-        for idx in 0 .. self.set_top {
-            if &self.set[idx as usize] == pos {
-                return true;
-            }
-        }
-
-        false
+    fn set_contains(&self, pos: Pos) -> bool {
+        self.set.contains(&pos)
     }
 
-    fn four_contains(&self, pos: &Pos) -> bool {
-        for idx in 0 .. self.four_top {
-            if &self.four[idx as usize] == pos {
-                return true;
-            }
-        }
-
-        false
+    fn four_contains(&self, pos: Pos) -> bool {
+        self.four.contains(&pos)
     }
 
     fn new(root: Pos) -> Self {
