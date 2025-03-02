@@ -1,6 +1,7 @@
 #![allow(incomplete_features)]
-#![feature(portable_simd)]
 #![feature(adt_const_params)]
+#![feature(portable_simd)]
+#![feature(avx512_target_feature)]
 
 #![cfg_attr(target_arch = "aarch64", feature(stdarch_aarch64_prefetch))]
 

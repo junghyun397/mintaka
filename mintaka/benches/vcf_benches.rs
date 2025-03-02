@@ -11,7 +11,6 @@ use mintaka::thread_data::ThreadData;
 use mintaka::thread_type::ThreadType;
 use rusty_renju::board::Board;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
-use test::Bencher;
 
 fn setup_test(sample_board: &str) -> (Board, ThreadData<'static>) {
     let board = sample_board.parse::<Board>().unwrap();
@@ -29,7 +28,7 @@ fn setup_test(sample_board: &str) -> (Board, ThreadData<'static>) {
     (board, td)
 }
 #[bench]
-fn trap_vcf(b: &mut Bencher) {
+fn trap_vcf(b: &mut criterion::Bencher) {
     let (board, td) = setup_test(indoc! {"\
     "});
 
@@ -39,7 +38,7 @@ fn trap_vcf(b: &mut Bencher) {
 }
 
 #[bench]
-fn deep_vcf(b: &mut Bencher) {
+fn deep_vcf(b: &mut criterion::Bencher) {
     let (board, td) = setup_test(indoc! {"\
            A B C D E F G H I J K L M N O
         15 O . . . X . . . . . . . X . X 15

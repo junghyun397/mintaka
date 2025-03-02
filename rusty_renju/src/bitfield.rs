@@ -1,3 +1,4 @@
+use crate::assert_struct_sizes;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use ethnum::u256;
@@ -7,6 +8,8 @@ use std::simd::u64x4;
 #[derive(Copy, Clone, PartialEq, Eq)]
 #[repr(align(32))]
 pub struct Bitfield(pub [u8; 32]);
+
+assert_struct_sizes!(Bitfield, size=32, align=32);
 
 impl Default for Bitfield {
 

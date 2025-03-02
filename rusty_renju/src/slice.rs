@@ -10,11 +10,11 @@ const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
 #[derive(Debug, Copy, Clone)]
 #[repr(align(16))]
 pub struct Slice {
-    pub black_stones: u16,
-    pub white_stones: u16,
     pub length: u8,
     pub start_row: u8,
     pub start_col: u8,
+    pub black_stones: u16,
+    pub white_stones: u16,
     pub pattern_available: ColorContainer<bool>,
 }
 
