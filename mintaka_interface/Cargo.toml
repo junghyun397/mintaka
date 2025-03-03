@@ -11,13 +11,6 @@ path = "src/piskvork.rs"
 name = "mintaka_command_line"
 path = "src/command_line.rs"
 
-[profile.release]
-opt-level = 3
-codegen-units = 1
-lto = "fat"
-strip = "symbols"
-panic = "abort"
-
 [dependencies]
 rusty_renju = { path = "../rusty_renju" }
 mintaka = { path = "../mintaka" }

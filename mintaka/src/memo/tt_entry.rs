@@ -81,7 +81,7 @@ impl TTFlag {
     }
 
     pub fn set_pv(&mut self, is_pv: bool) {
-        self.0 = (self.0 & !(1 << 4)) | ((is_pv as u8) << 4);
+        self.0 = (self.0 & !(0b1 << 4)) | ((is_pv as u8) << 4);
     }
 
 }
@@ -128,6 +128,7 @@ impl TTEntry {
 
 }
 
+#[derive(Debug)]
 #[repr(align(64))]
 pub struct TTEntryBucket {
     keys: [AtomicU64; 2],

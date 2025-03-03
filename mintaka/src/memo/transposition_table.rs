@@ -22,8 +22,16 @@ impl AbstractTranspositionTable for TranspositionTable {
         &mut self.table
     }
 
-    fn assign_internal_table_mut(&mut self, table: Vec<TTEntryBucket>) {
-        self.table = table;
+    fn fetch_age(&self) -> u8 {
+        self.age.load(Ordering::Relaxed)
+    }
+
+    fn increase_age(&self) {
+        self.age.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn clear_age(&self) {
+        self.age.store(0, Ordering::Relaxed);
     }
 
 }
@@ -41,8 +49,25 @@ impl TranspositionTable {
         new
     }
 
-    pub fn size_in_kib(&self) -> usize {
-        size_of_val(&self.table) / 1024
+    pub fn view(&self) -> TTView {
+        TTView {
+            table: &self.table,
+            age: self.fetch_age(),
+        }
+    }
+
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct TTView<'a> {
+    table: &'a [TTEntryBucket],
+    pub age: u8,
+}
+
+impl TTView<'_> {
+
+    fn calculate_index(&self, key: HashKey) -> usize {
+        ((key.0 as u128 * (self.table.len() as u128)) >> 64) as usize
     }
 
     #[inline]
@@ -61,7 +86,7 @@ impl TranspositionTable {
         &self,
         key: HashKey,
         ply: usize,
-        best_move: Pos,
+        maybe_best_move: Option<Pos>,
         score_kind: ScoreKind,
         endgame_flag: EndgameFlag,
         depth: Depth,
@@ -72,16 +97,16 @@ impl TranspositionTable {
         let idx = self.calculate_index(key);
 
         if let Some(mut entry) = self.table[idx].probe(key.into()) {
-            if self.fetch_age() > entry.age
+            if self.age > entry.age
                 || score_kind == ScoreKind::Exact
                 || entry.depth.saturating_add(5) > entry.depth
             {
-                if best_move != Pos::INVALID {
+                if let Some(best_move) = maybe_best_move {
                     entry.best_move = best_move;
                 }
 
                 entry.tt_flag = TTFlag::new(score_kind, endgame_flag, is_pv);
-                entry.age = self.fetch_age();
+                entry.age = self.age;
                 entry.depth = depth;
                 entry.eval = eval;
                 entry.score = score;
@@ -93,9 +118,9 @@ impl TranspositionTable {
         }
 
         let entry = TTEntry {
-            best_move,
+            best_move: maybe_best_move.unwrap_or(Pos::INVALID),
             tt_flag: TTFlag::new(score_kind, endgame_flag, false),
-            age: self.fetch_age(),
+            age: self.age,
             depth,
             eval,
             score,
@@ -104,12 +129,21 @@ impl TranspositionTable {
         self.table[idx].store_mut(key.into(), entry);
     }
 
-    pub fn increase_age(&self) {
-        self.age.fetch_add(1, Ordering::Relaxed);
-    }
-
-    pub fn fetch_age(&self) -> u8 {
-        self.age.load(Ordering::Relaxed)
+    fn prefetch(&self, key: HashKey) {
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            use std::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
+            let idx = self.calculate_index(key);
+            let entry = &self.table[idx];
+            _mm_prefetch::<_MM_HINT_T0>((entry as *const TTEntryBucket).cast());
+        }
+        #[cfg(target_arch = "aarch64")]
+        unsafe {
+            use std::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY0, _PREFETCH_READ};
+            let idx = self.calculate_index(key);
+            let entry = &self.table[idx];
+            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY0>((entry as *const TTEntry).cast());
+        }
     }
 
 }

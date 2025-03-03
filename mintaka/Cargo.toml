@@ -8,17 +8,5 @@ rusty_renju = {path = "../rusty_renju" }
 indoc = "2.0.5"
 smallvec = "1.13.2"
 
-[profile.release]
-opt-level = 3
-codegen-units = 1
-lto = "fat"
-strip = "symbols"
-panic = "abort"
-
-[profile.perf]
-inherits = "release"
-debug = true
-strip = "none"
-
 [dev-dependencies]
 criterion = "0.5.1"

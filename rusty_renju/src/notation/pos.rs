@@ -57,7 +57,7 @@ impl Pos {
         Self(cartesian_to_index!(row, col))
     }
 
-    pub const fn from_str_unchecked(source: &str) -> Pos {
+    pub const fn from_str_unchecked(source: &str) -> Self {
         let row = u8_from_str(source, 1) - 1;
         let col = source.as_bytes()[0] - b'a';
 
@@ -92,25 +92,25 @@ impl Pos {
         self.col() as usize
     }
 
-    pub const fn offset(&self, offset_row: isize, offset_col: isize) -> Option<Pos> {
+    pub const fn offset(&self, offset_row: isize, offset_col: isize) -> Option<Self> {
         let row = self.row() as isize + offset_row;
         let col = self.col() as isize + offset_col;
 
         if row >= 0 && row < I_BOARD_WIDTH && col >= 0 && col < I_BOARD_WIDTH {
-            Some(Pos::from_cartesian(row as u8, col as u8))
+            Some(Self::from_cartesian(row as u8, col as u8))
         } else {
             None
         }
     }
 
-    pub const fn offset_unchecked(&self, offset_row: isize, offset_col: isize) -> Pos {
-        Pos::from_cartesian(
+    pub const fn offset_unchecked(&self, offset_row: isize, offset_col: isize) -> Self {
+        Self::from_cartesian(
             self.row_usize().saturating_add_signed(offset_row) as u8,
             self.col_usize().saturating_add_signed(offset_col) as u8
         )
     }
 
-    pub const fn directional_offset_unchecked(&self, direction: Direction, offset: isize) -> Pos {
+    pub const fn directional_offset_unchecked(&self, direction: Direction, offset: isize) -> Self {
         Self::from_index((self.0 as isize + (STEP_TABLE[direction as usize] * offset)) as u8)
     }
 

@@ -2,7 +2,7 @@ use crate::batch_counter::BatchCounter;
 use crate::config::Config;
 use crate::endgame::vcf::VCFFrame;
 use crate::memo::history_table::HistoryTable;
-use crate::memo::transposition_table::TranspositionTable;
+use crate::memo::transposition_table::TTView;
 use crate::search_frame::SearchFrame;
 use crate::search_limit::{NodeCount, SearchLimit, TimeBound};
 use crate::thread_type::ThreadType;
@@ -16,7 +16,7 @@ pub struct ThreadData<'a> {
 
     pub config: Config,
 
-    pub tt: &'a TranspositionTable,
+    pub tt: TTView<'a>,
     pub ht: HistoryTable,
     pub search_stack: [SearchFrame; 128],
     pub vcf_stack: Vec<VCFFrame>,
@@ -31,7 +31,7 @@ impl<'a> ThreadData<'a> {
     pub fn new(
         thread_type: ThreadType, tid: usize,
         config: Config,
-        tt: &'a TranspositionTable,
+        tt: TTView<'a>,
         ht: HistoryTable,
         global_aborted: &'a AtomicBool,
         global_counter_in_1k: &'a AtomicUsize

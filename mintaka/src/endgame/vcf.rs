@@ -168,7 +168,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             .unwrap_or_else(|| TTEntry {
                 best_move: Pos::INVALID,
                 depth: vcf_ply,
-                age: td.tt.fetch_age(),
+                age: td.tt.age,
                 tt_flag: TTFlag::new(ScoreKind::None, EndgameFlag::Cold, false),
                 score: 0,
                 eval: 0,

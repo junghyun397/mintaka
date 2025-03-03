@@ -193,8 +193,8 @@ impl SlicePatchData {
 struct PatchLut {
     black: [SlicePatchData; 76],
     white: [SlicePatchData; 71],
-    dbg_black_length: usize,
-    dbg_white_length: usize,
+    _dbg_black_length: usize,
+    _dbg_white_length: usize,
 }
 
 struct SlicePatternLut {
@@ -222,8 +222,8 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
             patch: PatchLut {
                 black: [initial_patch_data; 76],
                 white: [initial_patch_data; 71],
-                dbg_black_length: 0,
-                dbg_white_length: 0,
+                _dbg_black_length: 0,
+                _dbg_white_length: 0,
             },
         }
     };
@@ -349,8 +349,10 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
     embed_pattern!(black, asymmetry, "O.OOOO", "O6OOOO");
     embed_pattern!(black, asymmetry, "OO.OOO", "OO6OOO");
 
-    compress_pattern_lut(temp_vector_match_lut_black, &mut slice_pattern_lut.vector.black, &mut slice_pattern_lut.patch.black, patch_top_black);
-    compress_pattern_lut(temp_vector_match_lut_white, &mut slice_pattern_lut.vector.white, &mut slice_pattern_lut.patch.white, patch_top_white);
+    slice_pattern_lut.patch._dbg_black_length =
+        compress_pattern_lut(temp_vector_match_lut_black, &mut slice_pattern_lut.vector.black, &mut slice_pattern_lut.patch.black, patch_top_black);
+    slice_pattern_lut.patch._dbg_white_length =
+        compress_pattern_lut(temp_vector_match_lut_white, &mut slice_pattern_lut.vector.white, &mut slice_pattern_lut.patch.white, patch_top_white);
 
     slice_pattern_lut
 }

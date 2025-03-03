@@ -1,5 +1,4 @@
 use crate::endgame::accumulator::{EndgameAccumulator, SequenceEndgameAccumulator};
-use crate::memo::transposition_table::TranspositionTable;
 use crate::memo::tt_entry::TTEntry;
 use crate::thread_data::ThreadData;
 use rusty_renju::board::Board;
@@ -20,17 +19,17 @@ pub(crate) struct VCTFrame {
 }
 
 pub fn vct_search(
-    tt: &TranspositionTable, td: &mut ThreadData,
+    td: &mut ThreadData,
     board: &Board, max_depth: Depth
 ) -> Score {
-    vct::<Score>(tt, td, board, max_depth)
+    vct::<Score>(td, board, max_depth)
 }
 
 pub fn vct_sequence(
-    tt: &TranspositionTable, td: &mut ThreadData,
+    td: &mut ThreadData,
     board: &Board, max_depth: Depth
 ) -> Option<Vec<Pos>> {
-    vct::<SequenceEndgameAccumulator>(tt, td, board, max_depth)
+    vct::<SequenceEndgameAccumulator>(td, board, max_depth)
         .map(|mut sequence| {
             sequence.reverse();
             sequence
@@ -38,19 +37,19 @@ pub fn vct_sequence(
 }
 
 fn vct<ACC: EndgameAccumulator>(
-    tt: &TranspositionTable, td: &mut ThreadData,
+    td: &mut ThreadData,
     board: &Board, max_depth: Depth
 ) -> ACC {
     let mut board = *board;
     match board.player_color {
-        Color::Black => try_vct::<{ Color::Black }, ACC>(tt, td, board, max_depth, 0, false, false),
-        Color::White => try_vct::<{ Color::White }, ACC>(tt, td, board, max_depth, 0, false, false),
+        Color::Black => try_vct::<{ Color::Black }, ACC>(td, board, max_depth, 0, false, false),
+        Color::White => try_vct::<{ Color::White }, ACC>(td, board, max_depth, 0, false, false),
     }
 }
 
 // depth-first proof-number search
 fn try_vct<const C: Color, ACC: EndgameAccumulator>(
-    tt: &TranspositionTable, td: &mut ThreadData,
+    td: &mut ThreadData,
     mut board: Board,
     max_depth: Depth, mut depth: Depth, mut opponent_has_open_four: bool, mut opponent_has_five: bool,
 ) -> ACC {
@@ -60,7 +59,7 @@ fn try_vct<const C: Color, ACC: EndgameAccumulator>(
 
     #[inline]
     fn backtrace_frames<ACC: EndgameAccumulator>(
-        tt: &TranspositionTable, td: &mut ThreadData, mut stack: SmallVec<[VCTFrame; 32]>,
+        td: &mut ThreadData, mut stack: SmallVec<[VCTFrame; 32]>,
         board: Board, depth: Depth, killer_pos: Pos
     ) -> ACC {
         let mut result = ACC::unit(killer_pos);
@@ -70,10 +69,10 @@ fn try_vct<const C: Color, ACC: EndgameAccumulator>(
 
         while let Some(frame) = stack.pop() {
             hash_key = hash_key.set(opponent_color, frame.defend_pos);
-            tt.store_entry_mut(hash_key, build_vcf_lose_tt_entry(depth));
+            td.tt.store_entry_mut(hash_key, build_vcf_lose_tt_entry(depth));
 
             hash_key = hash_key.set(board.player_color, frame.threat_pos);
-            tt.store_entry_mut(hash_key, build_vct_win_tt_entry(depth, frame.threat_pos));
+            td.tt.store_entry_mut(hash_key, build_vct_win_tt_entry(depth, frame.threat_pos));
 
             result = result.append(frame.defend_pos, frame.threat_pos);
         }

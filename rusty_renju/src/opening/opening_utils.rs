@@ -1,7 +1,7 @@
 use crate::history::History;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use rand::Rng;
+use rand::{rng, Rng};
 use smallvec::SmallVec;
 use std::collections::HashSet;
 
@@ -49,7 +49,7 @@ fn find_symmetry_moves(ref1: Pos, ref2: Pos, m: Pos) -> HashSet<Pos> {
     }
 }
 
-pub fn find_forbidden_symmetry_moves(history: &History, fifth_move: Pos) -> HashSet<Pos> {
+pub fn find_forbidden_symmetry_moves(history: &History, fifth_move: Pos) -> SmallVec<[Pos; 3]> {
     let black_side_symmetry_moves = find_symmetry_moves(
         history.get(0).unwrap().unwrap(),
         history.get(2).unwrap().unwrap(),
@@ -81,7 +81,7 @@ pub fn generate_random_opening_moves<const N: usize>() -> [Pos; N] {
 
     for idx in 1 .. N as u8 {
         let width = idx * 2 + 1;
-        let mut rel_move = rand::thread_rng().gen_range(0 .. width * width - idx);
+        let mut rel_move = rng().random_range(0 .. width * width - idx);
 
         for sub_idx in 0 .. idx as usize {
             if raw_moves[sub_idx] == calculate_abs_move(rel_move, width) {
@@ -93,8 +93,4 @@ pub fn generate_random_opening_moves<const N: usize>() -> [Pos; N] {
     }
 
     raw_moves.map(Pos::from_index)
-}
-
-pub fn generate_zeroing_moves() -> SmallVec<[Pos; 16]> {
-    todo!()
 }

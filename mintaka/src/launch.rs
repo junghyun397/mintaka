@@ -8,6 +8,7 @@ use crate::search_state::SearchState;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
+use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::notation::pos::Pos;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 
@@ -45,7 +46,7 @@ pub fn launch(
     let mut td = ThreadData::new(
         ThreadType::Main, 0,
         config,
-        &tt,
+        tt.view(),
         ht.clone(),
         &global_aborted, &global_counter_in_1k,
     );
@@ -60,7 +61,7 @@ pub fn launch(
             let mut worker_td = ThreadData::new(
                 ThreadType::Worker, tid,
                 config,
-                &tt,
+                tt.view(),
                 ht.clone(),
                 &global_aborted, &global_counter_in_1k
             );

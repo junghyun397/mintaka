@@ -1,5 +1,3 @@
-use crate::memo::hash_key::HashKey;
-
 pub trait AbstractTTEntry {
 
     const BUCKET_SIZE: usize;
@@ -14,7 +12,7 @@ pub trait AbstractTranspositionTable {
 
     type EntryType: AbstractTTEntry;
 
-    fn calculate_table_len_in_mib(size_in_kib: usize) -> usize {
+    fn calculate_table_len_in_kib(size_in_kib: usize) -> usize {
         size_in_kib * 1024 / size_of::<Self::EntryType>()
     }
 
@@ -22,59 +20,50 @@ pub trait AbstractTranspositionTable {
 
     fn internal_table_mut(&mut self) -> &mut Vec<Self::EntryType>;
 
-    fn assign_internal_table_mut(&mut self, table: Vec<Self::EntryType>);
+    fn fetch_age(&self) -> u8;
 
-    fn calculate_index(&self, key: HashKey) -> usize {
-        ((key.0 as u128 * (self.internal_table().len() as u128)) >> 64) as usize
-    }
+    fn increase_age(&self);
+
+    fn clear_age(&self);
 
     fn clear_mut(&self) {
+        self.clear_age();
+
         for entry in self.internal_table() {
             entry.clear_mut();
         }
     }
 
+    fn size_in_kib(&self) -> usize {
+        size_of_val(&self.internal_table()) / 1024
+    }
+
     fn resize_mut(&mut self, size_in_kib: usize) {
-        let len = Self::calculate_table_len_in_mib(size_in_kib);
+        self.clear_age();
+
+        let len = Self::calculate_table_len_in_kib(size_in_kib);
+
+        *self.internal_table_mut() = Vec::new();
+
         unsafe {
-            let new_table = Vec::from_raw_parts(
+            *self.internal_table_mut() = Vec::from_raw_parts(
                 std::alloc::alloc_zeroed(
                     std::alloc::Layout::array::<Self::EntryType>(len).unwrap()
                 ).cast(),
-                len,
-                len
+                len, len
             );
-
-            self.assign_internal_table_mut(new_table);
         };
     }
 
-    fn prefetch(&self, key: HashKey) {
-        #[cfg(target_arch = "x86_64")]
-        unsafe {
-            use std::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
-            let idx = self.calculate_index(key);
-            let entry = &self.internal_table()[idx];
-            _mm_prefetch::<_MM_HINT_T0>((entry as *const Self::EntryType).cast());
-        }
-        #[cfg(target_arch = "aarch64")]
-        unsafe {
-            use std::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY0, _PREFETCH_READ};
-            let idx = self.calculate_index(key);
-            let entry = &self.internal_table()[idx];
-            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY0>((entry as *const Self::EntryType).cast());
-        }
-    }
-
     fn hash_usage(&self) -> f64 {
-        const SAMPLES: usize = 1000;
+        let samples: usize = self.internal_table().len().min(1000);
 
         let sum: usize = self.internal_table().iter()
-            .take(self.internal_table().len().min(SAMPLES))
+            .take(samples)
             .map(Self::EntryType::usage)
             .sum();
 
-        sum as f64 / (SAMPLES * Self::EntryType::BUCKET_SIZE) as f64 * 100.0
+        sum as f64 / (samples * Self::EntryType::BUCKET_SIZE) as f64 * 100.0
     }
 
     fn total_entries(&self) -> usize {

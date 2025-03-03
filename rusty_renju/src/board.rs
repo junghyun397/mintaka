@@ -250,7 +250,7 @@ impl Board {
     }
 
     #[cfg(feature = "strict_renju")]
-    fn is_invalid_three_component<C: ValidateThreeContext>(&self, mut context: C, from_direction: Direction, pos: Pos) -> bool {
+    fn is_invalid_three_component<C: ValidateThreeContext>(&self, context: C, from_direction: Direction, pos: Pos) -> bool {
         const ANY_FOUR_OR_OVERLINE_MASK: u32 = pattern::UNIT_ANY_FOUR_MASK | pattern::UNIT_OVERLINE_MASK;
 
         let pattern = self.patterns.field.black[pos.idx_usize()];
@@ -340,7 +340,7 @@ impl Board {
     }
 
     #[inline(always)]
-    fn update_root_four_overrides(&self, overrides: &mut SetOverrideStack) {
+    fn update_root_four_overrides(&self, overrides: &mut SetOverrides) {
         let pos = overrides.set[0];
 
         for direction in self.patterns.field.black[pos.idx_usize()].iter_three_directions() {
@@ -349,7 +349,7 @@ impl Board {
     }
 
     #[inline(always)]
-    fn update_four_overrides(&self, overrides: &mut SetOverrideStack, from_direction: Direction, pos: Pos) {
+    fn update_four_overrides(&self, overrides: &mut SetOverrides, from_direction: Direction, pos: Pos) {
         for next_four_idx in 0 .. 12 {
             if next_four_idx / 3 != from_direction as u8 {
                 let four_pos = overrides.next_four[next_four_idx as usize];
@@ -374,7 +374,7 @@ impl Board {
         overrides.set_top += 1;
     }
 
-    fn update_four_overrides_each_direction(&self, overrides: &mut SetOverrideStack, direction: Direction, pos: Pos) {
+    fn update_four_overrides_each_direction(&self, overrides: &mut SetOverrides, direction: Direction, pos: Pos) {
         let direction_offset = direction as usize * 3;
 
         match self.calculate_near_four_window::<{ Color::Black }>(direction, pos) {
@@ -452,9 +452,9 @@ trait ValidateThreeContext : Copy {
 
     fn parent_direction(&self) -> Direction;
 
-    fn overrides(&self) -> &SetOverrideStack;
+    fn overrides(&self) -> &SetOverrides;
 
-    fn branch_overrides(&self) -> SetOverrideStack;
+    fn branch_overrides(&self) -> SetOverrides;
 
 }
 
@@ -474,19 +474,19 @@ impl ValidateThreeContext for ValidateThreeRoot {
         unreachable!()
     }
 
-    fn overrides(&self) -> &SetOverrideStack {
+    fn overrides(&self) -> &SetOverrides {
         unreachable!()
     }
 
-    fn branch_overrides(&self) -> SetOverrideStack {
-        SetOverrideStack::new(self.root_pos)
+    fn branch_overrides(&self) -> SetOverrides {
+        SetOverrides::new(self.root_pos)
     }
 }
 
 #[derive(Copy, Clone)]
 #[repr(align(8))]
 struct ValidateThreeNode {
-    overrides: SetOverrideStack,
+    overrides: SetOverrides,
     parent_direction: Direction,
     parent_pos: Pos,
 }
@@ -502,18 +502,18 @@ impl ValidateThreeContext for ValidateThreeNode {
         self.parent_direction
     }
 
-    fn overrides(&self) -> &SetOverrideStack {
+    fn overrides(&self) -> &SetOverrides {
         &self.overrides
     }
 
-    fn branch_overrides(&self) -> SetOverrideStack {
+    fn branch_overrides(&self) -> SetOverrides {
         self.overrides
     }
 }
 
 #[derive(Copy, Clone)]
 #[repr(align(32))]
-struct SetOverrideStack {
+struct SetOverrides {
     set: [Pos; 5],
     set_top: u8,
     four: [Pos; 13],
@@ -521,9 +521,9 @@ struct SetOverrideStack {
     next_four: [Pos; 12],
 }
 
-assert_struct_sizes!(SetOverrideStack, size=32, align=32);
+assert_struct_sizes!(SetOverrides, size=32, align=32);
 
-impl SetOverrideStack {
+impl SetOverrides {
 
     fn set_contains(&self, pos: Pos) -> bool {
         self.set.contains(&pos)

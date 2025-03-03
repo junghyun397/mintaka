@@ -23,7 +23,7 @@ mod test_vcf {
             let global_counter_in_1k = AtomicUsize::new(0);
             let global_aborted = AtomicBool::new(false);
 
-            let mut td = ThreadData::new(ThreadType::Main, 0, config, &tt, ht, &global_aborted, &global_counter_in_1k);
+            let mut td = ThreadData::new(ThreadType::Main, 0, config, tt.view(), ht, &global_aborted, &global_counter_in_1k);
             let vcf_result = vcf::vcf_sequence(&mut td, &board, u8::MAX).unwrap();
             let time = td.running_time();
 
