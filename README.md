@@ -4,12 +4,10 @@
 ## Features
 
 - **Core Engine**
-  - Full [Renju-rule](https://www.renju.net/rules/) implementation featuring strict forbidden move detection:
-    - Accurate detection of single-line and nested forbidden moves (overlines, double-threes, double-fours)
-    - See [detailed examples](./documents/renju.md) for complete specifications
+  - Full [Renju-rule](https://www.renju.net/rules/) implementation featuring [strict forbidden move](./documents/renju.md) detection.
   - Advanced tree search algorithm based on [Principal Variation Search](https://en.wikipedia.org/wiki/Principal_variation_search) (PVS) with dedicated VCF solver
   - [Lazy-SMP](https://en.wikipedia.org/wiki/Lazy_SMP) parallel processing for multithreaded search
-  - Hardware acceleration with SIMD instructions (AVX-512, AVX2, SSE2, Neon) and bit-manipulation instructions (BMI2)
+  - Hardware acceleration with SIMD (AVX-512, AVX2, SSE2, Neon) and bit-manipulation (BMI2) instructions
 
 - **Interfaces**
   - Protocol Support: [Piskvork(Gomocup)](https://plastovicka.github.io/protocl2en.htm), [Yixin-board](https://github.com/accreator/Yixin-Board)

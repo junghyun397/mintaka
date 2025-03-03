@@ -2,11 +2,28 @@
 members = [
     "rusty_renju",
     "mintaka",
-    "mintaka_trainer",
     "mintaka_interface",
-    "mintaka_server",
     "mintaka_wasm",
+    "mintaka_trainer",
+    "mintaka_server",
     "rusty_renju_jni",
 ]
 default-members = ["rusty_renju", "mintaka"]
 resolver = "2"
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = "fat"
+strip = "symbols"
+panic = "abort"
+
+[profile.bench]
+inherits = "release"
+codegen-units = 16
+lto = "off"
+
+[profile.perf]
+inherits = "release"
+debug = true
+strip = "none"
