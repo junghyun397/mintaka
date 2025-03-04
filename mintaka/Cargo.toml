@@ -5,8 +5,7 @@ edition = "2021"
 
 [dependencies]
 rusty_renju = {path = "../rusty_renju" }
-indoc = "2.0.5"
 smallvec = "1.13.2"
 
 [dev-dependencies]
-criterion = "0.5.1"
+indoc = "2.0.5"

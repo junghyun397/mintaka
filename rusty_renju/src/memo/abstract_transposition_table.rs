@@ -1,4 +1,4 @@
-pub trait AbstractTTEntry {
+pub trait AbstractTTEntry : Sync + Send {
 
     const BUCKET_SIZE: usize;
 
@@ -11,6 +11,10 @@ pub trait AbstractTTEntry {
 pub trait AbstractTranspositionTable {
 
     type EntryType: AbstractTTEntry;
+
+    fn size_in_kib(&self) -> usize {
+        size_of_val(&self.internal_table()) / 1024
+    }
 
     fn calculate_table_len_in_kib(size_in_kib: usize) -> usize {
         size_in_kib * 1024 / size_of::<Self::EntryType>()
@@ -26,16 +30,24 @@ pub trait AbstractTranspositionTable {
 
     fn clear_age(&self);
 
-    fn clear_mut(&self) {
+    fn clear_mut(&self, threads: usize) {
         self.clear_age();
 
-        for entry in self.internal_table() {
-            entry.clear_mut();
+        if self.size_in_kib() < 1024 * 32 {
+            for entry in self.internal_table().iter() {
+                entry.clear_mut();
+            }
+        } else {
+            std::thread::scope(|s| {
+                for chunk in self.internal_table().chunks(threads) {
+                    s.spawn(|| {
+                        for entry in chunk.iter() {
+                            entry.clear_mut();
+                        }
+                    });
+                }
+            });
         }
-    }
-
-    fn size_in_kib(&self) -> usize {
-        size_of_val(&self.internal_table()) / 1024
     }
 
     fn resize_mut(&mut self, size_in_kib: usize) {

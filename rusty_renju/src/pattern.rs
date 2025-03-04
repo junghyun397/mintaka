@@ -1,4 +1,3 @@
-use crate::cartesian_to_index;
 use crate::notation::color::{AlignedColorContainer, Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
@@ -7,6 +6,7 @@ use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slice;
 use crate::slice_pattern::{contains_five_in_a_row, SlicePattern};
 use crate::utils::lang_utils::{repeat_16x, repeat_4x};
+use crate::{assert_struct_sizes, cartesian_to_index};
 
 pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
@@ -214,6 +214,8 @@ pub struct Patterns {
     pub five_in_a_row: Option<Color>,
     pub unchecked_five_pos: ColorContainer<Option<Pos>>,
 }
+
+assert_struct_sizes!(Patterns, size=1920, align=64);
 
 impl Default for Patterns {
 

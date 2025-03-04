@@ -250,8 +250,10 @@ impl Board {
     }
 
     #[cfg(feature = "strict_renju")]
-    fn is_invalid_three_component<C: ValidateThreeContext>(&self, context: C, from_direction: Direction, pos: Pos) -> bool {
+    fn is_invalid_three_component<C: ValidateThreeContext>(&self, context: C, direction: Direction, offset: isize) -> bool {
         const ANY_FOUR_OR_OVERLINE_MASK: u32 = pattern::UNIT_ANY_FOUR_MASK | pattern::UNIT_OVERLINE_MASK;
+
+        let pos = context.parent_pos().directional_offset_unchecked(direction, offset);
 
         let pattern = self.patterns.field.black[pos.idx_usize()];
 
@@ -271,11 +273,11 @@ impl Board {
                 self.update_root_four_overrides(&mut new_overrides);
             }
 
-            self.update_four_overrides(&mut new_overrides, from_direction, pos);
+            self.update_four_overrides(&mut new_overrides, direction, pos);
 
             self.is_valid_double_three(ValidateThreeNode {
                 overrides: new_overrides,
-                parent_direction: from_direction,
+                parent_direction: direction,
                 parent_pos: pos,
             })
         }
@@ -298,34 +300,34 @@ impl Board {
 
             if match self.calculate_near_four_window::<{ Color::Black }>(direction, pos) {
                 /* .VOO. */ 0b11000 => {
-                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, -1)) &&
-                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, 3))
+                    self.is_invalid_three_component(context, direction, -1) &&
+                    self.is_invalid_three_component(context, direction, 3)
                 },
                 /* .OOV. */ 0b00011 => {
-                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, -3)) &&
-                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, 1))
+                    self.is_invalid_three_component(context, direction, -3) &&
+                    self.is_invalid_three_component(context, direction, 1)
                 },
                 /* V.OO  */ 0b10000 => {
-                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, 1))
+                    self.is_invalid_three_component(context, direction, 1)
                 }
                 /* OO.V  */ 0b00001 => {
-                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, -1))
+                    self.is_invalid_three_component(context, direction, -1)
                 }
                 /* VO.O  */ 0b01000 => {
-                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, 2))
+                    self.is_invalid_three_component(context, direction, 2)
                 },
                 /* .OVO. */ 0b01010 => {
-                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, -2)) &&
-                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, 2))
+                    self.is_invalid_three_component(context, direction, -2) &&
+                    self.is_invalid_three_component(context, direction, 2)
                 },
                 /* O.OV  */ 0b00010 => {
-                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, -2))
+                    self.is_invalid_three_component(context, direction, -2)
                 },
                 /* OV.O  */ 0b10010 => {
-                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, 1))
+                    self.is_invalid_three_component(context, direction, 1)
                 },
                 /* O.VO  */ 0b01001 => {
-                    self.is_invalid_three_component::<C>(context, direction, pos.directional_offset_unchecked(direction, -1))
+                    self.is_invalid_three_component(context, direction, -1)
                 },
                 _ => unreachable!()
             } {
@@ -349,21 +351,19 @@ impl Board {
     }
 
     #[inline(always)]
-    fn update_four_overrides(&self, overrides: &mut SetOverrides, from_direction: Direction, pos: Pos) {
-        for next_four_idx in 0 .. 12 {
-            if next_four_idx / 3 != from_direction as u8 {
-                let four_pos = overrides.next_four[next_four_idx as usize];
-                if four_pos != Pos::INVALID {
-                    overrides.four[overrides.four_top as usize] = four_pos;
-                    overrides.four_top += 1;
-                }
+    fn update_four_overrides(&self, overrides: &mut SetOverrides, direction_from: Direction, pos: Pos) {
+        for next_four_idx in (0 .. direction_from as u8 * 3).chain(direction_from as u8 * 4 .. 12) {
+            let four_pos = overrides.next_four[next_four_idx as usize];
+            if four_pos != Pos::INVALID {
+                overrides.four[overrides.four_top as usize] = four_pos;
+                overrides.four_top += 1;
             }
         }
 
         overrides.next_four = [Pos::INVALID; 12];
 
         for direction in self.patterns.field.black[pos.idx_usize()].iter_three_directions() {
-            if direction == from_direction {
+            if direction == direction_from {
                 continue;
             }
 

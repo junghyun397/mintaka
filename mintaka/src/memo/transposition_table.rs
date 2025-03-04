@@ -142,7 +142,7 @@ impl TTView<'_> {
             use std::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY0, _PREFETCH_READ};
             let idx = self.calculate_index(key);
             let entry = &self.table[idx];
-            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY0>((entry as *const TTEntry).cast());
+            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY0>((entry as *const TTEntryBucket).cast());
         }
     }
 
