@@ -76,6 +76,13 @@ macro_rules! impl_color_container {
                 }
             }
 
+            pub const fn access_mut(&mut self, color: Color) -> &mut T {
+                match color {
+                    Color::Black => &mut self.black,
+                    Color::White => &mut self.white
+                }
+            }
+
             pub const fn player_unit<const C: Color>(&self) -> &T {
                 match C {
                     Color::Black => &self.black,

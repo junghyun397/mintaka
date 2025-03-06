@@ -2,7 +2,7 @@ use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::{assert_struct_sizes, cartesian_to_index, const_for, max};
+use crate::{assert_struct_sizes, const_for, max};
 
 const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
@@ -22,14 +22,7 @@ assert_struct_sizes!(Slice, size=16, align=16);
 
 impl Slice {
 
-    pub const PLACEHOLDER: Self = Self {
-        length: 0,
-        start_row: 0,
-        start_col: 0,
-        black_stones: 0,
-        white_stones: 0,
-        pattern_available: ColorContainer::new(false, false),
-    };
+    pub const PLACEHOLDER: Self = unsafe { std::mem::zeroed() };
 
     pub const fn empty(length: u8, start_row: u8, start_col: u8) -> Self {
         Slice {
@@ -40,6 +33,10 @@ impl Slice {
             white_stones: 0,
             pattern_available: ColorContainer::new(false, false),
         }
+    }
+
+    pub fn start_pos(&self) -> Pos {
+        Pos::from_cartesian(self.start_row, self.start_col)
     }
 
     pub fn set(mut self, color: Color, idx: u8) -> Self {
@@ -99,20 +96,6 @@ impl Slice {
             Direction::Vertical => pos.row_usize(),
             Direction::Horizontal => pos.col_usize(),
             _ => pos.col_usize() - self.start_col as usize
-        }
-    }
-
-    #[inline(always)]
-    pub fn calculate_slice_offset<const D: Direction>(&self, offset: usize) -> usize {
-        match D {
-            Direction::Horizontal =>
-                cartesian_to_index!(self.start_row as usize, self.start_col as usize + offset),
-            Direction::Vertical =>
-                cartesian_to_index!(self.start_row as usize + offset, self.start_col as usize),
-            Direction::Ascending =>
-                cartesian_to_index!(self.start_row as usize + offset, self.start_col as usize + offset),
-            Direction::Descending =>
-                cartesian_to_index!(self.start_row as usize - offset, self.start_col as usize + offset),
         }
     }
 

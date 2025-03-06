@@ -1,12 +1,12 @@
 use crate::notation::color::{AlignedColorContainer, Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
-use crate::notation::pos::{step_idx_usize, Pos};
+use crate::notation::pos::Pos;
 use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slice;
 use crate::slice_pattern::{contains_five_in_a_row, SlicePattern};
 use crate::utils::lang_utils::{repeat_16x, repeat_4x};
-use crate::{assert_struct_sizes, cartesian_to_index};
+use crate::{assert_struct_sizes, cartesian_to_index, step_idx};
 
 pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
@@ -226,7 +226,7 @@ impl Default for Patterns {
             unchecked_five_pos: ColorContainer {
                 black: None,
                 white: None
-            }
+            },
         }
     }
 
@@ -255,7 +255,7 @@ impl Patterns {
         let mut idx = cartesian_to_index!(slice.start_row, slice.start_col) as usize;
         self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(0);
         for _ in 1 .. slice.length as usize {
-            idx = step_idx_usize::<D>(idx);
+            idx = step_idx!(D, idx, 1);
             self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(0);
         }
 
@@ -270,9 +270,10 @@ impl Patterns {
     ) {
         *self.unchecked_five_pos.player_unit_mut::<C>() = self.unchecked_five_pos.player_unit::<C>().or(
             (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK != 0)
-                .then(|| Pos::from_index(
-                    slice.calculate_slice_offset::<D>(((slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8) as usize) as u8
-                ))
+                .then(|| {
+                    let slice_idx = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8;
+                    Pos::from_index(step_idx!(D, slice.start_pos().idx(), slice_idx as u8))
+                })
         );
 
         let slice_pattern = unsafe { std::mem::transmute::<SlicePattern, [u8; 16]>(slice_pattern) };
@@ -280,7 +281,7 @@ impl Patterns {
         let mut idx = cartesian_to_index!(slice.start_row, slice.start_col) as usize;
         self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(slice_pattern[0]);
         for pattern_idx in 1 .. slice.length as usize {
-            idx = step_idx_usize::<D>(idx);
+            idx = step_idx!(D, idx, 1);
             self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(slice_pattern[pattern_idx]);
         }
 

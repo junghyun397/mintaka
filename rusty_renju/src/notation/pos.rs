@@ -30,17 +30,18 @@ pub const CENTER_ROW_COL: u8 = CENTER.col();
     ($idx:expr) => ($idx % 15);
 }
 
-const STEP_TABLE: [isize; 4] = [1, BOARD_WIDTH as isize, BOARD_WIDTH as isize + 1, -(BOARD_WIDTH as isize - 1)];
+#[macro_export] macro_rules! step_idx {
+     ($direction:expr,$idx:expr,$amount:expr) => {
+         match $direction {
+            Direction::Horizontal => $idx + (1 * $amount),
+            Direction::Vertical => $idx + (15 * $amount),
+            Direction::Ascending => $idx + ((15 + 1) * $amount),
+            Direction::Descending => $idx - ((15 - 1) * $amount)
+        }
+     };
+ }
 
-#[inline(always)]
-pub const fn step_idx_usize<const D: Direction>(idx: usize) -> usize {
-    match D {
-        Direction::Horizontal => idx + 1,
-        Direction::Vertical => idx + U_BOARD_WIDTH,
-        Direction::Ascending => idx + U_BOARD_WIDTH + 1,
-        Direction::Descending => idx - U_BOARD_WIDTH + 1
-    }
-}
+const STEP_TABLE: [isize; 4] = [1, BOARD_WIDTH as isize, BOARD_WIDTH as isize + 1, -(BOARD_WIDTH as isize - 1)];
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub struct Pos(u8);
@@ -112,6 +113,13 @@ impl Pos {
 
     pub const fn directional_offset_unchecked(&self, direction: Direction, offset: isize) -> Self {
         Self::from_index((self.0 as isize + (STEP_TABLE[direction as usize] * offset)) as u8)
+    }
+
+    pub fn distance(&self, other: Self) -> u8 {
+        let row_diff = (self.row() as i16 - other.row() as i16).unsigned_abs();
+        let col_diff = (self.col() as i16 - other.col() as i16).unsigned_abs();
+
+        row_diff.max(col_diff) as u8
     }
 
 }
