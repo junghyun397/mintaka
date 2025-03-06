@@ -13,6 +13,7 @@ pub struct Slice {
     pub length: u8,
     pub start_row: u8,
     pub start_col: u8,
+    pub start_pos: Pos,
     pub black_stones: u16,
     pub white_stones: u16,
     pub pattern_available: ColorContainer<bool>,
@@ -29,14 +30,11 @@ impl Slice {
             length,
             start_row,
             start_col,
+            start_pos: Pos::from_cartesian(start_row, start_col),
             black_stones: 0,
             white_stones: 0,
             pattern_available: ColorContainer::new(false, false),
         }
-    }
-
-    pub fn start_pos(&self) -> Pos {
-        Pos::from_cartesian(self.start_row, self.start_col)
     }
 
     pub fn set(mut self, color: Color, idx: u8) -> Self {

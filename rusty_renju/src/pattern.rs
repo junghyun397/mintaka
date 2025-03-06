@@ -6,7 +6,7 @@ use crate::notation::rule::ForbiddenKind;
 use crate::slice::Slice;
 use crate::slice_pattern::{contains_five_in_a_row, SlicePattern};
 use crate::utils::lang_utils::{repeat_16x, repeat_4x};
-use crate::{assert_struct_sizes, cartesian_to_index, step_idx};
+use crate::{assert_struct_sizes, step_idx};
 
 pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
@@ -18,9 +18,6 @@ pub const OPEN_THREE: u8                = 0b0000_1000;
 pub const CLOSE_THREE: u8               = 0b0000_0100;
 pub const OVERLINE: u8                  = 0b0000_0010;
 pub const MARKER: u8                    = 0b0000_0001;
-
-const OPEN_THREE_POSITION: u32          = 3;
-const CLOSED_FOUR_SINGLE_POSITION: u32  = 8;
 
 pub const UNIT_CLOSED_FOUR_SINGLE_MASK: u32 = repeat_4x(CLOSED_FOUR_SINGLE);
 pub const UNIT_CLOSED_FOUR_MASK: u32        = repeat_4x(CLOSED_FOUR_DOUBLE);
@@ -150,11 +147,11 @@ impl Pattern {
     }
 
     pub fn iter_three_directions(&self) -> impl Iterator<Item=Direction> + '_ {
-        DirectionIterator::<OPEN_THREE_POSITION>::from(self)
+        DirectionIterator { packed_unit: self.apply_mask(UNIT_OPEN_THREE_MASK) }
     }
 
     pub fn iter_four_directions(&self) -> impl Iterator<Item=Direction> + '_ {
-        DirectionIterator::<CLOSED_FOUR_SINGLE_POSITION>::from(self)
+        DirectionIterator { packed_unit: self.apply_mask(UNIT_ANY_FOUR_MASK) }
     }
 
     pub fn has_invalid_double_three(&self) -> bool {
@@ -252,7 +249,7 @@ impl Patterns {
 
     #[inline]
     pub fn clear_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
-        let mut idx = cartesian_to_index!(slice.start_row, slice.start_col) as usize;
+        let mut idx = slice.start_pos.idx_usize();
         self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(0);
         for _ in 1 .. slice.length as usize {
             idx = step_idx!(D, idx, 1);
@@ -272,13 +269,13 @@ impl Patterns {
             (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK != 0)
                 .then(|| {
                     let slice_idx = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8;
-                    Pos::from_index(step_idx!(D, slice.start_pos().idx(), slice_idx as u8))
+                    Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8))
                 })
         );
 
         let slice_pattern = unsafe { std::mem::transmute::<SlicePattern, [u8; 16]>(slice_pattern) };
 
-        let mut idx = cartesian_to_index!(slice.start_row, slice.start_col) as usize;
+        let mut idx = slice.start_pos.idx_usize();
         self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(slice_pattern[0]);
         for pattern_idx in 1 .. slice.length as usize {
             idx = step_idx!(D, idx, 1);
@@ -295,28 +292,11 @@ impl Patterns {
 
 }
 
-struct DirectionIterator<const P: u32> {
+struct DirectionIterator {
     packed_unit: u32
 }
 
-impl<const P: u32> DirectionIterator<P> {
-
-    const HORIZONTAL_N: u32 = P;
-    const VERTICAL_N: u32 = 8 + P;
-    const ASCENDING_N: u32 = 8 * 2 + P;
-    const DESCENDING_N: u32 = 8 * 3 + P;
-
-}
-
-impl<const P: u32> From<&Pattern> for DirectionIterator<P> {
-
-    fn from(value: &Pattern) -> Self {
-        Self { packed_unit: value.apply_mask(UNIT_OPEN_THREE_MASK) }
-    }
-
-}
-
-impl<const P: u32> Iterator for DirectionIterator<P> {
+impl Iterator for DirectionIterator {
 
     type Item = Direction;
 
@@ -325,13 +305,7 @@ impl<const P: u32> Iterator for DirectionIterator<P> {
             let tails = self.packed_unit.trailing_zeros();
             self.packed_unit &= self.packed_unit - 1;
 
-            match tails {
-                c if c == Self::HORIZONTAL_N => Direction::Horizontal,
-                c if c == Self::VERTICAL_N => Direction::Vertical,
-                c if c == Self::ASCENDING_N => Direction::Ascending,
-                c if c == Self::DESCENDING_N => Direction::Descending,
-                _ => unreachable!()
-            }
+            Direction::from_pattern_position(tails)
         })
     }
 
