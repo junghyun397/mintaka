@@ -12,6 +12,12 @@ use std::simd::Simd;
 
 pub type Moves = SmallVec<[Pos; 64]>;
 
+#[derive(Debug, Copy, Clone)]
+pub struct VcfMoves {
+    pub moves: [Pos; 31],
+    pub len: u8,
+}
+
 impl From<Moves> for Bitfield {
 
     fn from(moves: Moves) -> Self {
@@ -40,23 +46,52 @@ pub fn generate_moves(board: &Board, movegen_window: &MovegenWindow) -> Moves {
         }
     }
 
-    generate_neighborhood_moves(board, movegen_window)
+    generate_neighbors_moves(board, movegen_window)
 }
 
-fn sort_moves(recent_move: Pos, moves: &mut Moves) {
-    fn distance_to_recent_move(recent_move: Pos, pos: Pos) -> u8 {
-        let row_diff = (recent_move.row() as i16 - pos.row() as i16).unsigned_abs();
-        let col_diff = (recent_move.col() as i16 - pos.col() as i16).unsigned_abs();
-
-        row_diff.max(col_diff) as u8
-    }
-
+pub fn sort_moves(recent_move: Pos, moves: &mut [Pos]) {
     moves.sort_by(|a, b| {
-        distance_to_recent_move(recent_move, *a).cmp(&distance_to_recent_move(recent_move, *b))
+        recent_move.distance(*a).cmp(&recent_move.distance(*b))
     });
 }
 
-fn generate_neighborhood_moves(board: &Board, movegen_window: &MovegenWindow) -> Moves {
+pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, recent_move: Pos) -> VcfMoves {
+    let mut vcf_moves = [Pos::INVALID; 31];
+    let mut vcf_moves_top = 0;
+
+    let field_ptr = board.patterns.field.access(color).as_ptr() as *const u32;
+
+    for start_idx in (0 .. pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
+        let mut vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
+            unsafe { std::slice::from_raw_parts(field_ptr.add(start_idx), platform::U32_LANE_N) }
+        );
+
+        vector &= Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
+        let mut bitmask = vector
+            .simd_ne(Simd::splat(0))
+            .to_bitmask();
+
+        while bitmask != 0 {
+            let lane_position = bitmask.trailing_zeros() as usize;
+            bitmask &= bitmask - 1;
+
+            let pos = Pos::from_index((start_idx + lane_position) as u8);
+            if recent_move.distance(pos) <= distance_window {
+                vcf_moves[vcf_moves_top] = pos;
+                vcf_moves_top += 1;
+            }
+        }
+    }
+
+    if board.patterns.field.access(color)[pos::BOARD_BOUND].has_any_four() {
+        vcf_moves[vcf_moves_top] = Pos::from_index(pos::U8_BOARD_BOUND);
+        vcf_moves_top += 1;
+    }
+
+    VcfMoves { moves: vcf_moves, len: vcf_moves_top as u8 }
+}
+
+fn generate_neighbors_moves(board: &Board, movegen_window: &MovegenWindow) -> Moves {
     SmallVec::from_iter((board.hot_field ^ movegen_window.movegen_field).iter_hot_pos())
 }
 

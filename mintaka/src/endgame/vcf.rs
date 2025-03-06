@@ -2,6 +2,7 @@ use crate::endgame::accumulator::{EndgameAccumulator, SequenceEndgameAccumulator
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind, TTEntry, TTFlag};
 use crate::thread_data::ThreadData;
 use rusty_renju::board::Board;
+use rusty_renju::movegen::move_generator::{generate_vcf_moves, sort_moves, VcfMoves};
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
@@ -11,7 +12,8 @@ use rusty_renju::pattern::PatternCount;
 #[derive(Copy, Clone)]
 pub struct VCFFrame {
     board: Board,
-    next_idx: usize,
+    vcf_moves: VcfMoves,
+    next_seq: usize,
     depth: Depth,
     opponent_has_five: bool,
     four_pos: Pos,
@@ -22,14 +24,20 @@ pub fn vcf_search(
     td: &mut ThreadData,
     board: &Board, max_depth: Depth,
 ) -> Score {
-    vcf::<Score>(td, board, max_depth)
+    let mut vcf_moves = generate_vcf_moves(&board, board.player_color, u8::MAX, pos::CENTER);
+    sort_moves(pos::CENTER, &mut vcf_moves.moves[0 .. vcf_moves.len as usize]);
+
+    vcf::<Score>(td, board, vcf_moves, max_depth)
 }
 
 pub fn vcf_sequence(
     td: &mut ThreadData,
     board: &Board, max_depth: Depth
 ) -> Option<Vec<Pos>> {
-    vcf::<SequenceEndgameAccumulator>(td, board, max_depth)
+    let mut vcf_moves = generate_vcf_moves(&board, board.player_color, u8::MAX, pos::CENTER);
+    sort_moves(pos::CENTER, &mut vcf_moves.moves[0 .. vcf_moves.len as usize]);
+
+    vcf::<SequenceEndgameAccumulator>(td, board, vcf_moves, max_depth)
         .map(|mut sequence| {
             sequence.reverse();
             sequence
@@ -38,22 +46,22 @@ pub fn vcf_sequence(
 
 fn vcf<ACC: EndgameAccumulator>(
     td: &mut ThreadData,
-    board: &Board, max_depth: Depth
+    board: &Board, vcf_moves: VcfMoves, max_depth: Depth
 ) -> ACC {
     let board = *board;
     match board.player_color {
-        Color::Black => try_vcf::<{ Color::Black }, ACC>(td, board, max_depth, 0, false),
-        Color::White => try_vcf::<{ Color::White }, ACC>(td, board, max_depth, 0, false),
+        Color::Black => try_vcf::<{ Color::Black }, ACC>(td, board, vcf_moves, max_depth, 0, false),
+        Color::White => try_vcf::<{ Color::White }, ACC>(td, board, vcf_moves, max_depth, 0, false),
     }
 }
 
 // depth-first search
 fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
     td: &mut ThreadData,
-    mut board: Board,
+    mut board: Board, mut vcf_moves: VcfMoves,
     max_depth: Depth, mut vcf_ply: Depth, mut opponent_has_five: bool,
 ) -> ACC {
-    let mut idx: usize = 0;
+    let mut seq_offset: usize = 0;
 
     #[inline]
     fn backtrace_frames<ACC: EndgameAccumulator>(
@@ -81,20 +89,20 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
     }
 
     'vcf_search: loop {
-        'position_search: while idx < pos::BOARD_SIZE {
-            let player_pattern = board.patterns.field.player_unit::<C>()[idx];
-            let opponent_pattern = board.patterns.field.opponent_unit::<C>()[idx];
+        'position_search: for (seq, four_pos) in vcf_moves.moves.into_iter()
+            .take(vcf_moves.len as usize)
+            .skip(seq_offset)
+            .enumerate()
+        {
+            let idx = four_pos.idx_usize();
 
-            if !player_pattern.has_any_four()
-                || (opponent_has_five && !opponent_pattern.has_five())
+            let player_pattern = board.patterns.field.player_unit::<C>()[idx];
+
+            if (opponent_has_five && !board.patterns.field.opponent_unit::<C>()[idx].has_five())
                 || (C == Color::Black && player_pattern.is_forbidden())
             {
-                idx += 1;
-
                 continue 'position_search;
             }
-
-            let four_pos = Pos::from_index(idx as u8);
 
             if player_pattern.has_open_four() {
                 td.tt.store_entry_mut(board.hash_key, build_vcf_win_tt_entry(vcf_ply, four_pos));
@@ -116,7 +124,6 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 Color::White => defend_pattern.has_open_four()
                     && !defend_is_forbidden
             } {
-                idx += 1;
                 continue 'position_search;
             }
 
@@ -136,7 +143,6 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 || td.tt.probe(position_board.hash_key.set(C.reversed(), defend_pos))
                 .is_some_and(|entry| entry.tt_flag.endgame_flag() == EndgameFlag::Cold)
             {
-                idx += 1;
                 continue 'position_search;
             }
 
@@ -145,15 +151,19 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
             td.vcf_stack.push(VCFFrame {
                 board,
-                next_idx: idx + 1,
+                vcf_moves,
+                next_seq: seq + 1,
                 depth: vcf_ply,
                 opponent_has_five,
                 four_pos,
                 defend_pos,
             });
 
+            vcf_moves = generate_vcf_moves(&position_board, C, ACC::DISTANCE_WINDOW, defend_pos);
+            sort_moves(defend_pos, &mut vcf_moves.moves[0 .. vcf_moves.len as usize]);
+
+            seq_offset = 0;
             board = position_board;
-            idx = 0;
             vcf_ply = vcf_ply + 2;
             opponent_has_five = defend_four_count != PatternCount::Cold;
 
@@ -178,7 +188,8 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
         if let Some(frame) = td.vcf_stack.pop() {
             board = frame.board;
-            idx = frame.next_idx;
+            vcf_moves = frame.vcf_moves;
+            seq_offset = frame.next_seq;
             vcf_ply = frame.depth;
             opponent_has_five = frame.opponent_has_five;
         } else {

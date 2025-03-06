@@ -259,8 +259,8 @@ impl Board {
 
         if !pattern.has_three() // non-three
             || pattern.apply_mask(ANY_FOUR_OR_OVERLINE_MASK) != 0 // double-four or overline
-            || (C::IS_NESTED && context.overrides().four_contains(pos)) // double-four
-            || (C::IS_NESTED && context.overrides().set_contains(pos)) // recursive
+            || context.four_contains(pos) // double-four
+            || context.set_contains(pos) // recursive
         {
             return true;
         }
@@ -456,6 +456,10 @@ trait ValidateThreeContext : Copy {
 
     fn branch_overrides(&self) -> SetOverrides;
 
+    fn set_contains(&self, pos: Pos) -> bool;
+
+    fn four_contains(&self, pos: Pos) -> bool;
+
 }
 
 #[derive(Copy, Clone)]
@@ -480,6 +484,14 @@ impl ValidateThreeContext for ValidateThreeRoot {
 
     fn branch_overrides(&self) -> SetOverrides {
         SetOverrides::new(self.root_pos)
+    }
+
+    fn set_contains(&self, _pos: Pos) -> bool {
+        false
+    }
+
+    fn four_contains(&self, _pos: Pos) -> bool {
+        false
     }
 }
 
@@ -509,35 +521,35 @@ impl ValidateThreeContext for ValidateThreeNode {
     fn branch_overrides(&self) -> SetOverrides {
         self.overrides
     }
+
+    fn set_contains(&self, pos: Pos) -> bool {
+        self.overrides.set[..self.overrides.set_top as usize].contains(&pos)
+    }
+
+    fn four_contains(&self, pos: Pos) -> bool {
+        self.overrides.four[..self.overrides.four_top as usize].contains(&pos)
+    }
 }
 
 #[derive(Copy, Clone)]
-#[repr(align(32))]
-struct SetOverrides {
-    set: [Pos; 5],
+#[repr(align(8))]
+pub struct SetOverrides {
+    set: [Pos; 6],
     set_top: u8,
-    four: [Pos; 13],
+    four: [Pos; 20],
     four_top: u8,
     next_four: [Pos; 12],
 }
 
-assert_struct_sizes!(SetOverrides, size=32, align=32);
+assert_struct_sizes!(SetOverrides, size=40, align=8);
 
 impl SetOverrides {
 
-    fn set_contains(&self, pos: Pos) -> bool {
-        self.set.contains(&pos)
-    }
-
-    fn four_contains(&self, pos: Pos) -> bool {
-        self.four.contains(&pos)
-    }
-
     fn new(root: Pos) -> Self {
         Self {
-            set: [root, Pos::INVALID, Pos::INVALID, Pos::INVALID, Pos::INVALID],
+            set: [root, Pos::INVALID, Pos::INVALID, Pos::INVALID, Pos::INVALID, Pos::INVALID],
             set_top: 1,
-            four: [Pos::INVALID; 13],
+            four: [Pos::INVALID; 20],
             four_top: 0,
             next_four: [Pos::INVALID; 12],
         }
