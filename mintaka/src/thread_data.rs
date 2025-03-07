@@ -1,6 +1,6 @@
 use crate::batch_counter::BatchCounter;
 use crate::config::Config;
-use crate::endgame::vcf::VCFFrame;
+use crate::endgame::vcf::VcfFrame;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::search_frame::SearchFrame;
@@ -19,7 +19,7 @@ pub struct ThreadData<'a> {
     pub tt: TTView<'a>,
     pub ht: HistoryTable,
     pub search_stack: [SearchFrame; 128],
-    pub vcf_stack: Vec<VCFFrame>,
+    pub vcf_stack: Vec<VcfFrame>,
 
     pub batch_counter: BatchCounter<'a>,
     global_aborted: &'a AtomicBool,

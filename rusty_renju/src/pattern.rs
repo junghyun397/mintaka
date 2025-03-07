@@ -33,22 +33,17 @@ pub const SLICE_PATTERN_THREE_MASK: u128    = repeat_16x(OPEN_THREE);
 pub const SLICE_PATTERN_FIVE_MASK: u128     = repeat_16x(FIVE);
 
 #[derive(Eq, PartialEq, Copy, Clone)]
+#[repr(u8)]
 pub enum PatternCount {
-    Cold,
-    Single,
-    Multiple
+    Cold = 0,
+    Single = 1,
+    Multiple = 2
 }
 
 impl PatternCount {
 
     fn from_masked_unit(masked: u32) -> Self {
-        if masked == 0 {
-            PatternCount::Cold
-        } else if masked.count_ones() < 2 {
-            PatternCount::Single
-        } else {
-            PatternCount::Multiple
-        }
+        unsafe { std::mem::transmute::<u8, PatternCount>(masked.count_ones().min(2) as u8) }
     }
 
 }

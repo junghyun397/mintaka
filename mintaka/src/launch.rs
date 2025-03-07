@@ -1,10 +1,10 @@
 use crate::config::Config;
+use crate::game_state::GameState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::protocol::game_manager::GameManager;
 use crate::protocol::response::Response;
 use crate::search;
-use crate::search_state::SearchState;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
@@ -23,7 +23,7 @@ pub fn eager_launch(
     launch(
         manager,
         config,
-        SearchState {
+        GameState {
             board,
             recent_move: Pos::INVALID,
             movegen_window: Default::default(),
@@ -36,7 +36,7 @@ pub fn eager_launch(
 pub fn launch(
     manager: &(impl GameManager + Sync),
     config: Config,
-    mut state: SearchState,
+    mut state: GameState,
     tt: &TranspositionTable,
     ht: &mut HistoryTable,
 ) {

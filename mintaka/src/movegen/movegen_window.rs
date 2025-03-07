@@ -1,7 +1,7 @@
-use crate::bitfield::Bitfield;
-use crate::notation::pos;
-use crate::notation::pos::Pos;
-use crate::{cartesian_to_index, const_for, max, min};
+use rusty_renju::bitfield::Bitfield;
+use rusty_renju::notation::pos;
+use rusty_renju::notation::pos::Pos;
+use rusty_renju::{cartesian_to_index, const_for, max, min};
 
 #[derive(Debug, Copy, Clone)]
 pub struct MovegenWindow {

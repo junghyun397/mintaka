@@ -11,7 +11,6 @@ pub mod board;
 pub mod board_io;
 pub mod slice;
 pub mod memo;
-pub mod movegen;
 pub mod notation;
 pub mod game;
 pub mod utils;

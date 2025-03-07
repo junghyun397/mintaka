@@ -1,11 +1,10 @@
-use crate::bitfield::Bitfield;
-use crate::board::Board;
 use crate::movegen::movegen_window::MovegenWindow;
-use crate::notation::color::Color;
-use crate::notation::pos;
-use crate::notation::pos::Pos;
-use crate::pattern;
-use crate::utils::platform;
+use rusty_renju::board::Board;
+use rusty_renju::notation::color::Color;
+use rusty_renju::notation::pos;
+use rusty_renju::notation::pos::Pos;
+use rusty_renju::pattern;
+use rusty_renju::utils::platform;
 use smallvec::SmallVec;
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
@@ -16,20 +15,6 @@ pub type Moves = SmallVec<[Pos; 64]>;
 pub struct VcfMoves {
     pub moves: [Pos; 31],
     pub len: u8,
-}
-
-impl From<Moves> for Bitfield {
-
-    fn from(moves: Moves) -> Self {
-        let mut bitfield = Bitfield::ZERO_FILLED;
-
-        for pos in moves {
-            bitfield.set_mut(pos);
-        }
-
-        bitfield
-    }
-
 }
 
 pub fn generate_moves(board: &Board, movegen_window: &MovegenWindow) -> Moves {
@@ -87,6 +72,8 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
         vcf_moves[vcf_moves_top] = Pos::from_index(pos::U8_BOARD_BOUND);
         vcf_moves_top += 1;
     }
+
+    sort_moves(recent_move, &mut vcf_moves[..vcf_moves_top]);
 
     VcfMoves { moves: vcf_moves, len: vcf_moves_top as u8 }
 }
