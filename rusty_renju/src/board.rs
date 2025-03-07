@@ -452,8 +452,6 @@ trait ValidateThreeContext : Copy {
 
     fn parent_direction(&self) -> Direction;
 
-    fn overrides(&self) -> &SetOverrides;
-
     fn branch_overrides(&self) -> SetOverrides;
 
     fn set_contains(&self, pos: Pos) -> bool;
@@ -475,10 +473,6 @@ impl ValidateThreeContext for ValidateThreeRoot {
     }
 
     fn parent_direction(&self) -> Direction {
-        unreachable!()
-    }
-
-    fn overrides(&self) -> &SetOverrides {
         unreachable!()
     }
 
@@ -512,10 +506,6 @@ impl ValidateThreeContext for ValidateThreeNode {
 
     fn parent_direction(&self) -> Direction {
         self.parent_direction
-    }
-
-    fn overrides(&self) -> &SetOverrides {
-        &self.overrides
     }
 
     fn branch_overrides(&self) -> SetOverrides {

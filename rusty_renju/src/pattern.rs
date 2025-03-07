@@ -29,6 +29,8 @@ pub const UNIT_OPEN_THREE_MASK: u32         = repeat_4x(OPEN_THREE);
 pub const UNIT_CLOSE_THREE_MASK: u32        = repeat_4x(CLOSE_THREE);
 pub const UNIT_OVERLINE_MASK: u32           = repeat_4x(OVERLINE);
 
+pub const UNIT_PATTERN_MASK: u32            = repeat_4x(!MARKER);
+
 pub const SLICE_PATTERN_THREE_MASK: u128    = repeat_16x(OPEN_THREE);
 pub const SLICE_PATTERN_FIVE_MASK: u128     = repeat_16x(FIVE);
 
@@ -150,15 +152,15 @@ impl Pattern {
     }
 
     pub fn has_invalid_double_three(&self) -> bool {
-        self.horizontal & MARKER == MARKER
+        self.descending & MARKER == MARKER
     }
 
     pub fn mark_invalid_double_three(&mut self) {
-        self.horizontal |= MARKER;
+        self.descending |= MARKER;
     }
 
     pub fn unmark_invalid_double_three(&mut self) {
-        self.horizontal &= !MARKER;
+        self.descending &= !MARKER;
     }
 
     pub fn is_forbidden(&self) -> bool {
@@ -190,7 +192,7 @@ impl Pattern {
             Direction::Horizontal => self.horizontal = pattern,
             Direction::Vertical => self.vertical = pattern,
             Direction::Ascending => self.ascending = pattern,
-            Direction::Descending => self.descending = pattern,
+            Direction::Descending => self.descending = pattern | (self.descending & MARKER), // retain invalid three makers
         }
     }
 

@@ -92,6 +92,7 @@ fn generate_defend_three_moves<const C: Color>(board: &Board) -> Moves {
         let mut player_vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
             unsafe { std::slice::from_raw_parts(player_ptr.add(start_idx), platform::U32_LANE_N) }
         );
+
         let mut opponent_vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
             unsafe { std::slice::from_raw_parts(opponent_ptr.add(start_idx), platform::U32_LANE_N) }
         );
@@ -109,13 +110,12 @@ fn generate_defend_three_moves<const C: Color>(board: &Board) -> Moves {
 
             let idx = start_idx + lane_position;
             let player_pattern = board.patterns.field.player_unit::<C>()[idx];
-            let opponent_pattern = board.patterns.field.opponent_unit::<C>()[idx];
 
-            if (player_pattern.has_any_four() || opponent_pattern.has_close_three())
-                && (C == Color::White || !player_pattern.is_forbidden())
-            {
-                defend_threat_moves.push(Pos::from_index(idx as u8));
+            if C == Color::Black && player_pattern.is_forbidden() {
+                continue;
             }
+
+            defend_threat_moves.push(Pos::from_index(idx as u8));
         }
     }
 
