@@ -30,9 +30,8 @@ mod test_vcf {
 
             board.batch_set_mut(&vcf_result.clone().into_boxed_slice());
             let last_move = vcf_result.last().copied().unwrap();
-            let board_string = board.to_string_with_move_marker(last_move);
 
-            println!("{}", board_string);
+            println!("{}", board.to_string_with_move_marker(last_move));
             println!("length: {}", vcf_result.len());
             println!("sequence: {:?}", vcf_result);
             println!("time: {:?}", time);
@@ -219,7 +218,6 @@ mod test_vcf {
 
     #[test]
     fn deep_vcf() {
-        // 5 ms
         let case = indoc! {"
            A B C D E F G H I J K L M N O
         15 O O . . X . X . . O X O O X . 15
@@ -241,7 +239,6 @@ mod test_vcf {
 
         assert_eq!(vcf!(case), Pos::from_str_unchecked("f15"));
 
-        // 9 ms
         let case = indoc! {"
            A B C D E F G H I J K L M N O
         15 O . . . X . . . . . . . X . X 15
