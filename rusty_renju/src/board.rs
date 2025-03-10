@@ -49,8 +49,6 @@ impl Board {
     }
 
     pub fn set_mut(&mut self, pos: Pos) {
-        self.patterns.unchecked_five_pos = Patterns::EMPTY_UNCHECKED_FIVE_POS;
-
         self.stones += 1;
         self.hot_field.set_mut(pos);
         self.hash_key = self.hash_key.set(self.player_color, pos);
@@ -61,8 +59,7 @@ impl Board {
     }
 
     pub fn unset_mut(&mut self, pos: Pos) {
-        self.patterns.five_in_a_row = None;
-        self.patterns.unchecked_five_pos = Patterns::EMPTY_UNCHECKED_FIVE_POS;
+        self.patterns.unchecked_five_in_a_row = None;
 
         self.switch_player_mut();
 
@@ -157,6 +154,8 @@ impl Board {
                 }
             }};
         }
+
+        self.patterns.unchecked_five_pos = Patterns::EMPTY_UNCHECKED_FIVE_POS;
 
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
         update_by_slice!(Direction::Horizontal, horizontal_slice, pos.col());

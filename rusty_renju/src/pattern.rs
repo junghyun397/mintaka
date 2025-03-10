@@ -205,7 +205,7 @@ impl Pattern {
 #[derive(Debug, Copy, Clone)]
 pub struct Patterns {
     pub field: AlignedColorContainer<[Pattern; pos::BOARD_SIZE]>,
-    pub five_in_a_row: Option<Color>,
+    pub unchecked_five_in_a_row: Option<Color>,
     pub unchecked_five_pos: ColorContainer<Option<Pos>>,
 }
 
@@ -216,7 +216,7 @@ impl Default for Patterns {
     fn default() -> Self {
         Self {
             field: unsafe { std::mem::zeroed() },
-            five_in_a_row: None,
+            unchecked_five_in_a_row: None,
             unchecked_five_pos: ColorContainer {
                 black: None,
                 white: None
@@ -253,7 +253,7 @@ impl Patterns {
             self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(0);
         }
 
-        self.five_in_a_row = None;
+        self.unchecked_five_in_a_row = None;
 
         *slice.pattern_available.player_unit_mut::<C>() = false;
     }
@@ -279,7 +279,7 @@ impl Patterns {
             self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(slice_pattern[pattern_idx]);
         }
 
-        self.five_in_a_row = self.five_in_a_row.or(
+        self.unchecked_five_in_a_row = self.unchecked_five_in_a_row.or(
             contains_five_in_a_row(slice.stones::<C>())
                 .then_some(C)
         );

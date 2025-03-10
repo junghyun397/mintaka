@@ -55,7 +55,7 @@ impl Game {
     pub fn play_mut(&mut self, pos: Pos) {
         self.board.set_mut(pos);
         self.history.play_mut(pos);
-        self.result = self.board.patterns.five_in_a_row
+        self.result = self.board.patterns.unchecked_five_in_a_row
             .map(GameResult::FiveInARow)
             .or_else(|| (self.board.stones == pos::U8_BOARD_SIZE).then_some(GameResult::Full));
     }

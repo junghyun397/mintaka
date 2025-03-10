@@ -88,7 +88,7 @@ fn try_vct<const C: Color, ACC: EndgameAccumulator>(
         }
     }
 
-    ACC::COLD
+    ACC::ZERO
 }
 
 #[inline]

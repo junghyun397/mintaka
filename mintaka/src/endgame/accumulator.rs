@@ -5,7 +5,7 @@ pub trait EndgameAccumulator {
 
     const DISTANCE_WINDOW: u8;
 
-    const COLD: Self;
+    const ZERO: Self;
 
     fn unit(pos: Pos) -> Self;
 
@@ -21,7 +21,7 @@ impl EndgameAccumulator for SequenceEndgameAccumulator {
 
     const DISTANCE_WINDOW: u8 = 7;
 
-    const COLD: Self = None;
+    const ZERO: Self = None;
 
     #[inline]
     fn unit(pos: Pos) -> Self {
@@ -48,7 +48,7 @@ impl EndgameAccumulator for Score {
 
     const DISTANCE_WINDOW: u8 = 5;
 
-    const COLD: Self = 0;
+    const ZERO: Self = 0;
 
     #[inline]
     fn unit(_pos: Pos) -> Self {
