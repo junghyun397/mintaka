@@ -21,7 +21,7 @@ enum PiskvorkResponse {
     None
 }
 
-fn main() -> Result<(), std::io::Error> {
+fn main() -> Result<(), &'static str> {
     let manager = PiskvorkGameManager {};
 
     let mut config = Config::default();
@@ -35,7 +35,7 @@ fn main() -> Result<(), std::io::Error> {
 
     loop {
         let mut buf = String::new();
-        std::io::stdin().read_line(&mut buf)?;
+        std::io::stdin().read_line(&mut buf).map_err(|_| "failed to stdio")?;
         buf.make_ascii_uppercase();
         let args = buf.trim().split(' ').collect::<Vec<&str>>();
 
@@ -49,7 +49,7 @@ fn main() -> Result<(), std::io::Error> {
         // https://plastovicka.github.io/protocl2en.htm
         let piskvork_response = match command {
             "START" => {
-                let size: usize = parameters[0].parse().unwrap();
+                let size: usize = parameters[0].parse().map_err(|_| "size parsing failed.")?;
                 if size == pos::U_BOARD_WIDTH {
                     PiskvorkResponse::Ok
                 } else {
@@ -65,8 +65,8 @@ fn main() -> Result<(), std::io::Error> {
             },
             "TURN" => {
                 let pos = Pos::from_cartesian(
-                    parameters[0].parse::<u8>().unwrap() - 1,
-                    parameters[1].parse::<u8>().unwrap() - 1
+                    parameters[0].parse::<u8>().map_err(|_| "row parsing failed.")? - 1,
+                    parameters[1].parse::<u8>().map_err(|_| "column parsing failed.")? - 1
                 );
 
                 // launch
@@ -74,8 +74,8 @@ fn main() -> Result<(), std::io::Error> {
             },
             "TAKEBACK" => {
                 let pos = Pos::from_cartesian(
-                    parameters[0].parse::<u8>().unwrap() - 1,
-                    parameters[1].parse::<u8>().unwrap() - 1
+                    parameters[0].parse::<u8>().map_err(|_| "row parsing failed.")? - 1,
+                    parameters[1].parse::<u8>().map_err(|_| "column parsing failed.")? - 1
                 );
 
                 // undo
@@ -86,17 +86,22 @@ fn main() -> Result<(), std::io::Error> {
 
                 loop {
                     let mut buf = String::new();
-                    std::io::stdin().read_line(&mut buf).expect("failed to stdio");
+                    std::io::stdin().read_line(&mut buf).map_err(|_| "failed to stdio")?;
 
                     if buf.trim() == DONE_TOKEN {
                         break;
                     }
 
-                    let [row, col, color]: [&str; 3] = buf.trim().split(',').collect::<Vec<&str>>().try_into().unwrap();
+                    let [row, col, color]: [&str; 3] = buf.trim()
+                        .split(',')
+                        .collect::<Vec<&str>>()
+                        .try_into()
+                        .map_err(|_| "token parsing failed.")
+                        ?;
 
                     let pos = Pos::from_cartesian(
-                        row.parse::<u8>().unwrap() - 1,
-                        col.parse::<u8>().unwrap() - 1,
+                        row.parse::<u8>().map_err(|e| "row parsing failed.")? - 1,
+                        col.parse::<u8>().map_err(|e| "column parsing failed.")? - 1,
                     );
 
                     let color = match color {
@@ -104,10 +109,7 @@ fn main() -> Result<(), std::io::Error> {
                         "2" => !own_color,
                         "3" => own_color,
                         &_ => {
-                            return Err(std::io::Error::new(
-                                std::io::ErrorKind::InvalidData,
-                                "unknown color"
-                            ));
+                            return Err("unknown color token.");
                         }
                     };
 
@@ -121,18 +123,24 @@ fn main() -> Result<(), std::io::Error> {
                 PiskvorkResponse::None
             },
             "INFO" => {
-                match *args.get(0).expect("missing info key.") {
+                fn parse_time(parameters: &[&str]) -> Result<Duration, &'static str> {
+                    parameters.get(0)
+                        .ok_or("missing info value.")
+                        .and_then(|token| token
+                            .parse::<u64>()
+                            .map_err(|_| "time parsing failed.")
+                        )
+                        .map(Duration::from_millis)
+                }
+
+                match *args.get(0).ok_or("missing info key.")? {
                     "timeout_match" | "time_left" => {
-                        time_manager.total_remaining = Duration::from_millis(
-                            parameters.get(0).expect("missing info value.").parse().unwrap()
-                        );
+                        time_manager.total_remaining = parse_time(parameters)?;
 
                         PiskvorkResponse::Ok
                     },
                     "timeout_turn" => {
-                        time_manager.overhead = Duration::from_millis(
-                            parameters.get(0).expect("missing info value.").parse().unwrap()
-                        );
+                        time_manager.overhead = parse_time(parameters)?;
 
                         PiskvorkResponse::Ok
                     },
@@ -147,7 +155,10 @@ fn main() -> Result<(), std::io::Error> {
                         PiskvorkResponse::Ok
                     },
                     "game_type" => {
-                        match parameters.get(1).expect("missing info value.").chars().next().unwrap() {
+                        match parameters.get(1)
+                            .expect("missing info value.")
+                            .chars().next().unwrap()
+                        {
                             '0' ..= '3' => PiskvorkResponse::Ok,
                             _ => PiskvorkResponse::Error("unknown game type."),
                         }

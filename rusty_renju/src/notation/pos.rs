@@ -41,7 +41,7 @@ pub const CENTER_ROW_COL: u8 = CENTER.col();
      };
  }
 
-const STEP_TABLE: [isize; 4] = [1, BOARD_WIDTH as isize, BOARD_WIDTH as isize + 1, -(BOARD_WIDTH as isize - 1)];
+const STEP_TABLE: [isize; 4] = [1, I_BOARD_WIDTH, I_BOARD_WIDTH + 1, -(I_BOARD_WIDTH - 1)];
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub struct Pos(u8);

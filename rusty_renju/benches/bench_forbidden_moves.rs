@@ -9,14 +9,64 @@ mod bench_forbidden_moves {
     use test::Bencher;
 
     #[bench]
-    fn usual_position(b: &mut Bencher) {
-        let case = "usual_position";
+    fn clean_position(b: &mut Bencher) {
+        let case = indoc! {"
+           A B C D E F G H I J K L M N O
+        15 . . . . . . . . . . . . . . . 15
+        14 . . . . . . . . . . . . . . . 14
+        13 . . . . . . . . . . . . . . . 13
+        12 . . . . . . . . . . . . . . . 12
+        11 . . . . . . . . . . . . . . . 11
+        10 . . . . . . . . . . . . . . . 10
+         9 . . . X X . X O . . . . . . . 9
+         8 . . . . . O O X . . . . . . . 8
+         7 . . . . . . X O O . . . . . . 7
+         6 . . . . . . . X O . . . . . . 6
+         5 . . . . . . . . . . . . . . . 5
+         4 . . . . . . . . . . . . . . . 4
+         3 . . . . . . . . . . . . . . . 3
+         2 . . . . . . . . . . . . . . . 2
+         1 . . . . . . . . . . . . . . . 1
+           A B C D E F G H I J K L M N O"};
 
         let board = case.parse::<Board>().unwrap();
-        let pos = Pos::from_str_unchecked("a1");
+        let pos = Pos::from_str_unchecked("i9");
+        let validate_pos = Pos::from_str_unchecked("i8");
 
         b.iter(|| {
-            let _ = board.set(pos);
+            let board = board.set(pos);
+            assert_eq!(board.patterns.field.white[validate_pos.idx_usize()].has_three(), false);
+        })
+    }
+
+    #[bench]
+    fn usual_position(b: &mut Bencher) {
+        let case = indoc! {"
+           A B C D E F G H I J K L M N O
+        15 . . . . . . . . . . . . . . . 15
+        14 . . . . . . . . . . . . . . . 14
+        13 . . . . . . . . . . . . . . . 13
+        12 . . . . . . . O . . . . . . . 12
+        11 . . . . . . . . . . . . . . . 11
+        10 . . . . . O . X . . . . . . . 10
+         9 . . . . . X O X O . . . . . . 9
+         8 . . . . . X . X . O . . . . . 8
+         7 . . O X X X X O X . . . . . . 7
+         6 . . . . . X . O . O . . . . . 6
+         5 . . . . X O O . . . . . . . . 5
+         4 . . . O . . . . . . . . . . . 4
+         3 . . . . . . . . . . . . . . . 3
+         2 . . . . . . . . . . . . . . . 2
+         1 . . . . . . . . . . . . . . . 1
+           A B C D E F G H I J K L M N O"};
+
+        let board = case.parse::<Board>().unwrap();
+        let pos = Pos::from_str_unchecked("h11");
+        let validate_pos = Pos::from_str_unchecked("g8");
+
+        b.iter(|| {
+            let board = board.set(pos);
+            assert_eq!(board.patterns.field.black[validate_pos.idx_usize()].is_forbidden(), false);
         })
     }
 
@@ -31,7 +81,7 @@ mod bench_forbidden_moves {
         11 . . . . . . . . . . . . X . . 11
         10 . . . . . O . . . . . . O X . 10
          9 . . O X . . X O X X X O X . . 9
-         8 . . . X O O . X O . . . . . . 8
+         8 . . . . O O . X O . . . . . . 8
          7 . O . . X X . . . X . . . . . 7
          6 . . . . . . X . . . X X O . . 6
          5 . . . . O . . . . . . . . . . 5
@@ -42,10 +92,12 @@ mod bench_forbidden_moves {
            A B C D E F G H I J K L M N O"};
 
         let board = case.parse::<Board>().unwrap();
-        let pos = Pos::from_str_unchecked("a1");
+        let pos = Pos::from_str_unchecked("d8");
+        let validate_pos = Pos::from_str_unchecked("d7");
 
         b.iter(|| {
-            let _ = board.set(pos);
+            let board = board.set(pos);
+            assert_eq!(board.patterns.field.black[validate_pos.idx_usize()].is_forbidden(), false);
         })
     }
 }
