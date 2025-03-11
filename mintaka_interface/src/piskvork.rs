@@ -1,94 +1,218 @@
 use crate::piskvork_game_manager::PiskvorkGameManager;
-use mintaka::protocol::command::Command;
-use mintaka::protocol::game_manager::GameManager;
+use mintaka::config::Config;
+use mintaka::memo::history_table::HistoryTable;
+use mintaka::memo::transposition_table::TranspositionTable;
+use mintaka::utils::time_manager::TimeManager;
+use rusty_renju::board::Board;
+use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
+use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
+use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::rule::RuleKind;
+use std::time::Duration;
 
 mod piskvork_game_manager;
 
-enum PBrainCommand {
-    Command(Command),
+enum PiskvorkResponse {
     Info(&'static str),
     Error(&'static str),
+    Pos(Pos),
     Ok,
     None
 }
 
-fn main() {
+fn main() -> Result<(), std::io::Error> {
     let manager = PiskvorkGameManager {};
 
+    let mut config = Config::default();
+    let mut time_manager = TimeManager::default();
+
+    let mut transposition_table = TranspositionTable::new_with_size(1024 * 16);
+    let mut history_table = HistoryTable {};
+
+    let mut own_color = Color::Black;
+    let mut board = Board::default();
+
     loop {
-        let arg = "";
+        let mut buf = String::new();
+        std::io::stdin().read_line(&mut buf)?;
+        buf.make_ascii_uppercase();
+        let args = buf.trim().split(' ').collect::<Vec<&str>>();
+
+        if args.len() == 0 {
+            continue;
+        }
+
+        let command = args[0];
+        let parameters = &args[1..];
 
         // https://plastovicka.github.io/protocl2en.htm
-        let pbrain_command = match arg {
+        let piskvork_response = match command {
             "START" => {
-                let size = 15;
+                let size: usize = parameters[0].parse().unwrap();
                 if size == pos::U_BOARD_WIDTH {
-                    PBrainCommand::Ok
+                    PiskvorkResponse::Ok
                 } else {
-                    PBrainCommand::Error("ERROR unsupported size or other error")
+                    PiskvorkResponse::Error("unsupported size or other error")
                 }
             },
             "RECTSTART" => {
-                PBrainCommand::Error("ERROR rectangular board is not supported or other error")
+                PiskvorkResponse::Error("rectangular board is not supported or other error")
             }
             "BEGIN" => {
-                PBrainCommand::None
+                // launch
+                PiskvorkResponse::Pos(Pos::from_str_unchecked("h8"))
             },
             "TURN" => {
-                PBrainCommand::None
+                let pos = Pos::from_cartesian(
+                    parameters[0].parse::<u8>().unwrap() - 1,
+                    parameters[1].parse::<u8>().unwrap() - 1
+                );
+
+                // launch
+                PiskvorkResponse::Pos(Pos::from_str_unchecked("h8"))
             },
             "TAKEBACK" => {
-                PBrainCommand::None
+                let pos = Pos::from_cartesian(
+                    parameters[0].parse::<u8>().unwrap() - 1,
+                    parameters[1].parse::<u8>().unwrap() - 1
+                );
+
+                // undo
+                PiskvorkResponse::Ok
             },
             "BOARD" => {
-                const DONE_TOKEN : &str = "DONE";
+                const DONE_TOKEN: &str = "DONE";
 
-                let mut board = vec![];
                 loop {
-                    let line = "";
-                    if line == DONE_TOKEN {
+                    let mut buf = String::new();
+                    std::io::stdin().read_line(&mut buf).expect("failed to stdio");
+
+                    if buf.trim() == DONE_TOKEN {
                         break;
                     }
-                    board.push(line);
+
+                    let [row, col, color]: [&str; 3] = buf.trim().split(',').collect::<Vec<&str>>().try_into().unwrap();
+
+                    let pos = Pos::from_cartesian(
+                        row.parse::<u8>().unwrap() - 1,
+                        col.parse::<u8>().unwrap() - 1,
+                    );
+
+                    let color = match color {
+                        "1" => own_color,
+                        "2" => !own_color,
+                        "3" => own_color,
+                        &_ => {
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidData,
+                                "unknown color"
+                            ));
+                        }
+                    };
+
+                    board.set_mut(pos);
                 }
 
-                PBrainCommand::None
+                // launch
+                PiskvorkResponse::Pos(Pos::from_str_unchecked("h8"))
             },
             "END" => {
-                PBrainCommand::None
+                PiskvorkResponse::None
             },
             "INFO" => {
-                PBrainCommand::None
+                match *args.get(0).expect("missing info key.") {
+                    "timeout_match" | "time_left" => {
+                        time_manager.total_remaining = Duration::from_millis(
+                            parameters.get(0).expect("missing info value.").parse().unwrap()
+                        );
+
+                        PiskvorkResponse::Ok
+                    },
+                    "timeout_turn" => {
+                        time_manager.overhead = Duration::from_millis(
+                            parameters.get(0).expect("missing info value.").parse().unwrap()
+                        );
+
+                        PiskvorkResponse::Ok
+                    },
+                    "max_memory" => {
+                        const MEMORY_MARGIN_IN_KIB: usize = 1024 * 50;
+
+                        let max_memory_in_bytes: usize =
+                            parameters.get(0).expect("missing info value.").parse().unwrap();
+
+                        transposition_table.resize_mut(max_memory_in_bytes / 1024 - MEMORY_MARGIN_IN_KIB);
+
+                        PiskvorkResponse::Ok
+                    },
+                    "game_type" => {
+                        match parameters.get(1).expect("missing info value.").chars().next().unwrap() {
+                            '0' ..= '3' => PiskvorkResponse::Ok,
+                            _ => PiskvorkResponse::Error("unknown game type."),
+                        }
+                    },
+                    "rule" => {
+                        match parameters.get(1)
+                            .expect("missing info value.")
+                            .parse::<usize>().unwrap()
+                            .count_ones()
+                        {
+                            1 => {
+                                config.rule_kind = RuleKind::FiveInARow;
+                                PiskvorkResponse::Ok
+                            },
+                            4 => {
+                                config.rule_kind = RuleKind::Renju;
+                                PiskvorkResponse::Ok
+                            }
+                            _ => PiskvorkResponse::Error("unsupported rule."),
+                        }
+                    },
+                    "evaluate" => {
+                        PiskvorkResponse::Ok
+                    },
+                    "folder" => {
+                        PiskvorkResponse::Ok
+                    },
+                    &_ => {
+                        PiskvorkResponse::Error("unsupported info key.")
+                    }
+                }
             },
             "YXHASHCLEAR" => {
-                PBrainCommand::None
+                PiskvorkResponse::None
             },
             "YXSHOWFORBID" => {
-                PBrainCommand::None
+                PiskvorkResponse::None
             },
             "YXSHOWINFO" => {
-                PBrainCommand::None
+                PiskvorkResponse::None
             },
             "ABOUT" =>
-                PBrainCommand::Info("name=\"mintaka\", author=\"JeongHyeon Choi\", version=\"0.1\", country=\"UNK\""),
-            &_ => PBrainCommand::Info("ERROR unknown command.")
+                PiskvorkResponse::Info(
+                    "name=\"mintaka\",\
+                    author=\"JeongHyeon Choi\",\
+                    version=\"0.9.0 pre-alpha\",\
+                    country=\"KOR\""
+                ),
+            &_ => PiskvorkResponse::Error("unknown command.")
         };
 
-        match pbrain_command {
-            PBrainCommand::Command(command) => {
-                manager.command(command);
-            },
-            PBrainCommand::Info(message) => {
+        match piskvork_response {
+            PiskvorkResponse::Info(message) => {
                 println!("INFO {}", message);
             },
-            PBrainCommand::Error(message) => {
+            PiskvorkResponse::Error(message) => {
                 println!("ERROR {}", message);
             },
-            PBrainCommand::Ok => {
+            PiskvorkResponse::Ok => {
                 println!("OK");
             },
-            PBrainCommand::None => {},
+            PiskvorkResponse::Pos(pos) => {
+                println!("{} {}", pos.row() + 1, pos.col() + 1);
+            },
+            PiskvorkResponse::None => {},
         };
     }
 }

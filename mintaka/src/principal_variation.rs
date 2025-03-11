@@ -5,7 +5,7 @@ use smallvec::SmallVec;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PrincipalVariation {
     pub score: Score,
-    pub moves: SmallVec<[Pos; 128]>,
+    pub moves: SmallVec<Pos, 128>,
 }
 
 impl Default for PrincipalVariation {

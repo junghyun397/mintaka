@@ -55,11 +55,11 @@ fn try_vct<const C: Color, ACC: EndgameAccumulator>(
 ) -> ACC {
     let mut idx: usize = 0;
 
-    let mut stack: SmallVec<[VCTFrame; 32]> = smallvec![];
+    let mut stack: SmallVec<VCTFrame, 32> = smallvec![];
 
     #[inline]
     fn backtrace_frames<ACC: EndgameAccumulator>(
-        td: &mut ThreadData, mut stack: SmallVec<[VCTFrame; 32]>,
+        td: &mut ThreadData, mut stack: SmallVec<VCTFrame, 32>,
         board: Board, depth: Depth, killer_pos: Pos
     ) -> ACC {
         let mut result = ACC::unit(killer_pos);

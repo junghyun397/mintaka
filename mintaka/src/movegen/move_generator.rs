@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
 
-pub type Moves = SmallVec<[Pos; 64]>;
+pub type Moves = SmallVec<Pos, 64>;
 
 #[derive(Debug, Copy, Clone)]
 pub struct VcfMoves {

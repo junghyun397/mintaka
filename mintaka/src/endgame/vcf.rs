@@ -33,7 +33,7 @@ pub struct VcfDefend {
 
 impl VcfDestination for VcfDefend {
     fn additional_abort(&self, defend_pattern: Pattern) -> bool {
-        false
+        defend_pattern.has_three()
     }
 
     fn additional_reached(&self, four_pos: Pos) -> bool {

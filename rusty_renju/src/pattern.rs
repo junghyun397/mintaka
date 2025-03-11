@@ -50,8 +50,6 @@ impl PatternCount {
 
 }
 
-// packed in 8-bit: closed-4-1 closed-4-2 open-4 five open-3 close-3 overline open-3-direction
-// total 32bit
 #[derive(Debug, Copy, Clone, Default)]
 #[repr(C)]
 pub struct Pattern {
@@ -252,8 +250,6 @@ impl Patterns {
             idx = step_idx!(D, idx, 1);
             self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(0);
         }
-
-        self.unchecked_five_in_a_row = None;
 
         *slice.pattern_available.player_unit_mut::<C>() = false;
     }

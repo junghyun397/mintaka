@@ -1,5 +1,6 @@
 use crate::search_limit::SearchLimit;
 use rusty_renju::notation::pos;
+use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::value::Depth;
 use std::num::NonZeroUsize;
 
@@ -11,6 +12,7 @@ pub enum SearchObjective {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Config {
+    pub rule_kind: RuleKind,
     pub search_objective: SearchObjective,
 
     pub workers: NonZeroUsize,
@@ -24,6 +26,7 @@ impl Default for Config {
 
     fn default() -> Self {
         Config {
+            rule_kind: RuleKind::Renju,
             search_objective: SearchObjective::Best,
             workers: NonZeroUsize::new(1).unwrap(),
             search_limit: SearchLimit::Infinite,

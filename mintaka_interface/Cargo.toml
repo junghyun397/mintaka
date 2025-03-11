@@ -8,8 +8,8 @@ name = "pbrain_mintaka"
 path = "src/piskvork.rs"
 
 [[bin]]
-name = "mintaka_command_line"
-path = "src/command_line.rs"
+name = "mintaka_text_protocol"
+path = "src/text_protocol.rs"
 
 [dependencies]
 rusty_renju = { path = "../rusty_renju" }

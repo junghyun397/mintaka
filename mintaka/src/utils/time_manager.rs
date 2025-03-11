@@ -7,6 +7,18 @@ pub struct TimeManager {
     pub overhead: Duration,
 }
 
+impl Default for TimeManager {
+
+    fn default() -> Self {
+        Self {
+            total_remaining: Duration::from_secs(60 * 30),
+            increment: Duration::from_secs(30),
+            overhead: Duration::from_secs(30),
+        }
+    }
+
+}
+
 impl TimeManager {
 
     pub fn new(

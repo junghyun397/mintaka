@@ -192,6 +192,29 @@ impl FromStr for Board {
 
 }
 
+pub const BIN_BOARD_SIZE: usize = size_of::<[Bitfield; 2]>();
+
+impl From<&Board> for [u8; BIN_BOARD_SIZE] {
+
+    fn from(value: &Board) -> Self {
+        let mut black_field = Bitfield::default();
+        let mut white_field = Bitfield::default();
+
+        for row in 0 .. pos::U_BOARD_WIDTH {
+            for col in 0 .. pos::BOARD_WIDTH {
+                match value.slices.horizontal_slices[row].stone_kind(col) {
+                    Some(Color::Black) => { black_field.set_mut(Pos::from_cartesian(row as u8, col)) }
+                    Some(Color::White) => { white_field.set_mut(Pos::from_cartesian(row as u8, col)) }
+                    None => {}
+                }
+            }
+        }
+
+        unsafe { std::mem::transmute::<[[u8; 32]; 2], [u8; 64]>([black_field.0, white_field.0]) }
+    }
+
+}
+
 impl FromStr for Slice {
 
     type Err = &'static str;
