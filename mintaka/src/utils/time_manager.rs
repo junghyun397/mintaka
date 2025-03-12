@@ -34,31 +34,19 @@ impl TimeManager {
     }
 
     pub fn next_running_time(&self) -> Duration {
-        self.total_remaining / 20 + self.increment
+        (self.total_remaining / 20 + self.increment).min(self.overhead)
     }
 
-    pub fn consume(self, running_time: Duration) -> Self {
-        Self {
-            total_remaining: self.total_remaining - running_time,
-            increment: self.increment,
-            overhead: self.overhead,
-        }
+    pub fn consume_mut(&mut self, running_time: Duration) {
+        self.total_remaining = self.total_remaining - running_time;
     }
 
-    pub fn append(self, additional_time: Duration) -> Self {
-        Self {
-            total_remaining: self.total_remaining + additional_time,
-            increment: self.increment,
-            overhead: self.overhead,
-        }
+    pub fn append_mut(&mut self, additional_time: Duration) {
+        self.total_remaining = self.total_remaining + additional_time;
     }
 
-    pub fn subtract(self, revoked_time: Duration) -> Self {
-        Self {
-            total_remaining: self.total_remaining - revoked_time,
-            increment: self.increment,
-            overhead: self.overhead,
-        }
+    pub fn subtract_mut(&mut self, revoked_time: Duration) {
+        self.total_remaining = self.total_remaining - revoked_time;
     }
 
 }

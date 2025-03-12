@@ -6,11 +6,14 @@ pub trait ThreadType {
 
     fn make_response<F>(&self, produce: F) where F: FnOnce() -> Response;
 
+    fn time_limit_exceeded(&self) -> bool;
+
 }
 
-#[derive(Clone)]
 pub struct MainThread {
     pub response_channel: std::sync::mpsc::Sender<Response>,
+    pub start_time: std::time::Instant,
+    pub time_limit: std::time::Duration,
 }
 
 impl ThreadType for MainThread {
@@ -20,13 +23,20 @@ impl ThreadType for MainThread {
         let response = produce();
         self.response_channel.send(response).expect("sender channel closed.");
     }
+
+    fn time_limit_exceeded(&self) -> bool {
+        self.start_time.elapsed() > self.time_limit
+    }
 }
 
-#[derive(Clone)]
 pub struct WorkerThread;
 
 impl ThreadType for WorkerThread {
     const IS_MAIN: bool = false;
 
     fn make_response<F>(&self, _action: F) where F: FnOnce() -> Response { }
+
+    fn time_limit_exceeded(&self) -> bool {
+        false
+    }
 }

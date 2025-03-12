@@ -113,9 +113,8 @@ fn main() -> Result<(), &'static str> {
                     let pos = parse_pos(row, col)?;
 
                     let color = match color {
-                        "1" => agent.own_color,
+                        "1" | "3" => agent.own_color,
                         "2" => !agent.own_color,
-                        "3" => agent.own_color,
                         &_ => {
                             return Err("unknown color token.");
                         }
@@ -133,14 +132,14 @@ fn main() -> Result<(), &'static str> {
                 PiskvorkResponse::None
             },
             "INFO" => {
-                match *args.get(0).ok_or("missing info key.")? {
+                match parameters.get(0).copied().ok_or("missing info key.")? {
                     "timeout_match" | "time_left" => {
-                        agent.time_manager.total_remaining = parse_time(parameters)?;
+                        agent.set_remaining_time(parse_time(parameters)?);
 
                         PiskvorkResponse::Ok
                     },
                     "timeout_turn" => {
-                        agent.time_manager.overhead = parse_time(parameters)?;
+                        agent.set_overhead_time(parse_time(parameters)?);
 
                         PiskvorkResponse::Ok
                     },
@@ -231,7 +230,7 @@ fn spawn_response_subscriber(response_channel: std::sync::mpsc::Receiver<Respons
                     PiskvorkResponse::Info("status".to_string())
                 },
                 Response::Pv(pos, pv) => {
-                    PiskvorkResponse::Info("pv".to_string())
+                    todo!()
                 },
                 Response::BestMove(pos, _) => {
                     PiskvorkResponse::Pos(pos)
@@ -251,7 +250,7 @@ fn parse_pos(row: &str, col: &str) -> Result<Pos, &'static str> {
 }
 
 fn parse_time(parameters: &[&str]) -> Result<Duration, &'static str> {
-    parameters.get(0)
+    parameters.get(1)
         .ok_or("missing info value.")
         .and_then(|token| token
             .parse::<u64>()
