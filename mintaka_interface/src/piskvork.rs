@@ -1,37 +1,40 @@
-use crate::piskvork_game_manager::PiskvorkGameManager;
 use mintaka::config::Config;
-use mintaka::memo::history_table::HistoryTable;
-use mintaka::memo::transposition_table::TranspositionTable;
-use mintaka::utils::time_manager::TimeManager;
-use rusty_renju::board::Board;
-use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
-use rusty_renju::notation::color::Color;
+use mintaka::game_agent::GameAgent;
+use mintaka::protocol::command::Command;
+use mintaka::protocol::response::Response;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::rule::RuleKind;
 use std::time::Duration;
 
-mod piskvork_game_manager;
-
 enum PiskvorkResponse {
-    Info(&'static str),
-    Error(&'static str),
+    Info(String),
+    Error(String),
     Pos(Pos),
     Ok,
     None
 }
 
+fn stdio_out(piskvork_response: PiskvorkResponse) {
+    match piskvork_response {
+        PiskvorkResponse::Info(message) => {
+            println!("INFO {}", message);
+        },
+        PiskvorkResponse::Error(message) => {
+            println!("ERROR {}", message);
+        },
+        PiskvorkResponse::Ok => {
+            println!("OK");
+        },
+        PiskvorkResponse::Pos(pos) => {
+            println!("{} {}", pos.row() + 1, pos.col() + 1);
+        },
+        PiskvorkResponse::None => {},
+    };
+}
+
 fn main() -> Result<(), &'static str> {
-    let manager = PiskvorkGameManager {};
-
-    let mut config = Config::default();
-    let mut time_manager = TimeManager::default();
-
-    let mut transposition_table = TranspositionTable::new_with_size(1024 * 16);
-    let mut history_table = HistoryTable {};
-
-    let mut own_color = Color::Black;
-    let mut board = Board::default();
+    let mut agent = GameAgent::new(Config::default());
 
     loop {
         let mut buf = String::new();
@@ -47,41 +50,49 @@ fn main() -> Result<(), &'static str> {
         let parameters = &args[1..];
 
         // https://plastovicka.github.io/protocl2en.htm
+        // https://github.com/accreator/Yixin-protocol/blob/master/protocol.pdf
         let piskvork_response = match command {
             "START" => {
                 let size: usize = parameters[0].parse().map_err(|_| "size parsing failed.")?;
                 if size == pos::U_BOARD_WIDTH {
                     PiskvorkResponse::Ok
                 } else {
-                    PiskvorkResponse::Error("unsupported size or other error")
+                    PiskvorkResponse::Error("unsupported size or other error".to_string())
                 }
             },
             "RECTSTART" => {
-                PiskvorkResponse::Error("rectangular board is not supported or other error")
+                PiskvorkResponse::Error("rectangular board is not supported or other error".to_string())
             }
             "BEGIN" => {
-                // launch
-                PiskvorkResponse::Pos(Pos::from_str_unchecked("h8"))
+                let channel = agent.launch();
+                spawn_response_subscriber(channel);
+
+                PiskvorkResponse::None
             },
             "TURN" => {
-                let pos = Pos::from_cartesian(
-                    parameters[0].parse::<u8>().map_err(|_| "row parsing failed.")? - 1,
-                    parameters[1].parse::<u8>().map_err(|_| "column parsing failed.")? - 1
-                );
+                let pos = parse_pos(
+                    parameters.get(0).ok_or("missing row token.")?,
+                    parameters.get(1).ok_or("missing column token.")?
+                )?;
 
-                // launch
-                PiskvorkResponse::Pos(Pos::from_str_unchecked("h8"))
+                agent.set(pos, !agent.own_color);
+
+                let channel = agent.launch();
+                spawn_response_subscriber(channel);
+
+                PiskvorkResponse::None
             },
             "TAKEBACK" => {
-                let pos = Pos::from_cartesian(
-                    parameters[0].parse::<u8>().map_err(|_| "row parsing failed.")? - 1,
-                    parameters[1].parse::<u8>().map_err(|_| "column parsing failed.")? - 1
-                );
+                let pos = parse_pos(
+                    parameters.get(0).ok_or("missing row token.")?,
+                    parameters.get(1).ok_or("missing column token.")?
+                )?;
 
-                // undo
+                agent.unset(pos, !agent.own_color);
+
                 PiskvorkResponse::Ok
             },
-            "BOARD" => {
+            "BOARD" | "YXBOARD" => {
                 const DONE_TOKEN: &str = "DONE";
 
                 loop {
@@ -99,58 +110,45 @@ fn main() -> Result<(), &'static str> {
                         .map_err(|_| "token parsing failed.")
                         ?;
 
-                    let pos = Pos::from_cartesian(
-                        row.parse::<u8>().map_err(|e| "row parsing failed.")? - 1,
-                        col.parse::<u8>().map_err(|e| "column parsing failed.")? - 1,
-                    );
+                    let pos = parse_pos(row, col)?;
 
                     let color = match color {
-                        "1" => own_color,
-                        "2" => !own_color,
-                        "3" => own_color,
+                        "1" => agent.own_color,
+                        "2" => !agent.own_color,
+                        "3" => agent.own_color,
                         &_ => {
                             return Err("unknown color token.");
                         }
                     };
 
-                    board.set_mut(pos);
+                    agent.set(pos, color);
                 }
 
-                // launch
-                PiskvorkResponse::Pos(Pos::from_str_unchecked("h8"))
+                let channel = agent.launch();
+                spawn_response_subscriber(channel);
+
+                PiskvorkResponse::None
             },
             "END" => {
                 PiskvorkResponse::None
             },
             "INFO" => {
-                fn parse_time(parameters: &[&str]) -> Result<Duration, &'static str> {
-                    parameters.get(0)
-                        .ok_or("missing info value.")
-                        .and_then(|token| token
-                            .parse::<u64>()
-                            .map_err(|_| "time parsing failed.")
-                        )
-                        .map(Duration::from_millis)
-                }
-
                 match *args.get(0).ok_or("missing info key.")? {
                     "timeout_match" | "time_left" => {
-                        time_manager.total_remaining = parse_time(parameters)?;
+                        agent.time_manager.total_remaining = parse_time(parameters)?;
 
                         PiskvorkResponse::Ok
                     },
                     "timeout_turn" => {
-                        time_manager.overhead = parse_time(parameters)?;
+                        agent.time_manager.overhead = parse_time(parameters)?;
 
                         PiskvorkResponse::Ok
                     },
                     "max_memory" => {
-                        const MEMORY_MARGIN_IN_KIB: usize = 1024 * 50;
-
                         let max_memory_in_bytes: usize =
                             parameters.get(0).expect("missing info value.").parse().unwrap();
 
-                        transposition_table.resize_mut(max_memory_in_bytes / 1024 - MEMORY_MARGIN_IN_KIB);
+                        agent.resize_tt(max_memory_in_bytes / 1024);
 
                         PiskvorkResponse::Ok
                     },
@@ -160,7 +158,7 @@ fn main() -> Result<(), &'static str> {
                             .chars().next().unwrap()
                         {
                             '0' ..= '3' => PiskvorkResponse::Ok,
-                            _ => PiskvorkResponse::Error("unknown game type."),
+                            _ => PiskvorkResponse::Error("unknown game type.".to_string()),
                         }
                     },
                     "rule" => {
@@ -170,14 +168,14 @@ fn main() -> Result<(), &'static str> {
                             .count_ones()
                         {
                             1 => {
-                                config.rule_kind = RuleKind::FiveInARow;
+                                agent.config.rule_kind = RuleKind::FiveInARow;
                                 PiskvorkResponse::Ok
                             },
                             4 => {
-                                config.rule_kind = RuleKind::Renju;
+                                agent.config.rule_kind = RuleKind::Renju;
                                 PiskvorkResponse::Ok
                             }
-                            _ => PiskvorkResponse::Error("unsupported rule."),
+                            _ => PiskvorkResponse::Error("unsupported rule.".to_string()),
                         }
                     },
                     "evaluate" => {
@@ -187,9 +185,14 @@ fn main() -> Result<(), &'static str> {
                         PiskvorkResponse::Ok
                     },
                     &_ => {
-                        PiskvorkResponse::Error("unsupported info key.")
+                        PiskvorkResponse::Error("unsupported info key.".to_string())
                     }
                 }
+            },
+            "YXSTOP" => {
+                agent.command(Command::Abort);
+
+                PiskvorkResponse::None
             },
             "YXHASHCLEAR" => {
                 PiskvorkResponse::None
@@ -202,28 +205,57 @@ fn main() -> Result<(), &'static str> {
             },
             "ABOUT" =>
                 PiskvorkResponse::Info(
-                    "name=\"mintaka\",\
-                    author=\"JeongHyeon Choi\",\
-                    version=\"0.9.0 pre-alpha\",\
-                    country=\"KOR\""
+                    format!(
+                        "name=\"mintaka\",\
+                        author=\"JeongHyeon Choi\",\
+                        version=\"{}\",\
+                        country=\"KOR\"",
+                        mintaka::VERSION
+                    ).to_string()
                 ),
-            &_ => PiskvorkResponse::Error("unknown command.")
+            &_ => PiskvorkResponse::Error("unknown command.".to_string())
         };
 
-        match piskvork_response {
-            PiskvorkResponse::Info(message) => {
-                println!("INFO {}", message);
-            },
-            PiskvorkResponse::Error(message) => {
-                println!("ERROR {}", message);
-            },
-            PiskvorkResponse::Ok => {
-                println!("OK");
-            },
-            PiskvorkResponse::Pos(pos) => {
-                println!("{} {}", pos.row() + 1, pos.col() + 1);
-            },
-            PiskvorkResponse::None => {},
-        };
+        stdio_out(piskvork_response);
     }
+}
+
+fn spawn_response_subscriber(response_channel: std::sync::mpsc::Receiver<Response>) {
+    std::thread::spawn(move || {
+        for response in response_channel {
+            let piskvork_response = match response {
+                Response::Info(message) => PiskvorkResponse::Info(message),
+                Response::Warning(message) => PiskvorkResponse::Info(message),
+                Response::Error(message) => PiskvorkResponse::Error(message),
+                Response::Status(status) => {
+                    PiskvorkResponse::Info("status".to_string())
+                },
+                Response::Pv(pos, pv) => {
+                    PiskvorkResponse::Info("pv".to_string())
+                },
+                Response::BestMove(pos, _) => {
+                    PiskvorkResponse::Pos(pos)
+                },
+            };
+
+            stdio_out(piskvork_response);
+        }
+    });
+}
+
+fn parse_pos(row: &str, col: &str) -> Result<Pos, &'static str> {
+    Ok(Pos::from_cartesian(
+        row.parse::<u8>().map_err(|e| "row parsing failed.")? - 1,
+        col.parse::<u8>().map_err(|e| "column parsing failed.")? - 1,
+    ))
+}
+
+fn parse_time(parameters: &[&str]) -> Result<Duration, &'static str> {
+    parameters.get(0)
+        .ok_or("missing info value.")
+        .and_then(|token| token
+            .parse::<u64>()
+            .map_err(|_| "time parsing failed.")
+        )
+        .map(Duration::from_millis)
 }

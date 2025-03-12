@@ -15,7 +15,6 @@ pub mod search;
 pub mod principal_variation;
 pub mod nnue;
 pub mod thread_data;
-pub mod launch;
 pub mod thread_type;
 pub mod batch_counter;
 pub mod search_limit;
@@ -23,3 +22,6 @@ pub mod aspiration_window;
 pub mod search_frame;
 pub mod game_state;
 pub mod movegen;
+pub mod game_agent;
+
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -9,7 +9,7 @@ mod bench_vcf {
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
     use mintaka::thread_data::ThreadData;
-    use mintaka::thread_type::ThreadType;
+    use mintaka::thread_type::WorkerThread;
     use rusty_renju::board::Board;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use rusty_renju::notation::value::Score;
@@ -29,7 +29,7 @@ mod bench_vcf {
             let global_counter_in_1k = AtomicUsize::new(0);
             let global_aborted = AtomicBool::new(false);
 
-            let td = ThreadData::new(ThreadType::Main, 0, config, tt.view(), ht, &global_aborted, &global_counter_in_1k);
+            let td = ThreadData::new(WorkerThread, 0, config, tt.view(), ht, &global_aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
                 let result = vcf::vcf_search(&mut td.clone(), &board, u8::MAX);

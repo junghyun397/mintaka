@@ -10,10 +10,9 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 #[derive(Clone)]
-pub struct ThreadData<'a> {
-    pub thread_type: ThreadType,
+pub struct ThreadData<'a, TH: ThreadType> {
+    pub thread_type: TH,
     pub tid: usize,
-
     pub config: Config,
 
     pub tt: TTView<'a>,
@@ -26,10 +25,10 @@ pub struct ThreadData<'a> {
     created_time: Instant,
 }
 
-impl<'a> ThreadData<'a> {
+impl<'a, TH: ThreadType> ThreadData<'a, TH> {
 
     pub fn new(
-        thread_type: ThreadType, tid: usize,
+        thread_type: TH, tid: usize,
         config: Config,
         tt: TTView<'a>,
         ht: HistoryTable,

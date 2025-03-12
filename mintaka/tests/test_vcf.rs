@@ -6,7 +6,7 @@ mod test_vcf {
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
     use mintaka::thread_data::ThreadData;
-    use mintaka::thread_type::ThreadType;
+    use mintaka::thread_type::WorkerThread;
     use rusty_renju::board::Board;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use rusty_renju::notation::pos::Pos;
@@ -24,7 +24,7 @@ mod test_vcf {
             let global_counter_in_1k = AtomicUsize::new(0);
             let global_aborted = AtomicBool::new(false);
 
-            let mut td = ThreadData::new(ThreadType::Main, 0, config, tt.view(), ht, &global_aborted, &global_counter_in_1k);
+            let mut td = ThreadData::new(WorkerThread, 0, config, tt.view(), ht, &global_aborted, &global_counter_in_1k);
             let vcf_result = vcf::vcf_sequence(&mut td, &board, u8::MAX).unwrap();
             let time = td.running_time();
 

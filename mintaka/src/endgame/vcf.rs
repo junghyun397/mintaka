@@ -2,6 +2,7 @@ use crate::endgame::accumulator::{EndgameAccumulator, SequenceEndgameAccumulator
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind, TTEntry, TTFlag};
 use crate::movegen::move_generator::{generate_vcf_moves, VcfMoves};
 use crate::thread_data::ThreadData;
+use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
@@ -52,7 +53,7 @@ pub struct VcfFrame {
 }
 
 pub fn vcf_search(
-    td: &mut ThreadData,
+    td: &mut ThreadData<impl ThreadType>,
     board: &Board, max_depth: Depth,
 ) -> Score {
     let vcf_moves = generate_vcf_moves(&board, board.player_color, Score::DISTANCE_WINDOW, pos::CENTER);
@@ -61,7 +62,7 @@ pub fn vcf_search(
 }
 
 pub fn vcf_defend(
-    td: &mut ThreadData,
+    td: &mut ThreadData<impl ThreadType>,
     board: &Board, max_depth: Depth,
     target_pos: Pos
 ) -> Score {
@@ -71,7 +72,7 @@ pub fn vcf_defend(
 }
 
 pub fn vcf_sequence(
-    td: &mut ThreadData,
+    td: &mut ThreadData<impl ThreadType>,
     board: &Board, max_depth: Depth
 ) -> Option<Vec<Pos>> {
     let vcf_moves = generate_vcf_moves(&board, board.player_color, 8, pos::CENTER);
@@ -84,7 +85,7 @@ pub fn vcf_sequence(
 }
 
 fn vcf<ACC: EndgameAccumulator>(
-    td: &mut ThreadData, dest: impl VcfDestination,
+    td: &mut ThreadData<impl ThreadType>, dest: impl VcfDestination,
     board: &Board, vcf_moves: VcfMoves, max_depth: Depth
 ) -> ACC {
     let board = *board;
@@ -96,7 +97,7 @@ fn vcf<ACC: EndgameAccumulator>(
 
 // depth-first search
 fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
-    td: &mut ThreadData, dest: impl VcfDestination,
+    td: &mut ThreadData<impl ThreadType>, dest: impl VcfDestination,
     mut board: Board, mut vcf_moves: VcfMoves,
     max_depth: Depth, mut vcf_ply: Depth,
 ) -> ACC {
@@ -104,7 +105,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
     #[inline]
     fn backtrace_frames<ACC: EndgameAccumulator>(
-        td: &mut ThreadData,
+        td: &mut ThreadData<impl ThreadType>,
         board: Board, depth: Depth, four_pos: Pos
     ) -> ACC {
         let mut result = ACC::unit(four_pos);

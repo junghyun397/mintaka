@@ -20,3 +20,5 @@ pub mod slice_pattern;
 pub mod board_iter;
 pub mod bitfield;
 pub mod history;
+
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");

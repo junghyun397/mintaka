@@ -1,6 +1,7 @@
 use crate::endgame::accumulator::{EndgameAccumulator, SequenceEndgameAccumulator};
 use crate::memo::tt_entry::TTEntry;
 use crate::thread_data::ThreadData;
+use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
@@ -19,14 +20,14 @@ pub(crate) struct VCTFrame {
 }
 
 pub fn vct_search(
-    td: &mut ThreadData,
+    td: &mut ThreadData<impl ThreadType>,
     board: &Board, max_depth: Depth
 ) -> Score {
     vct::<Score>(td, board, max_depth)
 }
 
 pub fn vct_sequence(
-    td: &mut ThreadData,
+    td: &mut ThreadData<impl ThreadType>,
     board: &Board, max_depth: Depth
 ) -> Option<Vec<Pos>> {
     vct::<SequenceEndgameAccumulator>(td, board, max_depth)
@@ -37,7 +38,7 @@ pub fn vct_sequence(
 }
 
 fn vct<ACC: EndgameAccumulator>(
-    td: &mut ThreadData,
+    td: &mut ThreadData<impl ThreadType>,
     board: &Board, max_depth: Depth
 ) -> ACC {
     let mut board = *board;
@@ -49,7 +50,7 @@ fn vct<ACC: EndgameAccumulator>(
 
 // depth-first proof-number search
 fn try_vct<const C: Color, ACC: EndgameAccumulator>(
-    td: &mut ThreadData,
+    td: &mut ThreadData<impl ThreadType>,
     mut board: Board,
     max_depth: Depth, mut depth: Depth, mut opponent_has_open_four: bool, mut opponent_has_five: bool,
 ) -> ACC {
@@ -59,7 +60,7 @@ fn try_vct<const C: Color, ACC: EndgameAccumulator>(
 
     #[inline]
     fn backtrace_frames<ACC: EndgameAccumulator>(
-        td: &mut ThreadData, mut stack: SmallVec<VCTFrame, 32>,
+        td: &mut ThreadData<impl ThreadType>, mut stack: SmallVec<VCTFrame, 32>,
         board: Board, depth: Depth, killer_pos: Pos
     ) -> ACC {
         let mut result = ACC::unit(killer_pos);

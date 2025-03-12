@@ -32,8 +32,8 @@ struct OffPVNode; impl NodeType for OffPVNode {
     type NextType = Self;
 }
 
-pub fn iterative_deepening<const TH: ThreadType>(
-    td: &mut ThreadData,
+pub fn iterative_deepening<TH: ThreadType>(
+    td: &mut ThreadData<TH>,
     state: &mut GameState,
 ) -> (Pos, Score) {
     let mut best_move = Pos::INVALID;
@@ -49,16 +49,16 @@ pub fn iterative_deepening<const TH: ThreadType>(
     (best_move, score)
 }
 
-pub fn aspiration<const TH: ThreadType>(
-    td: &mut ThreadData,
+pub fn aspiration<TH: ThreadType>(
+    td: &mut ThreadData<TH>,
     state: &mut GameState,
     pv: &mut PrincipalVariation,
 ) {
     todo!()
 }
 
-pub fn pvs<NT: NodeType>(
-    td: &mut ThreadData,
+pub fn pvs<NT: NodeType, TH: ThreadType>(
+    td: &mut ThreadData<TH>,
     pv: &mut PrincipalVariation,
     state: &mut GameState,
     mut depth: Depth,
@@ -75,7 +75,7 @@ pub fn pvs<NT: NodeType>(
     if NT::IS_PV {
     }
 
-    let beta = -pvs::<NT::NextType>(td, pv, state, depth, alpha, beta);
+    let beta = -pvs::<NT::NextType, TH>(td, pv, state, depth, alpha, beta);
 
     0
 }
