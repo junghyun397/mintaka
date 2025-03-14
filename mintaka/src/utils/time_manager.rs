@@ -4,7 +4,7 @@ use std::time::Duration;
 pub struct TimeManager {
     pub total_remaining: Duration,
     pub increment: Duration,
-    pub overhead: Duration,
+    pub turn: Duration,
 }
 
 impl Default for TimeManager {
@@ -13,7 +13,7 @@ impl Default for TimeManager {
         Self {
             total_remaining: Duration::from_secs(60 * 30),
             increment: Duration::from_secs(30),
-            overhead: Duration::from_secs(30),
+            turn: Duration::from_secs(30),
         }
     }
 
@@ -29,12 +29,12 @@ impl TimeManager {
         Self {
             total_remaining: total_time,
             increment,
-            overhead,
+            turn: overhead,
         }
     }
 
     pub fn next_running_time(&self) -> Duration {
-        (self.total_remaining / 20 + self.increment).min(self.overhead)
+        (self.total_remaining / 20 + self.increment).min(self.turn)
     }
 
     pub fn consume_mut(&mut self, running_time: Duration) {

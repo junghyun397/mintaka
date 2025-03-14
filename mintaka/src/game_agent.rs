@@ -8,11 +8,12 @@ use crate::search;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::utils::time_manager::TimeManager;
-use rusty_renju::history::History;
+use rusty_renju::history::{Action, History};
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::Pos;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
+use std::sync::mpsc;
 use std::time::Duration;
 
 pub struct GameAgent {
@@ -24,6 +25,7 @@ pub struct GameAgent {
     tt: TranspositionTable,
     ht: HistoryTable,
     global_aborted: AtomicBool,
+    best_move: AtomicU8,
 }
 
 impl GameAgent {
@@ -38,37 +40,28 @@ impl GameAgent {
             tt: TranspositionTable::new_with_size(1024 * 16),
             ht: HistoryTable {},
             global_aborted: AtomicBool::new(false),
+            best_move: AtomicU8::new(Pos::INVALID.idx()),
         }
     }
 
-    pub fn command(&mut self, command: Command) {
-        match command {
-            Command::Status => {
-                todo!()
-            }
-            Command::Abort => {
-                self.global_aborted.store(true, Ordering::Relaxed);
-            }
-        }
-    }
-
-    pub fn launch(&mut self) -> std::sync::mpsc::Receiver<Response> {
+    pub fn launch(&mut self, runtime_commander: mpsc::Receiver<Command>) -> mpsc::Receiver<Response> {
         self.tt.increase_age();
 
         self.global_aborted.store(true, Ordering::Relaxed);
         let global_counter_in_1k = AtomicUsize::new(0);
 
-        let (response_sender, response_receiver) = std::sync::mpsc::channel();
+        let (response_sender, response_receiver) = mpsc::channel();
 
         let running_time = self.time_manager.next_running_time();
         self.time_manager.consume_mut(running_time);
 
         let mut main_td = ThreadData::new(
-            MainThread {
-                response_channel: response_sender.clone(),
-                start_time: std::time::Instant::now(),
-                time_limit: running_time,
-            },
+            MainThread::new(
+                runtime_commander,
+                response_sender.clone(),
+                std::time::Instant::now(),
+                running_time
+            ),
             0,
             self.config,
             self.tt.view(),
@@ -77,9 +70,13 @@ impl GameAgent {
         );
 
         std::thread::scope(|s| {
+            let mut state = self.state.clone();
+            let mut atomic_best_move = &self.best_move;
 
-            s.spawn(|| {
-                let (best_move, score) = search::iterative_deepening(&mut main_td, &mut self.state.clone());
+            s.spawn(move || {
+                let (best_move, score) = search::iterative_deepening(&mut main_td, &mut state);
+
+                atomic_best_move.store(0, Ordering::Relaxed);
 
                 response_sender.send(Response::BestMove(best_move, score)).expect("sender channel closed.");
             });
@@ -104,28 +101,77 @@ impl GameAgent {
         response_receiver
     }
 
-    pub fn set(&mut self, pos: Pos, color: Color) {
-        self.state.board.player_color = color;
+    pub fn recent_pos(&self) -> Option<Pos> {
+        self.history.0.last().and_then(|action| {
+            if let Action::Move(pos) = action {
+                Some(*pos)
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn play(&mut self, pos: Pos) {
         self.state.board.set_mut(pos);
     }
 
-    pub fn unset(&mut self, pos: Pos, color: Color) {
-        self.state.board.player_color = !color;
-        self.state.board.unset_mut(pos);
+    pub fn undo(&mut self) {
+        if let Some(action) = self.history.0.pop() {
+            match action {
+                Action::Move(pos) => {
+                    self.state.board.unset_mut(pos);
+                },
+                Action::Pass => {
+                    self.state.board.switch_player_mut();
+                }
+            }
+        }
+    }
+
+    pub fn pass(&mut self) {
+        self.state.board.pass_mut();
+        self.history.pass_mut();
+    }
+
+    pub fn switch_color(&mut self) {
+        self.own_color = !self.own_color;
+    }
+
+    pub fn batch_set(&mut self, black_stones: Box<[Pos]>, white_stones: Box<[Pos]>, player_color: Color) {
+        self.state.board.batch_set_each_color_mut(black_stones, white_stones, player_color)
     }
 
     pub fn set_remaining_time(&mut self, remaining_time: Duration) {
         self.time_manager.total_remaining = remaining_time;
     }
 
-    pub fn set_overhead_time(&mut self, overhead_time: Duration) {
-        self.time_manager.overhead = overhead_time;
+    pub fn set_turn_time(&mut self, turn_time: Duration) {
+        self.time_manager.turn = turn_time;
     }
 
     pub fn resize_tt(&mut self, size_in_kib: usize) {
         const MEMORY_MARGIN_IN_KIB: usize = 1024 * 10;
 
         self.tt.resize_mut(size_in_kib - MEMORY_MARGIN_IN_KIB);
+    }
+
+}
+
+pub struct RuntimeCommander<'a> {
+    global_aborted: &'a AtomicBool,
+}
+
+impl RuntimeCommander<'_> {
+
+    pub fn command(&self, command: Command) {
+        match command {
+            Command::Status => {
+                todo!()
+            }
+            Command::Abort => {
+                self.global_aborted.store(true, Ordering::Relaxed);
+            }
+        }
     }
 
 }

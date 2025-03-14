@@ -4,10 +4,9 @@ use crate::endgame::vcf::VcfFrame;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::search_frame::SearchFrame;
-use crate::search_limit::{NodeCount, SearchLimit, TimeBound};
 use crate::thread_type::ThreadType;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[derive(Clone)]
 pub struct ThreadData<'a, TH: ThreadType> {
@@ -22,7 +21,6 @@ pub struct ThreadData<'a, TH: ThreadType> {
 
     pub batch_counter: BatchCounter<'a>,
     global_aborted: &'a AtomicBool,
-    created_time: Instant,
 }
 
 impl<'a, TH: ThreadType> ThreadData<'a, TH> {
@@ -44,33 +42,15 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
             vcf_stack: Vec::with_capacity(32),
             batch_counter: BatchCounter::new(global_counter_in_1k),
             global_aborted,
-            created_time: Instant::now(),
         }
-    }
-
-    pub fn running_time(&self) -> Duration {
-        self.created_time.elapsed()
     }
 
     pub fn is_aborted(&self) -> bool {
         self.global_aborted.load(Ordering::Relaxed)
     }
 
-    pub fn limit_reached(&self) -> bool {
-        match self.config.search_limit {
-            SearchLimit::Nodes(NodeCount { nodes_in_1k }) =>
-                self.batch_counter.count_global() >= nodes_in_1k,
-            SearchLimit::Time(TimeBound { duration }) =>
-                self.created_time.elapsed() >= duration,
-            SearchLimit::Complex(complex) =>
-                self.batch_counter.count_global() >= complex.node_count.nodes_in_1k ||
-                self.created_time.elapsed() >= complex.time_bound.duration,
-            SearchLimit::Infinite => false,
-        }
-    }
-
-    pub fn calculate_tps(&self) -> f64 {
-        let elapsed = self.created_time.elapsed().as_secs_f64();
+    pub fn calculate_tps(&self, elapsed: Duration) -> f64 {
+        let elapsed = elapsed.as_secs_f64();
         let nodes = self.batch_counter.count_global() as f64;
         nodes / elapsed
     }

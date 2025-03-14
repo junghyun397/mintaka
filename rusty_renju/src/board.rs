@@ -115,7 +115,7 @@ impl Board {
         self.hash_key = HashKey::from(&self.slices.horizontal_slices);
     }
 
-    fn switch_player_mut(&mut self) {
+    pub fn switch_player_mut(&mut self) {
         self.player_color = self.opponent_color();
     }
 

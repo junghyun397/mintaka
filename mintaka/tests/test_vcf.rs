@@ -25,8 +25,9 @@ mod test_vcf {
             let global_aborted = AtomicBool::new(false);
 
             let mut td = ThreadData::new(WorkerThread, 0, config, tt.view(), ht, &global_aborted, &global_counter_in_1k);
+            let time = std::time::Instant::now();
             let vcf_result = vcf::vcf_sequence(&mut td, &board, u8::MAX).unwrap();
-            let time = td.running_time();
+            let time = time.elapsed();
 
             board.batch_set_mut(&vcf_result.clone().into_boxed_slice());
             let last_move = vcf_result.last().copied().unwrap();

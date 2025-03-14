@@ -65,7 +65,7 @@ pub fn pvs<NT: NodeType, TH: ThreadType>(
     mut alpha: Score,
     mut beta: Score,
 ) -> Score {
-    if td.is_aborted() || td.limit_reached() {
+    if td.is_aborted() {
         return 0;
     }
 

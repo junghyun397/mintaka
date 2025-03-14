@@ -1,4 +1,3 @@
-use crate::search_limit::SearchLimit;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::value::Depth;
@@ -16,10 +15,12 @@ pub struct Config {
     pub search_objective: SearchObjective,
 
     pub workers: NonZeroUsize,
-    pub search_limit: SearchLimit,
 
     pub max_vcf_depth: Depth,
     pub max_ply: u8,
+
+    pub report_search_status: bool,
+    pub report_main_pv: bool,
 }
 
 impl Default for Config {
@@ -29,9 +30,10 @@ impl Default for Config {
             rule_kind: RuleKind::Renju,
             search_objective: SearchObjective::Best,
             workers: NonZeroUsize::new(1).unwrap(),
-            search_limit: SearchLimit::Infinite,
             max_vcf_depth: pos::U8_BOARD_SIZE,
             max_ply: u8::MAX,
+            report_search_status: false,
+            report_main_pv: false,
         }
     }
 
