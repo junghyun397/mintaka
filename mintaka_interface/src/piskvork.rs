@@ -2,8 +2,8 @@ mod stdio_utils;
 
 use mintaka::config::Config;
 use mintaka::game_agent::GameAgent;
-use mintaka::protocol::command::Command;
 use mintaka::protocol::response::Response;
+use mintaka::protocol::runtime_command::RuntimeCommand;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
@@ -39,7 +39,7 @@ fn stdio_out(piskvork_response: PiskvorkResponse) {
 
 fn main() -> Result<(), &'static str> {
     let mut game_agent = GameAgent::new(Config::default());
-    let mut runtime_commander: Option<mpsc::Sender<Command>> = None;
+    let mut runtime_commander: Option<mpsc::Sender<RuntimeCommand>> = None;
 
     loop {
         let args = stdio_utils::read_line();
@@ -52,7 +52,7 @@ fn main() -> Result<(), &'static str> {
             Some(command_sender) => {
                 match args[0].as_str() {
                     "YXSTOP" => {
-                        command_sender.send(Command::Abort).unwrap();
+                        command_sender.send(RuntimeCommand::Abort).unwrap();
                         runtime_commander = None;
                         PiskvorkResponse::None
                     },

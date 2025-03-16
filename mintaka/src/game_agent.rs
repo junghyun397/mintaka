@@ -4,6 +4,7 @@ use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::protocol::command::Command;
 use crate::protocol::response::Response;
+use crate::protocol::runtime_command::RuntimeCommand;
 use crate::search;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
@@ -12,6 +13,7 @@ use rusty_renju::history::{Action, History};
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::rule::RuleKind;
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::time::Duration;
@@ -20,6 +22,7 @@ pub struct GameAgent {
     pub config: Config,
     pub own_color: Color,
     pub state: GameState,
+    pub rule: RuleKind,
     history: History,
     time_manager: TimeManager,
     tt: TranspositionTable,
@@ -35,6 +38,7 @@ impl GameAgent {
             own_color: Color::Black,
             config,
             state: GameState::default(),
+            rule: RuleKind::Renju,
             history: History::default(),
             time_manager: TimeManager::default(),
             tt: TranspositionTable::new_with_size(1024 * 16),
@@ -44,7 +48,42 @@ impl GameAgent {
         }
     }
 
-    pub fn launch(&mut self, runtime_commander: mpsc::Receiver<Command>) -> mpsc::Receiver<Response> {
+    pub fn command(&mut self, command: Command) {
+        match command {
+            Command::Play(action) => {
+                match action {
+                    Action::Move(pos) => {
+                        self.state.board.set_mut(pos);
+                        self.history.play_mut(pos);
+                    }
+                    Action::Pass => {
+                        self.state.board.pass_mut();
+                        self.history.pass_mut();
+                    }
+                }
+            }
+            Command::Set { pos, color } => {
+                todo!()
+            }
+            Command::Unset { pos, color } => {
+                todo!()
+            }
+            Command::Undo => {
+                todo!()
+            }
+            Command::TotalTime(time) => {
+                self.time_manager.total_remaining = time;
+            }
+            Command::TurnTime(time) => {
+                self.time_manager.turn = time;
+            }
+            Command::Rule(kind) => {
+                self.rule = kind;
+            }
+        }
+    }
+
+    pub fn launch(&mut self, runtime_commander: mpsc::Receiver<RuntimeCommand>) -> mpsc::Receiver<Response> {
         self.tt.increase_age();
 
         self.global_aborted.store(true, Ordering::Relaxed);
@@ -163,12 +202,12 @@ pub struct RuntimeCommander<'a> {
 
 impl RuntimeCommander<'_> {
 
-    pub fn command(&self, command: Command) {
+    pub fn command(&self, command: RuntimeCommand) {
         match command {
-            Command::Status => {
+            RuntimeCommand::Status => {
                 todo!()
             }
-            Command::Abort => {
+            RuntimeCommand::Abort => {
                 self.global_aborted.store(true, Ordering::Relaxed);
             }
         }

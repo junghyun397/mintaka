@@ -65,6 +65,10 @@ mod bench_vcf {
     }
 
     #[bench]
+    fn white_reject_vcf(b: &mut Bencher) {
+    }
+
+    #[bench]
     fn black_vcf(b: &mut Bencher) {
         let case = indoc! {"\
            A B C D E F G H I J K L M N O
@@ -88,6 +92,11 @@ mod bench_vcf {
 
         bench_vcf!(b, case, Score::MAX);
     }
+
+    #[bench]
+    fn black_reject_vcf(b: &mut Bencher) {
+    }
+
 }
 
 mod bench_vct {
