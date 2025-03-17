@@ -10,7 +10,6 @@ pub enum Response {
     Error(String),
 
     Status {
-        nps: f64,
         total_nodes_in_1k: usize,
         hash_usage: f64,
         best_moves: Vec<(Pos, Score)>,

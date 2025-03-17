@@ -14,3 +14,4 @@ path = "src/text_protocol.rs"
 [dependencies]
 rusty_renju = { path = "../rusty_renju" }
 mintaka = { path = "../mintaka" }
+crossbeam-channel = "0.5.14"

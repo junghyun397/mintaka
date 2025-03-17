@@ -31,6 +31,13 @@ pub struct GameAgent {
     best_move: AtomicU8,
 }
 
+pub enum GameCommand {
+    Command(Command),
+    RuntimeCommand(RuntimeCommand),
+    Launch,
+    Quite,
+}
+
 impl GameAgent {
 
     pub fn new(config: Config) -> Self {
@@ -61,25 +68,32 @@ impl GameAgent {
                         self.history.pass_mut();
                     }
                 }
-            }
+            },
             Command::Set { pos, color } => {
                 todo!()
-            }
+            },
             Command::Unset { pos, color } => {
                 todo!()
-            }
+            },
             Command::Undo => {
                 todo!()
-            }
+            },
             Command::TotalTime(time) => {
                 self.time_manager.total_remaining = time;
-            }
+            },
             Command::TurnTime(time) => {
                 self.time_manager.turn = time;
-            }
+            },
+            Command::IncrementTime(time) => {
+                self.time_manager.increment = time;
+            },
             Command::Rule(kind) => {
                 self.rule = kind;
-            }
+            },
+            Command::MaxMemory { in_kib } => {
+                const HEAP_MEMORY_MARGIN_IN_KIB: usize = 1024 * 10;
+                self.tt.resize_mut(in_kib + HEAP_MEMORY_MARGIN_IN_KIB);
+            },
         }
     }
 
@@ -192,25 +206,6 @@ impl GameAgent {
         const MEMORY_MARGIN_IN_KIB: usize = 1024 * 10;
 
         self.tt.resize_mut(size_in_kib - MEMORY_MARGIN_IN_KIB);
-    }
-
-}
-
-pub struct RuntimeCommander<'a> {
-    global_aborted: &'a AtomicBool,
-}
-
-impl RuntimeCommander<'_> {
-
-    pub fn command(&self, command: RuntimeCommand) {
-        match command {
-            RuntimeCommand::Status => {
-                todo!()
-            }
-            RuntimeCommand::Abort => {
-                self.global_aborted.store(true, Ordering::Relaxed);
-            }
-        }
     }
 
 }

@@ -17,5 +17,7 @@ pub enum Command {
     Undo,
     TotalTime(Duration),
     TurnTime(Duration),
+    IncrementTime(Duration),
+    MaxMemory { in_kib: usize },
     Rule(RuleKind),
 }
