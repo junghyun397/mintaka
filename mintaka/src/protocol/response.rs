@@ -11,8 +11,8 @@ pub enum Response {
 
     Status {
         total_nodes_in_1k: usize,
-        hash_usage: f64,
         best_moves: Vec<(Pos, Score)>,
+        hash_usage: f64,
     },
     Pv(Pos, PrincipalVariation),
     BestMove(Pos, Score),

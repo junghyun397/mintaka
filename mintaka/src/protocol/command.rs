@@ -15,6 +15,12 @@ pub enum Command {
         color: Color,
     },
     Undo,
+    Switch,
+    BatchSet {
+        black_stones: Box<[Pos]>,
+        white_stones: Box<[Pos]>,
+        player_color: Color,
+    },
     TotalTime(Duration),
     TurnTime(Duration),
     IncrementTime(Duration),

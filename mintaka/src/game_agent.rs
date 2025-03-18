@@ -3,11 +3,11 @@ use crate::game_state::GameState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::protocol::command::Command;
+use crate::protocol::message::ResponseSender;
 use crate::protocol::response::Response;
-use crate::protocol::runtime_command::RuntimeCommand;
 use crate::search;
 use crate::thread_data::ThreadData;
-use crate::thread_type::{MainThread, WorkerThread};
+use crate::thread_type::{MainThread, ThreadType, WorkerThread};
 use crate::utils::time_manager::TimeManager;
 use rusty_renju::history::{Action, History};
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
@@ -15,8 +15,6 @@ use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::rule::RuleKind;
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
-use std::sync::mpsc;
-use std::time::Duration;
 
 pub struct GameAgent {
     pub config: Config,
@@ -33,8 +31,8 @@ pub struct GameAgent {
 
 pub enum GameCommand {
     Command(Command),
-    RuntimeCommand(RuntimeCommand),
     Launch,
+    Abort,
     Quite,
 }
 
@@ -70,13 +68,22 @@ impl GameAgent {
                 }
             },
             Command::Set { pos, color } => {
-                todo!()
+                self.state.board.set_mut(pos);
+                self.state.board.switch_player_mut();
             },
             Command::Unset { pos, color } => {
-                todo!()
+                self.state.board.unset_mut(pos);
+                self.state.board.switch_player_mut();
             },
             Command::Undo => {
-                todo!()
+                self.state.board.unset_mut(todo!());
+            },
+            Command::Switch => {
+                self.own_color = !self.own_color;
+                self.state.board.switch_player_mut();
+            }
+            Command::BatchSet { black_stones, white_stones, player_color } => {
+                self.state.board.batch_set_each_color_mut(black_stones, white_stones, player_color);
             },
             Command::TotalTime(time) => {
                 self.time_manager.total_remaining = time;
@@ -92,26 +99,22 @@ impl GameAgent {
             },
             Command::MaxMemory { in_kib } => {
                 const HEAP_MEMORY_MARGIN_IN_KIB: usize = 1024 * 10;
+
                 self.tt.resize_mut(in_kib + HEAP_MEMORY_MARGIN_IN_KIB);
             },
         }
     }
 
-    pub fn launch(&mut self, runtime_commander: mpsc::Receiver<RuntimeCommand>) -> mpsc::Receiver<Response> {
-        self.tt.increase_age();
-
+    pub fn launch(&mut self, response_sender: ResponseSender) {
         self.global_aborted.store(true, Ordering::Relaxed);
         let global_counter_in_1k = AtomicUsize::new(0);
-
-        let (response_sender, response_receiver) = mpsc::channel();
 
         let running_time = self.time_manager.next_running_time();
         self.time_manager.consume_mut(running_time);
 
         let mut main_td = ThreadData::new(
             MainThread::new(
-                runtime_commander,
-                response_sender.clone(),
+                response_sender,
                 std::time::Instant::now(),
                 running_time
             ),
@@ -131,7 +134,9 @@ impl GameAgent {
 
                 atomic_best_move.store(0, Ordering::Relaxed);
 
-                response_sender.send(Response::BestMove(best_move, score)).expect("sender channel closed.");
+                main_td.thread_type.make_response(||
+                    Response::BestMove(best_move, score)
+                );
             });
 
             for tid in 1 .. self.config.workers.get() {
@@ -151,61 +156,11 @@ impl GameAgent {
             }
         });
 
-        response_receiver
+        self.tt.increase_age();
     }
 
-    pub fn recent_pos(&self) -> Option<Pos> {
-        self.history.0.last().and_then(|action| {
-            if let Action::Move(pos) = action {
-                Some(*pos)
-            } else {
-                None
-            }
-        })
-    }
-
-    pub fn play(&mut self, pos: Pos) {
-        self.state.board.set_mut(pos);
-    }
-
-    pub fn undo(&mut self) {
-        if let Some(action) = self.history.0.pop() {
-            match action {
-                Action::Move(pos) => {
-                    self.state.board.unset_mut(pos);
-                },
-                Action::Pass => {
-                    self.state.board.switch_player_mut();
-                }
-            }
-        }
-    }
-
-    pub fn pass(&mut self) {
-        self.state.board.pass_mut();
-        self.history.pass_mut();
-    }
-
-    pub fn switch_color(&mut self) {
-        self.own_color = !self.own_color;
-    }
-
-    pub fn batch_set(&mut self, black_stones: Box<[Pos]>, white_stones: Box<[Pos]>, player_color: Color) {
-        self.state.board.batch_set_each_color_mut(black_stones, white_stones, player_color)
-    }
-
-    pub fn set_remaining_time(&mut self, remaining_time: Duration) {
-        self.time_manager.total_remaining = remaining_time;
-    }
-
-    pub fn set_turn_time(&mut self, turn_time: Duration) {
-        self.time_manager.turn = turn_time;
-    }
-
-    pub fn resize_tt(&mut self, size_in_kib: usize) {
-        const MEMORY_MARGIN_IN_KIB: usize = 1024 * 10;
-
-        self.tt.resize_mut(size_in_kib - MEMORY_MARGIN_IN_KIB);
+    pub fn abort(&self) {
+        self.global_aborted.store(true, Ordering::Relaxed);
     }
 
 }

@@ -1,10 +1,10 @@
 mod stdio_utils;
 
 use mintaka::config::Config;
-use mintaka::game_agent::{GameAgent, GameCommand};
+use mintaka::game_agent::GameAgent;
 use mintaka::protocol::command::Command;
+use mintaka::protocol::message::{CommandSender, Message, ResponseSender};
 use mintaka::protocol::response::Response;
-use mintaka::protocol::runtime_command::RuntimeCommand;
 use rusty_renju::history::Action;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
@@ -22,7 +22,7 @@ enum PiskvorkResponse {
     None
 }
 
-fn spawn_command_listener(launched: Arc<AtomicBool>, command_sender: mpsc::Sender<GameCommand>) {
+fn spawn_command_listener(launched: Arc<AtomicBool>, command_sender: CommandSender) {
     std::thread::spawn(move || {
         let mut buf = String::new();
 
@@ -48,56 +48,52 @@ fn main() -> Result<(), &'static str> {
 
     let launched = Arc::new(AtomicBool::new(false));
 
-    let (command_sender, command_receiver) = mpsc::channel();
-
-    let mut runtime_channel: Option<(mpsc::Sender<RuntimeCommand>, mpsc::Receiver<Response>)> = None;
+    let (command_sender, response_sender, message_receiver) = {
+        let (message_sender, message_receiver) = mpsc::channel();
+        (CommandSender::new(message_sender.clone()), ResponseSender::new(message_sender), message_receiver)
+    };
 
     spawn_command_listener(launched.clone(), command_sender);
 
-    for game_command in command_receiver {
-        while let Some(response) = runtime_channel.as_ref()
-            .and_then(|(_, receiver)| receiver.try_recv().ok())
-        {
-            let piskvork_response = match response {
-                Response::Info(message) => PiskvorkResponse::Info(message),
-                Response::Warning(message) => PiskvorkResponse::Info(message),
-                Response::Error(message) => PiskvorkResponse::Error(message),
-                Response::Status { total_nodes_in_1k, hash_usage, best_moves } => {
-                    PiskvorkResponse::Info(format!(
-                        "status total-nodes={total_nodes_in_1k}K, hash-usage={hash_usage}, best-moves={best_moves:?}"
-                    ))
-                },
-                Response::Pv(pos, pv) => {
-                    PiskvorkResponse::Info(format!("pv pos={}, pv={}", pos, pv))
-                },
-                Response::BestMove(pos, _) => {
-                    runtime_channel = None;
-                    game_agent.play(pos);
-                    PiskvorkResponse::Pos(pos)
-                }
-            };
-
-            stdio_out(piskvork_response);
-        }
-
-        match game_command {
-            GameCommand::Command(command) => {
+    for message in message_receiver {
+        match message {
+            Message::Command(command) => {
                 game_agent.command(command);
             },
-            GameCommand::RuntimeCommand(runtime_command) => {
-                if let Some((runtime_commander, _)) = runtime_channel.as_ref() {
-                    runtime_commander.send(runtime_command).unwrap();
-                } else {
-                    return Err("runtime channel is not available.");
-                }
-            },
-            GameCommand::Launch => {
-                let (runtime_command_tx, runtime_command_rx) = mpsc::channel();
-                let response_rx = game_agent.launch(runtime_command_rx);
+            Message::Response(response) => {
+                let piskvork_response = match response {
+                    Response::Info(message) => PiskvorkResponse::Info(message),
+                    Response::Warning(message) => PiskvorkResponse::Info(message),
+                    Response::Error(message) => PiskvorkResponse::Error(message),
+                    Response::Status { total_nodes_in_1k, hash_usage, best_moves } => {
+                        PiskvorkResponse::Info(format!(
+                            "status total-nodes={total_nodes_in_1k}K, \
+                            hash-usage={hash_usage}, \
+                            best-moves={best_moves:?}"
+                        ))
+                    },
+                    Response::Pv(pos, pv) => {
+                        PiskvorkResponse::Info(format!("pv pos={}, pv={}", pos, pv))
+                    },
+                    Response::BestMove(pos, _) => {
+                        launched.store(false, Ordering::Relaxed);
 
-                runtime_channel = Some((runtime_command_tx, response_rx));
+                        game_agent.command(Command::Play(Action::Move(pos)));
+
+                        PiskvorkResponse::Pos(pos)
+                    }
+                };
+
+                stdio_out(piskvork_response);
             },
-            GameCommand::Quite => {
+            Message::Launch => {
+                launched.store(true, Ordering::Relaxed);
+                game_agent.launch(response_sender.clone());
+            },
+            Message::Abort => {
+                launched.store(false, Ordering::Relaxed);
+            },
+            Message::Quit => {
                 break;
             }
         }
@@ -127,16 +123,16 @@ fn stdio_out(piskvork_response: PiskvorkResponse) {
 // https://plastovicka.github.io/protocl2en.htm
 // https://github.com/accreator/Yixin-protocol/blob/master/protocol.pdf
 fn match_command(
-    launched: &Arc<AtomicBool>, command_sender: &mpsc::Sender<GameCommand>, args: Vec<&str>
+    launched: &Arc<AtomicBool>, command_sender: &CommandSender, args: Vec<&str>
 ) -> Result<PiskvorkResponse, &'static str> {
     if launched.load(Ordering::Relaxed) {
         match args[0] {
             "YXSTOP" => {
-                command_sender.send(GameCommand::RuntimeCommand(RuntimeCommand::Abort)).unwrap();
+                // command_sender.send(GameCommand::Abort).unwrap();
                 Ok(PiskvorkResponse::None)
             },
             "QUIT" => {
-                command_sender.send(GameCommand::Quite).unwrap();
+                // command_sender.send(GameCommand::Quite).unwrap();
                 Ok(PiskvorkResponse::None)
             },
             _ => {
@@ -157,7 +153,7 @@ fn match_command(
                 Err("rectangular board is not supported or other error")
             }
             "BEGIN" => {
-                command_sender.send(GameCommand::Launch).unwrap();
+                // command_sender.send(GameCommand::Launch);
                 Ok(PiskvorkResponse::None)
             },
             "TURN" => {
@@ -166,11 +162,8 @@ fn match_command(
                     args.get(2).ok_or("missing column token.")?
                 )?;
 
-                command_sender.send(GameCommand::Command(
-                    Command::Play(Action::Move(pos))
-                )).unwrap();
-
-                command_sender.send(GameCommand::Launch).unwrap();
+                command_sender.send(Command::Play(Action::Move(pos)));
+                command_sender.launch();
 
                 Ok(PiskvorkResponse::None)
             },
@@ -180,9 +173,7 @@ fn match_command(
                     args.get(2).ok_or("missing column token.")?
                 )?;
 
-                command_sender.send(GameCommand::Command(
-                    Command::Unset { pos, color: Color::Black }
-                )).unwrap();
+                command_sender.send(Command::Unset { pos, color: Color::Black });
 
                 Ok(PiskvorkResponse::Ok)
             },
@@ -228,22 +219,18 @@ fn match_command(
                 Ok(PiskvorkResponse::None)
             },
             "END" => {
-                command_sender.send(GameCommand::Quite).unwrap();
+                command_sender.quit();
                 Ok(PiskvorkResponse::None)
             },
             "INFO" => {
                 match *args.get(1).ok_or("missing info key.")? {
                     "timeout_match" | "time_left" => {
-                        command_sender.send(GameCommand::Command(
-                            Command::TotalTime(parse_time(&args)?))
-                        ).unwrap();
+                        command_sender.send(Command::TotalTime(parse_time(&args)?));
 
                         Ok(PiskvorkResponse::Ok)
                     },
                     "timeout_turn" => {
-                        command_sender.send(GameCommand::Command(
-                            Command::TurnTime(parse_time(&args)?)
-                        )).unwrap();
+                        command_sender.send(Command::TurnTime(parse_time(&args)?));
 
                         Ok(PiskvorkResponse::Ok)
                     },
@@ -251,9 +238,9 @@ fn match_command(
                         let max_memory_in_bytes: usize =
                             args.get(1).expect("missing info value.").parse().unwrap();
 
-                        command_sender.send(GameCommand::Command(
+                        command_sender.send(
                             Command::MaxMemory { in_kib: max_memory_in_bytes / 1024 }
-                        )).unwrap();
+                        );
 
                         Ok(PiskvorkResponse::Ok)
                     },
@@ -277,9 +264,7 @@ fn match_command(
                             _ => Err("unsupported rule."),
                         }?;
 
-                        command_sender.send(GameCommand::Command(
-                            Command::Rule(rule_kind)
-                        )).unwrap();
+                        command_sender.send(Command::Rule(rule_kind));
 
                         Ok(PiskvorkResponse::Ok)
                     },

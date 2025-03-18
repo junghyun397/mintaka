@@ -1,100 +1,117 @@
 use mintaka::config::Config;
 use mintaka::game_agent::GameAgent;
+use mintaka::protocol::command::Command;
+use mintaka::protocol::message::{CommandSender, Message, ResponseSender};
 use mintaka::protocol::response::Response;
+use rusty_renju::history::Action;
+use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::Pos;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc};
+
+fn spawn_command_listener(launched: Arc<AtomicBool>, command_sender: CommandSender) {
+    std::thread::spawn(move || {
+        let mut buf = String::new();
+
+        loop {
+            buf.clear();
+            std::io::stdin().read_line(&mut buf).unwrap();
+            let args = buf.trim().split(' ').collect::<Vec<&str>>();
+
+            if args.len() == 0 {
+                continue;
+            }
+
+            if launched.load(Ordering::Relaxed) {
+                match args[0] {
+                    "abort" => command_sender.abort(),
+                    "quite" => command_sender.quit(),
+                    &_ => println!("error: unknown command.")
+                }
+            } else {
+                match args[0] {
+                    "set" => {
+                        let pos = Pos::from_str(args[1]).unwrap();
+
+                        command_sender.send(Command::Set { pos, color: Color::Black });
+                    },
+                    "unset" => {
+                        let pos = Pos::from_str(args[1]).unwrap();
+
+                        command_sender.send(Command::Unset { pos, color: Color::White });
+                    },
+                    "play" => {
+                        let pos = Pos::from_str(args[1]).unwrap();
+
+                        command_sender.send(Command::Play(Action::Move(pos)));
+                    },
+                    "undo" => {
+                        command_sender.send(Command::Undo);
+                    },
+                    "switch" => {
+                        command_sender.send(Command::Switch);
+                    },
+                    "gen" => {
+                        command_sender.launch();
+                    },
+                    &_ => println!("error: unknown command."),
+                }
+            }
+        }
+    });
+}
 
 fn main() -> Result<(), &'static str> {
     let mut game_agent = GameAgent::new(Config::default());
 
-    loop {
-        let mut buf = String::new();
-        std::io::stdin().read_line(&mut buf).map_err(|_| "failed to stdio")?;
-        let args = buf.trim().split(' ').collect::<Vec<&str>>();
+    let launched = Arc::new(AtomicBool::new(false));
 
-        if args.len() == 0 {
-            continue;
-        }
-
-        let parameters = &args[1..];
-
-        match args[0] {
-            "parse-board" => {
-            },
-            "show-board" => {
-                println!(
-                    "board: total {} moves, {}'s turn.\n{}",
-                    0,
-                    game_agent.state.board.player_color,
-                    game_agent.state.board
-                );
-            },
-            "clear-board" => {
-                todo!()
-            },
-            "set" => {
-                let pos = Pos::from_str(parameters[0]).map_err(|_| "pos parsing failed.")?;
-                todo!()
-            },
-            "unset" => {
-                let pos = Pos::from_str(parameters[0]).map_err(|_| "pos parsing failed.")?;
-                todo!()
-            },
-            "play" => {
-                let pos = Pos::from_str(parameters[0]).map_err(|_| "pos parsing failed.")?;
-                game_agent.play(pos);
-            },
-            "undo" => {
-                game_agent.undo();
-            },
-            "batch-set" => {
-                todo!()
-            },
-            "switch" => {
-                todo!()
-            },
-            "gen" => {
-                let channel = game_agent.launch(todo!());
-
-                std::thread::spawn(move || {
-                    for response in channel {
-                        match response {
-                            Response::Info(message) => {
-                                println!("info: {}", message);
-                            },
-                            Response::Warning(message) => {
-                                println!("warning: {}", message);
-                            }
-                            Response::Error(message) => {
-                                println!("error: {}", message);
-                            },
-                            Response::Status { nps, total_nodes_in_1k, hash_usage, best_moves } => {
-                                todo!()
-                            }
-                            Response::Pv(pos, pv) => {
-                                println!("pv: pos={}, pv={}", pos, pv);
-                            }
-                            Response::BestMove(pos, score) => {
-                                game_agent.state.board.set_mut(pos);
-                                println!("solution: pos={}, score={}", pos, score);
-                            },
-                        }
-                    }
-                });
-            },
-            "status" => {
-                todo!()
-            },
-            "abort" => {
-                todo!()
-            },
-            "reset" => {
-                game_agent = GameAgent::new(Config::default());
-            },
-            "quite" => {
-                return Ok(());
-            },
-            &_ => { println!("error: unknown command."); }
-        }
+    let (command_sender, response_sender, message_receiver) = {
+        let (message_sender, message_receiver) = mpsc::channel();
+        (CommandSender::new(message_sender.clone()), ResponseSender::new(message_sender), message_receiver)
     };
+
+    spawn_command_listener(launched.clone(), command_sender);
+
+    for message in message_receiver {
+        match message {
+            Message::Command(command) => {
+                game_agent.command(command);
+            },
+            Message::Response(response) => {
+                match response {
+                    Response::Info(message) =>
+                        println!("info: {}", message),
+                    Response::Warning(message) =>
+                        println!("warning: {}", message),
+                    Response::Error(message) =>
+                        println!("error: {}", message),
+                    Response::Status { total_nodes_in_1k, best_moves, hash_usage } => {
+                        println!(
+                            "status: total_nodes_in_1k={total_nodes_in_1k}, \
+                            best_moves={best_moves:?}, \
+                            hash_usage={hash_usage}"
+                        );
+                    }
+                    Response::Pv(pos, pv) =>
+                        println!("pv: pos={pos}, pv={pv}"),
+                    Response::BestMove(pos, score) =>
+                        println!("solution: pos={pos}, score={score}"),
+                }
+            },
+            Message::Launch => {
+                launched.store(true, Ordering::Relaxed);
+                game_agent.launch(response_sender.clone());
+            },
+            Message::Abort => {
+                launched.store(false, Ordering::Relaxed);
+            },
+            Message::Quit => {
+                break;
+            },
+        }
+    }
+
+    Ok(())
 }
