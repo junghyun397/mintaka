@@ -22,9 +22,9 @@ mod test_vcf {
             let ht = HistoryTable {};
 
             let global_counter_in_1k = AtomicUsize::new(0);
-            let global_aborted = AtomicBool::new(false);
+            let aborted = AtomicBool::new(false);
 
-            let mut td = ThreadData::new(WorkerThread, 0, config, tt.view(), ht, &global_aborted, &global_counter_in_1k);
+            let mut td = ThreadData::new(WorkerThread, 0, config, tt.view(), ht, &aborted, &global_counter_in_1k);
             let time = std::time::Instant::now();
             let vcf_result = vcf::vcf_sequence(&mut td, &board, u8::MAX).unwrap();
             let time = time.elapsed();

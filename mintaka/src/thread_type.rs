@@ -20,12 +20,12 @@ pub struct MainThread {
 impl MainThread {
 
     pub fn new(
-        response_channel: ResponseSender,
+        response_sender: ResponseSender,
         start_time: std::time::Instant,
         time_limit: std::time::Duration,
     ) -> Self {
         Self {
-            response_sender: response_channel,
+            response_sender,
             start_time,
             time_limit,
         }
@@ -38,7 +38,7 @@ impl ThreadType for MainThread {
 
     fn make_response<F>(&self, produce: F) where F: FnOnce() -> Response {
         let response = produce();
-        self.response_sender.send(response);
+        self.response_sender.response(response);
     }
 
     fn time_limit_exceeded(&self) -> bool {

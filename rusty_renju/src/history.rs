@@ -54,4 +54,8 @@ impl History {
         self.0.push(Action::Pass)
     }
 
+    pub fn pop_mut(&mut self) -> Option<Action> {
+        self.0.pop()
+    }
+
 }

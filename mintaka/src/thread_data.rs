@@ -20,7 +20,7 @@ pub struct ThreadData<'a, TH: ThreadType> {
     pub vcf_stack: Vec<VcfFrame>,
 
     pub batch_counter: BatchCounter<'a>,
-    global_aborted: &'a AtomicBool,
+    aborted: &'a AtomicBool,
 }
 
 impl<'a, TH: ThreadType> ThreadData<'a, TH> {
@@ -30,7 +30,7 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
         config: Config,
         tt: TTView<'a>,
         ht: HistoryTable,
-        global_aborted: &'a AtomicBool,
+        aborted: &'a AtomicBool,
         global_counter_in_1k: &'a AtomicUsize
     ) -> Self {
         Self {
@@ -41,12 +41,12 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
             search_stack: [SearchFrame::default(); 128],
             vcf_stack: Vec::with_capacity(32),
             batch_counter: BatchCounter::new(global_counter_in_1k),
-            global_aborted,
+            aborted,
         }
     }
 
     pub fn is_aborted(&self) -> bool {
-        self.global_aborted.load(Ordering::Relaxed)
+        self.aborted.load(Ordering::Relaxed)
     }
 
     pub fn calculate_tps(&self, elapsed: Duration) -> f64 {

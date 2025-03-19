@@ -5,9 +5,16 @@ use std::sync::mpsc;
 pub enum Message {
     Command(Command),
     Response(Response),
+    Status(StatusCommand),
     Launch,
     Abort,
     Quit,
+}
+
+pub enum StatusCommand {
+    Version,
+    Board,
+    History,
 }
 
 #[derive(Clone)]
@@ -15,7 +22,7 @@ pub struct ResponseSender {
     sender: mpsc::Sender<Message>,
 }
 
-const CHANNEL_CLOSED: &str = "sender channel closed.";
+const CHANNEL_CLOSED_MESSAGE: &str = "sender channel closed.";
 
 impl ResponseSender {
 
@@ -23,8 +30,8 @@ impl ResponseSender {
         Self { sender }
     }
 
-    pub fn send(&self, response: Response) {
-        self.sender.send(Message::Response(response)).expect(CHANNEL_CLOSED);
+    pub fn response(&self, response: Response) {
+        self.sender.send(Message::Response(response)).expect(CHANNEL_CLOSED_MESSAGE);
     }
 
 }
@@ -39,20 +46,24 @@ impl CommandSender {
         Self { sender }
     }
 
-    pub fn send(&self, command: Command) {
-        self.sender.send(Message::Command(command)).expect(CHANNEL_CLOSED);
+    pub fn command(&self, command: Command) {
+        self.sender.send(Message::Command(command)).expect(CHANNEL_CLOSED_MESSAGE);
+    }
+
+    pub fn status(&self, command: StatusCommand) {
+        self.sender.send(Message::Status(command)).expect(CHANNEL_CLOSED_MESSAGE);
     }
 
     pub fn launch(&self) {
-        self.sender.send(Message::Launch).expect(CHANNEL_CLOSED);
+        self.sender.send(Message::Launch).expect(CHANNEL_CLOSED_MESSAGE);
     }
 
     pub fn abort(&self) {
-        self.sender.send(Message::Abort).expect(CHANNEL_CLOSED);
+        self.sender.send(Message::Abort).expect(CHANNEL_CLOSED_MESSAGE);
     }
 
     pub fn quit(&self) {
-        self.sender.send(Message::Quit).expect(CHANNEL_CLOSED);
+        self.sender.send(Message::Quit).expect(CHANNEL_CLOSED_MESSAGE);
     }
 
 }

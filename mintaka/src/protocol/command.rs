@@ -1,10 +1,12 @@
-use rusty_renju::history::Action;
+use rusty_renju::board::Board;
+use rusty_renju::history::{Action, History};
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::rule::RuleKind;
 use std::time::Duration;
 
 pub enum Command {
+    Load(Box<Board>, History),
     Play(Action),
     Set {
         pos: Pos,
@@ -15,11 +17,9 @@ pub enum Command {
         color: Color,
     },
     Undo,
-    Switch,
     BatchSet {
-        black_stones: Box<[Pos]>,
-        white_stones: Box<[Pos]>,
-        player_color: Color,
+        player_stones: Vec<Pos>,
+        opponent_stones: Vec<Pos>,
     },
     TotalTime(Duration),
     TurnTime(Duration),

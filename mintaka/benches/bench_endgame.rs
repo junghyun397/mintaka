@@ -27,9 +27,9 @@ mod bench_vcf {
             let ht = HistoryTable {};
 
             let global_counter_in_1k = AtomicUsize::new(0);
-            let global_aborted = AtomicBool::new(false);
+            let aborted = AtomicBool::new(false);
 
-            let td = ThreadData::new(WorkerThread, 0, config, tt.view(), ht, &global_aborted, &global_counter_in_1k);
+            let td = ThreadData::new(WorkerThread, 0, config, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
                 let result = vcf::vcf_search(&mut td.clone(), &board, u8::MAX);
