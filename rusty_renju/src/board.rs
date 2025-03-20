@@ -5,6 +5,7 @@ use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
+use crate::notation::rule::RuleKind;
 use crate::pattern;
 use crate::pattern::Patterns;
 use crate::slice::Slices;
@@ -239,8 +240,10 @@ impl Board {
     }
 
     #[cfg(not(feature = "strict_renju"))]
-    fn is_invalid_three_component<C>(&self, _context: ValidateThreeRoot, _from_direction: Direction, pos: Pos) -> bool {
+    fn is_invalid_three_component<C: ValidateThreeContext>(&self, context: C, direction: Direction, offset: isize) -> bool {
         const ANY_FOUR_OR_OVERLINE_MASK: u32 = pattern::UNIT_ANY_FOUR_MASK | pattern::UNIT_OVERLINE_MASK;
+
+        let pos = context.parent_pos().directional_offset_unchecked(direction, offset);
 
         let pattern = self.patterns.field.black[pos.idx_usize()];
 

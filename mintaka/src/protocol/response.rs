@@ -1,6 +1,5 @@
 use crate::principal_variation::PrincipalVariation;
 use rusty_renju::notation::pos::Pos;
-use std::fmt::Debug;
 
 pub enum Response {
     Info(String),

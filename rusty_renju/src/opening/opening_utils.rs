@@ -1,4 +1,3 @@
-use crate::history::History;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use rand::{rng, Rng};
@@ -49,18 +48,10 @@ fn find_symmetry_moves(ref1: Pos, ref2: Pos, m: Pos) -> HashSet<Pos> {
     }
 }
 
-pub fn find_forbidden_symmetry_moves(history: &History, fifth_move: Pos) -> SmallVec<[Pos; 3]> {
-    let black_side_symmetry_moves = find_symmetry_moves(
-        history.get(0).unwrap().unwrap(),
-        history.get(2).unwrap().unwrap(),
-        fifth_move
-    );
+pub fn find_forbidden_symmetry_moves(history: &[Pos; 4], fifth_move: Pos) -> SmallVec<[Pos; 3]> {
+    let black_side_symmetry_moves = find_symmetry_moves(history[0], history[1], fifth_move);
 
-    let white_side_symmetry_moves = find_symmetry_moves(
-        history.get(1).unwrap().unwrap(),
-        history.get(3).unwrap().unwrap(),
-        fifth_move
-    );
+    let white_side_symmetry_moves = find_symmetry_moves(history[2], history[3], fifth_move);
 
     black_side_symmetry_moves
         .intersection(&white_side_symmetry_moves)
@@ -70,26 +61,24 @@ pub fn find_forbidden_symmetry_moves(history: &History, fifth_move: Pos) -> Smal
 }
 
 pub fn generate_random_opening_moves<const N: usize>() -> [Pos; N] {
-    let mut raw_moves: [u8; N] = [0; N];
+    let mut raw_moves: [u8; N] = [Pos::INVALID.idx(); N];
     raw_moves[0] = pos::CENTER.idx();
 
-    fn calculate_abs_move(rel_move: u8, width: u8) -> u8 {
-        const HALF: u8 = pos::BOARD_WIDTH / 2;
-        let offset = HALF - width / 2;
+    fn generate_move_in(width: u8) -> u8 {
+        let rel_move = rng().random_range(0 .. width * width);
+        let offset = pos::BOARD_WIDTH / 2 - width / 2;
         (rel_move / width + offset) * pos::BOARD_WIDTH + rel_move % width + offset
     }
 
     for idx in 1 .. N as u8 {
         let width = idx * 2 + 1;
-        let mut rel_move = rng().random_range(0 .. width * width - idx);
+        let mut abs_move = generate_move_in(width);
 
-        for sub_idx in 0 .. idx as usize {
-            if raw_moves[sub_idx] == calculate_abs_move(rel_move, width) {
-                rel_move += 1;
-            }
+        while raw_moves[.. idx as usize].contains(&abs_move) {
+            abs_move = generate_move_in(width);
         }
 
-        raw_moves[idx as usize] = calculate_abs_move(rel_move, width);
+        raw_moves[idx as usize] = abs_move;
     }
 
     raw_moves.map(Pos::from_index)

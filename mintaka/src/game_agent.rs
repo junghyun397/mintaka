@@ -108,11 +108,11 @@ impl GameAgent {
 
                 self.tt.clear_mut(self.config.workers.into());
             },
-            Command::BatchSet { player_stones, opponent_stones } => {
+            Command::BatchSet { player_moves, opponent_moves } => {
                 let (black_stones, white_stones) =
                     match self.state.board.player_color {
-                        Color::Black => (player_stones, opponent_stones),
-                        Color::White => (opponent_stones, player_stones),
+                        Color::Black => (player_moves, opponent_moves),
+                        Color::White => (opponent_moves, player_moves),
                     };
 
                 let batch_color =
@@ -129,7 +129,7 @@ impl GameAgent {
                     white_stones.into_boxed_slice(),
                     player
                 );
-            },
+            }
             Command::TotalTime(time) => {
                 self.time_manager.total_remaining = time;
             },

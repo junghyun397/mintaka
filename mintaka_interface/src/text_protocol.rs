@@ -7,9 +7,11 @@ use rusty_renju::board::Board;
 use rusty_renju::history::{Action, History};
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::Pos;
+use std::num::NonZeroUsize;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
+use std::time::Duration;
 
 fn main() -> Result<(), &'static str> {
     let mut game_agent = GameAgent::new(Config::default());
@@ -114,11 +116,80 @@ fn handle_command(
         }
     } else {
         match args[0] {
-            "parse" => {
-                match args.get(1)
+            "config" => {
+                match *args.get(1)
                     .ok_or("data type not provided.")?
-                    .to_ascii_lowercase()
-                    .as_str()
+                {
+                    "time" => {
+                        fn parse_time_in_milliseconds(args: &Vec<&str>) -> Result<Duration, &'static str> {
+                            let time = args.get(1)
+                                .ok_or("time not provided.")?
+                                .parse::<u64>()
+                                .map_err(|_| "invalid time.")?;
+
+                            Ok(Duration::from_millis(time))
+                        }
+
+                        match *args.get(2)
+                            .ok_or("data type not provided.")?
+                        {
+                            "match" => {
+                                command_sender.command(
+                                    Command::TotalTime(parse_time_in_milliseconds(&args)?)
+                                );
+                            },
+                            "turn" => {
+                                command_sender.command(
+                                    Command::TurnTime(parse_time_in_milliseconds(&args)?)
+                                );
+                            },
+                            "increment" => {
+                                command_sender.command(
+                                    Command::IncrementTime(parse_time_in_milliseconds(&args)?)
+                                );
+                            }
+                            &_ => return Err("unknown time type.")
+                        }
+                    },
+                    "workers" => {
+                        match *args.get(2)
+                            .ok_or("workers not provided.")?
+                        {
+                            "auto" => {
+                                let cores = num_cpus::get_physical();
+
+                                println!("info: workers={cores}");
+
+                                command_sender.command(
+                                    Command::Workers(NonZeroUsize::new(cores).unwrap())
+                                );
+                            },
+                            &_ => {
+                                let workers = args.get(2)
+                                    .ok_or("workers not provided.")?
+                                    .parse::<usize>()
+                                    .map_err(|_| "invalid workers number.")?;
+
+                                command_sender.command(
+                                    Command::Workers(NonZeroUsize::new(workers).unwrap())
+                                );
+                            }
+                        }
+                    },
+                    "memory" => {
+                        let memory = args.get(2)
+                            .ok_or("memory not provided.")?
+                            .parse::<usize>()
+                            .map_err(|_| "invalid memory size.")?;
+
+                        command_sender.command(Command::MaxMemory { in_kib: memory });
+                    },
+                    &_ => return Err("data type not provided.")
+                }
+            },
+            "parse" => {
+                match *args.get(1)
+                    .ok_or("data type not provided.")?
                 {
                     "board" => {
                         command_sender.command(Command::Load(

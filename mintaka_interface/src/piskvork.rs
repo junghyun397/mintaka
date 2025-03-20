@@ -182,11 +182,12 @@ fn match_command(
             "BOARD" | "YXBOARD" => {
                 const DONE_TOKEN: &str = "DONE";
 
-                let mut player_stones = vec![];
+                let mut player_moves = vec![];
                 let mut opponent_moves = vec![];
 
+                let mut buf = String::new();
                 loop {
-                    let mut buf = String::new();
+                    buf.clear();
                     std::io::stdin().read_line(&mut buf).map_err(|_| "failed to stdio")?;
 
                     if buf.trim() == DONE_TOKEN {
@@ -203,7 +204,7 @@ fn match_command(
 
                     match color {
                         "1" => {
-                            player_stones.push(pos);
+                            player_moves.push(pos);
                         },
                         "2" => {
                             opponent_moves.push(pos);
@@ -212,7 +213,11 @@ fn match_command(
                     };
                 }
 
-                command_sender.command(Command::BatchSet { player_stones, opponent_stones });
+                command_sender.command(Command::BatchSet { player_moves, opponent_moves });
+
+                if args[0] == "BOARD" {
+                    command_sender.launch();
+                }
 
                 PiskvorkResponse::None
             },
@@ -275,7 +280,9 @@ fn match_command(
                 }
             },
             "YXHASHCLEAR" => {
-                command_sender.command(Command::Load(Box::from(Board::default()), History::default()));
+                command_sender.command(
+                    Command::Load(Box::from(Board::default()), History::default())
+                );
 
                 PiskvorkResponse::None
             },

@@ -1,5 +1,3 @@
-use crate::game::Game;
-use crate::history::History;
 use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
@@ -10,7 +8,7 @@ use std::collections::HashSet;
 pub enum OpeningKind {
     Soosyrv8,
     Taraguchi10,
-    Zeroed,
+    Random4,
 }
 
 pub enum OpeningStage {
@@ -99,11 +97,9 @@ impl MoveStageOpeningAgent for OpeningMove {
 
 impl OpeningMove {
 
-    fn set(&self, game: Game, pos: Pos) -> (Game, Option<OpeningStage>) {
-        if self.validate_move(pos) {
-            let game = game.play(pos);
-
-            let next = match self.opening_kind {
+    fn set(&self, pos: Pos) -> Option<OpeningStage> {
+        self.validate_move(pos).then(|| {
+            match self.opening_kind {
                 OpeningKind::Soosyrv8 => match self.moves {
                     0 ..= 3 => OpeningStage::Move(OpeningMove {
                         opening_kind: self.opening_kind,
@@ -135,13 +131,9 @@ impl OpeningMove {
                     }),
                     _ => OpeningStage::Finish
                 },
-                OpeningKind::Zeroed => unreachable!()
-            };
-
-            (game, Some(next))
-        } else {
-            (game, None)
-        }
+                OpeningKind::Random4 => unreachable!()
+            }
+        })
     }
 
 }
@@ -192,7 +184,7 @@ impl OpeningSwap {
                 }),
                 _ => OpeningStage::Finish
             },
-            OpeningKind::Zeroed => unreachable!()
+            OpeningKind::Random4 => unreachable!()
         }
     }
 
@@ -224,7 +216,7 @@ impl OpeningDeclare {
                 )
             }
             OpeningKind::Taraguchi10 => unreachable!(),
-            OpeningKind::Zeroed => unreachable!(),
+            OpeningKind::Random4 => unreachable!(),
         }
     }
 
@@ -252,7 +244,7 @@ impl MoveStageOpeningAgent for OpeningOffer {
 
 impl OpeningOffer {
 
-    fn add(&self, history: History, pos: Pos) -> Option<OpeningStage> {
+    fn add(&self, history: &[Pos; 4], pos: Pos) -> Option<OpeningStage> {
         self.validate_move(pos).then(|| {
             let mut offers = self.offers.clone();
             offers.push(pos);
@@ -307,7 +299,7 @@ impl OpeningSelect {
             match self.opening_kind {
                 OpeningKind::Soosyrv8 => OpeningStage::Finish,
                 OpeningKind::Taraguchi10 => OpeningStage::Finish,
-                OpeningKind::Zeroed => OpeningStage::Finish,
+                OpeningKind::Random4 => OpeningStage::Finish,
             }
         )
     }
@@ -347,7 +339,7 @@ impl OpeningBranch {
                     })
                 },
             OpeningKind::Soosyrv8 => unreachable!(),
-            OpeningKind::Zeroed => unreachable!(),
+            OpeningKind::Random4 => unreachable!(),
         }
     }
 
