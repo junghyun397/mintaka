@@ -56,7 +56,7 @@ impl GameAgent {
                 }
             },
             Command::Set { pos, color } => {
-                if self.state.board.stone_kind(pos) != None {
+                if self.state.board.stone_kind(pos).is_some() {
                     return Err("stone already exists");
                 }
 
@@ -139,6 +139,9 @@ impl GameAgent {
             Command::IncrementTime(time) => {
                 self.time_manager.increment = time;
             },
+            Command::Workers(workers) => {
+                self.config.workers = workers;
+            },
             Command::Rule(kind) => {
                 self.rule = kind;
             },
@@ -153,14 +156,14 @@ impl GameAgent {
     }
 
     pub fn launch(&mut self, response_sender: ResponseSender) {
-        self.aborted.store(true, Ordering::Relaxed);
+        self.aborted.store(false, Ordering::Relaxed);
         let global_counter_in_1k = AtomicUsize::new(0);
 
         let running_time = self.time_manager.next_running_time();
         self.time_manager.consume_mut(running_time);
 
         std::thread::scope(|s| {
-            let mut state = self.state.clone();
+            let mut state = self.state;
 
             let mut main_td = ThreadData::new(
                 MainThread::new(
@@ -193,7 +196,7 @@ impl GameAgent {
                     &self.aborted, &global_counter_in_1k
                 );
 
-                let mut state = self.state.clone();
+                let mut state = self.state;
 
                 s.spawn(move || {
                     search::iterative_deepening(&mut worker_td, &mut state);

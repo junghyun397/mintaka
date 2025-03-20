@@ -1,4 +1,5 @@
 use rusty_renju::board::Board;
+use rusty_renju::history::Action;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{Pos, BOARD_WIDTH};
 use tiny_skia::Pixmap;
@@ -99,7 +100,7 @@ impl ImageBoardRenderer {
     pub fn render_board(
         &self,
         board: &Board,
-        history: &[Option<Pos>],
+        history: &[Action],
         render_type: HistoryRenderType,
         offers: Option<&[Pos]>,
         blinds: Option<&[Pos]>,

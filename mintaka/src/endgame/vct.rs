@@ -5,7 +5,7 @@ use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
-use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::value::{Depth, Score};
 use smallvec::{smallvec, SmallVec};
 
@@ -98,7 +98,7 @@ fn find_defend_open_four_unchecked<const C: Color>(board: &Board) -> Pos {
 }
 
 #[inline]
-fn find_vcf_to_defend_pos<const C: Color>(board: &Board) -> Option<Pos> {
+fn find_vcf_to_defend_pos<const C: Color>(board: &Board) -> MaybePos {
     todo!()
 }
 

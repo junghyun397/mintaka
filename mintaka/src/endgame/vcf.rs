@@ -6,7 +6,7 @@ use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
-use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::value::{Depth, Eval, Score};
 use rusty_renju::pattern::{Pattern, PatternCount};
 
@@ -56,7 +56,7 @@ pub fn vcf_search(
     td: &mut ThreadData<impl ThreadType>,
     board: &Board, max_depth: Depth,
 ) -> Score {
-    let vcf_moves = generate_vcf_moves(&board, board.player_color, Score::DISTANCE_WINDOW, pos::CENTER);
+    let vcf_moves = generate_vcf_moves(board, board.player_color, Score::DISTANCE_WINDOW, pos::CENTER);
 
     vcf::<Score>(td, VcfWin, board, vcf_moves, max_depth)
 }
@@ -66,7 +66,7 @@ pub fn vcf_defend(
     board: &Board, max_depth: Depth,
     target_pos: Pos
 ) -> Score {
-    let vcf_moves = generate_vcf_moves(&board, board.player_color, 8, pos::CENTER);
+    let vcf_moves = generate_vcf_moves(board, board.player_color, 8, pos::CENTER);
 
     vcf::<Score>(td, VcfDefend { target_pos }, board, vcf_moves, max_depth)
 }
@@ -75,7 +75,7 @@ pub fn vcf_sequence(
     td: &mut ThreadData<impl ThreadType>,
     board: &Board, max_depth: Depth
 ) -> Option<Vec<Pos>> {
-    let vcf_moves = generate_vcf_moves(&board, board.player_color, 8, pos::CENTER);
+    let vcf_moves = generate_vcf_moves(board, board.player_color, 8, pos::CENTER);
 
     vcf::<SequenceEndgameAccumulator>(td, VcfWin, board, vcf_moves, max_depth)
         .map(|mut sequence| {
@@ -130,9 +130,9 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
     'vcf_search: loop {
         'position_search: for (seq, four_pos) in vcf_moves.moves.into_iter()
+            .enumerate()
             .take(vcf_moves.len as usize)
             .skip(move_counter)
-            .enumerate()
         {
             let idx = four_pos.idx_usize();
 
@@ -198,7 +198,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
                 if !position_board.patterns.field.player_unit::<C>()[defend_move.idx_usize()].has_any_four() {
                     board = position_board;
-                    vcf_ply = vcf_ply + 2;
+                    vcf_ply += 2;
                     break 'position_search;
                 }
 
@@ -211,7 +211,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
             move_counter = 0;
             board = position_board;
-            vcf_ply = vcf_ply + 2;
+            vcf_ply += 2;
 
             continue 'vcf_search;
         }
@@ -222,7 +222,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 tt_entry
             })
             .unwrap_or_else(|| TTEntry {
-                best_move: Pos::INVALID,
+                best_move: MaybePos::NONE,
                 depth: vcf_ply,
                 age: td.tt.age,
                 tt_flag: TTFlag::new(ScoreKind::None, EndgameFlag::Cold, false),
@@ -248,7 +248,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 #[inline]
 fn build_vcf_win_tt_entry(depth: Depth, four_pos: Pos) -> TTEntry {
     TTEntry {
-        best_move: four_pos,
+        best_move: MaybePos::new(four_pos),
         depth,
         age: u8::MAX,
         tt_flag: TTFlag::new(
@@ -264,7 +264,7 @@ fn build_vcf_win_tt_entry(depth: Depth, four_pos: Pos) -> TTEntry {
 #[inline]
 fn build_vcf_lose_tt_entry(depth: Depth) -> TTEntry {
    TTEntry {
-       best_move: Pos::INVALID,
+       best_move: MaybePos::NONE,
        depth,
        age: u8::MAX,
        tt_flag: TTFlag::new(

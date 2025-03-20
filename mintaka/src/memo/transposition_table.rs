@@ -1,7 +1,7 @@
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind, TTEntry, TTEntryBucket, TTFlag};
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
-use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::value::{Depth, Eval, Score};
 use std::sync::atomic::{AtomicU8, Ordering};
 
@@ -82,11 +82,12 @@ impl TTView<'_> {
         self.table[idx].store_mut(key.into(), entry);
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn store_mut(
         &self,
         key: HashKey,
         ply: usize,
-        maybe_best_move: Option<Pos>,
+        maybe_best_move: MaybePos,
         score_kind: ScoreKind,
         endgame_flag: EndgameFlag,
         depth: Depth,
@@ -101,8 +102,8 @@ impl TTView<'_> {
                 || score_kind == ScoreKind::Exact
                 || entry.depth.saturating_add(5) > entry.depth
             {
-                if let Some(best_move) = maybe_best_move {
-                    entry.best_move = best_move;
+                if maybe_best_move.is_some() {
+                    entry.best_move = maybe_best_move;
                 }
 
                 entry.tt_flag = TTFlag::new(score_kind, endgame_flag, is_pv);
@@ -118,7 +119,7 @@ impl TTView<'_> {
         }
 
         let entry = TTEntry {
-            best_move: maybe_best_move.unwrap_or(Pos::INVALID),
+            best_move: maybe_best_move,
             tt_flag: TTFlag::new(score_kind, endgame_flag, false),
             age: self.age,
             depth,
@@ -129,7 +130,7 @@ impl TTView<'_> {
         self.table[idx].store_mut(key.into(), entry);
     }
 
-    fn prefetch(&self, key: HashKey) {
+    pub fn prefetch(&self, key: HashKey) {
         #[cfg(target_arch = "x86_64")]
         unsafe {
             use std::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};

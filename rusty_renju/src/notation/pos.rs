@@ -123,3 +123,44 @@ impl Pos {
     }
 
 }
+
+#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
+pub struct MaybePos(Pos);
+
+impl MaybePos {
+
+    pub const NONE: Self = Self(Pos::INVALID);
+
+    pub const fn new(pos: Pos) -> Self {
+        Self(pos)
+    }
+
+    pub const fn is_none(&self) -> bool {
+        self.0.0 == Pos::INVALID.0
+    }
+
+    pub const fn is_some(&self) -> bool {
+        !self.is_none()
+    }
+
+    pub const fn unwrap(self) -> Pos {
+        self.0
+    }
+
+}
+
+impl From<Pos> for MaybePos {
+    fn from(value: Pos) -> Self {
+        Self(value)
+    }
+}
+
+impl From<MaybePos> for Option<Pos> {
+    fn from(value: MaybePos) -> Self {
+        if value.is_none() {
+            None
+        } else {
+            Some(value.0)
+        }
+    }
+}

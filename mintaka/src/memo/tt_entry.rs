@@ -1,7 +1,7 @@
 use rusty_renju::assert_struct_sizes;
 use rusty_renju::memo::abstract_transposition_table::AbstractTTEntry;
 use rusty_renju::memo::hash_key::HashKey;
-use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::value::{Depth, Eval, Score};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -89,7 +89,7 @@ impl TTFlag {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(C, align(8))]
 pub struct TTEntry {
-    pub best_move: Pos, // 8
+    pub best_move: MaybePos, // 8
     pub tt_flag: TTFlag, // 8
     pub age: u8, // 8
     pub depth: Depth, // 8
@@ -118,7 +118,7 @@ impl From<u64> for TTEntry {
 impl TTEntry {
 
     pub const EMPTY: Self = Self {
-        best_move: Pos::INVALID,
+        best_move: MaybePos::NONE,
         tt_flag: TTFlag::DEFAULT,
         age: 0,
         depth: 0,

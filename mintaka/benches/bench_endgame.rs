@@ -13,7 +13,6 @@ mod bench_vcf {
     use rusty_renju::board::Board;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use rusty_renju::notation::value::Score;
-    use rusty_renju::utils::platform;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
     use test::Bencher;
 
@@ -34,7 +33,7 @@ mod bench_vcf {
             $bencher.iter(|| {
                 let result = vcf::vcf_search(&mut td.clone(), &board, u8::MAX);
                 assert_eq!(result, $score);
-                tt.clear_mut(platform::available_cores());
+                tt.clear_mut(1);
             })
         }};
     }

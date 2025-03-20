@@ -320,7 +320,7 @@ impl From<History> for Game {
             .enumerate()
             .filter_map(|(idx, action)|
                 (idx % 2 == 0)
-                    .then(|| action.maybe_move())
+                    .then(|| action.maybe_move().into())
                     .flatten()
             )
             .collect();
@@ -329,7 +329,7 @@ impl From<History> for Game {
             .enumerate()
             .filter_map(|(idx, action)|
                 (idx % 2 == 1)
-                    .then(|| action.maybe_move())
+                    .then(|| action.maybe_move().into())
                     .flatten()
             )
             .collect();

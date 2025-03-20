@@ -1,4 +1,4 @@
-use crate::notation::pos::Pos;
+use crate::notation::pos::{MaybePos, Pos};
 
 #[derive(Copy, Clone)]
 pub enum Action {
@@ -8,10 +8,10 @@ pub enum Action {
 
 impl Action {
     
-    pub fn maybe_move(&self) -> Option<Pos> {
+    pub fn maybe_move(&self) -> MaybePos {
         match self {
-            Action::Move(pos) => Some(*pos),
-            Action::Pass => None
+            Action::Move(pos) => (*pos).into(),
+            Action::Pass => MaybePos::NONE
         }
     }
     

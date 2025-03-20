@@ -266,6 +266,7 @@ impl Patterns {
             (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK != 0)
                 .then(|| {
                     let slice_idx = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8;
+
                     Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8))
                 })
         );
@@ -274,9 +275,9 @@ impl Patterns {
 
         let mut idx = slice.start_pos.idx_usize();
         self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(slice_pattern[0]);
-        for pattern_idx in 1 .. slice.length as usize {
+        for pattern in slice_pattern.into_iter().take(slice.length as usize).skip(1) {
             idx = step_idx!(D, idx, 1);
-            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(slice_pattern[pattern_idx]);
+            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(pattern);
         }
 
         self.unchecked_five_in_a_row = self.unchecked_five_in_a_row.or(
