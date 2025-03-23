@@ -91,6 +91,7 @@ fn main() -> Result<(), &'static str> {
             },
             Message::Abort => {
                 launched.store(false, Ordering::Relaxed);
+                game_agent.abort();
             },
             Message::Quit => {
                 break;
@@ -146,6 +147,7 @@ fn match_command(
         match args[0] {
             "START" => {
                 let size: usize = args[1].parse().map_err(|_| "size parsing failed.")?;
+
                 if size == pos::U_BOARD_WIDTH {
                     PiskvorkResponse::Ok
                 } else {
@@ -239,8 +241,10 @@ fn match_command(
                         PiskvorkResponse::Ok
                     },
                     "max_memory" => {
-                        let max_memory_in_bytes: usize =
-                            args.get(1).expect("missing info value.").parse().unwrap();
+                        let max_memory_in_bytes: usize = args.get(1)
+                            .ok_or("missing info value.")?
+                            .parse()
+                            .map_err(|_| "memory parsing failed.")?;
 
                         command_sender.command(
                             Command::MaxMemory { in_kib: max_memory_in_bytes / 1024 }
@@ -250,26 +254,28 @@ fn match_command(
                     },
                     "game_type" => {
                         match args.get(1)
-                            .expect("missing info value.")
-                            .chars().next().unwrap()
+                            .ok_or("missing info value.")?
+                            .chars()
+                            .next().unwrap()
                         {
                             '0' ..= '3' => PiskvorkResponse::Ok,
                             _ => return Err("unknown game type."),
                         }
                     },
                     "rule" => {
-                        let rule_kind = match args.get(1)
-                            .expect("missing info value.")
-                            .parse::<usize>().unwrap()
+                        let rule_kind: Result<RuleKind, &str> = match args.get(1)
+                            .ok_or("missing info value.")?
+                            .parse::<usize>()
+                            .map_err(|_| "rule parsing failed.")?
                             .count_ones()
                         {
                             // 1 => Ok(RuleKind::Gomoku),
                             // 6 => Ok(RuleKind::Gomoku), // swap2
-                            4 => RuleKind::Renju,
+                            4 => Ok(RuleKind::Renju),
                             _ => return Err("unsupported rule."),
-                        }?;
+                        };
 
-                        command_sender.command(Command::Rule(rule_kind));
+                        command_sender.command(Command::Rule(rule_kind?));
 
                         PiskvorkResponse::Ok
                     },

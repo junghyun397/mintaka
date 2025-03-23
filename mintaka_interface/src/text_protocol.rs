@@ -5,10 +5,8 @@ use mintaka::protocol::message::{CommandSender, Message, ResponseSender, StatusC
 use mintaka::protocol::response::Response;
 use rusty_renju::board::Board;
 use rusty_renju::history::{Action, History};
-use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::Pos;
 use std::num::NonZeroUsize;
-use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
@@ -42,14 +40,13 @@ fn main() -> Result<(), &'static str> {
                         println!("warning: {}", message),
                     Response::Error(message) =>
                         println!("error: {}", message),
-                    Response::Status { eval, total_nodes_in_1k, best_moves, hash_usage } => {
+                    Response::Status { eval, total_nodes_in_1k, best_moves, hash_usage } =>
                         println!(
                             "status: eval={eval}\
                             total_nodes_in_1k={total_nodes_in_1k}, \
                             best_moves={best_moves:?}, \
                             hash_usage={hash_usage}"
-                        );
-                    }
+                        ),
                     Response::Pv(pvs) =>
                         println!("pvs={pvs:?}"),
                     Response::BestMove(pos, score) => {
@@ -73,6 +70,7 @@ fn main() -> Result<(), &'static str> {
             },
             Message::Abort => {
                 launched.store(false, Ordering::Relaxed);
+                game_agent.abort();
             },
             Message::Quit => {
                 break;
@@ -193,7 +191,7 @@ fn handle_command(
                 {
                     "board" => {
                         command_sender.command(Command::Load(
-                            Box::new(Board::from_str(buf)?), History::default()
+                            Box::new(buf.parse()?), History::default()
                         ));
                     },
                     "history" => {
@@ -226,19 +224,19 @@ fn handle_command(
                 command_sender.status(StatusCommand::Version);
             },
             "set" => {
-                let pos = Pos::from_str(args.get(1).ok_or("pos not provided.")?)?;
-                let color = Color::from_str(args.get(2).ok_or("color not provided.")?)?;
+                let pos = args.get(1).ok_or("pos not provided.")?.parse()?;
+                let color = args.get(2).ok_or("color not provided.")?.parse()?;
 
                 command_sender.command(Command::Set { pos, color });
             },
             "unset" => {
-                let pos = Pos::from_str(args.get(1).ok_or("pos not provided.")?)?;
-                let color = Color::from_str(args.get(2).ok_or("color not provided.")?)?;
+                let pos = args.get(1).ok_or("pos not provided.")?.parse()?;
+                let color = args.get(2).ok_or("color not provided.")?.parse()?;
 
                 command_sender.command(Command::Unset { pos, color });
             },
             "play" => {
-                let pos = Pos::from_str(args.get(1).ok_or("pos not provided.")?)?;
+                let pos = args.get(1).ok_or("pos not provided.")?.parse()?;
 
                 command_sender.command(Command::Play(Action::Move(pos)));
             },

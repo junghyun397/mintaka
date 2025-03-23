@@ -248,22 +248,18 @@ impl FromStr for Slice {
 
 impl Display for Slice {
 
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let content = (0 .. self.length)
-            .map(|idx|
-                match self.stone_kind(idx) {
-                    Some(color) => char::from(color),
-                    None => SYMBOL_EMPTY
-                }.to_string()
-            )
-            .reduce(|head, tail|
-                format!("{head} {tail}")
-            )
-            .unwrap();
+fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let content = (0..self.length)
+            .map(|idx| match self.stone_kind(idx) {
+                Some(color) => char::from(color),
+                None => SYMBOL_EMPTY
+            })
+            .map(String::from)
+            .collect::<Vec<_>>()
+            .join(" ");
 
         write!(f, "{}", content)
     }
-
 }
 
 impl Display for History {
@@ -276,10 +272,8 @@ impl Display for History {
                     Action::Pass => HISTORY_LITERAL_PASS.to_string()
                 }
             )
-            .reduce(|head, tail|
-                format!("{head}{HISTORY_LITERAL_SEPARATOR} {tail}")
-            )
-            .unwrap();
+            .collect::<Vec<_>>()
+            .join(format!("{HISTORY_LITERAL_SEPARATOR} ").as_str());
 
         write!(f, "{history}")
     }
@@ -367,13 +361,14 @@ impl FromStr for Pos {
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
         source[1..].parse::<u8>()
-            .map_err(|_| "Invalid row charter")
+            .map_err(|_| "invalid row charter")
             .and_then(|row| {
                 let col = source.chars().next().unwrap() as u8 - b'a';
                 let pos = Pos::from_cartesian(row - 1 , col);
-                if pos.col() < pos::BOARD_WIDTH && pos.row() < pos::BOARD_WIDTH {
-                    Ok(pos)
-                } else { Err("Invalid range") }
+
+                (pos.col() < pos::BOARD_WIDTH && pos.row() < pos::BOARD_WIDTH)
+                    .then_some(pos)
+                    .ok_or("invalid range")
             })
     }
 
