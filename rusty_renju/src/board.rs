@@ -4,7 +4,7 @@ use crate::memo::hash_key::HashKey;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
-use crate::notation::pos::Pos;
+use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::RuleKind;
 use crate::pattern;
 use crate::pattern::Patterns;
@@ -356,13 +356,13 @@ impl Board {
     fn update_four_overrides(&self, overrides: &mut SetOverrides, direction_from: Direction, pos: Pos) {
         for next_four_idx in (0 .. direction_from as u8 * 3).chain(direction_from as u8 * 4 .. 12) {
             let four_pos = overrides.next_four[next_four_idx as usize];
-            if four_pos != Pos::INVALID {
+            if four_pos != MaybePos::NONE.unwrap() {
                 overrides.four[overrides.four_top as usize] = four_pos;
                 overrides.four_top += 1;
             }
         }
 
-        overrides.next_four = [Pos::INVALID; 12];
+        overrides.next_four = [MaybePos::NONE.unwrap(); 12];
 
         for direction in self.patterns.field.black[pos.idx_usize()].iter_three_directions() {
             if direction == direction_from {
@@ -539,11 +539,16 @@ impl SetOverrides {
 
     fn new(root: Pos) -> Self {
         Self {
-            set: [root, Pos::INVALID, Pos::INVALID, Pos::INVALID, Pos::INVALID, Pos::INVALID],
+            set: {
+                const SET: [Pos; 6] = [MaybePos::NONE.unwrap(); 6];
+                let mut set = SET;
+                set[0] = root;
+                set
+            },
             set_top: 1,
-            four: [Pos::INVALID; 20],
+            four: [MaybePos::NONE.unwrap(); 20],
             four_top: 0,
-            next_four: [Pos::INVALID; 12],
+            next_four: [MaybePos::NONE.unwrap(); 12],
         }
     }
 

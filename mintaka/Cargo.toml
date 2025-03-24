@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 rusty_renju = {path = "../rusty_renju" }
 smallvec = "2.0.0-alpha.10"
+arrayvec = "0.7.6"
 
 [dev-dependencies]
 indoc = "2.0.5"

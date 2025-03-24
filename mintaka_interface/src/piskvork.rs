@@ -146,7 +146,10 @@ fn match_command(
     } else {
         match args[0] {
             "START" => {
-                let size: usize = args[1].parse().map_err(|_| "size parsing failed.")?;
+                let size: usize = args.get(1)
+                    .ok_or("missing size token.")?
+                    .parse()
+                    .map_err(|_| "size parsing failed.")?;
 
                 if size == pos::U_BOARD_WIDTH {
                     PiskvorkResponse::Ok
@@ -317,8 +320,8 @@ fn match_command(
 
 fn parse_pos(row: &str, col: &str) -> Result<Pos, &'static str> {
     Ok(Pos::from_cartesian(
-        row.parse::<u8>().map_err(|e| "row parsing failed.")?,
-        col.parse::<u8>().map_err(|e| "column parsing failed.")?,
+        row.parse::<u8>().map_err(|e| "invalid row range.")?,
+        col.parse::<u8>().map_err(|e| "invalid col range.")?,
     ))
 }
 

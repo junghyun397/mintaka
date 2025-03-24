@@ -2,7 +2,7 @@ use crate::movegen::movegen_window::MovegenWindow;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
-use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::pattern;
 use rusty_renju::utils::platform;
 use smallvec::SmallVec;
@@ -41,7 +41,7 @@ pub fn sort_moves(recent_move: Pos, moves: &mut [Pos]) {
 }
 
 pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, recent_move: Pos) -> VcfMoves {
-    let mut vcf_moves = [Pos::INVALID; 31];
+    let mut vcf_moves = [MaybePos::NONE.unwrap(); 31];
     let mut vcf_moves_top = 0;
 
     let field_ptr = board.patterns.field.access(color).as_ptr() as *const u32;

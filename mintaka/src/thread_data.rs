@@ -6,7 +6,6 @@ use crate::memo::transposition_table::TTView;
 use crate::search_frame::SearchFrame;
 use crate::thread_type::ThreadType;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::time::Duration;
 
 #[derive(Clone)]
 pub struct ThreadData<'a, TH: ThreadType> {
@@ -45,14 +44,21 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
         }
     }
 
-    pub fn is_aborted(&self) -> bool {
-        self.aborted.load(Ordering::Relaxed)
+    pub fn search_limit_exceeded(&self) -> bool {
+        self.thread_type.time_limit_exceeded()
+            || self.batch_counter.count_global() >= self.config.max_nodes_in_1k
     }
 
-    pub fn calculate_tps(&self, elapsed: Duration) -> f64 {
-        let elapsed = elapsed.as_secs_f64();
-        let nodes = self.batch_counter.count_global() as f64;
-        nodes / elapsed
+    pub fn node_limit_exceeded(&self) -> bool {
+        self.batch_counter.count_global() >= self.config.max_nodes_in_1k
+    }
+
+    pub fn set_aborted_mut(&self) {
+        self.aborted.store(true, Ordering::Relaxed);
+    }
+
+    pub fn is_aborted(&self) -> bool {
+        self.aborted.load(Ordering::Relaxed)
     }
 
 }

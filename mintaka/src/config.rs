@@ -17,7 +17,7 @@ pub struct Config {
     pub workers: NonZeroUsize,
 
     pub max_vcf_depth: Depth,
-    pub max_ply: u8,
+    pub max_nodes_in_1k: usize,
 
     pub report_search_status: bool,
     pub report_main_pv: bool,
@@ -31,7 +31,7 @@ impl Default for Config {
             search_objective: SearchObjective::Best,
             workers: NonZeroUsize::new(1).unwrap(),
             max_vcf_depth: pos::U8_BOARD_SIZE,
-            max_ply: u8::MAX,
+            max_nodes_in_1k: usize::MAX,
             report_search_status: false,
             report_main_pv: false,
         }

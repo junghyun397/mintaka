@@ -48,8 +48,6 @@ pub struct Pos(u8);
 
 impl Pos {
 
-    pub const INVALID: Self = Self(u8::MAX);
-
     pub const fn from_index(index: u8) -> Self {
         Self(index)
     }
@@ -129,14 +127,16 @@ pub struct MaybePos(Pos);
 
 impl MaybePos {
 
-    pub const NONE: Self = Self(Pos::INVALID);
+    const INVALID_POS: Pos = Pos(u8::MAX);
+
+    pub const NONE: Self = Self(Self::INVALID_POS);
 
     pub const fn new(pos: Pos) -> Self {
         Self(pos)
     }
 
     pub const fn is_none(&self) -> bool {
-        self.0.0 == Pos::INVALID.0
+        self.0.0 == Self::INVALID_POS.0
     }
 
     pub const fn is_some(&self) -> bool {
@@ -161,6 +161,15 @@ impl From<MaybePos> for Option<Pos> {
             None
         } else {
             Some(value.0)
+        }
+    }
+}
+
+impl From<Option<Pos>> for MaybePos {
+    fn from(value: Option<Pos>) -> Self {
+        match value {
+            Some(pos) => Self(pos),
+            None => Self::NONE,
         }
     }
 }

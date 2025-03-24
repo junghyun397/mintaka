@@ -202,7 +202,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                     break 'position_search;
                 }
 
-                let mut moves = [Pos::INVALID; 31];
+                let mut moves = [MaybePos::NONE.unwrap(); 31];
                 moves[0] = position_board.patterns.unchecked_five_pos.opponent_unit::<C>().unwrap();
                 VcfMoves { moves, len: 1 }
             } else {

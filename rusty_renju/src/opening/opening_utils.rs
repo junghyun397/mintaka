@@ -1,5 +1,5 @@
 use crate::notation::pos;
-use crate::notation::pos::Pos;
+use crate::notation::pos::{MaybePos, Pos};
 use rand::{rng, Rng};
 use smallvec::SmallVec;
 use std::collections::HashSet;
@@ -61,7 +61,7 @@ pub fn find_forbidden_symmetry_moves(history: &[Pos; 4], fifth_move: Pos) -> Sma
 }
 
 pub fn generate_random_opening_moves<const N: usize>() -> [Pos; N] {
-    let mut raw_moves: [u8; N] = [Pos::INVALID.idx(); N];
+    let mut raw_moves: [u8; N] = [MaybePos::NONE.unwrap().idx(); N];
     raw_moves[0] = pos::CENTER.idx();
 
     fn generate_move_in(width: u8) -> u8 {
