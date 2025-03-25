@@ -46,6 +46,18 @@ const STEP_TABLE: [isize; 4] = [1, I_BOARD_WIDTH, I_BOARD_WIDTH + 1, -(I_BOARD_W
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub struct Pos(u8);
 
+impl From<usize> for Pos {
+    fn from(value: usize) -> Self {
+        Pos::from_index(value as u8)
+    }
+}
+
+impl From<u8> for Pos {
+    fn from(value: u8) -> Self {
+        Pos::from_index(value)
+    }
+}
+
 impl Pos {
 
     pub const fn from_index(index: u8) -> Self {

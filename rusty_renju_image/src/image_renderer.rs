@@ -1,6 +1,6 @@
 use rusty_renju::board::Board;
-use rusty_renju::history::Action;
-use rusty_renju::notation::color::Color;
+use rusty_renju::board_iter::BoardIterItem;
+use rusty_renju::history::{Action, History};
 use rusty_renju::notation::pos::{Pos, BOARD_WIDTH};
 use tiny_skia::Pixmap;
 
@@ -68,6 +68,11 @@ pub struct ImageBoardRenderer {
     font_bin: Vec<u8>,
 }
 
+pub struct RenderArtifact {
+    pixmap: Pixmap,
+    history_layer: Option<Pixmap>,
+}
+
 impl Default for ImageBoardRenderer {
     fn default() -> Self {
         let board_width = POINT_SIZE * BOARD_WIDTH as u32;
@@ -97,7 +102,26 @@ impl ImageBoardRenderer {
         (x, y)
     }
 
-    pub fn render_board(
+    pub fn render_history_layer(
+        &self,
+        history: &History,
+        history_cache: Option<Pixmap>
+    ) -> (Pixmap, Pixmap) {
+        todo!()
+    }
+
+    pub fn incremental_render(
+        &self,
+        board: &Board,
+        history: &[Action],
+        render_type: HistoryRenderType,
+        display_forbidden_moves: bool,
+        render_artifact: RenderArtifact,
+    ) -> (Pixmap, RenderArtifact) {
+        todo!()
+    }
+
+    pub fn full_render(
         &self,
         board: &Board,
         history: &[Action],
@@ -105,11 +129,27 @@ impl ImageBoardRenderer {
         offers: Option<&[Pos]>,
         blinds: Option<&[Pos]>,
         display_forbidden_moves: bool
-    ) -> Pixmap {
+    ) -> (Pixmap, RenderArtifact) {
         let mut pixmap = self.prototype_pixmap.clone();
 
+        let mut pixmap_archive = pixmap.clone();
+
+        let mut information_layer = Pixmap::new(self.dimension, self.dimension).unwrap();
+
         if display_forbidden_moves {
-            todo!()
+            for (idx, _) in board.iter_items()
+                .enumerate()
+                .filter(|(_, item)|
+                    if let BoardIterItem::Pattern(container) = item {
+                        container.black.is_forbidden()
+                    } else {
+                        false
+                    }
+                )
+            {
+                let pos: Pos = idx.into();
+                todo!()
+            }
         }
 
         if let Some(offers) = offers {
@@ -120,26 +160,42 @@ impl ImageBoardRenderer {
             todo!()
         }
 
+        let mut history_layer = None;
+
         match render_type {
             HistoryRenderType::Sequence => {
-                todo!()
+                let mut history_pixmap = Pixmap::new(self.dimension, self.dimension).unwrap();
+
+                history_layer = Some(history_layer);
             },
             HistoryRenderType::Recent => {
                 todo!()
             },
-            HistoryRenderType::None => {},
+            _ => {},
         }
 
-        pixmap
-    }
+        pixmap.draw_pixmap(
+            0, 0,
+            information_layer.as_ref(),
+            &tiny_skia::PixmapPaint::default(),
+            tiny_skia::Transform::identity(),
+            None,
+        );
 
-    pub fn render_incremental(&self, mut pixmap: Pixmap, pos: Pos, color: Color) -> Pixmap {
-        self.draw_stone(&mut pixmap, pos, color);
-        pixmap
-    }
+        if let Some(hist_layer) = history_layer {
+            pixmap.draw_pixmap(
+                0, 0,
+                hist_layer.as_ref(),
+                &tiny_skia::PixmapPaint::default(),
+                tiny_skia::Transform::identity(),
+                None,
+            );
+        }
 
-    fn draw_stone(&self, pixmap: &mut Pixmap, pos: Pos, color: Color) {
-        todo!()
+        (pixmap, RenderArtifact {
+            pixmap: pixmap_archive,
+            history_layer,
+        })
     }
 
 }

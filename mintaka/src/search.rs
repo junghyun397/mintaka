@@ -75,10 +75,14 @@ pub fn aspiration<TH: ThreadType>(
 pub fn pvs<NT: NodeType, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
-    mut remaining_depth: Depth,
+    mut depth_left: Depth,
     mut alpha: Score,
     mut beta: Score,
 ) -> Score {
+    if td.is_aborted() {
+        return 0;
+    }
+
     let pv = PrincipalVariation::default();
 
     if NT::IS_ROOT {
@@ -116,11 +120,15 @@ pub fn pvs<NT: NodeType, TH: ThreadType>(
 
     let mut full_window = true;
     for pos in moves {
+        state.board.set_mut(pos);
+
         let score = if full_window {
-            pvs::<NT::NextType, TH>(td, state, remaining_depth - 1, -beta, -alpha)
+            -pvs::<NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
         } else {
-            pvs::<NT::NextType, TH>(td, state, remaining_depth - 1, -alpha - 1, -alpha)
+            -pvs::<NT::NextType, TH>(td, state, depth_left - 1, -alpha - 1, -alpha)
         };
+
+        state.board.unset_mut(pos);
 
         best_score = best_score.max(score);
 
