@@ -1,10 +1,11 @@
 use crate::game_state::GameState;
-use crate::memo::tt_entry::ScoreKind;
+use crate::memo::tt_entry::{EndgameFlag, ScoreKind};
 use crate::movegen::move_generator::generate_moves;
 use crate::principal_variation::PrincipalVariation;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
-use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::notation::pos::MaybePos;
+use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::value::{Depth, Eval, Score};
 
 pub trait NodeType {
@@ -34,19 +35,27 @@ struct OffPVNode; impl NodeType for OffPVNode {
     type NextType = Self;
 }
 
-pub fn iterative_deepening<TH: ThreadType>(
+pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
-) -> (Pos, Score) {
-    let mut best_move = MaybePos::NONE;
+) -> Score {
+    if let Some(pos) = state.board.patterns.unchecked_five_pos.access(state.board.player_color) {
+        td.best_move = *pos;
+        return Score::MAX;
+    }
+
+    if let Some(pos) = state.board.patterns.unchecked_five_pos.access(state.board.opponent_color()) {
+        td.best_move = *pos;
+        return 0;
+    }
+
     let mut eval: Eval = 0;
     let mut score: Score = 0;
 
     let max_depth: Depth = 0;
-    let initial_depth = 1 + td.tid as Depth % 10;
 
-    'iterative_deepening: for depth in initial_depth ..= max_depth {
-        eval = pvs::<RootNode, TH>(td, state, depth, -Score::MAX, Score::MAX);
+    'iterative_deepening: for depth in 1 ..= max_depth {
+        eval = pvs::<R, RootNode, TH>(td, state, depth, -Score::MAX, Score::MAX);
 
         if TH::IS_MAIN {
             if td.node_limit_exceeded() {
@@ -61,10 +70,10 @@ pub fn iterative_deepening<TH: ThreadType>(
         }
     }
 
-    (best_move.unwrap(), score)
+    score
 }
 
-pub fn aspiration<TH: ThreadType>(
+pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
     pv: &mut PrincipalVariation,
@@ -72,7 +81,7 @@ pub fn aspiration<TH: ThreadType>(
     todo!()
 }
 
-pub fn pvs<NT: NodeType, TH: ThreadType>(
+pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
     mut depth_left: Depth,
@@ -100,6 +109,16 @@ pub fn pvs<NT: NodeType, TH: ThreadType>(
         let endgame_flag = entry.tt_flag.endgame_flag();
         let is_pv = entry.tt_flag.is_pv();
 
+        match endgame_flag {
+            EndgameFlag::Win => {
+                return Score::MAX;
+            },
+            EndgameFlag::Lose => {
+                return Score::MIN;
+            },
+            _ => {}
+        }
+
         tt_move = entry.best_move;
         tt_score = entry.score;
 
@@ -119,13 +138,13 @@ pub fn pvs<NT: NodeType, TH: ThreadType>(
     let mut moves = generate_moves(&state.board, &state.movegen_window);
 
     let mut full_window = true;
-    for pos in moves {
+    'position_search: for pos in moves {
         state.board.set_mut(pos);
 
         let score = if full_window {
-            -pvs::<NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
+            -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
         } else {
-            -pvs::<NT::NextType, TH>(td, state, depth_left - 1, -alpha - 1, -alpha)
+            -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -alpha - 1, -alpha)
         };
 
         state.board.unset_mut(pos);
@@ -134,7 +153,7 @@ pub fn pvs<NT: NodeType, TH: ThreadType>(
 
         // alpha-cutoff
         if score <= alpha {
-            continue;
+            continue 'position_search;
         }
 
         best_move = pos.into();
@@ -143,12 +162,16 @@ pub fn pvs<NT: NodeType, TH: ThreadType>(
 
         // beta-cutoff
         if score < beta {
-            continue;
+            continue 'position_search;
         }
 
         score_kind = ScoreKind::Lower;
 
-        break;
+        break 'position_search;
+    }
+
+    if td.is_aborted() {
+        return 0;
     }
 
     best_score

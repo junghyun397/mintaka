@@ -15,7 +15,7 @@ crate-type = ["rlib", "cdylib"]
 ethnum = "1.5.0"
 regex-lite = "0.1.6"
 rand = "0.9.0-alpha.2"
-smallvec = "1.13.2"
+smallvec = "2.0.0-alpha.11"
 
 [dev-dependencies]
 indoc = "2.0.5"

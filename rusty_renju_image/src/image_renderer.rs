@@ -1,6 +1,7 @@
 use rusty_renju::board::Board;
 use rusty_renju::board_iter::BoardIterItem;
-use rusty_renju::history::{Action, History};
+use rusty_renju::history::History;
+use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{Pos, BOARD_WIDTH};
 use tiny_skia::Pixmap;
 
@@ -64,11 +65,12 @@ pub struct ImageBoardRenderer {
     color_palette: ColorPalette,
     board_width: u32,
     dimension: u32,
-    prototype_pixmap: Pixmap,
+    background_pixmap: Pixmap,
     font_bin: Vec<u8>,
 }
 
 pub struct RenderArtifact {
+    actions: usize,
     pixmap: Pixmap,
     history_layer: Option<Pixmap>,
 }
@@ -76,24 +78,24 @@ pub struct RenderArtifact {
 impl Default for ImageBoardRenderer {
     fn default() -> Self {
         let board_width = POINT_SIZE * BOARD_WIDTH as u32;
-        let dimension = COORDINATE_SIZE * 2 + board_width;
+        let pixmap_width = COORDINATE_SIZE * 2 + board_width;
 
-        let mut prototype_pixmap = Pixmap::new(dimension, dimension).unwrap();
-        Self::initialize_prototype(ColorPalette::default(), &mut prototype_pixmap, dimension, board_width);
+        let mut background_pixmap = Pixmap::new(pixmap_width, pixmap_width).unwrap();
+        Self::initialize_background(ColorPalette::default(), &mut background_pixmap, pixmap_width, board_width);
 
         Self {
             color_palette: ColorPalette::default(),
             board_width,
-            dimension,
-            prototype_pixmap,
+            dimension: pixmap_width,
+            background_pixmap,
             font_bin: include_bytes!(font_path!()).to_vec(),
         }
     }
 }
 
 impl ImageBoardRenderer {
-    fn initialize_prototype(color_palette: ColorPalette, pixmap: &mut Pixmap, dimension: u32, board_width: u32) {
-        todo!()
+    fn initialize_background(color_palette: ColorPalette, pixmap: &mut Pixmap, dimension: u32, board_width: u32) {
+        todo!() // draw background grid
     }
 
     fn pos_to_board_pos(&self, pos: Pos) -> (f32, f32) {
@@ -102,37 +104,71 @@ impl ImageBoardRenderer {
         (x, y)
     }
 
-    pub fn render_history_layer(
-        &self,
+    fn render_stone(
+        pixmap: &mut Pixmap,
+        pos: Pos,
+        color: Color,
+    ) {
+        todo!()
+    }
+
+    fn render_history_layer(
         history: &History,
         history_cache: Option<Pixmap>
-    ) -> (Pixmap, Pixmap) {
+    ) -> Pixmap {
         todo!()
     }
 
-    pub fn incremental_render(
+    pub fn render(
         &self,
         board: &Board,
-        history: &[Action],
+        maybe_render_artifact: Option<RenderArtifact>,
+        maybe_history: Option<&History>,
+        maybe_offers: Option<&[Pos]>,
+        maybe_blinds: Option<&[Pos]>,
         render_type: HistoryRenderType,
         display_forbidden_moves: bool,
-        render_artifact: RenderArtifact,
     ) -> (Pixmap, RenderArtifact) {
-        todo!()
-    }
+        let (mut pixmap, history_cache) = if let (Some(history), Some(render_artifact))
+            = (maybe_history, maybe_render_artifact)
+        {
+            let mut pixmap = render_artifact.pixmap;
 
-    pub fn full_render(
-        &self,
-        board: &Board,
-        history: &[Action],
-        render_type: HistoryRenderType,
-        offers: Option<&[Pos]>,
-        blinds: Option<&[Pos]>,
-        display_forbidden_moves: bool
-    ) -> (Pixmap, RenderArtifact) {
-        let mut pixmap = self.prototype_pixmap.clone();
+            for (pos, color) in history.0.iter()
+                .enumerate()
+                .skip(render_artifact.actions)
+                .filter_map(|(seq, action)|
+                    if let Some(pos) = action.maybe_move() {
+                        Some((pos, Color::player_color_from_moves(seq)))
+                    } else {
+                        None
+                    }
+                )
+            {
+                Self::render_stone(&mut pixmap, pos, color);
+            }
 
-        let mut pixmap_archive = pixmap.clone();
+            (pixmap, render_artifact.history_layer)
+        } else {
+            let mut pixmap = self.background_pixmap.clone();
+
+            for (pos, color) in board.iter_items()
+                .enumerate()
+                .filter_map(|(idx, item)|
+                    if let BoardIterItem::Stone(color) = item {
+                        Some((Pos::from_index(idx as u8), color))
+                    } else {
+                        None
+                    }
+                )
+            {
+                Self::render_stone(&mut pixmap, pos, color);
+            }
+
+            (pixmap, None)
+        };
+
+        let mut pixmap_artifact = pixmap.clone();
 
         let mut information_layer = Pixmap::new(self.dimension, self.dimension).unwrap();
 
@@ -148,28 +184,51 @@ impl ImageBoardRenderer {
                 )
             {
                 let pos: Pos = idx.into();
-                todo!()
+                todo!() // draw on information-layer
             }
         }
 
-        if let Some(offers) = offers {
-            todo!()
+        if let Some(offers) = maybe_offers {
+            for offer in offers {
+                todo!() // draw on information-layer
+            }
         }
 
-        if let Some(blinds) = blinds {
-            todo!()
+        if let Some(blinds) = maybe_blinds {
+            for blind in blinds {
+                todo!() // draw on information-layer
+            }
         }
 
-        let mut history_layer = None;
+        let mut maybe_history_layer = None;
 
         match render_type {
             HistoryRenderType::Sequence => {
-                let mut history_pixmap = Pixmap::new(self.dimension, self.dimension).unwrap();
+                let history_pixmap = Self::render_history_layer(
+                    maybe_history.unwrap(),
+                    history_cache
+                );
 
-                history_layer = Some(history_layer);
+                pixmap.draw_pixmap(
+                    0, 0,
+                    history_pixmap.as_ref(),
+                    &tiny_skia::PixmapPaint::default(),
+                    tiny_skia::Transform::identity(),
+                    None,
+                );
+
+                maybe_history_layer = Some(history_pixmap);
             },
             HistoryRenderType::Recent => {
-                todo!()
+                let [pos1, pos2] = maybe_history.unwrap().recent_move_pair();
+
+                if pos1.is_some() {
+                    todo!() // draw on information-layer
+                }
+
+                if pos2.is_some() {
+                    todo!() // draw on information-layer
+                }
             },
             _ => {},
         }
@@ -182,10 +241,10 @@ impl ImageBoardRenderer {
             None,
         );
 
-        if let Some(hist_layer) = history_layer {
+        if let Some(history_layer) = &maybe_history_layer {
             pixmap.draw_pixmap(
                 0, 0,
-                hist_layer.as_ref(),
+                history_layer.as_ref(),
                 &tiny_skia::PixmapPaint::default(),
                 tiny_skia::Transform::identity(),
                 None,
@@ -193,8 +252,9 @@ impl ImageBoardRenderer {
         }
 
         (pixmap, RenderArtifact {
-            pixmap: pixmap_archive,
-            history_layer,
+            actions: maybe_history.unwrap().len(),
+            pixmap: pixmap_artifact,
+            history_layer: maybe_history_layer,
         })
     }
 

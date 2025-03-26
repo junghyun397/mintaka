@@ -58,4 +58,12 @@ impl History {
         self.0.pop()
     }
 
+    pub fn recent_move_pair(&self) -> [MaybePos; 2] {
+        match self.0.len() {
+            0 => [MaybePos::NONE, MaybePos::NONE],
+            1 => [self.0[1].maybe_move(), MaybePos::NONE],
+            _ => [self.0[self.0.len() - 2].maybe_move(), self.0[self.0.len() - 1].maybe_move()]
+        }
+    }
+
 }

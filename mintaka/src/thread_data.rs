@@ -5,6 +5,7 @@ use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::search_frame::SearchFrame;
 use crate::thread_type::ThreadType;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 #[derive(Clone)]
@@ -20,6 +21,8 @@ pub struct ThreadData<'a, TH: ThreadType> {
 
     pub batch_counter: BatchCounter<'a>,
     aborted: &'a AtomicBool,
+
+    pub best_move: Pos,
 }
 
 impl<'a, TH: ThreadType> ThreadData<'a, TH> {
@@ -41,6 +44,7 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
             vcf_stack: Vec::with_capacity(32),
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
+            best_move: MaybePos::NONE.unwrap(),
         }
     }
 
