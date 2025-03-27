@@ -1,9 +1,9 @@
 use rusty_renju::board::Board;
 use rusty_renju::board_iter::BoardIterItem;
-use rusty_renju::history::History;
+use rusty_renju::history::{Action, History};
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{Pos, BOARD_WIDTH};
-use tiny_skia::Pixmap;
+use tiny_skia::{Paint, Pixmap, Stroke};
 
 const POINT_SIZE: u32 = 60; // must have 30 as a factor
 const COORDINATE_SIZE: u32 = POINT_SIZE / 2;
@@ -55,6 +55,16 @@ impl Default for ColorPalette {
     }
 }
 
+pub enum ImageFormat {
+    Png,
+    Webp,
+}
+
+pub enum AnimationFormat {
+    Gif,
+    Webp,
+}
+
 pub enum HistoryRenderType {
     None,
     Recent,
@@ -95,28 +105,57 @@ impl Default for ImageBoardRenderer {
 
 impl ImageBoardRenderer {
     fn initialize_background(color_palette: ColorPalette, pixmap: &mut Pixmap, dimension: u32, board_width: u32) {
-        todo!() // draw background grid
+        pixmap.fill(color_palette.color_wood);
+
+        let mut lint_paint = Paint::default();
+        lint_paint.set_color(color_palette.color_black);
+
+        let line_stroke = Stroke {
+            width: LINE_WEIGHT,
+            ..Stroke::default()
+        };
+
+        let mut text_paint = Paint::default();
+        text_paint.set_color(color_palette.color_black);
+        text_paint.anti_alias = true;
+
+        todo!() // build background image
     }
 
-    fn pos_to_board_pos(&self, pos: Pos) -> (f32, f32) {
+    fn pos_into_board_pos(pos: Pos) -> (f32, f32) {
         let x = COORDINATE_SIZE as f32 + pos.col() as f32 * POINT_SIZE as f32;
         let y = COORDINATE_SIZE as f32 + (BOARD_WIDTH as f32 - pos.row() as f32 - 1.0) * POINT_SIZE as f32;
         (x, y)
     }
 
     fn render_stone(
+        &self,
         pixmap: &mut Pixmap,
-        pos: Pos,
+        board_pos: (f32, f32),
         color: Color,
+        translucent: bool
     ) {
-        todo!()
+        let mut draw_color = match color {
+            Color::Black => self.color_palette.color_black,
+            Color::White => self.color_palette.color_white,
+        };
+
+        let mut border_color = self.color_palette.color_grey;
+
+        if translucent {
+            draw_color.set_alpha(0.5);
+            border_color.set_alpha(0.5);
+        }
+
+        todo!() // draw single stone
     }
 
     fn render_history_layer(
+        &self,
         history: &History,
         history_cache: Option<Pixmap>
     ) -> Pixmap {
-        todo!()
+        todo!() // draw history layer
     }
 
     pub fn render(
@@ -127,8 +166,9 @@ impl ImageBoardRenderer {
         maybe_offers: Option<&[Pos]>,
         maybe_blinds: Option<&[Pos]>,
         render_type: HistoryRenderType,
+        image_format: ImageFormat,
         display_forbidden_moves: bool,
-    ) -> (Pixmap, RenderArtifact) {
+    ) -> (Vec<u8>, RenderArtifact) {
         let (mut pixmap, history_cache) = if let (Some(history), Some(render_artifact))
             = (maybe_history, maybe_render_artifact)
         {
@@ -145,7 +185,7 @@ impl ImageBoardRenderer {
                     }
                 )
             {
-                Self::render_stone(&mut pixmap, pos, color);
+                self.render_stone(&mut pixmap, Self::pos_into_board_pos(pos), color, false);
             }
 
             (pixmap, render_artifact.history_layer)
@@ -162,15 +202,13 @@ impl ImageBoardRenderer {
                     }
                 )
             {
-                Self::render_stone(&mut pixmap, pos, color);
+                self.render_stone(&mut pixmap, Self::pos_into_board_pos(pos), color, false);
             }
 
             (pixmap, None)
         };
 
         let mut pixmap_artifact = pixmap.clone();
-
-        let mut information_layer = Pixmap::new(self.dimension, self.dimension).unwrap();
 
         if display_forbidden_moves {
             for (idx, _) in board.iter_items()
@@ -184,19 +222,20 @@ impl ImageBoardRenderer {
                 )
             {
                 let pos: Pos = idx.into();
-                todo!() // draw on information-layer
+
+                todo!() // draw forbidden dot
             }
         }
 
         if let Some(offers) = maybe_offers {
             for offer in offers {
-                todo!() // draw on information-layer
+                self.render_stone(&mut pixmap, Self::pos_into_board_pos(*offer), Color::Black, true);
             }
         }
 
         if let Some(blinds) = maybe_blinds {
             for blind in blinds {
-                todo!() // draw on information-layer
+                todo!() // draw blind
             }
         }
 
@@ -204,7 +243,7 @@ impl ImageBoardRenderer {
 
         match render_type {
             HistoryRenderType::Sequence => {
-                let history_pixmap = Self::render_history_layer(
+                let history_pixmap = self.render_history_layer(
                     maybe_history.unwrap(),
                     history_cache
                 );
@@ -223,39 +262,52 @@ impl ImageBoardRenderer {
                 let [pos1, pos2] = maybe_history.unwrap().recent_move_pair();
 
                 if pos1.is_some() {
-                    todo!() // draw on information-layer
+                    todo!() // draw "+" mark
                 }
 
                 if pos2.is_some() {
-                    todo!() // draw on information-layer
+                    todo!() // draw "." mark
                 }
             },
             _ => {},
         }
 
-        pixmap.draw_pixmap(
-            0, 0,
-            information_layer.as_ref(),
-            &tiny_skia::PixmapPaint::default(),
-            tiny_skia::Transform::identity(),
-            None,
-        );
+        let image_data = Self::build_image(pixmap, image_format);
 
-        if let Some(history_layer) = &maybe_history_layer {
-            pixmap.draw_pixmap(
-                0, 0,
-                history_layer.as_ref(),
-                &tiny_skia::PixmapPaint::default(),
-                tiny_skia::Transform::identity(),
-                None,
-            );
-        }
-
-        (pixmap, RenderArtifact {
+        (image_data, RenderArtifact {
             actions: maybe_history.unwrap().len(),
             pixmap: pixmap_artifact,
             history_layer: maybe_history_layer,
         })
+    }
+
+    fn build_image(pixmap: Pixmap, image_format: ImageFormat) -> Vec<u8> {
+        match image_format {
+            ImageFormat::Png => pixmap.encode_png().expect("png encoding error"),
+            ImageFormat::Webp => todo!(),
+        }
+    }
+
+    fn build_animation(history: &History, image_format: AnimationFormat) -> Vec<u8> {
+        let mut board = Board::default();
+
+        let mut acc: Vec<Pixmap> = Vec::new();
+
+        for action in history.0.iter() {
+            match action {
+                Action::Move(pos) => {
+                    todo!()
+                }
+                Action::Pass => {
+                    board.pass_mut();
+                }
+            }
+        }
+
+        match image_format {
+            AnimationFormat::Gif => todo!(),
+            AnimationFormat::Webp => todo!(),
+        }
     }
 
 }

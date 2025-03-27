@@ -80,12 +80,12 @@ fn extract_stones_by_color<const C: Color>(source: &[Option<Color>]) -> Box<[Pos
 impl Board {
 
     pub fn to_string_with_move_marker(&self, pos: Pos) -> String {
-        add_move_marker(self.to_string(), self.opponent_color(), pos, '[', ']')
+        add_move_marker(self.to_string(), !self.player_color, pos, '[', ']')
     }
 
     pub fn to_string_with_move_marker_pair(&self, pre: Pos, post: Pos) -> String {
         let board_string = add_move_marker(self.to_string(), self.player_color, pre, '|', '|');
-        add_move_marker(board_string, self.opponent_color(), post, '[', ']')
+        add_move_marker(board_string, !self.player_color, post, '[', ']')
     }
 
     pub fn build_attribute_string<F>(&self, transform: F) -> String

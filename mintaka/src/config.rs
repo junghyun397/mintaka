@@ -12,6 +12,8 @@ pub enum SearchObjective {
 #[derive(Debug, Clone, Copy)]
 pub struct Config {
     pub rule_kind: RuleKind,
+    pub draw_stones: u8,
+
     pub search_objective: SearchObjective,
 
     pub workers: NonZeroUsize,
@@ -28,6 +30,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             rule_kind: RuleKind::Renju,
+            draw_stones: pos::U8_BOARD_SIZE,
             search_objective: SearchObjective::Best,
             workers: NonZeroUsize::new(1).unwrap(),
             max_vcf_depth: pos::U8_BOARD_SIZE,

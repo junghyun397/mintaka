@@ -1,10 +1,10 @@
 use crate::game_state::GameState;
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind};
-use crate::movegen::move_generator::generate_moves;
+use crate::movegen::move_generator::{generate_moves, sort_moves};
 use crate::principal_variation::PrincipalVariation;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
-use rusty_renju::notation::pos::MaybePos;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::value::{Depth, Eval, Score};
 
@@ -39,15 +39,6 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
 ) -> Score {
-    if let Some(pos) = state.board.patterns.unchecked_five_pos.access(state.board.player_color) {
-        td.best_move = *pos;
-        return Score::MAX;
-    }
-
-    if let Some(pos) = state.board.patterns.unchecked_five_pos.access(state.board.opponent_color()) {
-        td.best_move = *pos;
-        return 0;
-    }
 
     let mut eval: Eval = 0;
     let mut score: Score = 0;
@@ -88,17 +79,24 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     mut alpha: Score,
     mut beta: Score,
 ) -> Score {
+    if let Some(pos) = *state.board.patterns.unchecked_five_pos.access(state.board.player_color) {
+        td.best_move = pos;
+        return Score::MAX;
+    }
+
+    if state.board.stones + 2 > td.config.draw_stones {
+        return 0;
+    }
+
     if td.is_aborted() {
         return 0;
     }
 
+    if !NT::IS_ROOT && alpha >= beta {
+        return alpha;
+    }
+
     let pv = PrincipalVariation::default();
-
-    if NT::IS_ROOT {
-    }
-
-    if NT::IS_PV {
-    }
 
     let mut eval = 0;
     let mut tt_move = MaybePos::NONE;
@@ -136,6 +134,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     let mut best_move = tt_move;
 
     let mut moves = generate_moves(&state.board, &state.movegen_window);
+    sort_moves(Pos::from_index(0), &mut moves);
 
     let mut full_window = true;
     'position_search: for pos in moves {
