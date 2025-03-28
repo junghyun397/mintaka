@@ -1,7 +1,6 @@
 use crate::bitfield::Bitfield;
 use crate::board::Board;
 use crate::board_iter::BoardIterItem;
-use crate::game::Game;
 use crate::history::{Action, History};
 use crate::impl_debug_from_display;
 use crate::notation::color::Color;
@@ -303,40 +302,6 @@ impl FromStr for History {
             )
             .collect()
         ))
-    }
-
-}
-
-impl From<History> for Game {
-
-    fn from(history: History) -> Self {
-        let blacks: Box<[Pos]> = history.0.iter()
-            .enumerate()
-            .filter_map(|(idx, action)|
-                (idx % 2 == 0)
-                    .then(|| action.maybe_move().into())
-                    .flatten()
-            )
-            .collect();
-
-        let whites: Box<[Pos]> = history.0.iter()
-            .enumerate()
-            .filter_map(|(idx, action)|
-                (idx % 2 == 1)
-                    .then(|| action.maybe_move().into())
-                    .flatten()
-            )
-            .collect();
-
-        let mut game = Game {
-            board: Board::default(),
-            history,
-            result: None,
-        };
-
-        game.batch_set_each_mut(blacks, whites);
-
-        game
     }
 
 }

@@ -90,8 +90,7 @@ impl Default for ImageBoardRenderer {
         let board_width = POINT_SIZE * BOARD_WIDTH as u32;
         let pixmap_width = COORDINATE_SIZE * 2 + board_width;
 
-        let mut background_pixmap = Pixmap::new(pixmap_width, pixmap_width).unwrap();
-        Self::initialize_background(ColorPalette::default(), &mut background_pixmap, pixmap_width, board_width);
+        let background_pixmap = Self::initialize_background(&ColorPalette::default(), pixmap_width, board_width);
 
         Self {
             color_palette: ColorPalette::default(),
@@ -104,7 +103,8 @@ impl Default for ImageBoardRenderer {
 }
 
 impl ImageBoardRenderer {
-    fn initialize_background(color_palette: ColorPalette, pixmap: &mut Pixmap, dimension: u32, board_width: u32) {
+    fn initialize_background(color_palette: &ColorPalette, dimension: u32, board_width: u32) -> Pixmap {
+        let mut pixmap = Pixmap::new(dimension, dimension).unwrap();
         pixmap.fill(color_palette.color_wood);
 
         let mut lint_paint = Paint::default();
@@ -259,14 +259,19 @@ impl ImageBoardRenderer {
                 maybe_history_layer = Some(history_pixmap);
             },
             HistoryRenderType::Recent => {
-                let [pos1, pos2] = maybe_history.unwrap().recent_move_pair();
+                let [player_action, opponent_action]
+                    = maybe_history.unwrap().recent_move_pair();
 
-                if pos1.is_some() {
-                    todo!() // draw "+" mark
+                if let Some(action) = player_action {
+                    if let Action::Move(pos) = action {
+                        todo!() // draw "+" mark
+                    }
                 }
 
-                if pos2.is_some() {
-                    todo!() // draw "." mark
+                if let Some(action) = opponent_action {
+                    if let Action::Move(pos) = action {
+                        todo!() // draw "." mark
+                    }
                 }
             },
             _ => {},
@@ -288,15 +293,31 @@ impl ImageBoardRenderer {
         }
     }
 
-    fn build_animation(history: &History, image_format: AnimationFormat) -> Vec<u8> {
+    fn build_animation(&self, reference_history: &History, image_format: AnimationFormat) -> Vec<u8> {
+        let mut frames: Vec<Vec<u8>> = Vec::new();
+
         let mut board = Board::default();
+        let mut source_history = History::default();
 
-        let mut acc: Vec<Pixmap> = Vec::new();
-
-        for action in history.0.iter() {
-            match action {
+        let mut render_artifact = None;
+        for action in &reference_history.0 {
+            source_history.action_mut(*action);
+            match *action {
                 Action::Move(pos) => {
-                    todo!()
+                    board.set_mut(*pos);
+
+                    let (frame, artifact) = self.render(
+                        &board,
+                        render_artifact,
+                        Some(&source_history),
+                        None, None,
+                        HistoryRenderType::Sequence,
+                        ImageFormat::Png,
+                        true
+                    );
+
+                    frames.push(frame);
+                    render_artifact = Some(artifact);
                 }
                 Action::Pass => {
                     board.pass_mut();

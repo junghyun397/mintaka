@@ -76,20 +76,19 @@ impl Board {
     }
 
     pub fn batch_set_mut(&mut self, moves: &[Pos]) {
-        let (behind_moves, after_moves): (Vec<Pos>, Vec<Pos>) = moves.iter()
+        let odd_moves = moves.iter()
             .enumerate()
-            .fold(
-                (Vec::with_capacity(moves.len() / 2), Vec::with_capacity(moves.len() / 2)),
-                |(mut even, mut odd), (idx, pos)| {
-                    if idx % 2 == 0 { even.push(*pos); } else { odd.push(*pos); }
+            .filter_map(|(idx, pos)| (idx % 2 == 1).then_some(*pos))
+            .collect::<Vec<_>>();
 
-                    (even, odd)
-                }
-            );
+        let even_moves = moves.iter()
+            .enumerate()
+            .filter_map(|(idx, pos)| (idx % 2 == 0).then_some(*pos))
+            .collect::<Vec<_>>();
 
         let (black_moves, white_moves) = match self.player_color {
-            Color::Black => (behind_moves, after_moves),
-            Color::White => (after_moves, behind_moves)
+            Color::Black => (even_moves, odd_moves),
+            Color::White => (odd_moves, even_moves)
         };
 
         let player = Color::player_color_from_each_moves(black_moves.len(), white_moves.len());

@@ -42,6 +42,10 @@ impl History {
             .copied()
     }
 
+    pub fn action_mut(&mut self, action: Action) {
+        self.0.push(action);
+    }
+
     pub fn play_mut(&mut self, pos: Pos) {
         self.0.push(Action::Move(pos));
     }
@@ -58,11 +62,15 @@ impl History {
         self.0.pop()
     }
 
-    pub fn recent_move_pair(&self) -> [MaybePos; 2] {
+    pub fn recent_move(&self) -> Option<Action> {
+        self.0.last().copied()
+    }
+
+    pub fn recent_move_pair(&self) -> [Option<Action>; 2] {
         match self.0.len() {
-            0 => [MaybePos::NONE, MaybePos::NONE],
-            1 => [self.0[1].maybe_move(), MaybePos::NONE],
-            _ => [self.0[self.0.len() - 2].maybe_move(), self.0[self.0.len() - 1].maybe_move()]
+            0 => [None, None],
+            1 => [Some(self.0[1]), None],
+            _ => [Some(self.0[self.0.len() - 2]), Some(self.0[self.0.len() - 1])]
         }
     }
 
