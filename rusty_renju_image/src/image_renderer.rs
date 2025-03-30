@@ -3,7 +3,7 @@ use rusty_renju::board_iter::BoardIterItem;
 use rusty_renju::history::{Action, History};
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{Pos, BOARD_WIDTH};
-use tiny_skia::{Paint, Pixmap, Stroke};
+use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
 
 const POINT_SIZE: u32 = 60; // must have 30 as a factor
 const COORDINATE_SIZE: u32 = POINT_SIZE / 2;
@@ -13,6 +13,7 @@ const COORDINATE_PADDING: u32 = COORDINATE_SIZE / 5;
 const LINE_WEIGHT: f32 = POINT_SIZE as f32 / 30.0;
 const LINE_START_POS: f32 = COORDINATE_SIZE as f32 + POINT_SIZE as f32 / 2.0 - LINE_WEIGHT / 2.0;
 const LINE_END_POS: f32 = BOARD_WIDTH as f32 * POINT_SIZE as f32 - POINT_SIZE as f32 + LINE_WEIGHT;
+const LINE_END_POS_DELTA: f32 = (BOARD_WIDTH as f32 - 1.0) * POINT_SIZE as f32;
 
 const STONE_SIZE: f32 = POINT_SIZE as f32 - POINT_SIZE as f32 / 30.0;
 const STONE_OFFSET: f32 = (POINT_SIZE as f32 - STONE_SIZE) / 2.0;
@@ -107,19 +108,52 @@ impl ImageBoardRenderer {
         let mut pixmap = Pixmap::new(dimension, dimension).unwrap();
         pixmap.fill(color_palette.color_wood);
 
-        let mut lint_paint = Paint::default();
-        lint_paint.set_color(color_palette.color_black);
+        let mut line_paint = Paint::default();
+        line_paint.set_color(color_palette.color_black);
+        line_paint.anti_alias = true; // Smoother lines
 
         let line_stroke = Stroke {
             width: LINE_WEIGHT,
             ..Stroke::default()
         };
 
-        let mut text_paint = Paint::default();
-        text_paint.set_color(color_palette.color_black);
-        text_paint.anti_alias = true;
+        let mut path_builder = PathBuilder::new();
+        for idx in 0 .. BOARD_WIDTH {
+            let offset = idx as f32 * POINT_SIZE as f32;
 
-        todo!() // build background image
+            // horizontal
+            path_builder.move_to(LINE_START_POS, LINE_START_POS + offset);
+            path_builder.line_to(LINE_START_POS + LINE_END_POS_DELTA, LINE_START_POS + offset);
+
+            // vertical
+            path_builder.move_to(LINE_START_POS + offset, LINE_START_POS);
+            path_builder.line_to(LINE_START_POS + offset, LINE_START_POS + LINE_END_POS_DELTA);
+        }
+
+        let grid_path = path_builder.finish().unwrap();
+        pixmap.stroke_path(
+            &grid_path,
+            &line_paint,
+            &line_stroke,
+            Transform::identity(),
+            None,
+        );
+
+        let center_dot_radius = LINE_WEIGHT * 3.0;
+        let center_xy = dimension as f32 / 2.0;
+        let mut center_dot_path_builder = PathBuilder::new();
+        center_dot_path_builder.push_circle(center_xy, center_xy, center_dot_radius);
+        if let Some(path) = center_dot_path_builder.finish() {
+            pixmap.fill_path(
+                &path,
+                &line_paint,
+                FillRule::Winding,
+                Transform::identity(),
+                None,
+            );
+        }
+
+        pixmap
     }
 
     fn pos_into_board_pos(pos: Pos) -> (f32, f32) {
@@ -147,7 +181,7 @@ impl ImageBoardRenderer {
             border_color.set_alpha(0.5);
         }
 
-        todo!() // draw single stone
+        // todo!() // draw single stone
     }
 
     fn render_history_layer(
@@ -178,8 +212,8 @@ impl ImageBoardRenderer {
                 .enumerate()
                 .skip(render_artifact.actions)
                 .filter_map(|(seq, action)|
-                    if let Some(pos) = action.maybe_move() {
-                        Some((pos, Color::player_color_from_moves(seq)))
+                    if let Action::Move(pos) = action {
+                        Some((*pos, Color::player_color_from_moves(seq)))
                     } else {
                         None
                     }
@@ -280,7 +314,7 @@ impl ImageBoardRenderer {
         let image_data = Self::build_image(pixmap, image_format);
 
         (image_data, RenderArtifact {
-            actions: maybe_history.unwrap().len(),
+            actions: maybe_history.map(|history| history.len()).unwrap_or(0),
             pixmap: pixmap_artifact,
             history_layer: maybe_history_layer,
         })
@@ -304,7 +338,7 @@ impl ImageBoardRenderer {
             source_history.action_mut(*action);
             match *action {
                 Action::Move(pos) => {
-                    board.set_mut(*pos);
+                    board.set_mut(pos);
 
                     let (frame, artifact) = self.render(
                         &board,

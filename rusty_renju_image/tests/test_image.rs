@@ -2,10 +2,11 @@
 mod test_image {
     use indoc::indoc;
     use rusty_renju::board::Board;
-    use rusty_renju_image::image_renderer::ImageBoardRenderer;
+    use rusty_renju_image::image_renderer::{HistoryRenderType, ImageBoardRenderer, ImageFormat};
     use std::fs::File;
     use std::io::Write;
 
+    #[test]
     fn default_image() {
         let case = indoc! {"
            A B C D E F G H I J K L M N O
@@ -30,7 +31,16 @@ mod test_image {
 
         let renderer = ImageBoardRenderer::default();
 
-        let bytes = todo!();
+        let (bytes, _) = renderer.render(
+            &board,
+            None,
+            None,
+            None,
+            None,
+            HistoryRenderType::None,
+            ImageFormat::Png,
+            true
+        );
 
         let mut file = File::create("output.png").unwrap();
 

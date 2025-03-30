@@ -10,9 +10,6 @@ crate-type = ["rlib", "cdylib"]
 [dependencies]
 rusty_renju = { path = "../rusty_renju" }
 tiny-skia = "0.11.4"
-ab_glyph = "0.2.29"
-gif = "0.13.1"
-webp = "0.3.0"
 
 [dev-dependencies]
 indoc = "2.0.5"
