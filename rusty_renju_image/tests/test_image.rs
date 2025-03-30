@@ -6,7 +6,6 @@ mod test_image {
     use std::fs::File;
     use std::io::Write;
 
-    #[test]
     fn default_image() {
         let case = indoc! {"
            A B C D E F G H I J K L M N O

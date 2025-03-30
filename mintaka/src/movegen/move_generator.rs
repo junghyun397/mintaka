@@ -122,7 +122,8 @@ fn generate_defend_three_moves<const C: Color>(board: &Board) -> Moves {
     let player_pattern = board.patterns.field.player_unit::<C>()[pos::BOARD_BOUND];
     let opponent_pattern = board.patterns.field.opponent_unit::<C>()[pos::BOARD_BOUND];
 
-    if (player_pattern.has_any_four() || opponent_pattern.has_close_three())
+    if (!player_pattern.is_empty() || !opponent_pattern.is_empty())
+        && (player_pattern.has_any_four() || opponent_pattern.has_close_three())
         && !(C == Color::Black && player_pattern.is_forbidden())
     {
         defend_threat_moves.push(Pos::from_index(pos::U8_BOARD_BOUND));

@@ -8,7 +8,13 @@ pub struct AspirationWindow {
     pub beta_fails: usize
 }
 
+const ASPIRATION_WINDOW: i32 = 5;
+
 impl AspirationWindow {
+
+    fn calculate_window(depth: i32) -> i32 {
+        (ASPIRATION_WINDOW + (50 / depth - 3)).max(10)
+    }
 
     pub const INFINITE: Self = Self {
         mid: 0,
@@ -17,6 +23,17 @@ impl AspirationWindow {
         alpha_fails: 0,
         beta_fails: 0
     };
+
+    pub fn wrap(mid: Score) -> Self {
+        let window = Self::calculate_window(mid as i32) as Score;
+        Self {
+            mid,
+            alpha: mid - window,
+            beta: mid + window,
+            alpha_fails: 0,
+            beta_fails: 0
+        }
+    }
 
     pub fn extend_alpha(&mut self, score: Score, depth: Depth) {
         self.alpha_fails += 1;

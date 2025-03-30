@@ -179,11 +179,10 @@ impl GameAgent {
             );
 
             s.spawn(move || {
-                let (best_move, score) =
-                    search::iterative_deepening(&mut main_td, &mut state);
+                let score = search::iterative_deepening::<{ RuleKind::Renju }, _>(&mut main_td, &mut state);
 
                 main_td.thread_type.make_response(||
-                    Response::BestMove(best_move, score as f32)
+                    Response::BestMove(main_td.best_move, score as f32)
                 );
             });
 
@@ -199,7 +198,7 @@ impl GameAgent {
                 let mut state = self.state;
 
                 s.spawn(move || {
-                    search::iterative_deepening(&mut worker_td, &mut state);
+                    search::iterative_deepening::<{ RuleKind::Renju }, _>(&mut worker_td, &mut state);
                 });
             }
 

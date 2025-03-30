@@ -48,7 +48,7 @@ fn find_symmetry_moves(ref1: Pos, ref2: Pos, m: Pos) -> HashSet<Pos> {
     }
 }
 
-pub fn find_forbidden_symmetry_moves(history: &[Pos; 4], fifth_move: Pos) -> SmallVec<[Pos; 3]> {
+pub fn find_forbidden_symmetry_moves(history: &[Pos; 4], fifth_move: Pos) -> SmallVec<Pos, 3> {
     let black_side_symmetry_moves = find_symmetry_moves(history[0], history[1], fifth_move);
 
     let white_side_symmetry_moves = find_symmetry_moves(history[2], history[3], fifth_move);

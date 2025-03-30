@@ -1,8 +1,9 @@
 use rusty_renju::board::Board;
-use rusty_renju::history::Action;
+use rusty_renju::board_iter::BoardIterItem;
+use rusty_renju::history::{Action, History};
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{Pos, BOARD_WIDTH};
-use tiny_skia::Pixmap;
+use tiny_skia::{Paint, Pixmap, Stroke};
 
 const POINT_SIZE: u32 = 60; // must have 30 as a factor
 const COORDINATE_SIZE: u32 = POINT_SIZE / 2;
@@ -54,6 +55,16 @@ impl Default for ColorPalette {
     }
 }
 
+pub enum ImageFormat {
+    Png,
+    Webp,
+}
+
+pub enum AnimationFormat {
+    Gif,
+    Webp,
+}
+
 pub enum HistoryRenderType {
     None,
     Recent,
@@ -64,82 +75,260 @@ pub struct ImageBoardRenderer {
     color_palette: ColorPalette,
     board_width: u32,
     dimension: u32,
-    prototype_pixmap: Pixmap,
+    background_pixmap: Pixmap,
     font_bin: Vec<u8>,
+}
+
+pub struct RenderArtifact {
+    actions: usize,
+    pixmap: Pixmap,
+    history_layer: Option<Pixmap>,
 }
 
 impl Default for ImageBoardRenderer {
     fn default() -> Self {
         let board_width = POINT_SIZE * BOARD_WIDTH as u32;
-        let dimension = COORDINATE_SIZE * 2 + board_width;
+        let pixmap_width = COORDINATE_SIZE * 2 + board_width;
 
-        let mut prototype_pixmap = Pixmap::new(dimension, dimension).unwrap();
-        Self::initialize_prototype(ColorPalette::default(), &mut prototype_pixmap, dimension, board_width);
+        let background_pixmap = Self::initialize_background(&ColorPalette::default(), pixmap_width, board_width);
 
         Self {
             color_palette: ColorPalette::default(),
             board_width,
-            dimension,
-            prototype_pixmap,
+            dimension: pixmap_width,
+            background_pixmap,
             font_bin: include_bytes!(font_path!()).to_vec(),
         }
     }
 }
 
 impl ImageBoardRenderer {
-    fn initialize_prototype(color_palette: ColorPalette, pixmap: &mut Pixmap, dimension: u32, board_width: u32) {
-        todo!()
+    fn initialize_background(color_palette: &ColorPalette, dimension: u32, board_width: u32) -> Pixmap {
+        let mut pixmap = Pixmap::new(dimension, dimension).unwrap();
+        pixmap.fill(color_palette.color_wood);
+
+        let mut lint_paint = Paint::default();
+        lint_paint.set_color(color_palette.color_black);
+
+        let line_stroke = Stroke {
+            width: LINE_WEIGHT,
+            ..Stroke::default()
+        };
+
+        let mut text_paint = Paint::default();
+        text_paint.set_color(color_palette.color_black);
+        text_paint.anti_alias = true;
+
+        todo!() // build background image
     }
 
-    fn pos_to_board_pos(&self, pos: Pos) -> (f32, f32) {
+    fn pos_into_board_pos(pos: Pos) -> (f32, f32) {
         let x = COORDINATE_SIZE as f32 + pos.col() as f32 * POINT_SIZE as f32;
         let y = COORDINATE_SIZE as f32 + (BOARD_WIDTH as f32 - pos.row() as f32 - 1.0) * POINT_SIZE as f32;
         (x, y)
     }
 
-    pub fn render_board(
+    fn render_stone(
+        &self,
+        pixmap: &mut Pixmap,
+        board_pos: (f32, f32),
+        color: Color,
+        translucent: bool
+    ) {
+        let mut draw_color = match color {
+            Color::Black => self.color_palette.color_black,
+            Color::White => self.color_palette.color_white,
+        };
+
+        let mut border_color = self.color_palette.color_grey;
+
+        if translucent {
+            draw_color.set_alpha(0.5);
+            border_color.set_alpha(0.5);
+        }
+
+        todo!() // draw single stone
+    }
+
+    fn render_history_layer(
+        &self,
+        history: &History,
+        history_cache: Option<Pixmap>
+    ) -> Pixmap {
+        todo!() // draw history layer
+    }
+
+    pub fn render(
         &self,
         board: &Board,
-        history: &[Action],
+        maybe_render_artifact: Option<RenderArtifact>,
+        maybe_history: Option<&History>,
+        maybe_offers: Option<&[Pos]>,
+        maybe_blinds: Option<&[Pos]>,
         render_type: HistoryRenderType,
-        offers: Option<&[Pos]>,
-        blinds: Option<&[Pos]>,
-        display_forbidden_moves: bool
-    ) -> Pixmap {
-        let mut pixmap = self.prototype_pixmap.clone();
+        image_format: ImageFormat,
+        display_forbidden_moves: bool,
+    ) -> (Vec<u8>, RenderArtifact) {
+        let (mut pixmap, history_cache) = if let (Some(history), Some(render_artifact))
+            = (maybe_history, maybe_render_artifact)
+        {
+            let mut pixmap = render_artifact.pixmap;
+
+            for (pos, color) in history.0.iter()
+                .enumerate()
+                .skip(render_artifact.actions)
+                .filter_map(|(seq, action)|
+                    if let Some(pos) = action.maybe_move() {
+                        Some((pos, Color::player_color_from_moves(seq)))
+                    } else {
+                        None
+                    }
+                )
+            {
+                self.render_stone(&mut pixmap, Self::pos_into_board_pos(pos), color, false);
+            }
+
+            (pixmap, render_artifact.history_layer)
+        } else {
+            let mut pixmap = self.background_pixmap.clone();
+
+            for (pos, color) in board.iter_items()
+                .enumerate()
+                .filter_map(|(idx, item)|
+                    if let BoardIterItem::Stone(color) = item {
+                        Some((Pos::from_index(idx as u8), color))
+                    } else {
+                        None
+                    }
+                )
+            {
+                self.render_stone(&mut pixmap, Self::pos_into_board_pos(pos), color, false);
+            }
+
+            (pixmap, None)
+        };
+
+        let mut pixmap_artifact = pixmap.clone();
 
         if display_forbidden_moves {
-            todo!()
+            for (idx, _) in board.iter_items()
+                .enumerate()
+                .filter(|(_, item)|
+                    if let BoardIterItem::Pattern(container) = item {
+                        container.black.is_forbidden()
+                    } else {
+                        false
+                    }
+                )
+            {
+                let pos: Pos = idx.into();
+
+                todo!() // draw forbidden dot
+            }
         }
 
-        if let Some(offers) = offers {
-            todo!()
+        if let Some(offers) = maybe_offers {
+            for offer in offers {
+                self.render_stone(&mut pixmap, Self::pos_into_board_pos(*offer), Color::Black, true);
+            }
         }
 
-        if let Some(blinds) = blinds {
-            todo!()
+        if let Some(blinds) = maybe_blinds {
+            for blind in blinds {
+                todo!() // draw blind
+            }
         }
+
+        let mut maybe_history_layer = None;
 
         match render_type {
             HistoryRenderType::Sequence => {
-                todo!()
+                let history_pixmap = self.render_history_layer(
+                    maybe_history.unwrap(),
+                    history_cache
+                );
+
+                pixmap.draw_pixmap(
+                    0, 0,
+                    history_pixmap.as_ref(),
+                    &tiny_skia::PixmapPaint::default(),
+                    tiny_skia::Transform::identity(),
+                    None,
+                );
+
+                maybe_history_layer = Some(history_pixmap);
             },
             HistoryRenderType::Recent => {
-                todo!()
+                let [player_action, opponent_action]
+                    = maybe_history.unwrap().recent_move_pair();
+
+                if let Some(action) = player_action {
+                    if let Action::Move(pos) = action {
+                        todo!() // draw "+" mark
+                    }
+                }
+
+                if let Some(action) = opponent_action {
+                    if let Action::Move(pos) = action {
+                        todo!() // draw "." mark
+                    }
+                }
             },
-            HistoryRenderType::None => {},
+            _ => {},
         }
 
-        pixmap
+        let image_data = Self::build_image(pixmap, image_format);
+
+        (image_data, RenderArtifact {
+            actions: maybe_history.unwrap().len(),
+            pixmap: pixmap_artifact,
+            history_layer: maybe_history_layer,
+        })
     }
 
-    pub fn render_incremental(&self, mut pixmap: Pixmap, pos: Pos, color: Color) -> Pixmap {
-        self.draw_stone(&mut pixmap, pos, color);
-        pixmap
+    fn build_image(pixmap: Pixmap, image_format: ImageFormat) -> Vec<u8> {
+        match image_format {
+            ImageFormat::Png => pixmap.encode_png().expect("png encoding error"),
+            ImageFormat::Webp => todo!(),
+        }
     }
 
-    fn draw_stone(&self, pixmap: &mut Pixmap, pos: Pos, color: Color) {
-        todo!()
+    fn build_animation(&self, reference_history: &History, image_format: AnimationFormat) -> Vec<u8> {
+        let mut frames: Vec<Vec<u8>> = Vec::new();
+
+        let mut board = Board::default();
+        let mut source_history = History::default();
+
+        let mut render_artifact = None;
+        for action in &reference_history.0 {
+            source_history.action_mut(*action);
+            match *action {
+                Action::Move(pos) => {
+                    board.set_mut(*pos);
+
+                    let (frame, artifact) = self.render(
+                        &board,
+                        render_artifact,
+                        Some(&source_history),
+                        None, None,
+                        HistoryRenderType::Sequence,
+                        ImageFormat::Png,
+                        true
+                    );
+
+                    frames.push(frame);
+                    render_artifact = Some(artifact);
+                }
+                Action::Pass => {
+                    board.pass_mut();
+                }
+            }
+        }
+
+        match image_format {
+            AnimationFormat::Gif => todo!(),
+            AnimationFormat::Webp => todo!(),
+        }
     }
 
 }
