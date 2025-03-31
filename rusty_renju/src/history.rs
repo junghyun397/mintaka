@@ -10,14 +10,14 @@ impl Action {
     
     pub fn maybe_move(&self) -> MaybePos {
         match self {
-            Action::Move(pos) => (*pos).into(),
+            &Action::Move(pos) => pos.into(),
             Action::Pass => MaybePos::NONE
         }
     }
     
-    pub fn unwrap(&self) -> Pos {
+    pub fn unwrap(self) -> Pos {
         match self {
-            Action::Move(pos) => *pos,
+            Action::Move(pos) => pos,
             Action::Pass => unreachable!()
         }
     }

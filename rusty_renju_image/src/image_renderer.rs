@@ -1,40 +1,25 @@
 use rusty_renju::board::Board;
 use rusty_renju::board_iter::BoardIterItem;
 use rusty_renju::history::{Action, History};
-use rusty_renju::notation::color::Color;
-use rusty_renju::notation::pos::{Pos, BOARD_WIDTH};
-use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
+use rusty_renju::notation::color::{Color, ColorContainer};
+use rusty_renju::notation::pos;
+use rusty_renju::notation::pos::Pos;
+use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, PixmapPaint, Stroke, Transform};
 
-const POINT_SIZE: u32 = 60; // must have 30 as a factor
-const COORDINATE_SIZE: u32 = POINT_SIZE / 2;
-const COORDINATE_START_OFFSET: u32 = COORDINATE_SIZE + POINT_SIZE / 2;
-const COORDINATE_PADDING: u32 = COORDINATE_SIZE / 5;
+const POINT_SIZE: i32 = 60; // must have 30 as a factor
+const COORDINATE_SIZE: i32 = POINT_SIZE / 2;
+const COORDINATE_START_OFFSET: i32 = COORDINATE_SIZE + POINT_SIZE / 2;
+const COORDINATE_PADDING: i32 = COORDINATE_SIZE / 5;
 
-const LINE_WEIGHT: f32 = POINT_SIZE as f32 / 30.0;
-const LINE_START_POS: f32 = COORDINATE_SIZE as f32 + POINT_SIZE as f32 / 2.0 - LINE_WEIGHT / 2.0;
-const LINE_END_POS: f32 = BOARD_WIDTH as f32 * POINT_SIZE as f32 - POINT_SIZE as f32 + LINE_WEIGHT;
-const LINE_END_POS_DELTA: f32 = (BOARD_WIDTH as f32 - 1.0) * POINT_SIZE as f32;
+const BOARD_WIDTH: u32 = POINT_SIZE as u32 * pos::BOARD_WIDTH as u32;
+pub const PIXMAP_WIDTH: u32 = COORDINATE_SIZE as u32 * 2 + BOARD_WIDTH;
 
 const STONE_SIZE: f32 = POINT_SIZE as f32 - POINT_SIZE as f32 / 30.0;
 const STONE_OFFSET: f32 = (POINT_SIZE as f32 - STONE_SIZE) / 2.0;
 
 const BORDER_SIZE: f32 = POINT_SIZE as f32 / 20.0;
 
-const LATEST_MOVE_DOT_SIZE: f32 = POINT_SIZE as f32 / 5.0;
-const LATEST_MOVE_DOT_OFFSET: f32 = (POINT_SIZE as f32 - LATEST_MOVE_DOT_SIZE) / 2.0;
-
-const LATEST_MOVE_CROSS_SIZE: f32 = POINT_SIZE as f32 / 3.0;
-const LATEST_MOVE_CROSS_WEIGHT: f32 = POINT_SIZE as f32 / 30.0;
-const LATEST_MOVE_CROSS_HEIGHT_OFFSET: f32 = (POINT_SIZE as f32 - LATEST_MOVE_CROSS_WEIGHT) / 2.0;
-const LATEST_MOVE_CROSS_WIDTH_OFFSET: f32 = (POINT_SIZE as f32 - LATEST_MOVE_CROSS_SIZE) / 2.0;
-
-const FORBID_DOT_SIZE: f32 = POINT_SIZE as f32 / 5.0;
-const FORBID_DOT_OFFSET: f32 = (POINT_SIZE as f32 - FORBID_DOT_SIZE) / 2.0;
-
 macro_rules! font_path { () => {"../assets/BitstreamCharter.otf"}; }
-
-const HISTORY_FONT_SIZE: f32 = POINT_SIZE as f32 / 2.5;
-const COORDINATE_FONT_SIZE: f32 = POINT_SIZE as f32 / 2.5;
 
 struct ColorPalette {
     color_wood: tiny_skia::Color,
@@ -56,6 +41,14 @@ impl Default for ColorPalette {
     }
 }
 
+struct PixmapLut {
+    background: Pixmap,
+    stone: ColorContainer<Pixmap>,
+    history: ColorContainer<[Pixmap; pos::BOARD_SIZE]>,
+    forbidden_dot: Pixmap,
+    recent_move_marker: ColorContainer<[Pixmap; 2]>,
+}
+
 pub enum ImageFormat {
     Png,
     Webp,
@@ -74,9 +67,8 @@ pub enum HistoryRenderType {
 
 pub struct ImageBoardRenderer {
     color_palette: ColorPalette,
+    pixmap_lut: PixmapLut,
     board_width: u32,
-    dimension: u32,
-    background_pixmap: Pixmap,
     font_bin: Vec<u8>,
 }
 
@@ -88,24 +80,35 @@ pub struct RenderArtifact {
 
 impl Default for ImageBoardRenderer {
     fn default() -> Self {
-        let board_width = POINT_SIZE * BOARD_WIDTH as u32;
-        let pixmap_width = COORDINATE_SIZE * 2 + board_width;
 
-        let background_pixmap = Self::initialize_background(&ColorPalette::default(), pixmap_width, board_width);
+        let color_palette = ColorPalette::default();
+
+        let pixmap_lut = PixmapLut {
+            background: Self::initialize_background(&color_palette),
+            stone: Self::initialize_stone_lut(&color_palette),
+            history: Self::initialize_history_lut(&color_palette),
+            forbidden_dot: Self::initialize_forbidden_dot(&color_palette),
+            recent_move_marker: Self::initialize_recent_move_marker(&color_palette),
+        };
 
         Self {
-            color_palette: ColorPalette::default(),
+            color_palette,
+            pixmap_lut,
             board_width,
-            dimension: pixmap_width,
-            background_pixmap,
             font_bin: include_bytes!(font_path!()).to_vec(),
         }
     }
 }
 
 impl ImageBoardRenderer {
-    fn initialize_background(color_palette: &ColorPalette, dimension: u32, board_width: u32) -> Pixmap {
-        let mut pixmap = Pixmap::new(dimension, dimension).unwrap();
+    fn initialize_background(color_palette: &ColorPalette) -> Pixmap {
+        const LINE_WEIGHT: f32 = POINT_SIZE as f32 / 30.0;
+        const LINE_START_POS: f32 = COORDINATE_SIZE as f32 + POINT_SIZE as f32 / 2.0 - LINE_WEIGHT / 2.0;
+        const LINE_END_POS: f32 = pos::BOARD_WIDTH as f32 * POINT_SIZE as f32 - POINT_SIZE as f32 + LINE_WEIGHT;
+
+        const COORDINATE_FONT_SIZE: f32 = POINT_SIZE as f32 / 2.5;
+
+        let mut pixmap = Pixmap::new(PIXMAP_WIDTH, PIXMAP_WIDTH).unwrap();
         pixmap.fill(color_palette.color_wood);
 
         let mut line_paint = Paint::default();
@@ -118,16 +121,16 @@ impl ImageBoardRenderer {
         };
 
         let mut path_builder = PathBuilder::new();
-        for idx in 0 .. BOARD_WIDTH {
+        for idx in 0 .. pos::BOARD_WIDTH {
             let offset = idx as f32 * POINT_SIZE as f32;
 
             // horizontal
             path_builder.move_to(LINE_START_POS, LINE_START_POS + offset);
-            path_builder.line_to(LINE_START_POS + LINE_END_POS_DELTA, LINE_START_POS + offset);
+            path_builder.line_to(LINE_START_POS + 0.0, LINE_START_POS + offset);
 
             // vertical
             path_builder.move_to(LINE_START_POS + offset, LINE_START_POS);
-            path_builder.line_to(LINE_START_POS + offset, LINE_START_POS + LINE_END_POS_DELTA);
+            path_builder.line_to(LINE_START_POS + offset, LINE_START_POS + 0.0);
         }
 
         let grid_path = path_builder.finish().unwrap();
@@ -140,7 +143,7 @@ impl ImageBoardRenderer {
         );
 
         let center_dot_radius = LINE_WEIGHT * 3.0;
-        let center_xy = dimension as f32 / 2.0;
+        let center_xy = PIXMAP_WIDTH as f32 / 2.0;
         let mut center_dot_path_builder = PathBuilder::new();
         center_dot_path_builder.push_circle(center_xy, center_xy, center_dot_radius);
         if let Some(path) = center_dot_path_builder.finish() {
@@ -156,40 +159,100 @@ impl ImageBoardRenderer {
         pixmap
     }
 
-    fn pos_into_board_pos(pos: Pos) -> (f32, f32) {
-        let x = COORDINATE_SIZE as f32 + pos.col() as f32 * POINT_SIZE as f32;
-        let y = COORDINATE_SIZE as f32 + (BOARD_WIDTH as f32 - pos.row() as f32 - 1.0) * POINT_SIZE as f32;
+    fn initialize_stone_lut(color_palette: &ColorPalette) -> ColorContainer<Pixmap> {
+        todo!()
+    }
+
+    fn initialize_history_lut(color_palette: &ColorPalette) -> ColorContainer<[Pixmap; pos::BOARD_SIZE]> {
+        const HISTORY_FONT_SIZE: f32 = POINT_SIZE as f32 / 2.5;
+
+        let acc = {
+            ColorContainer {
+                black: [Pixmap::new(POINT_SIZE as u32, POINT_SIZE as u32).unwrap(); pos::BOARD_SIZE],
+                white: [Pixmap::new(POINT_SIZE as u32, POINT_SIZE as u32).unwrap(); pos::BOARD_SIZE],
+            }
+        };
+
+        for idx in 0 .. pos::BOARD_SIZE {
+            todo!()
+        }
+
+        acc
+    }
+
+    fn initialize_forbidden_dot(color_palette: &ColorPalette) -> Pixmap {
+        const FORBID_DOT_SIZE: f32 = POINT_SIZE as f32 / 5.0;
+        const FORBID_DOT_OFFSET: f32 = (POINT_SIZE as f32 - FORBID_DOT_SIZE) / 2.0;
+
+        todo!()
+    }
+
+    fn initialize_recent_move_marker(color_palette: &ColorPalette) -> ColorContainer<[Pixmap; 2]> {
+        const LATEST_MOVE_DOT_SIZE: f32 = POINT_SIZE as f32 / 5.0;
+        const LATEST_MOVE_DOT_OFFSET: f32 = (POINT_SIZE as f32 - LATEST_MOVE_DOT_SIZE) / 2.0;
+
+        const LATEST_MOVE_CROSS_SIZE: f32 = POINT_SIZE as f32 / 3.0;
+        const LATEST_MOVE_CROSS_WEIGHT: f32 = POINT_SIZE as f32 / 30.0;
+        const LATEST_MOVE_CROSS_HEIGHT_OFFSET: f32 = (POINT_SIZE as f32 - LATEST_MOVE_CROSS_WEIGHT) / 2.0;
+        const LATEST_MOVE_CROSS_WIDTH_OFFSET: f32 = (POINT_SIZE as f32 - LATEST_MOVE_CROSS_SIZE) / 2.0;
+        todo!()
+    }
+
+    fn pos_into_board_pos(pos: Pos) -> (i32, i32) {
+        let x = COORDINATE_SIZE + pos.col() as i32 * POINT_SIZE;
+        let y = COORDINATE_SIZE + (pos::BOARD_WIDTH as i32 - pos.row() as i32 - 1) * POINT_SIZE;
         (x, y)
     }
 
     fn render_stone(
         &self,
         pixmap: &mut Pixmap,
-        board_pos: (f32, f32),
+        board_pos: (i32, i32),
         color: Color,
         translucent: bool
     ) {
-        let mut draw_color = match color {
-            Color::Black => self.color_palette.color_black,
-            Color::White => self.color_palette.color_white,
+        let mut paint = PixmapPaint::default();
+        paint.opacity = if translucent {
+            0.5
+        } else {
+            1.0
         };
 
-        let mut border_color = self.color_palette.color_grey;
-
-        if translucent {
-            draw_color.set_alpha(0.5);
-            border_color.set_alpha(0.5);
-        }
-
-        // todo!() // draw single stone
+        pixmap.draw_pixmap(
+            board_pos.0, board_pos.1,
+            self.pixmap_lut.stone.access(color).as_ref(),
+            &paint,
+            Transform::identity(),
+            None
+        );
     }
 
     fn render_history_layer(
         &self,
         history: &History,
-        history_cache: Option<Pixmap>
+        history_cache: Option<(usize, Pixmap)>,
     ) -> Pixmap {
-        todo!() // draw history layer
+        let (skip, mut pixmap) = history_cache.unwrap_or_else(||
+            (0, Pixmap::new(POINT_SIZE as u32, POINT_SIZE as u32).unwrap())
+        );
+
+        for (idx, &action) in history.0.iter().enumerate().skip(skip) {
+            if let Action::Move(pos) = action {
+                let color = Color::player_color_from_moves(idx);
+
+                let (x, y) = Self::pos_into_board_pos(pos);
+
+                pixmap.draw_pixmap(
+                    x, y,
+                    self.pixmap_lut.history.access(color)[idx].as_ref(),
+                    &PixmapPaint::default(),
+                    Transform::identity(),
+                    None,
+                );
+            }
+        }
+
+        pixmap
     }
 
     pub fn render(
@@ -212,8 +275,8 @@ impl ImageBoardRenderer {
                 .enumerate()
                 .skip(render_artifact.actions)
                 .filter_map(|(seq, action)|
-                    if let Action::Move(pos) = action {
-                        Some((*pos, Color::player_color_from_moves(seq)))
+                    if let &Action::Move(pos) = action {
+                        Some((pos, Color::player_color_from_moves(seq)))
                     } else {
                         None
                     }
@@ -222,9 +285,9 @@ impl ImageBoardRenderer {
                 self.render_stone(&mut pixmap, Self::pos_into_board_pos(pos), color, false);
             }
 
-            (pixmap, render_artifact.history_layer)
+            (pixmap, render_artifact.history_layer.map(|history_layer| (history.0.len(), history_layer)))
         } else {
-            let mut pixmap = self.background_pixmap.clone();
+            let mut pixmap = self.pixmap_lut.background.clone();
 
             for (pos, color) in board.iter_items()
                 .enumerate()
@@ -257,13 +320,15 @@ impl ImageBoardRenderer {
             {
                 let pos: Pos = idx.into();
 
+                let (x, y) = Self::pos_into_board_pos(pos);
+
                 todo!() // draw forbidden dot
             }
         }
 
         if let Some(offers) = maybe_offers {
-            for offer in offers {
-                self.render_stone(&mut pixmap, Self::pos_into_board_pos(*offer), Color::Black, true);
+            for &offer in offers {
+                self.render_stone(&mut pixmap, Self::pos_into_board_pos(offer), Color::Black, true);
             }
         }
 
@@ -334,9 +399,9 @@ impl ImageBoardRenderer {
         let mut source_history = History::default();
 
         let mut render_artifact = None;
-        for action in &reference_history.0 {
-            source_history.action_mut(*action);
-            match *action {
+        for &action in &reference_history.0 {
+            source_history.action_mut(action);
+            match action {
                 Action::Move(pos) => {
                     board.set_mut(pos);
 

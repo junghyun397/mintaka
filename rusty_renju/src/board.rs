@@ -5,7 +5,6 @@ use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
-use crate::notation::rule::RuleKind;
 use crate::pattern;
 use crate::pattern::Patterns;
 use crate::slice::Slices;
@@ -78,12 +77,12 @@ impl Board {
     pub fn batch_set_mut(&mut self, moves: &[Pos]) {
         let odd_moves = moves.iter()
             .enumerate()
-            .filter_map(|(idx, pos)| (idx % 2 == 1).then_some(*pos))
+            .filter_map(|(idx, &pos)| (idx % 2 == 1).then_some(pos))
             .collect::<Vec<_>>();
 
         let even_moves = moves.iter()
             .enumerate()
-            .filter_map(|(idx, pos)| (idx % 2 == 0).then_some(*pos))
+            .filter_map(|(idx, &pos)| (idx % 2 == 0).then_some(pos))
             .collect::<Vec<_>>();
 
         let (black_moves, white_moves) = match self.player_color {

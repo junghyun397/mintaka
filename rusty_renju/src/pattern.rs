@@ -235,7 +235,7 @@ impl Patterns {
     pub fn update_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
         let slice_pattern = slice.calculate_slice_pattern::<C>();
 
-        match (*slice.pattern_available.player_unit::<C>(), slice_pattern.is_empty()) {
+        match (slice.pattern_available.player_unit::<C>(), slice_pattern.is_empty()) {
             (true, true) => {
                 self.clear_with_slice_mut::<C, D>(slice);
             },

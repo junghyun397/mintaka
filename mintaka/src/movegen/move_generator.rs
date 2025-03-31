@@ -35,8 +35,8 @@ pub fn generate_moves(board: &Board, movegen_window: &MovegenWindow) -> Moves {
 }
 
 pub fn sort_moves(recent_move: Pos, moves: &mut [Pos]) {
-    moves.sort_by(|a, b| {
-        recent_move.distance(*a).cmp(&recent_move.distance(*b))
+    moves.sort_by(|&a, &b| {
+        recent_move.distance(a).cmp(&recent_move.distance(b))
     });
 }
 

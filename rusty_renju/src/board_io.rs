@@ -121,7 +121,7 @@ impl Board {
             fn render_pattern(board: &Board, color: Color, extract: fn(&Pattern) -> u32) -> String {
                 board.build_attribute_string(|item| {
                     match item {
-                        BoardIterItem::Stone(color) => char::from(*color).to_string(),
+                        &BoardIterItem::Stone(color) => char::from(color).to_string(),
                         BoardIterItem::Pattern(pattern) => {
                             let count = extract(&pattern.access(color));
 
@@ -158,7 +158,7 @@ impl Display for Board {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.build_attribute_string(|item|
             match item {
-                BoardIterItem::Stone(color) => char::from(*color),
+                &BoardIterItem::Stone(color) => char::from(color),
                 BoardIterItem::Pattern(pattern) =>
                     pattern.black.forbidden_kind()
                         .map(char::from)

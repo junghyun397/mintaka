@@ -73,8 +73,8 @@ impl MovegenWindow {
     }
 
     pub fn batch_expand_window_mut(&mut self, moves: &[Pos]) {
-        for pos in moves {
-            self.expand_bounds_mut(*pos);
+        for &pos in moves {
+            self.expand_bounds_mut(pos);
         }
 
         self.fill_bounds_mut();
