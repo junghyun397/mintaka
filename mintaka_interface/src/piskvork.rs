@@ -6,7 +6,7 @@ use mintaka::protocol::command::Command;
 use mintaka::protocol::message::{CommandSender, Message, ResponseSender};
 use mintaka::protocol::response::Response;
 use rusty_renju::board::Board;
-use rusty_renju::history::{Action, History};
+use rusty_renju::history::History;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
@@ -77,7 +77,7 @@ fn main() -> Result<(), &'static str> {
                     Response::BestMove(pos, _) => {
                         launched.store(false, Ordering::Relaxed);
 
-                        game_agent.command(Command::Play(Action::Move(pos)))?;
+                        game_agent.command(Command::Play(pos.into()))?;
 
                         PiskvorkResponse::Pos(pos)
                     }
@@ -164,7 +164,7 @@ fn match_command(
                     args.get(2).ok_or("missing column token.")?
                 )?;
 
-                command_sender.command(Command::Play(Action::Move(pos)));
+                command_sender.command(Command::Play(pos.into()));
                 command_sender.launch();
 
                 PiskvorkResponse::None

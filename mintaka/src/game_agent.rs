@@ -9,9 +9,10 @@ use crate::search;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, ThreadType, WorkerThread};
 use crate::utils::time_manager::TimeManager;
-use rusty_renju::history::{Action, History};
+use rusty_renju::history::History;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::notation::color::Color;
+use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -45,13 +46,13 @@ impl GameAgent {
         match command {
             Command::Play(action) => {
                 match action {
-                    Action::Move(pos) => {
-                        self.state.board.set_mut(pos);
-                        self.history.play_mut(pos);
-                    }
-                    Action::Pass => {
+                    MaybePos::NONE => {
                         self.state.board.pass_mut();
                         self.history.pass_mut();
+                    },
+                    pos => {
+                        self.state.board.set_mut(pos.unwrap());
+                        self.history.play_mut(pos.unwrap());
                     }
                 }
             },
@@ -84,14 +85,14 @@ impl GameAgent {
                 }
             },
             Command::Undo => {
-                match self.history.pop_mut() {
+                match self.history.pop() {
                     None => return Err("no history to undo"),
-                    Some(action) => match action {
-                        Action::Move(pos) => {
-                            self.state.board.unset_mut(pos);
-                        }
-                        Action::Pass => {
+                    Some(maybe_pos) => match maybe_pos {
+                        MaybePos::NONE => {
                             self.state.board.switch_player_mut();
+                        },
+                        pos => {
+                            self.state.board.unset_mut(pos.unwrap());
                         }
                     }
                 }
@@ -101,7 +102,8 @@ impl GameAgent {
 
                 self.state = GameState {
                     board: *board,
-                    movegen_window
+                    movegen_window,
+                    history,
                 };
 
                 self.history = history;
@@ -201,9 +203,9 @@ impl GameAgent {
                     search::iterative_deepening::<{ RuleKind::Renju }, _>(&mut worker_td, &mut state);
                 });
             }
-
-            self.tt.increase_age();
         });
+
+        self.tt.increase_age();
     }
 
     pub fn abort(&self) {

@@ -1,76 +1,75 @@
+use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
 
-#[derive(Copy, Clone)]
-pub enum Action {
-    Move(Pos),
-    Pass
+#[derive(Debug, Copy, Clone)]
+pub struct History {
+    pub entries: [MaybePos; pos::BOARD_SIZE],
+    top: usize
 }
 
-impl Action {
-    
-    pub fn maybe_move(&self) -> MaybePos {
-        match self {
-            &Action::Move(pos) => pos.into(),
-            Action::Pass => MaybePos::NONE
-        }
+impl Default for History {
+    fn default() -> Self {
+        Self::EMPTY
     }
-    
-    pub fn unwrap(self) -> Pos {
-        match self {
-            Action::Move(pos) => pos,
-            Action::Pass => unreachable!()
-        }
-    }
-
 }
-
-#[derive(Clone, Default)]
-pub struct History(pub Vec<Action>);
 
 impl History {
 
+    const EMPTY: Self = Self {
+        entries: [MaybePos::NONE; pos::BOARD_SIZE],
+        top: 0,
+    };
+
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.top
+    }
+
+    pub fn push(&mut self, pos: MaybePos) {
+        self.entries[self.top] = pos;
+        self.top += 1;
+    }
+
+    pub fn pop(&mut self) -> Option<MaybePos> {
+        if self.top == 0 {
+            return None;
+        }
+
+        self.top -= 1;
+        let pos = self.entries[self.top];
+        Some(pos)
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.top == 0
     }
 
-    pub fn get(&self, idx: usize) -> Option<Action> {
-        self.0.get(idx)
-            .copied()
-    }
-
-    pub fn action_mut(&mut self, action: Action) {
-        self.0.push(action);
+    pub fn action_mut(&mut self, action: MaybePos) {
+        self.top += 1;
+        self.entries[self.top] = action;
     }
 
     pub fn play_mut(&mut self, pos: Pos) {
-        self.0.push(Action::Move(pos));
-    }
-
-    pub fn undo_mut(&mut self) -> Action {
-        self.0.pop().unwrap_or(Action::Pass)
+        self.action_mut(pos.into())
     }
 
     pub fn pass_mut(&mut self) {
-        self.0.push(Action::Pass)
+        self.top += 1;
+        self.entries[self.top] = MaybePos::NONE;
     }
 
-    pub fn pop_mut(&mut self) -> Option<Action> {
-        self.0.pop()
+    pub fn iter(&self) -> impl Iterator<Item = &MaybePos> {
+        self.entries[..self.top].iter()
     }
 
-    pub fn recent_move(&self) -> Option<Action> {
-        self.0.last().copied()
+    pub fn recent_move(&self) -> MaybePos {
+        self.entries[self.top]
     }
 
-    pub fn recent_move_pair(&self) -> [Option<Action>; 2] {
-        match self.0.len() {
+    pub fn recent_move_pair(&self) -> [Option<MaybePos>; 2] {
+        match self.len() {
             0 => [None, None],
-            1 => [Some(self.0[1]), None],
-            _ => [Some(self.0[self.0.len() - 2]), Some(self.0[self.0.len() - 1])]
+            1 => [Some(self.entries[1]), None],
+            _ => [Some(self.entries[self.len() - 2]), Some(self.entries[self.len() - 1])]
         }
     }
 

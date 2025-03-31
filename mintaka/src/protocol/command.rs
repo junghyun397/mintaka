@@ -1,14 +1,14 @@
 use rusty_renju::board::Board;
-use rusty_renju::history::{Action, History};
+use rusty_renju::history::History;
 use rusty_renju::notation::color::Color;
-use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
 use std::num::NonZeroUsize;
 use std::time::Duration;
 
 pub enum Command {
     Load(Box<Board>, History),
-    Play(Action),
+    Play(MaybePos),
     Set {
         pos: Pos,
         color: Color,

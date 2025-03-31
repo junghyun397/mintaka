@@ -1,11 +1,11 @@
 use crate::bitfield::Bitfield;
 use crate::board::Board;
 use crate::board_iter::BoardIterItem;
-use crate::history::{Action, History};
+use crate::history::History;
 use crate::impl_debug_from_display;
 use crate::notation::color::Color;
 use crate::notation::pos;
-use crate::notation::pos::Pos;
+use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::ForbiddenKind;
 use crate::pattern::Pattern;
 use crate::slice::Slice;
@@ -264,11 +264,11 @@ fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 impl Display for History {
 
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let history = self.0.iter()
-            .map(|mv|
+        let history = self.iter()
+            .map(|&mv|
                 match mv {
-                    Action::Move(pos) => pos.to_string(),
-                    Action::Pass => HISTORY_LITERAL_PASS.to_string()
+                    MaybePos::NONE => HISTORY_LITERAL_PASS.to_string(),
+                    pos => pos.unwrap().to_string()
                 }
             )
             .collect::<Vec<_>>()
@@ -296,12 +296,7 @@ impl FromStr for History {
             return Err(result.unwrap_err());
         }
 
-        Ok(History(IntoIterator::into_iter(history)
-            .filter_map(|r| r.ok()
-                .map(Action::Move)
-            )
-            .collect()
-        ))
+        Ok(todo!())
     }
 
 }

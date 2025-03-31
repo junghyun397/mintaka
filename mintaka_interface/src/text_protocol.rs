@@ -4,8 +4,8 @@ use mintaka::protocol::command::Command;
 use mintaka::protocol::message::{CommandSender, Message, ResponseSender, StatusCommand};
 use mintaka::protocol::response::Response;
 use rusty_renju::board::Board;
-use rusty_renju::history::{Action, History};
-use rusty_renju::notation::pos::Pos;
+use rusty_renju::history::History;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
@@ -202,8 +202,9 @@ fn handle_command(
                         let mut board = Board::default();
 
                         board.batch_set_mut(
-                            &history.0.iter()
-                                .map(Action::unwrap)
+                            &history.iter()
+                                .copied()
+                                .map(MaybePos::unwrap)
                                 .collect::<Vec<Pos>>()
                         );
 
@@ -236,9 +237,9 @@ fn handle_command(
                 command_sender.command(Command::Unset { pos, color });
             },
             "play" => {
-                let pos = args.get(1).ok_or("pos not provided.")?.parse()?;
+                let pos: Pos = args.get(1).ok_or("pos not provided.")?.parse()?;
 
-                command_sender.command(Command::Play(Action::Move(pos)));
+                command_sender.command(Command::Play(pos.into()));
             },
             "undo" => {
                 command_sender.command(Command::Undo);

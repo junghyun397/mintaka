@@ -1,3 +1,4 @@
+use crate::movegen::move_list::MoveList;
 use crate::movegen::movegen_window::MovegenWindow;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
@@ -5,33 +6,13 @@ use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::pattern;
 use rusty_renju::utils::platform;
-use smallvec::SmallVec;
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
-
-pub type Moves = SmallVec<Pos, 64>;
 
 #[derive(Debug, Copy, Clone)]
 pub struct VcfMoves {
     pub moves: [Pos; 31],
     pub len: u8,
-}
-
-pub fn generate_moves(board: &Board, movegen_window: &MovegenWindow) -> Moves {
-    match board.player_color {
-        Color::Black => {
-            if is_open_four_available_white(board) {
-                return generate_defend_three_moves::<{ Color::Black }>(board);
-            }
-        },
-        Color::White => {
-            if is_open_four_available_black(board) {
-                return generate_defend_three_moves::<{ Color::White }>(board);
-            }
-        }
-    }
-
-    generate_neighbors_moves(board, movegen_window)
 }
 
 pub fn sort_moves(recent_move: Pos, moves: &mut [Pos]) {
@@ -78,13 +59,20 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
     VcfMoves { moves: vcf_moves, len: vcf_moves_top as u8 }
 }
 
-fn generate_neighbors_moves(board: &Board, movegen_window: &MovegenWindow) -> Moves {
-    SmallVec::from_iter((board.hot_field ^ movegen_window.movegen_field).iter_hot_pos())
+pub fn generate_neighbors_moves(board: &Board, movegen_window: &MovegenWindow, moves: &mut MoveList) {
+    for pos in (board.hot_field ^ movegen_window.movegen_field).iter_hot_pos() {
+        moves.push(pos, 0); // TODO: distance score
+    }
 }
 
-fn generate_defend_three_moves<const C: Color>(board: &Board) -> Moves {
-    let mut defend_threat_moves = SmallVec::new();
+pub fn generate_defend_three_moves(board: &Board, moves: &mut MoveList) {
+    match board.player_color {
+        Color::Black => generate_defend_three_moves_impl::<{ Color::Black }>(board, moves),
+        Color::White => generate_defend_three_moves_impl::<{ Color::White }>(board, moves)
+    }
+}
 
+fn generate_defend_three_moves_impl<const C: Color>(board: &Board, moves: &mut MoveList) {
     let player_ptr = board.patterns.field.player_unit::<C>().as_ptr() as *const u32;
     let opponent_ptr = board.patterns.field.opponent_unit::<C>().as_ptr() as *const u32;
 
@@ -115,7 +103,7 @@ fn generate_defend_three_moves<const C: Color>(board: &Board) -> Moves {
                 continue;
             }
 
-            defend_threat_moves.push(Pos::from_index(idx as u8));
+            moves.push(Pos::from_index(idx as u8), 0); // TODO: distance score
         }
     }
 
@@ -126,10 +114,15 @@ fn generate_defend_three_moves<const C: Color>(board: &Board) -> Moves {
         && (player_pattern.has_any_four() || opponent_pattern.has_close_three())
         && !(C == Color::Black && player_pattern.is_forbidden())
     {
-        defend_threat_moves.push(Pos::from_index(pos::U8_BOARD_BOUND));
+        moves.push(Pos::from_index(pos::U8_BOARD_BOUND), 0); // TODO: distance score
     }
+}
 
-    defend_threat_moves
+pub fn is_open_four_available(board: &Board) -> bool {
+    match board.player_color {
+        Color::Black => is_open_four_available_black(board),
+        Color::White => is_open_four_available_white(board),
+    }
 }
 
 fn is_open_four_available_black(board: &Board) -> bool {

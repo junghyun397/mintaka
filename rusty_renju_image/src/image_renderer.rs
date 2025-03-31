@@ -1,9 +1,9 @@
 use rusty_renju::board::Board;
 use rusty_renju::board_iter::BoardIterItem;
-use rusty_renju::history::{Action, History};
-use rusty_renju::notation::color::{Color, ColorContainer};
+use rusty_renju::history::History;
+use rusty_renju::notation::color::{Color, HeapColorContainer};
 use rusty_renju::notation::pos;
-use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, PixmapPaint, Stroke, Transform};
 
 const POINT_SIZE: i32 = 60; // must have 30 as a factor
@@ -43,10 +43,10 @@ impl Default for ColorPalette {
 
 struct PixmapLut {
     background: Pixmap,
-    stone: ColorContainer<Pixmap>,
-    history: ColorContainer<[Pixmap; pos::BOARD_SIZE]>,
+    stone: HeapColorContainer<Pixmap>,
+    history: HeapColorContainer<[Pixmap; pos::BOARD_SIZE]>,
     forbidden_dot: Pixmap,
-    recent_move_marker: ColorContainer<[Pixmap; 2]>,
+    recent_move_marker: HeapColorContainer<[Pixmap; 2]>,
 }
 
 pub enum ImageFormat {
@@ -68,7 +68,6 @@ pub enum HistoryRenderType {
 pub struct ImageBoardRenderer {
     color_palette: ColorPalette,
     pixmap_lut: PixmapLut,
-    board_width: u32,
     font_bin: Vec<u8>,
 }
 
@@ -94,7 +93,6 @@ impl Default for ImageBoardRenderer {
         Self {
             color_palette,
             pixmap_lut,
-            board_width,
             font_bin: include_bytes!(font_path!()).to_vec(),
         }
     }
@@ -159,18 +157,15 @@ impl ImageBoardRenderer {
         pixmap
     }
 
-    fn initialize_stone_lut(color_palette: &ColorPalette) -> ColorContainer<Pixmap> {
+    fn initialize_stone_lut(color_palette: &ColorPalette) -> HeapColorContainer<Pixmap> {
         todo!()
     }
 
-    fn initialize_history_lut(color_palette: &ColorPalette) -> ColorContainer<[Pixmap; pos::BOARD_SIZE]> {
+    fn initialize_history_lut(color_palette: &ColorPalette) -> HeapColorContainer<[Pixmap; pos::BOARD_SIZE]> {
         const HISTORY_FONT_SIZE: f32 = POINT_SIZE as f32 / 2.5;
 
         let acc = {
-            ColorContainer {
-                black: [Pixmap::new(POINT_SIZE as u32, POINT_SIZE as u32).unwrap(); pos::BOARD_SIZE],
-                white: [Pixmap::new(POINT_SIZE as u32, POINT_SIZE as u32).unwrap(); pos::BOARD_SIZE],
-            }
+            todo!()
         };
 
         for idx in 0 .. pos::BOARD_SIZE {
@@ -187,7 +182,7 @@ impl ImageBoardRenderer {
         todo!()
     }
 
-    fn initialize_recent_move_marker(color_palette: &ColorPalette) -> ColorContainer<[Pixmap; 2]> {
+    fn initialize_recent_move_marker(color_palette: &ColorPalette) -> HeapColorContainer<[Pixmap; 2]> {
         const LATEST_MOVE_DOT_SIZE: f32 = POINT_SIZE as f32 / 5.0;
         const LATEST_MOVE_DOT_OFFSET: f32 = (POINT_SIZE as f32 - LATEST_MOVE_DOT_SIZE) / 2.0;
 
@@ -236,11 +231,11 @@ impl ImageBoardRenderer {
             (0, Pixmap::new(POINT_SIZE as u32, POINT_SIZE as u32).unwrap())
         );
 
-        for (idx, &action) in history.0.iter().enumerate().skip(skip) {
-            if let Action::Move(pos) = action {
+        for (idx, &action) in history.iter().enumerate().skip(skip) {
+            if action != MaybePos::NONE {
                 let color = Color::player_color_from_moves(idx);
 
-                let (x, y) = Self::pos_into_board_pos(pos);
+                let (x, y) = Self::pos_into_board_pos(action.unwrap());
 
                 pixmap.draw_pixmap(
                     x, y,
@@ -271,21 +266,20 @@ impl ImageBoardRenderer {
         {
             let mut pixmap = render_artifact.pixmap;
 
-            for (pos, color) in history.0.iter()
+            for (pos, color) in history.iter()
                 .enumerate()
                 .skip(render_artifact.actions)
-                .filter_map(|(seq, action)|
-                    if let &Action::Move(pos) = action {
-                        Some((pos, Color::player_color_from_moves(seq)))
-                    } else {
-                        None
+                .filter_map(|(seq, &action)|
+                    match action {
+                        MaybePos::NONE => None,
+                        _ => Some((action.unwrap(), Color::player_color_from_moves(seq))),
                     }
                 )
             {
                 self.render_stone(&mut pixmap, Self::pos_into_board_pos(pos), color, false);
             }
 
-            (pixmap, render_artifact.history_layer.map(|history_layer| (history.0.len(), history_layer)))
+            (pixmap, render_artifact.history_layer.map(|history_layer| (history.len(), history_layer)))
         } else {
             let mut pixmap = self.pixmap_lut.background.clone();
 
@@ -362,13 +356,13 @@ impl ImageBoardRenderer {
                     = maybe_history.unwrap().recent_move_pair();
 
                 if let Some(action) = player_action {
-                    if let Action::Move(pos) = action {
+                    if action != MaybePos::NONE {
                         todo!() // draw "+" mark
                     }
                 }
 
                 if let Some(action) = opponent_action {
-                    if let Action::Move(pos) = action {
+                    if action != MaybePos::NONE {
                         todo!() // draw "." mark
                     }
                 }
@@ -399,11 +393,14 @@ impl ImageBoardRenderer {
         let mut source_history = History::default();
 
         let mut render_artifact = None;
-        for &action in &reference_history.0 {
+        for &action in reference_history.iter() {
             source_history.action_mut(action);
             match action {
-                Action::Move(pos) => {
-                    board.set_mut(pos);
+                MaybePos::NONE => {
+                    board.pass_mut();
+                },
+                pos => {
+                    board.set_mut(pos.unwrap());
 
                     let (frame, artifact) = self.render(
                         &board,
@@ -417,9 +414,6 @@ impl ImageBoardRenderer {
 
                     frames.push(frame);
                     render_artifact = Some(artifact);
-                }
-                Action::Pass => {
-                    board.pass_mut();
                 }
             }
         }

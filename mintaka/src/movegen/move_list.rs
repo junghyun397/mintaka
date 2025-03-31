@@ -28,4 +28,14 @@ impl MoveList {
         self.top
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = (usize, &(Pos, i32))> {
+        self.moves[..self.top].iter().enumerate()
+    }
+
+    pub fn consume(&mut self, idx: usize) -> (Pos, i32) {
+        self.top -= 1;
+        self.moves.swap(idx, self.top);
+        self.moves[self.top]
+    }
+
 }

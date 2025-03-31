@@ -34,7 +34,7 @@ impl<'a> BatchCounter<'a> {
         }
     }
 
-    pub fn count_global(&self) -> usize {
+    pub fn count_global_in_1k(&self) -> usize {
         self.global_counter_in_1k.load(Ordering::Relaxed)
     }
 

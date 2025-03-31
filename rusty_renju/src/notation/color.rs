@@ -124,6 +124,15 @@ pub struct ColorContainer<T: Copy> {
 
 impl_color_container!(ColorContainer);
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[repr(C)]
+pub struct HeapColorContainer<T> {
+    pub black: T,
+    pub white: T,
+}
+
+impl_color_container!(HeapColorContainer);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(align(64))]
 pub struct AlignedColorContainer<T: Copy> {

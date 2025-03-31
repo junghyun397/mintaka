@@ -12,7 +12,6 @@ pub mod board_io;
 pub mod slice;
 pub mod memo;
 pub mod notation;
-pub mod game;
 pub mod utils;
 pub mod opening;
 pub mod pattern;

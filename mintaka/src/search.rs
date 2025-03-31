@@ -1,12 +1,12 @@
 use crate::game_state::GameState;
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind};
-use crate::movegen::move_generator::{generate_moves, sort_moves};
+use crate::movegen::move_picker::MovePicker;
 use crate::principal_variation::PrincipalVariation;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
-use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::{Depth, Eval, Score};
+use rusty_renju::notation::value::Depth;
 
 pub trait NodeType {
 
@@ -38,15 +38,15 @@ struct OffPVNode; impl NodeType for OffPVNode {
 pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
-) -> Score {
+) -> i32 {
 
-    let mut eval: Eval = 0;
-    let mut score: Score = 0;
+    let mut eval: i32 = 0;
+    let mut score: i32 = 0;
 
     let max_depth: Depth = 0;
 
     'iterative_deepening: for depth in 1 ..= max_depth {
-        eval = pvs::<R, RootNode, TH>(td, state, depth, -Score::MAX, Score::MAX);
+        eval = pvs::<R, RootNode, TH>(td, state, depth, -i32::MAX, i32::MAX);
 
         if TH::IS_MAIN {
             if td.node_limit_exceeded() {
@@ -76,24 +76,34 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
     mut depth_left: Depth,
-    mut alpha: Score,
-    mut beta: Score,
-) -> Score {
+    mut alpha: i32,
+    mut beta: i32,
+) -> i32 {
     if let Some(pos) = *state.board.patterns.unchecked_five_pos.access(state.board.player_color) {
         td.best_move = pos;
-        return Score::MAX;
+        return i32::MAX;
     }
 
-    if state.board.stones + 2 > td.config.draw_stones {
+    if td.config.draw_condition.is_some_and(|depth|
+        state.board.stones + 2 > depth
+    ) {
         return 0;
     }
 
-    if td.is_aborted() {
+    if TH::IS_MAIN
+        && td.batch_counter.count_local_total() % 1024 == 0
+        && td.search_limit_exceeded()
+    {
+        td.set_aborted_mut();
+        return 0;
+    } else if td.is_aborted() {
         return 0;
     }
 
-    if !NT::IS_ROOT && alpha >= beta {
-        return alpha;
+    if !NT::IS_ROOT {
+        if alpha >= beta {
+            return alpha;
+        }
     }
 
     let pv = PrincipalVariation::default();
@@ -109,10 +119,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
         match endgame_flag {
             EndgameFlag::Win => {
-                return Score::MAX;
+                return i32::MAX;
             },
             EndgameFlag::Lose => {
-                return Score::MIN;
+                return i32::MIN;
             },
             _ => {}
         }
@@ -130,15 +140,18 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     }
 
     let mut score_kind = ScoreKind::Upper;
-    let mut best_score = Score::MIN;
+    let mut best_score = i32::MIN;
     let mut best_move = tt_move;
 
-    let mut moves = generate_moves(&state.board, &state.movegen_window);
-    sort_moves(Pos::from_index(0), &mut moves);
+    let mut move_picker = MovePicker::new(
+        td,
+        None,
+        None,
+    );
 
     let mut full_window = true;
-    'position_search: for pos in moves {
-        state.board.set_mut(pos);
+    'position_search: while let Some((pos, move_eval)) = move_picker.next(td, state) {
+        state.set(pos);
 
         let score = if full_window {
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
@@ -146,7 +159,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -alpha - 1, -alpha)
         };
 
-        state.board.unset_mut(pos);
+        state.unset();
 
         best_score = best_score.max(score);
 
