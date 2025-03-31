@@ -1,5 +1,5 @@
+use crate::game_state::GameState;
 use crate::movegen::move_list::MoveList;
-use crate::movegen::movegen_window::MovegenWindow;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
@@ -59,22 +59,25 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
     VcfMoves { moves: vcf_moves, len: vcf_moves_top as u8 }
 }
 
-pub fn generate_neighbors_moves(board: &Board, movegen_window: &MovegenWindow, moves: &mut MoveList) {
-    for pos in (board.hot_field ^ movegen_window.movegen_field).iter_hot_pos() {
-        moves.push(pos, 0); // TODO: distance score
+pub fn generate_neighbors_moves(state: &GameState, moves: &mut MoveList) {
+    let [move1, move2] = state.history.recent_move_pair_unchecked();
+
+    for pos in (state.board.hot_field ^ state.movegen_window.movegen_field).iter_hot_pos() {
+        let distance = 5u8.saturating_sub((pos.distance(move1) + pos.distance(move2)) / 2);
+        moves.push(pos, distance as i32);
     }
 }
 
-pub fn generate_defend_three_moves(board: &Board, moves: &mut MoveList) {
-    match board.player_color {
-        Color::Black => generate_defend_three_moves_impl::<{ Color::Black }>(board, moves),
-        Color::White => generate_defend_three_moves_impl::<{ Color::White }>(board, moves)
+pub fn generate_defend_three_moves(state: &GameState, moves: &mut MoveList) {
+    match state.board.player_color {
+        Color::Black => generate_defend_three_moves_impl::<{ Color::Black }>(state, moves),
+        Color::White => generate_defend_three_moves_impl::<{ Color::White }>(state, moves)
     }
 }
 
-fn generate_defend_three_moves_impl<const C: Color>(board: &Board, moves: &mut MoveList) {
-    let player_ptr = board.patterns.field.player_unit::<C>().as_ptr() as *const u32;
-    let opponent_ptr = board.patterns.field.opponent_unit::<C>().as_ptr() as *const u32;
+fn generate_defend_three_moves_impl<const C: Color>(state: &GameState, moves: &mut MoveList) {
+    let player_ptr = state.board.patterns.field.player_unit::<C>().as_ptr() as *const u32;
+    let opponent_ptr = state.board.patterns.field.opponent_unit::<C>().as_ptr() as *const u32;
 
     for start_idx in (0..pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
         let mut player_vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
@@ -97,7 +100,7 @@ fn generate_defend_three_moves_impl<const C: Color>(board: &Board, moves: &mut M
             bitmask &= bitmask - 1;
 
             let idx = start_idx + lane_position;
-            let player_pattern = board.patterns.field.player_unit::<C>()[idx];
+            let player_pattern = state.board.patterns.field.player_unit::<C>()[idx];
 
             if C == Color::Black && player_pattern.is_forbidden() {
                 continue;
@@ -107,8 +110,8 @@ fn generate_defend_three_moves_impl<const C: Color>(board: &Board, moves: &mut M
         }
     }
 
-    let player_pattern = board.patterns.field.player_unit::<C>()[pos::BOARD_BOUND];
-    let opponent_pattern = board.patterns.field.opponent_unit::<C>()[pos::BOARD_BOUND];
+    let player_pattern = state.board.patterns.field.player_unit::<C>()[pos::BOARD_BOUND];
+    let opponent_pattern = state.board.patterns.field.opponent_unit::<C>()[pos::BOARD_BOUND];
 
     if (!player_pattern.is_empty() || !opponent_pattern.is_empty())
         && (player_pattern.has_any_four() || opponent_pattern.has_close_three())

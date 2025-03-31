@@ -45,41 +45,43 @@ impl MovePicker {
         td: &ThreadData<impl ThreadType>,
         state: &GameState,
     ) -> Option<(Pos, i32)> {
-        if self.stage == MoveStage::TT {
-            self.stage = MoveStage::Killer;
+        match self.stage {
+            MoveStage::TT => {
+                self.stage = MoveStage::Killer;
 
-            if let Some(tt_move) = self.tt_move {
-                return Some((tt_move, TT_MOVE_SCORE));
+                if let Some(tt_move) = self.tt_move {
+                    return Some((tt_move, TT_MOVE_SCORE));
+                }
+
+                self.next(td, state)
+            },
+            MoveStage::Killer => {
+                if is_open_four_available(&state.board) {
+                    generate_defend_three_moves(&state, &mut self.moves);
+                    self.stage = MoveStage::DefendFour;
+                } else {
+                    generate_neighbors_moves(&state, &mut self.moves);
+                    self.stage = MoveStage::Neighbor;
+                }
+
+                if let Some(killer_move) = self.killer_move {
+                    return Some((killer_move, 0));
+                }
+
+                self.next(td, state)
+            },
+            MoveStage::DefendFour | MoveStage::Neighbor => {
+                let next_move = self.pick_next();
+
+                if next_move.is_none() {
+                    self.stage = MoveStage::Done;
+                }
+
+                next_move
             }
+
+            MoveStage::Done => None
         }
-
-        if self.stage == MoveStage::Killer {
-            self.stage = if is_open_four_available(&state.board) {
-                generate_defend_three_moves(&state.board, &mut self.moves);
-
-                MoveStage::DefendFour
-            } else {
-                generate_neighbors_moves(&state.board, &state.movegen_window, &mut self.moves);
-
-                MoveStage::Neighbor
-            };
-
-            if let Some(killer_move) = self.killer_move {
-                return Some((killer_move, 0));
-            }
-        }
-
-        if self.stage == MoveStage::DefendFour || self.stage == MoveStage::Neighbor {
-            let next_move = self.pick_next();
-
-            if next_move.is_none() {
-                self.stage = MoveStage::Done;
-            }
-
-            return next_move;
-        }
-
-        None
     }
 
     fn pick_next(&mut self) -> Option<(Pos, i32)> {

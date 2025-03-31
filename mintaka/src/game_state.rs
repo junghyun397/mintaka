@@ -14,13 +14,16 @@ impl GameState {
 
     pub fn set(&mut self, pos: Pos) {
         self.board.set(pos);
-        self.movegen_window.expand_window_mut(pos);
         self.history.push(pos.into());
+
+        self.movegen_window.expand_window_mut(pos);
     }
 
-    pub fn unset(&mut self) {
+    pub fn unset(&mut self, movegen_window: MovegenWindow) {
         let pos = self.history.pop().unwrap();
         self.board.unset(pos.unwrap());
+
+        self.movegen_window = movegen_window;
     }
 
 }

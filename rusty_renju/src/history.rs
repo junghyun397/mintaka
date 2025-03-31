@@ -73,4 +73,8 @@ impl History {
         }
     }
 
+    pub fn recent_move_pair_unchecked(&self) -> [Pos; 2] {
+        [self.entries[self.top - 2].unwrap(), self.entries[self.top - 1].unwrap()]
+    }
+
 }

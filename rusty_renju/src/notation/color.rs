@@ -48,19 +48,8 @@ impl Not for Color {
 }
 
 macro_rules! impl_color_container {
-    ($name:ident) => {
-        impl<T: Copy + Default> Default for $name<T> {
-
-            fn default() -> Self {
-                Self {
-                    black: T::default(),
-                    white: T::default()
-                }
-            }
-
-        }
-
-        impl<T: Copy> $name<T> {
+    ($name:ident,$bound:ident) => {
+        impl<T: $bound> $name<T> {
 
             pub const fn new(black: T, white: T) -> Self {
                 Self {
@@ -122,7 +111,7 @@ pub struct ColorContainer<T: Copy> {
     pub white: T,
 }
 
-impl_color_container!(ColorContainer);
+impl_color_container!(ColorContainer, Copy);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(C)]
@@ -131,7 +120,7 @@ pub struct HeapColorContainer<T> {
     pub white: T,
 }
 
-impl_color_container!(HeapColorContainer);
+impl_color_container!(HeapColorContainer, Clone);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(align(64))]
@@ -140,4 +129,4 @@ pub struct AlignedColorContainer<T: Copy> {
     pub white: T,
 }
 
-impl_color_container!(AlignedColorContainer);
+impl_color_container!(AlignedColorContainer, Copy);

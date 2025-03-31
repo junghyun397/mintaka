@@ -151,6 +151,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
     let mut full_window = true;
     'position_search: while let Some((pos, move_eval)) = move_picker.next(td, state) {
+        let movegen_window = state.movegen_window;
         state.set(pos);
 
         let score = if full_window {
@@ -159,7 +160,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -alpha - 1, -alpha)
         };
 
-        state.unset();
+        state.unset(movegen_window);
 
         best_score = best_score.max(score);
 
