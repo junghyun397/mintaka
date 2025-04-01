@@ -48,14 +48,6 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     'iterative_deepening: for depth in 1 ..= max_depth {
         eval = pvs::<R, RootNode, TH>(td, state, depth, -i32::MAX, i32::MAX);
 
-        if TH::IS_MAIN {
-            if td.node_limit_exceeded() {
-                td.set_aborted_mut();
-
-                break 'iterative_deepening;
-            }
-        }
-
         if td.is_aborted() {
             break 'iterative_deepening;
         }
@@ -100,10 +92,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         return 0;
     }
 
-    if !NT::IS_ROOT {
-        if alpha >= beta {
-            return alpha;
-        }
+    if !NT::IS_ROOT
+        && alpha >= beta
+    {
+        return alpha;
     }
 
     let pv = PrincipalVariation::default();
@@ -143,14 +135,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     let mut best_score = i32::MIN;
     let mut best_move = tt_move;
 
-    let mut move_picker = MovePicker::new(
-        td,
-        None,
-        None,
-    );
+    let mut move_picker = MovePicker::new(tt_move, MaybePos::NONE);
 
     let mut full_window = true;
-    'position_search: while let Some((pos, move_eval)) = move_picker.next(td, state) {
+    'position_search: while let Some((pos, move_eval)) = move_picker.next(state) {
         let movegen_window = state.movegen_window;
         state.set(pos);
 
@@ -160,11 +148,12 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -alpha - 1, -alpha)
         };
 
+        full_window = false;
+
         state.unset(movegen_window);
 
         best_score = best_score.max(score);
 
-        // alpha-cutoff
         if score <= alpha {
             continue 'position_search;
         }

@@ -57,7 +57,7 @@ impl GameAgent {
                 }
             },
             Command::Set { pos, color } => {
-                if self.state.board.stone_kind(pos).is_some() {
+                if !self.state.board.is_pos_empty(pos) {
                     return Err("stone already exists");
                 }
 
@@ -97,13 +97,17 @@ impl GameAgent {
                     }
                 }
             },
-            Command::Load(board, history) => {
+            Command::Load(boxed) => {
+                let (board, history) = *boxed;
+
                 let movegen_window = (&board.hot_field).into();
+                let move_scores = board.hot_field.into();
 
                 self.state = GameState {
-                    board: *board,
-                    movegen_window,
+                    board,
                     history,
+                    movegen_window,
+                    move_scores,
                 };
 
                 self.history = history;

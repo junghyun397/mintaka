@@ -6,19 +6,35 @@ mod bench_vcf {
     use indoc::indoc;
     use mintaka::config::Config;
     use mintaka::endgame::vcf;
+    use mintaka::game_state::GameState;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
     use rusty_renju::board::Board;
+    use rusty_renju::history::History;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
+    use rusty_renju::notation::pos::pos_unchecked;
     use rusty_renju::notation::value::Score;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
     use test::Bencher;
 
     macro_rules! bench_vcf {
-        ($bencher:expr,$case:expr,$score:expr) => {{
+        ($bencher:expr,$case:expr,$score:expr,$player_move:expr,$opponent_move:expr) => {{
             let board = $case.parse::<Board>().unwrap();
+
+            let game_state = GameState {
+                board,
+                history: {
+                    let mut history = History::default();
+
+                    history.push($player_move.into());
+                    history.push($opponent_move.into());
+
+                    history
+                },
+                ..Default::default()
+            };
 
             let config = Config::default();
 
@@ -31,7 +47,7 @@ mod bench_vcf {
             let td = ThreadData::new(WorkerThread, 0, config, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
-                let result = vcf::vcf_search(&mut td.clone(), &board, u8::MAX);
+                let result = vcf::vcf_search(&mut td.clone(), &game_state, u8::MAX);
                 assert_eq!(result, $score);
                 tt.clear_mut(1);
             })
@@ -60,7 +76,7 @@ mod bench_vcf {
            A B C D E F G H I J K L M N O"
         };
 
-        bench_vcf!(b, case, Score::MAX);
+        bench_vcf!(b, case, Score::MAX, pos_unchecked("h6"), pos_unchecked("i6"));
     }
 
     #[bench]
@@ -89,7 +105,7 @@ mod bench_vcf {
            A B C D E F G H I J K L M N O"
         };
 
-        bench_vcf!(b, case, Score::MAX);
+        bench_vcf!(b, case, Score::MAX, pos_unchecked("h8"), pos_unchecked("h8"));
     }
 
     #[bench]

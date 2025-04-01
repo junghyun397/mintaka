@@ -5,7 +5,7 @@ extern crate test;
 mod bench_forbidden_moves {
     use indoc::indoc;
     use rusty_renju::board::Board;
-    use rusty_renju::notation::pos::Pos;
+    use rusty_renju::notation::pos::pos_unchecked;
     use test::Bencher;
 
     #[bench]
@@ -30,8 +30,8 @@ mod bench_forbidden_moves {
            A B C D E F G H I J K L M N O"};
 
         let board = case.parse::<Board>().unwrap();
-        let pos = Pos::from_str_unchecked("i9");
-        let validate_pos = Pos::from_str_unchecked("i8");
+        let pos = pos_unchecked("i9");
+        let validate_pos = pos_unchecked("i8");
 
         b.iter(|| {
             let board = board.set(pos);
@@ -40,7 +40,7 @@ mod bench_forbidden_moves {
     }
 
     #[bench]
-    fn usual_position(b: &mut Bencher) {
+    fn pseudo_position(b: &mut Bencher) {
         let case = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
@@ -61,8 +61,8 @@ mod bench_forbidden_moves {
            A B C D E F G H I J K L M N O"};
 
         let board = case.parse::<Board>().unwrap();
-        let pos = Pos::from_str_unchecked("h11");
-        let validate_pos = Pos::from_str_unchecked("g8");
+        let pos = pos_unchecked("h11");
+        let validate_pos = pos_unchecked("g8");
 
         b.iter(|| {
             let board = board.set(pos);
@@ -92,8 +92,8 @@ mod bench_forbidden_moves {
            A B C D E F G H I J K L M N O"};
 
         let board = case.parse::<Board>().unwrap();
-        let pos = Pos::from_str_unchecked("d8");
-        let validate_pos = Pos::from_str_unchecked("d7");
+        let pos = pos_unchecked("d8");
+        let validate_pos = pos_unchecked("d7");
 
         b.iter(|| {
             let board = board.set(pos);

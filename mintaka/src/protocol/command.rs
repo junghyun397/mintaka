@@ -7,7 +7,7 @@ use std::num::NonZeroUsize;
 use std::time::Duration;
 
 pub enum Command {
-    Load(Box<Board>, History),
+    Load(Box<(Board, History)>),
     Play(MaybePos),
     Set {
         pos: Pos,

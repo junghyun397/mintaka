@@ -244,7 +244,7 @@ impl MoveStageOpeningAgent for OpeningOffer {
 
 impl OpeningOffer {
 
-    fn add(&self, history: &[Pos; 4], pos: Pos) -> Option<OpeningStage> {
+    fn add(&self, partial_history: &[Pos; 4], pos: Pos) -> Option<OpeningStage> {
         self.validate_move(pos).then(|| {
             let mut offers = self.offers.clone();
             offers.push(pos);
@@ -258,7 +258,7 @@ impl OpeningOffer {
                 })
             } else {
                 let mut symmetry_moves = self.symmetry_moves.to_owned();
-                symmetry_moves.extend(find_forbidden_symmetry_moves(&history, pos));
+                symmetry_moves.extend(find_forbidden_symmetry_moves(partial_history, pos));
 
                 OpeningStage::Offer(OpeningOffer {
                     moves: self.moves,

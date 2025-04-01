@@ -29,6 +29,10 @@ impl Board {
         self.player_color.reversed()
     }
 
+    pub fn is_pos_empty(&self, pos: Pos) -> bool {
+        self.slices.horizontal_slices[pos.row_usize()].is_empty(pos.col())
+    }
+
     pub fn stone_kind(&self, pos: Pos) -> Option<Color> {
         self.slices.horizontal_slices[pos.row_usize()].stone_kind(pos.col())
     }

@@ -1,9 +1,7 @@
 use crate::game_state::GameState;
 use crate::movegen::move_generator::{generate_defend_three_moves, generate_neighbors_moves, is_open_four_available};
 use crate::movegen::move_list::MoveList;
-use crate::thread_data::ThreadData;
-use crate::thread_type::ThreadType;
-use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 
 const TT_MOVE_SCORE: i32 = i32::MAX - 5000;
 
@@ -17,24 +15,21 @@ enum MoveStage {
 }
 
 pub struct MovePicker {
-    pub stage: MoveStage,
+    stage: MoveStage,
     moves: MoveList,
-    index: usize,
-    tt_move: Option<Pos>,
-    killer_move: Option<Pos>,
+    tt_move: MaybePos,
+    killer_move: MaybePos,
 }
 
 impl MovePicker {
 
     pub fn new(
-        td: &ThreadData<impl ThreadType>,
-        tt_move: Option<Pos>,
-        killer_move: Option<Pos>,
+        tt_move: MaybePos,
+        killer_move: MaybePos,
     ) -> Self {
         Self {
             stage: MoveStage::TT,
             moves: MoveList::default(),
-            index: 0,
             tt_move,
             killer_move,
         }
@@ -42,33 +37,32 @@ impl MovePicker {
 
     pub fn next(
         &mut self,
-        td: &ThreadData<impl ThreadType>,
         state: &GameState,
     ) -> Option<(Pos, i32)> {
         match self.stage {
             MoveStage::TT => {
                 self.stage = MoveStage::Killer;
 
-                if let Some(tt_move) = self.tt_move {
-                    return Some((tt_move, TT_MOVE_SCORE));
+                if self.tt_move.is_some() {
+                    return Some((self.tt_move.unwrap(), TT_MOVE_SCORE));
                 }
 
-                self.next(td, state)
+                self.next(state)
             },
             MoveStage::Killer => {
                 if is_open_four_available(&state.board) {
-                    generate_defend_three_moves(&state, &mut self.moves);
+                    generate_defend_three_moves(state, &mut self.moves);
                     self.stage = MoveStage::DefendFour;
                 } else {
-                    generate_neighbors_moves(&state, &mut self.moves);
+                    generate_neighbors_moves(state, &mut self.moves);
                     self.stage = MoveStage::Neighbor;
                 }
 
-                if let Some(killer_move) = self.killer_move {
-                    return Some((killer_move, 0));
+                if self.killer_move.is_some() {
+                    return Some((self.killer_move.unwrap(), 0));
                 }
 
-                self.next(td, state)
+                self.next(state)
             },
             MoveStage::DefendFour | MoveStage::Neighbor => {
                 let next_move = self.pick_next();
@@ -78,21 +72,20 @@ impl MovePicker {
                 }
 
                 next_move
-            }
-
+            },
             MoveStage::Done => None
         }
     }
 
     fn pick_next(&mut self) -> Option<(Pos, i32)> {
-        if self.index >= self.moves.len() {
+        if self.moves.is_empty() {
             return None;
         }
 
         let mut best_idx = 0;
         let mut best_score = i32::MIN;
 
-        for (idx, &(pos, score)) in self.moves.iter() {
+        for (idx, &(pos, score)) in self.moves.iter().enumerate() {
             if score > best_score {
                 best_score = score;
                 best_idx = idx;

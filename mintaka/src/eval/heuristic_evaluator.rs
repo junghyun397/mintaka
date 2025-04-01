@@ -98,17 +98,14 @@ impl HeuristicEvaluator {
             Color::Black => {
                 if unit.has_three() {
                     acc[PatternAssign::Three as usize] += 1;
-                    return;
                 }
             },
             Color::White => match unit.count_threes() {
                 PatternCount::Single => {
                     acc[PatternAssign::Three as usize] += 1;
-                    return;
                 },
                 PatternCount::Multiple => {
                     acc[PatternAssign::DoubleThreeFork as usize] += 1;
-                    return;
                 },
                 _ => {}
             }
@@ -124,23 +121,20 @@ impl Evaluator for HeuristicEvaluator {
         let mut acc_white = [0; 9];
 
         for item in board.iter_items() {
-            match item {
-                BoardIterItem::Pattern(pattern) => {
-                    match pattern.black.forbidden_kind() {
-                        Some(ForbiddenKind::DoubleThree) => {
-                            acc_black[PatternAssign::SoftForbidden as usize] += 1;
-                        },
-                        Some(ForbiddenKind::DoubleFour | ForbiddenKind::Overline) => {
-                            acc_black[PatternAssign::HardForbidden as usize] += 1;
-                        },
-                        None => {
-                            Self::eval_pattern::<{ Color::Black }>(&pattern.black, &mut acc_black);
-                        }
-                    };
+            if let BoardIterItem::Pattern(pattern) = item {
+                match pattern.black.forbidden_kind() {
+                    Some(ForbiddenKind::DoubleThree) => {
+                        acc_black[PatternAssign::SoftForbidden as usize] += 1;
+                    },
+                    Some(ForbiddenKind::DoubleFour | ForbiddenKind::Overline) => {
+                        acc_black[PatternAssign::HardForbidden as usize] += 1;
+                    },
+                    None => {
+                        Self::eval_pattern::<{ Color::Black }>(&pattern.black, &mut acc_black);
+                    }
+                };
 
-                    Self::eval_pattern::<{ Color::White }>(&pattern.white, &mut acc_white);
-                }
-                _ => {}
+                Self::eval_pattern::<{ Color::White }>(&pattern.white, &mut acc_white);
             }
         }
 

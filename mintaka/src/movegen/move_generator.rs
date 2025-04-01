@@ -21,7 +21,12 @@ pub fn sort_moves(recent_move: Pos, moves: &mut [Pos]) {
     });
 }
 
-pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, recent_move: Pos) -> VcfMoves {
+fn score_move(state: &GameState, pos: Pos) -> i32 {
+    let distance = 5u8.saturating_sub(state.history.multi_distance(pos));
+    state.move_scores.scores[pos.idx_usize()] as i32 * distance as i32
+}
+
+pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, recent_four: Pos) -> VcfMoves {
     let mut vcf_moves = [MaybePos::NONE.unwrap(); 31];
     let mut vcf_moves_top = 0;
 
@@ -42,7 +47,7 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
             bitmask &= bitmask - 1;
 
             let pos = Pos::from_index((start_idx + lane_position) as u8);
-            if recent_move.distance(pos) <= distance_window {
+            if recent_four.distance(pos) <= distance_window {
                 vcf_moves[vcf_moves_top] = pos;
                 vcf_moves_top += 1;
             }
@@ -54,17 +59,15 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
         vcf_moves_top += 1;
     }
 
-    sort_moves(recent_move, &mut vcf_moves[..vcf_moves_top]);
+    sort_moves(recent_four, &mut vcf_moves[..vcf_moves_top]);
 
     VcfMoves { moves: vcf_moves, len: vcf_moves_top as u8 }
 }
 
 pub fn generate_neighbors_moves(state: &GameState, moves: &mut MoveList) {
-    let [move1, move2] = state.history.recent_move_pair_unchecked();
 
     for pos in (state.board.hot_field ^ state.movegen_window.movegen_field).iter_hot_pos() {
-        let distance = 5u8.saturating_sub((pos.distance(move1) + pos.distance(move2)) / 2);
-        moves.push(pos, distance as i32);
+        moves.push(pos, score_move(state, pos));
     }
 }
 
@@ -89,7 +92,7 @@ fn generate_defend_three_moves_impl<const C: Color>(state: &GameState, moves: &m
         );
 
         player_vector &= Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
-        opponent_vector &= Simd::splat(pattern::UNIT_CLOSE_THREE_MASK | pattern::UNIT_OPEN_FOUR_MASK);
+        opponent_vector &= Simd::splat(pattern::UNIT_CLOSE_THREE_MASK);
 
         let mut bitmask = (
             player_vector.simd_ne(Simd::splat(0)) | opponent_vector.simd_ne(Simd::splat(0))
@@ -106,7 +109,8 @@ fn generate_defend_three_moves_impl<const C: Color>(state: &GameState, moves: &m
                 continue;
             }
 
-            moves.push(Pos::from_index(idx as u8), 0); // TODO: distance score
+            let pos = Pos::from_index(idx as u8);
+            moves.push(pos, score_move(state, pos));
         }
     }
 
@@ -117,14 +121,15 @@ fn generate_defend_three_moves_impl<const C: Color>(state: &GameState, moves: &m
         && (player_pattern.has_any_four() || opponent_pattern.has_close_three())
         && !(C == Color::Black && player_pattern.is_forbidden())
     {
-        moves.push(Pos::from_index(pos::U8_BOARD_BOUND), 0); // TODO: distance score
+        const POS: Pos = Pos::from_index(pos::U8_BOARD_BOUND);
+        moves.push(POS, score_move(state, POS));
     }
 }
 
 pub fn is_open_four_available(board: &Board) -> bool {
     match board.player_color {
-        Color::Black => is_open_four_available_black(board),
-        Color::White => is_open_four_available_white(board),
+        Color::Black => is_open_four_available_white(board),
+        Color::White => is_open_four_available_black(board),
     }
 }
 

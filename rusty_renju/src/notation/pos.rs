@@ -43,6 +43,13 @@ pub const CENTER_ROW_COL: u8 = CENTER.col();
 
 const STEP_TABLE: [isize; 4] = [1, I_BOARD_WIDTH, I_BOARD_WIDTH + 1, -(I_BOARD_WIDTH - 1)];
 
+pub const fn pos_unchecked(source: &str) -> Pos {
+    let row = u8_from_str(source, 1) - 1;
+    let col = source.as_bytes()[0] - b'a';
+
+    Pos::from_cartesian(row, col)
+}
+
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub struct Pos(u8);
 
@@ -68,12 +75,6 @@ impl Pos {
         Self(cartesian_to_index!(row, col))
     }
 
-    pub const fn from_str_unchecked(source: &str) -> Self {
-        let row = u8_from_str(source, 1) - 1;
-        let col = source.as_bytes()[0] - b'a';
-
-        Self::from_cartesian(row, col)
-    }
 
     pub const fn to_cartesian(&self) -> (u8, u8) {
         index_to_cartesian!(self.0)

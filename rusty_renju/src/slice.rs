@@ -77,6 +77,11 @@ impl Slice {
         }
     }
 
+    pub fn is_empty(&self, idx: u8) -> bool {
+        let mask = 0b1 << idx;
+        (self.black_stones | self.white_stones) & mask == 0
+    }
+
     pub fn stone_kind(&self, idx: u8) -> Option<Color> {
         let mask = 0b1 << idx;
 

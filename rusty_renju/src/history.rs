@@ -73,8 +73,40 @@ impl History {
         }
     }
 
+    pub fn recent_player_move_unchecked(&self) -> Pos {
+        self.entries[self.top - 2].unwrap()
+    }
+
+    pub fn recent_opponent_move_unchecked(&self) -> Pos {
+        self.entries[self.top - 1].unwrap()
+    }
+
     pub fn recent_move_pair_unchecked(&self) -> [Pos; 2] {
-        [self.entries[self.top - 2].unwrap(), self.entries[self.top - 1].unwrap()]
+        [self.recent_player_move_unchecked(), self.recent_opponent_move_unchecked()]
+    }
+
+    pub fn multi_distance(&self, pos: Pos) -> u8 {
+        match self.top {
+            1 => self.entries[0].unwrap().distance(pos),
+            2 => {
+                let distance1 = self.entries[self.top - 2].unwrap().distance(pos);
+                let distance2 = self.entries[self.top - 1].unwrap().distance(pos);
+                (distance1 + distance2) / 2
+            },
+            3 => {
+                let distance1 = self.entries[self.top - 3].unwrap().distance(pos);
+                let distance2 = self.entries[self.top - 2].unwrap().distance(pos);
+                let distance3 = self.entries[self.top - 1].unwrap().distance(pos);
+                (distance1 + distance2 + distance3) / 3
+            },
+            _ => {
+                let distance1 = self.entries[self.top - 4].unwrap().distance(pos);
+                let distance2 = self.entries[self.top - 3].unwrap().distance(pos);
+                let distance3 = self.entries[self.top - 2].unwrap().distance(pos);
+                let distance4 = self.entries[self.top - 1].unwrap().distance(pos);
+                (distance1 + distance2 + distance3 + distance4) / 4
+            }
+        }
     }
 
 }
