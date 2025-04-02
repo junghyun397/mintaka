@@ -1,9 +1,10 @@
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::notation::value::Score;
 
 #[derive(Debug)]
 pub struct MoveList {
-    moves: [(Pos, i32); pos::BOARD_SIZE],
+    moves: [(Pos, Score); pos::BOARD_SIZE],
     top: usize,
 }
 
@@ -16,31 +17,34 @@ impl Default for MoveList {
 impl MoveList {
 
     const EMPTY: Self = Self {
-        moves: [(MaybePos::NONE.unwrap(), i32::MIN); pos::BOARD_SIZE],
+        moves: [(MaybePos::NONE.unwrap(), Score::MIN); pos::BOARD_SIZE],
         top: 0,
     };
 
-    pub fn push(&mut self, pos: Pos, score: i32) {
+    pub fn push(&mut self, pos: Pos, score: Score) {
         self.moves[self.top] = (pos, score);
         self.top += 1;
     }
 
-    pub fn len(&self) -> usize {
-        self.top
-    }
+    pub fn consume_best(&mut self) -> Option<(Pos, Score)> {
+        if self.top == 0 {
+            return None;
+        }
 
-    pub fn is_empty(&self) -> bool {
-        self.top == 0
-    }
+        let mut best_idx = 0;
+        let mut best_score = i16::MIN;
 
-    pub fn iter(&self) -> impl Iterator<Item = &(Pos, i32)> {
-        self.moves[..self.top].iter()
-    }
+        for (idx, &(_, score)) in self.moves[0 .. self.top].iter().enumerate() {
+            if score > best_score {
+                best_score = score;
+                best_idx = idx;
+            }
+        }
 
-    pub fn consume(&mut self, idx: usize) -> (Pos, i32) {
         self.top -= 1;
-        self.moves.swap(idx, self.top);
-        self.moves[self.top]
+        self.moves.swap(best_idx, self.top);
+
+        Some(self.moves[self.top])
     }
 
 }

@@ -16,7 +16,7 @@ impl GameState {
 
     pub fn set(&mut self, pos: Pos) {
         self.board.set_mut(pos);
-        self.history.push(pos.into());
+        self.history.set_mut(pos);
 
         self.move_scores.add_neighborhood_score(pos);
         self.movegen_window.expand_window_mut(pos);

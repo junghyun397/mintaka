@@ -3,7 +3,7 @@ use rusty_renju::board::Board;
 use rusty_renju::board_iter::BoardIterItem;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::rule::ForbiddenKind;
-use rusty_renju::notation::value::Eval;
+use rusty_renju::notation::value::Score;
 use rusty_renju::pattern::{Pattern, PatternCount};
 
 struct HeuristicWeights {
@@ -116,7 +116,7 @@ impl HeuristicEvaluator {
 
 impl Evaluator for HeuristicEvaluator {
 
-    fn static_eval(&self, board: &Board) -> Eval {
+    fn static_eval(&self, board: &Board) -> Score {
         let mut acc_black = [0; 9];
         let mut acc_white = [0; 9];
 
@@ -162,7 +162,7 @@ impl Evaluator for HeuristicEvaluator {
             }
         };
 
-        score.clamp(Eval::MIN as isize, Eval::MAX as isize) as Eval
+        score.clamp(Score::MIN as isize, Score::MAX as isize) as Score
     }
 
 }

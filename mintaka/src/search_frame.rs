@@ -1,9 +1,9 @@
 use rusty_renju::notation::pos::MaybePos;
-use rusty_renju::notation::value::Eval;
+use rusty_renju::notation::value::Score;
 
 #[derive(Debug, Copy, Clone)]
 pub struct SearchFrame {
-    pub static_eval: Eval,
+    pub static_eval: Score,
     pub best_move: MaybePos,
     pub extensions: bool,
     pub on_pv: bool,

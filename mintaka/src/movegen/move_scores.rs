@@ -2,6 +2,7 @@ use rusty_renju::bitfield::Bitfield;
 use rusty_renju::cartesian_to_index;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
+use rusty_renju::pattern::Pattern;
 
 #[derive(Debug, Copy, Clone)]
 pub struct MoveScores {
@@ -29,6 +30,10 @@ impl MoveScores {
     pub const EMPTY: MoveScores = MoveScores {
         scores: [0; pos::BOARD_SIZE],
     };
+
+    pub fn update_pattern_score(&mut self, pos: Pos, pattern: Pattern) {
+        todo!()
+    }
 
     pub fn add_neighborhood_score(&mut self, pos: Pos) {
         for row in

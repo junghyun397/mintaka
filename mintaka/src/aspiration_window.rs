@@ -8,11 +8,11 @@ pub struct AspirationWindow {
     pub beta_fails: usize
 }
 
-const ASPIRATION_WINDOW: i32 = 5;
+const ASPIRATION_WINDOW: i16 = 5;
 
 impl AspirationWindow {
 
-    fn calculate_window(depth: i32) -> i32 {
+    fn calculate_window(depth: i16) -> i16 {
         (ASPIRATION_WINDOW + (50 / depth - 3)).max(10)
     }
 
@@ -25,7 +25,7 @@ impl AspirationWindow {
     };
 
     pub fn wrap(mid: Score) -> Self {
-        let window = Self::calculate_window(mid as i32) as Score;
+        let window = Self::calculate_window(mid as i16) as Score;
         Self {
             mid,
             alpha: mid - window,

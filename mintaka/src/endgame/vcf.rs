@@ -8,7 +8,7 @@ use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::value::{Depth, Eval, Score};
+use rusty_renju::notation::value::{Depth, Score};
 use rusty_renju::pattern::{Pattern, PatternCount};
 
 pub trait VcfDestination {
@@ -141,7 +141,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
     'vcf_search: loop {
         'position_search: for (seq, four_pos) in vcf_moves.moves.into_iter()
             .enumerate()
-            .take(vcf_moves.len as usize)
+            .take(vcf_moves.top as usize)
             .skip(move_counter)
         {
             let idx = four_pos.idx_usize();
@@ -217,7 +217,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
                 let mut moves = [MaybePos::NONE.unwrap(); 31];
                 moves[0] = position_board.patterns.unchecked_five_pos.opponent_unit::<C>().unwrap();
-                VcfMoves { moves, len: 1 }
+                VcfMoves { moves, top: 1 }
             } else {
                 generate_vcf_moves(&position_board, C, ACC::DISTANCE_WINDOW, four_pos)
             };
@@ -270,7 +270,7 @@ fn build_vcf_win_tt_entry(depth: Depth, four_pos: Pos) -> TTEntry {
             false,
         ),
         score: Score::MAX,
-        eval: Eval::MAX,
+        eval: Score::MAX,
     }
 }
 
@@ -286,6 +286,6 @@ fn build_vcf_lose_tt_entry(depth: Depth) -> TTEntry {
            false,
        ),
        score: Score::MIN,
-       eval: Eval::MIN,
+       eval: Score::MIN,
    }
 }

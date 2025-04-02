@@ -12,18 +12,25 @@ use std::simd::Simd;
 #[derive(Debug, Copy, Clone)]
 pub struct VcfMoves {
     pub moves: [Pos; 31],
-    pub len: u8,
+    pub top: u8,
 }
 
-pub fn sort_moves(recent_move: Pos, moves: &mut [Pos]) {
-    moves.sort_by(|&a, &b| {
-        recent_move.distance(a).cmp(&recent_move.distance(b))
-    });
+impl VcfMoves {
+
+    fn sort_moves(&mut self, ref_pos: Pos) {
+        let ref_row = ref_pos.row();
+        let ref_col = ref_pos.col();
+
+        self.moves[..self.top as usize].sort_by_key(|&pos|
+            pos::chebyshev_distance(ref_row, ref_col, pos.row(), pos.col())
+        );
+    }
+
 }
 
-fn score_move(state: &GameState, pos: Pos) -> i32 {
+fn score_move(state: &GameState, pos: Pos) -> i16 {
     let distance = 5u8.saturating_sub(state.history.multi_distance(pos));
-    state.move_scores.scores[pos.idx_usize()] as i32 * distance as i32
+    state.move_scores.scores[pos.idx_usize()] as i16 * distance as i16
 }
 
 pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, recent_four: Pos) -> VcfMoves {
@@ -59,9 +66,11 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
         vcf_moves_top += 1;
     }
 
-    sort_moves(recent_four, &mut vcf_moves[..vcf_moves_top]);
+    let mut vcf_moves = VcfMoves { moves: vcf_moves, top: vcf_moves_top as u8 };
 
-    VcfMoves { moves: vcf_moves, len: vcf_moves_top as u8 }
+    vcf_moves.sort_moves(recent_four);
+
+    vcf_moves
 }
 
 pub fn generate_neighbors_moves(state: &GameState, moves: &mut MoveList) {

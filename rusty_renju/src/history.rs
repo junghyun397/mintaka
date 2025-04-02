@@ -24,11 +24,6 @@ impl History {
         self.top
     }
 
-    pub fn push(&mut self, pos: MaybePos) {
-        self.entries[self.top] = pos;
-        self.top += 1;
-    }
-
     pub fn pop(&mut self) -> Option<MaybePos> {
         if self.top == 0 {
             return None;
@@ -43,18 +38,17 @@ impl History {
         self.top == 0
     }
 
-    pub fn action_mut(&mut self, action: MaybePos) {
-        self.top += 1;
+    fn action_mut(&mut self, action: MaybePos) {
         self.entries[self.top] = action;
+        self.top += 1;
     }
 
-    pub fn play_mut(&mut self, pos: Pos) {
+    pub fn set_mut(&mut self, pos: Pos) {
         self.action_mut(pos.into())
     }
 
     pub fn pass_mut(&mut self) {
-        self.top += 1;
-        self.entries[self.top] = MaybePos::NONE;
+        self.action_mut(MaybePos::NONE)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &MaybePos> {

@@ -28,8 +28,8 @@ mod bench_vcf {
                 history: {
                     let mut history = History::default();
 
-                    history.push($player_move.into());
-                    history.push($opponent_move.into());
+                    history.set_mut($player_move.into());
+                    history.set_mut($opponent_move.into());
 
                     history
                 },
@@ -105,7 +105,7 @@ mod bench_vcf {
            A B C D E F G H I J K L M N O"
         };
 
-        bench_vcf!(b, case, Score::MAX, pos_unchecked("h8"), pos_unchecked("h8"));
+        bench_vcf!(b, case, Score::MAX, pos_unchecked("e8"), pos_unchecked("e7"));
     }
 
     #[bench]

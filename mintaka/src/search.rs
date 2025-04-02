@@ -38,15 +38,15 @@ struct OffPVNode; impl NodeType for OffPVNode {
 pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
-) -> i32 {
+) -> i16 {
 
-    let mut eval: i32 = 0;
-    let mut score: i32 = 0;
+    let mut eval: i16 = 0;
+    let mut score: i16 = 0;
 
     let max_depth: Depth = 0;
 
     'iterative_deepening: for depth in 1 ..= max_depth {
-        eval = pvs::<R, RootNode, TH>(td, state, depth, -i32::MAX, i32::MAX);
+        eval = pvs::<R, RootNode, TH>(td, state, depth, -i16::MAX, i16::MAX);
 
         if td.is_aborted() {
             break 'iterative_deepening;
@@ -68,12 +68,12 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
     mut depth_left: Depth,
-    mut alpha: i32,
-    mut beta: i32,
-) -> i32 {
+    mut alpha: i16,
+    mut beta: i16,
+) -> i16 {
     if let Some(pos) = *state.board.patterns.unchecked_five_pos.access(state.board.player_color) {
         td.best_move = pos;
-        return i32::MAX;
+        return i16::MAX;
     }
 
     if td.config.draw_condition.is_some_and(|depth|
@@ -111,10 +111,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
         match endgame_flag {
             EndgameFlag::Win => {
-                return i32::MAX;
+                return i16::MAX;
             },
             EndgameFlag::Lose => {
-                return i32::MIN;
+                return i16::MIN;
             },
             _ => {}
         }
@@ -132,13 +132,13 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     }
 
     let mut score_kind = ScoreKind::Upper;
-    let mut best_score = i32::MIN;
+    let mut best_score = i16::MIN;
     let mut best_move = tt_move;
 
     let mut move_picker = MovePicker::new(tt_move, MaybePos::NONE);
 
     let mut full_window = true;
-    'position_search: while let Some((pos, move_eval)) = move_picker.next(state) {
+    'position_search: while let Some((pos, move_score)) = move_picker.next(state) {
         let movegen_window = state.movegen_window;
         state.set(pos);
 

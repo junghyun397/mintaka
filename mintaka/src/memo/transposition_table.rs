@@ -2,7 +2,7 @@ use crate::memo::tt_entry::{EndgameFlag, ScoreKind, TTEntry, TTEntryBucket, TTFl
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
-use rusty_renju::notation::value::{Depth, Eval, Score};
+use rusty_renju::notation::value::{Depth, Score};
 use std::sync::atomic::{AtomicU8, Ordering};
 
 pub struct TranspositionTable {
@@ -86,12 +86,11 @@ impl TTView<'_> {
     pub fn store_mut(
         &self,
         key: HashKey,
-        ply: usize,
         maybe_best_move: MaybePos,
         score_kind: ScoreKind,
         endgame_flag: EndgameFlag,
         depth: Depth,
-        eval: Eval,
+        eval: Score,
         mut score: Score,
         is_pv: bool,
     ) {

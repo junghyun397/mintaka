@@ -52,7 +52,7 @@ impl GameAgent {
                     },
                     pos => {
                         self.state.board.set_mut(pos.unwrap());
-                        self.history.play_mut(pos.unwrap());
+                        self.history.set_mut(pos.unwrap());
                     }
                 }
             },
