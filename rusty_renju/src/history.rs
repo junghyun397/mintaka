@@ -38,7 +38,7 @@ impl History {
         self.top == 0
     }
 
-    fn action_mut(&mut self, action: MaybePos) {
+    pub fn action_mut(&mut self, action: MaybePos) {
         self.entries[self.top] = action;
         self.top += 1;
     }

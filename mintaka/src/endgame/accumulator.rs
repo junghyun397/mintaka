@@ -9,7 +9,7 @@ pub trait EndgameAccumulator {
 
     fn unit(pos: Pos) -> Self;
 
-    fn append(self, defend: Pos, threat: Pos) -> Self;
+    fn append_pos(self, defend: Pos, threat: Pos) -> Self;
 
     fn has_result(&self) -> bool;
 
@@ -29,7 +29,7 @@ impl EndgameAccumulator for SequenceEndgameAccumulator {
     }
 
     #[inline]
-    fn append(self, defend: Pos, four: Pos) -> Self {
+    fn append_pos(self, defend: Pos, four: Pos) -> Self {
         self.map(|mut sequence| {
             sequence.push(defend);
             sequence.push(four);
@@ -56,7 +56,7 @@ impl EndgameAccumulator for Score {
     }
 
     #[inline]
-    fn append(self, _defend: Pos, _four: Pos) -> Self {
+    fn append_pos(self, _defend: Pos, _four: Pos) -> Self {
         self
     }
 

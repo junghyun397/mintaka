@@ -1,3 +1,4 @@
+use crate::endgame;
 use crate::game_state::GameState;
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind};
 use crate::movegen::move_picker::MovePicker;
@@ -6,7 +7,7 @@ use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::Depth;
+use rusty_renju::notation::value::{Depth, Score};
 
 pub trait NodeType {
 
@@ -38,15 +39,20 @@ struct OffPVNode; impl NodeType for OffPVNode {
 pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
-) -> i16 {
+) -> Score {
 
-    let mut eval: i16 = 0;
-    let mut score: i16 = 0;
+    let mut score: Score = Score::MIN;
 
     let max_depth: Depth = 0;
 
     'iterative_deepening: for depth in 1 ..= max_depth {
-        eval = pvs::<R, RootNode, TH>(td, state, depth, -i16::MAX, i16::MAX);
+        score = if depth < 7 {
+            pvs::<R, RootNode, TH>(td, state, depth, Score::MIN, Score::MAX)
+        } else {
+            aspiration(td, state, depth, score)
+        };
+
+        // TODO: set best-move
 
         if td.is_aborted() {
             break 'iterative_deepening;
@@ -59,9 +65,39 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
 pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
-    pv: &mut PrincipalVariation,
-) {
-    todo!()
+    max_depth: Depth,
+    mut score: Score,
+) -> Score {
+    let mut delta = 5 + score / 1000;
+    let mut alpha = Score::MIN;
+    let mut beta = Score::MAX;
+    let mut depth = max_depth;
+
+    if max_depth >= 4 {
+        alpha = alpha.max(score - delta);
+        beta = beta.min(score + delta);
+    }
+
+    loop {
+        score = pvs::<R, RootNode, _>(td, state, 0, alpha, beta);
+
+        if td.is_aborted() {
+            return 0;
+        }
+
+        if score <= alpha { // fail-low
+            beta = (alpha + beta) / 2;
+            alpha = score.saturating_sub(delta);
+            depth = max_depth;
+        } else if score >= beta { // fail-high
+            beta = score.saturating_add(delta);
+            depth -= 1;
+        } else { // exact score
+            return score;
+        }
+
+        delta += delta / 2;
+    }
 }
 
 pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
@@ -70,10 +106,14 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     mut depth_left: Depth,
     mut alpha: i16,
     mut beta: i16,
-) -> i16 {
-    if let Some(pos) = *state.board.patterns.unchecked_five_pos.access(state.board.player_color) {
-        td.best_move = pos;
+) -> Score {
+    if state.board.patterns.unchecked_five_pos.access(state.board.player_color).is_some() {
         return i16::MAX;
+    }
+
+    if let &Some(pos) = state.board.patterns.unchecked_five_pos.access(!state.board.player_color) {
+        state.set(pos.into());
+        return pvs(td, state, depth_left - 1, -beta, -alpha);
     }
 
     if td.config.draw_condition.is_some_and(|depth|
@@ -100,7 +140,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
     let pv = PrincipalVariation::default();
 
-    let mut eval = 0;
+    let mut static_eval = 0;
     let mut tt_move = MaybePos::NONE;
     let mut tt_score = 0;
 
@@ -111,10 +151,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
         match endgame_flag {
             EndgameFlag::Win => {
-                return i16::MAX;
+                return Score::MAX;
             },
             EndgameFlag::Lose => {
-                return i16::MIN;
+                return Score::MIN;
             },
             _ => {}
         }
@@ -123,12 +163,17 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         tt_score = entry.score;
 
         if match score_kind {
-            ScoreKind::Lower => eval <= entry.score,
-            ScoreKind::Upper => eval >= entry.score,
+            ScoreKind::Lower => static_eval <= entry.score,
+            ScoreKind::Upper => static_eval >= entry.score,
             _ => false
         } {
-            eval = entry.score
+            static_eval = entry.score;
         }
+    }
+
+    if depth_left == 0 {
+        return endgame::vcf::vcf_search(td, state, td.config.max_vcf_depth) // drop into vcf search
+            .unwrap_or(static_eval);
     }
 
     let mut score_kind = ScoreKind::Upper;

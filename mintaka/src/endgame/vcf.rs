@@ -56,15 +56,19 @@ pub struct VcfFrame {
 pub fn vcf_search(
     td: &mut ThreadData<impl ThreadType>,
     state: &GameState, max_depth: Depth,
-) -> Score {
-    let vcf_moves = generate_vcf_moves(
+) -> Option<Score> {
+    let mut vcf_moves = generate_vcf_moves(
         &state.board,
         state.board.player_color,
         Score::DISTANCE_WINDOW,
         state.history.recent_player_move_unchecked()
     );
 
-    vcf::<Score>(td, VcfWin, state.board, vcf_moves, max_depth)
+    (vcf_moves.top != 0).then(|| {
+        vcf_moves.sort_moves(state.history.recent_player_move_unchecked());
+
+        vcf::<Score>(td, VcfWin, state.board, vcf_moves, max_depth)
+    })
 }
 
 pub fn vcf_defend(
@@ -130,7 +134,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             hash_key = hash_key.set(board.player_color, frame.four_pos);
             td.tt.store_entry_mut(hash_key, build_vcf_win_tt_entry(depth, frame.four_pos));
 
-            result = result.append(frame.defend_pos, frame.four_pos);
+            result = result.append_pos(frame.defend_pos, frame.four_pos);
         }
 
         td.batch_counter.add_single_mut();

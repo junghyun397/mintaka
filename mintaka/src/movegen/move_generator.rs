@@ -17,7 +17,7 @@ pub struct VcfMoves {
 
 impl VcfMoves {
 
-    fn sort_moves(&mut self, ref_pos: Pos) {
+    pub fn sort_moves(&mut self, ref_pos: Pos) {
         let ref_row = ref_pos.row();
         let ref_col = ref_pos.col();
 
@@ -67,8 +67,6 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
     }
 
     let mut vcf_moves = VcfMoves { moves: vcf_moves, top: vcf_moves_top as u8 };
-
-    vcf_moves.sort_moves(recent_four);
 
     vcf_moves
 }
