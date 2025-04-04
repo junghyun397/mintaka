@@ -5,6 +5,7 @@ use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::search_frame::SearchFrame;
 use crate::thread_type::ThreadType;
+use arrayvec::ArrayVec;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -16,7 +17,7 @@ pub struct ThreadData<'a, TH: ThreadType> {
 
     pub tt: TTView<'a>,
     pub ht: HistoryTable,
-    pub search_stack: [SearchFrame; 128],
+    pub search_stack: ArrayVec<SearchFrame, 128>,
     pub vcf_stack: Vec<VcfFrame>,
 
     pub batch_counter: BatchCounter<'a>,
@@ -40,7 +41,7 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
             tid,
             config,
             tt, ht,
-            search_stack: [SearchFrame::default(); 128],
+            search_stack: ArrayVec::new_const(),
             vcf_stack: Vec::with_capacity(32),
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
@@ -50,11 +51,7 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
 
     pub fn search_limit_exceeded(&self) -> bool {
         self.thread_type.time_limit_exceeded()
-            || self.batch_counter.count_global_in_1k() >= self.config.max_nodes_in_1k
-    }
-
-    pub fn node_limit_exceeded(&self) -> bool {
-        self.batch_counter.count_global_in_1k() >= self.config.max_nodes_in_1k
+            || self.batch_counter.count_global_in_1k() > self.config.max_nodes_in_1k
     }
 
     pub fn set_aborted_mut(&self) {

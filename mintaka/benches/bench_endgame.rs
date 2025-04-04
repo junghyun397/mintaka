@@ -76,7 +76,7 @@ mod bench_vcf {
            A B C D E F G H I J K L M N O"
         };
 
-        bench_vcf!(b, case, Score::MAX, pos_unchecked("h6"), pos_unchecked("i6"));
+        bench_vcf!(b, case, Some(Score::MAX), pos_unchecked("h6"), pos_unchecked("i6"));
     }
 
     #[bench]
@@ -105,7 +105,7 @@ mod bench_vcf {
            A B C D E F G H I J K L M N O"
         };
 
-        bench_vcf!(b, case, Score::MAX, pos_unchecked("e8"), pos_unchecked("e7"));
+        bench_vcf!(b, case, Some(Score::MAX), pos_unchecked("e8"), pos_unchecked("e7"));
     }
 
     #[bench]

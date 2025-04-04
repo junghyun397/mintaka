@@ -7,8 +7,6 @@ pub enum Message {
     Response(Response),
     Status(StatusCommand),
     Launch,
-    Abort,
-    Quit,
 }
 
 pub enum StatusCommand {
@@ -56,14 +54,6 @@ impl CommandSender {
 
     pub fn launch(&self) {
         self.sender.send(Message::Launch).expect(CHANNEL_CLOSED_MESSAGE);
-    }
-
-    pub fn abort(&self) {
-        self.sender.send(Message::Abort).expect(CHANNEL_CLOSED_MESSAGE);
-    }
-
-    pub fn quit(&self) {
-        self.sender.send(Message::Quit).expect(CHANNEL_CLOSED_MESSAGE);
     }
 
 }

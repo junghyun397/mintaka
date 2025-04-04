@@ -12,16 +12,17 @@ use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
 fn main() -> Result<(), &'static str> {
-    let mut game_agent = GameAgent::new(Config::default());
-
     let launched = Arc::new(AtomicBool::new(false));
+    let aborted = Arc::new(AtomicBool::new(false));
+
+    let mut game_agent = GameAgent::new(Config::default(), aborted.clone());
 
     let (command_sender, response_sender, message_receiver) = {
         let (message_sender, message_receiver) = mpsc::channel();
         (CommandSender::new(message_sender.clone()), ResponseSender::new(message_sender), message_receiver)
     };
 
-    spawn_command_listener(launched.clone(), command_sender);
+    spawn_command_listener(launched.clone(), aborted, command_sender);
 
     for message in message_receiver {
         match message {
@@ -68,20 +69,13 @@ fn main() -> Result<(), &'static str> {
                 launched.store(true, Ordering::Relaxed);
                 game_agent.launch(response_sender.clone());
             },
-            Message::Abort => {
-                launched.store(false, Ordering::Relaxed);
-                game_agent.abort();
-            },
-            Message::Quit => {
-                break;
-            },
         }
     }
 
     Ok(())
 }
 
-fn spawn_command_listener(launched: Arc<AtomicBool>, command_sender: CommandSender) {
+fn spawn_command_listener(launched: Arc<AtomicBool>, abort: Arc<AtomicBool>, command_sender: CommandSender) {
     std::thread::spawn(move || {
         let mut buf = String::new();
 
@@ -94,7 +88,7 @@ fn spawn_command_listener(launched: Arc<AtomicBool>, command_sender: CommandSend
                 continue;
             }
 
-            let result = handle_command(&launched, &command_sender, &buf, args);
+            let result = handle_command(&launched, &abort, &command_sender, &buf, args);
 
             if let Err(err) = result {
                 println!("error: {err}");
@@ -104,12 +98,14 @@ fn spawn_command_listener(launched: Arc<AtomicBool>, command_sender: CommandSend
 }
 
 fn handle_command(
-    launched: &Arc<AtomicBool>, command_sender: &CommandSender, buf: &str, args: Vec<&str>
+    launched: &Arc<AtomicBool>, abort: &Arc<AtomicBool>, command_sender: &CommandSender, buf: &str, args: Vec<&str>
 ) -> Result<(), &'static str> {
     if launched.load(Ordering::Relaxed) {
         match args[0] {
-            "abort" => command_sender.abort(),
-            "quite" => command_sender.quit(),
+            "abort" => {
+                abort.store(true, Ordering::Relaxed);
+            },
+            "quite" => todo!(),
             &_ => return Err("unknown command.")
         }
     } else {
@@ -191,7 +187,7 @@ fn handle_command(
                 {
                     "board" => {
                         command_sender.command(Command::Load(
-                            Box::new(buf.parse()?), History::default()
+                            Box::new((buf.parse()?, History::default()))
                         ));
                     },
                     "history" => {
@@ -209,7 +205,7 @@ fn handle_command(
                         );
 
                         command_sender.command(Command::Load(
-                            Box::new(board), history
+                            Box::new((board, history))
                         ))
                     },
                     &_ => return Err("unknown data type."),

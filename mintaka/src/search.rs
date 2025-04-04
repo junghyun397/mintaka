@@ -49,7 +49,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
         score = if depth < 7 {
             pvs::<R, RootNode, TH>(td, state, depth, Score::MIN, Score::MAX)
         } else {
-            aspiration(td, state, depth, score)
+            aspiration::<R, TH>(td, state, depth, score)
         };
 
         // TODO: set best-move
@@ -112,8 +112,8 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     }
 
     if let &Some(pos) = state.board.patterns.unchecked_five_pos.access(!state.board.player_color) {
-        state.set(pos.into());
-        return pvs(td, state, depth_left - 1, -beta, -alpha);
+        state.set(pos.into()); // forced move
+        return -pvs::<R, NT, TH>(td, state, depth_left - 1, -beta, -alpha);
     }
 
     if td.config.draw_condition.is_some_and(|depth|
@@ -180,7 +180,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     let mut best_score = i16::MIN;
     let mut best_move = tt_move;
 
-    let mut move_picker = MovePicker::new(tt_move, MaybePos::NONE);
+    let mut move_picker = MovePicker::new(tt_move, td.search_stack.last().unwrap().killer_moves);
 
     let mut full_window = true;
     'position_search: while let Some((pos, move_score)) = move_picker.next(state) {
@@ -188,9 +188,9 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         state.set(pos);
 
         let score = if full_window {
-            -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
+            -pvs::<R, PVNode, TH>(td, state, depth_left - 1, -beta, -alpha)
         } else {
-            -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -alpha - 1, -alpha)
+            -pvs::<R, OffPVNode, TH>(td, state, depth_left - 1, -alpha - 1, -alpha)
         };
 
         full_window = false;

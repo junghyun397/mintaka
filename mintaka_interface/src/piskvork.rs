@@ -5,8 +5,6 @@ use mintaka::game_agent::GameAgent;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::message::{CommandSender, Message, ResponseSender};
 use mintaka::protocol::response::Response;
-use rusty_renju::board::Board;
-use rusty_renju::history::History;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
@@ -42,16 +40,17 @@ fn stdio_out(piskvork_response: PiskvorkResponse) {
 }
 
 fn main() -> Result<(), &'static str> {
-    let mut game_agent = GameAgent::new(Config::default());
-
     let launched = Arc::new(AtomicBool::new(false));
+    let aborted = Arc::new(AtomicBool::new(false));
+
+    let mut game_agent = GameAgent::new(Config::default(), aborted.clone());
 
     let (command_sender, response_sender, message_receiver) = {
         let (message_sender, message_receiver) = mpsc::channel();
         (CommandSender::new(message_sender.clone()), ResponseSender::new(message_sender), message_receiver)
     };
 
-    spawn_command_listener(launched.clone(), command_sender);
+    spawn_command_listener(launched.clone(), aborted, command_sender);
 
     for message in message_receiver {
         match message {
@@ -89,13 +88,6 @@ fn main() -> Result<(), &'static str> {
                 launched.store(true, Ordering::Relaxed);
                 game_agent.launch(response_sender.clone());
             },
-            Message::Abort => {
-                launched.store(false, Ordering::Relaxed);
-                game_agent.abort();
-            },
-            Message::Quit => {
-                break;
-            },
             _ => unreachable!()
         }
     }
@@ -103,7 +95,7 @@ fn main() -> Result<(), &'static str> {
     Ok(())
 }
 
-fn spawn_command_listener(launched: Arc<AtomicBool>, command_sender: CommandSender) {
+fn spawn_command_listener(launched: Arc<AtomicBool>, aborted: Arc<AtomicBool>, command_sender: CommandSender) {
     std::thread::spawn(move || {
         let mut buf = String::new();
 
@@ -116,7 +108,7 @@ fn spawn_command_listener(launched: Arc<AtomicBool>, command_sender: CommandSend
                 continue;
             }
 
-            let piskvork_response = match_command(&launched, &command_sender, args)
+            let piskvork_response = match_command(&launched, &aborted, &command_sender, args)
                 .unwrap_or_else(|message| PiskvorkResponse::Error(message.to_string()));
 
             stdio_out(piskvork_response);
@@ -127,17 +119,12 @@ fn spawn_command_listener(launched: Arc<AtomicBool>, command_sender: CommandSend
 // https://plastovicka.github.io/protocl2en.htm
 // https://github.com/accreator/Yixin-protocol/blob/master/protocol.pdf
 fn match_command(
-    launched: &Arc<AtomicBool>, command_sender: &CommandSender, args: Vec<&str>
+    launched: &Arc<AtomicBool>, aborted: &Arc<AtomicBool>, command_sender: &CommandSender, args: Vec<&str>
 ) -> Result<PiskvorkResponse, &'static str> {
     let response = if launched.load(Ordering::Relaxed) {
         match args[0] {
             "YXSTOP" => {
-                command_sender.abort();
-
-                PiskvorkResponse::None
-            },
-            "QUIT" => {
-                command_sender.quit();
+                aborted.store(true, Ordering::Relaxed);
 
                 PiskvorkResponse::None
             },
@@ -227,8 +214,6 @@ fn match_command(
                 PiskvorkResponse::None
             },
             "END" => {
-                command_sender.quit();
-
                 PiskvorkResponse::None
             },
             "INFO" => {
@@ -290,7 +275,7 @@ fn match_command(
             },
             "YXHASHCLEAR" => {
                 command_sender.command(
-                    Command::Load(Box::from(Board::default()), History::default())
+                    Command::Load(Box::default())
                 );
 
                 PiskvorkResponse::None

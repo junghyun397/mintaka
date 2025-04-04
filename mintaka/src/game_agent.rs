@@ -15,6 +15,7 @@ use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
 
 pub struct GameAgent {
     pub config: Config,
@@ -24,12 +25,12 @@ pub struct GameAgent {
     time_manager: TimeManager,
     tt: TranspositionTable,
     ht: HistoryTable,
-    aborted: AtomicBool,
+    aborted: Arc<AtomicBool>,
 }
 
 impl GameAgent {
 
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Config, aborted: Arc<AtomicBool>) -> Self {
         Self {
             config,
             state: GameState::default(),
@@ -38,7 +39,7 @@ impl GameAgent {
             time_manager: TimeManager::default(),
             tt: TranspositionTable::new_with_size(1024 * 16),
             ht: HistoryTable {},
-            aborted: AtomicBool::new(false),
+            aborted,
         }
     }
 
