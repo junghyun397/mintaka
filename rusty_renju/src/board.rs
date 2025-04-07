@@ -251,6 +251,7 @@ impl Board {
 
         !pattern.has_three() // non-three
             || pattern.apply_mask(ANY_FOUR_OR_OVERLINE_MASK) != 0 // double-four or overline
+            || pattern.count_open_threes() > 2 // maybe nested double-three
     }
 
     #[cfg(feature = "strict_renju")]
@@ -261,30 +262,25 @@ impl Board {
 
         let pattern = self.patterns.field.black[pos.idx_usize()];
 
-        if !pattern.has_three() // non-three
+        !pattern.has_three() // non-three
             || pattern.apply_mask(ANY_FOUR_OR_OVERLINE_MASK) != 0 // double-four or overline
             || context.four_contains(pos) // double-four
             || context.set_contains(pos) // recursive
-        {
-            return true;
-        }
+            || (pattern.count_open_threes() > 2 && { // nested double-three
+                let mut new_overrides = context.branch_overrides();
 
-        // nested double-three
-        pattern.count_open_threes() > 2 && {
-            let mut new_overrides = context.branch_overrides();
+                if !C::IS_NESTED {
+                    self.update_root_four_overrides(&mut new_overrides);
+                }
 
-            if !C::IS_NESTED {
-                self.update_root_four_overrides(&mut new_overrides);
-            }
+                self.update_four_overrides(&mut new_overrides, direction, pos);
 
-            self.update_four_overrides(&mut new_overrides, direction, pos);
-
-            self.is_valid_double_three(ValidateThreeNode {
-                overrides: new_overrides,
-                parent_direction: direction,
-                parent_pos: pos,
+                self.is_valid_double_three(ValidateThreeNode {
+                    overrides: new_overrides,
+                    parent_direction: direction,
+                    parent_pos: pos,
+                })
             })
-        }
     }
 
     fn is_valid_double_three<C: ValidateThreeContext>(&self, context: C) -> bool {

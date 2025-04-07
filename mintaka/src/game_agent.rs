@@ -86,9 +86,9 @@ impl GameAgent {
                 }
             },
             Command::Undo => {
-                match self.history.pop() {
+                match self.history.pop_mut() {
                     None => return Err("no history to undo"),
-                    Some(maybe_pos) => match maybe_pos {
+                    Some(action) => match action {
                         MaybePos::NONE => {
                             self.state.board.switch_player_mut();
                         },

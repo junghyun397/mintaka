@@ -1,5 +1,5 @@
 use crate::eval::evaluator::Evaluator;
-use rusty_renju::board::Board;
+use crate::game_state::GameState;
 use rusty_renju::board_iter::BoardIterItem;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::rule::ForbiddenKind;
@@ -116,11 +116,11 @@ impl HeuristicEvaluator {
 
 impl Evaluator for HeuristicEvaluator {
 
-    fn static_eval(&self, board: &Board) -> Score {
+    fn static_eval(&self, state: &GameState) -> Score {
         let mut acc_black = [0; 9];
         let mut acc_white = [0; 9];
 
-        for item in board.iter_items() {
+        for item in state.board.iter_items() {
             if let BoardIterItem::Pattern(pattern) = item {
                 match pattern.black.forbidden_kind() {
                     Some(ForbiddenKind::DoubleThree) => {
@@ -141,7 +141,7 @@ impl Evaluator for HeuristicEvaluator {
         let black_win = acc_black[PatternAssign::Five as usize] > 1;
         let white_win = acc_white[PatternAssign::Five as usize] > 1;
 
-        let score = match board.player_color {
+        let score = match state.board.player_color {
             Color::Black => {
                 if black_win {
                     isize::MAX
@@ -162,7 +162,7 @@ impl Evaluator for HeuristicEvaluator {
             }
         };
 
-        score.clamp(Score::MIN as isize, Score::MAX as isize) as Score
+        score.clamp(-10000, 10000) as Score
     }
 
 }

@@ -1,6 +1,6 @@
 use crate::batch_counter::BatchCounter;
 use crate::config::Config;
-use crate::endgame::vcf::VcfFrame;
+use crate::endgame::vcf_search::VcfFrame;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::search_frame::SearchFrame;

@@ -5,7 +5,7 @@ extern crate test;
 mod bench_vcf {
     use indoc::indoc;
     use mintaka::config::Config;
-    use mintaka::endgame::vcf;
+    use mintaka::endgame::vcf_search;
     use mintaka::game_state::GameState;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
@@ -47,7 +47,7 @@ mod bench_vcf {
             let td = ThreadData::new(WorkerThread, 0, config, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
-                let result = vcf::vcf_search(&mut td.clone(), &game_state, u8::MAX);
+                let result = vcf_search::vcf_search(&mut td.clone(), &game_state, u8::MAX);
                 assert_eq!(result, $score);
                 tt.clear_mut(1);
             })

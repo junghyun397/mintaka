@@ -14,7 +14,7 @@ pub struct GameState {
 
 impl GameState {
 
-    pub fn set(&mut self, pos: Pos) {
+    pub fn set_mut(&mut self, pos: Pos) {
         self.board.set_mut(pos);
         self.history.set_mut(pos);
 
@@ -22,12 +22,12 @@ impl GameState {
         self.movegen_window.expand_window_mut(pos);
     }
 
-    pub fn pass_unchecked(&mut self) {
+    pub fn pass_mut(&mut self) {
         self.board.pass_mut();
     }
 
-    pub fn unset(&mut self, movegen_window: MovegenWindow) {
-        let pos = self.history.pop().unwrap().unwrap();
+    pub fn unset_mut(&mut self, movegen_window: MovegenWindow) {
+        let pos = self.history.pop_mut().unwrap().unwrap();
         self.board.unset_mut(pos);
 
         self.move_scores.remove_neighborhood_score(pos);

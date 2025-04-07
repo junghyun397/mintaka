@@ -28,7 +28,7 @@ mod bench_movegen {
             #$bencher.iter(|| {
                 let mut game_state = game_state;
 
-                game_state.set($new_move.into());
+                game_state.set_mut($new_move.into());
 
                 let mut move_picker = MovePicker::new(None, None);
 

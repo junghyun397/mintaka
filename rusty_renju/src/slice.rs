@@ -6,6 +6,7 @@ use crate::{assert_struct_sizes, const_for, max};
 
 const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
+pub const TOTAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 + DIAGONAL_SLICE_AMOUNT * 2;
 
 #[derive(Debug, Copy, Clone)]
 #[repr(align(16))]

@@ -1,15 +1,30 @@
 use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
+use std::ops::{Index, IndexMut};
 
 #[derive(Debug, Copy, Clone)]
 pub struct History {
-    pub entries: [MaybePos; pos::BOARD_SIZE],
+    entries: [MaybePos; pos::BOARD_SIZE],
     top: usize
 }
 
 impl Default for History {
     fn default() -> Self {
         Self::EMPTY
+    }
+}
+
+impl Index<usize> for History {
+    type Output = MaybePos;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.entries[index]
+    }
+}
+
+impl IndexMut<usize> for History {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.entries[index]
     }
 }
 
@@ -24,7 +39,7 @@ impl History {
         self.top
     }
 
-    pub fn pop(&mut self) -> Option<MaybePos> {
+    pub fn pop_mut(&mut self) -> Option<MaybePos> {
         if self.top == 0 {
             return None;
         }

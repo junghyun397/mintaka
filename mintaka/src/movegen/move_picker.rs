@@ -52,7 +52,7 @@ impl MovePicker {
             },
             MoveStage::Killer => {
                 for killer_move in self.killer_moves.iter_mut()
-                    .filter(|maybe_move| maybe_move.is_some())
+                    .filter(|action| action.is_some())
                 {
                         let pos = killer_move.unwrap();
                         *killer_move = MaybePos::NONE;

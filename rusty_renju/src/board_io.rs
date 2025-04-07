@@ -272,7 +272,7 @@ impl Display for History {
                 }
             )
             .collect::<Vec<_>>()
-            .join(format!("{HISTORY_LITERAL_SEPARATOR} ").as_str());
+            .join(format!("{HISTORY_LITERAL_SEPARATOR}").as_str());
 
         write!(f, "{history}")
     }
