@@ -211,6 +211,11 @@ fn handle_command(
                     &_ => return Err("unknown data type."),
                 }
             },
+            "clear" => {
+                command_sender.command(Command::Load(
+                    Box::new((Board::default(), History::default()))
+                ));
+            },
             "board" => {
                 command_sender.status(StatusCommand::Board);
             },
