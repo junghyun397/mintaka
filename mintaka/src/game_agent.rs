@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, SearchLimit};
 use crate::game_state::GameState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
@@ -6,7 +6,6 @@ use crate::protocol::command::Command;
 use crate::protocol::message::ResponseSender;
 use crate::protocol::response::Response;
 use crate::search;
-use crate::search_limit::SearchLimit;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, ThreadType, WorkerThread};
 use crate::utils::time_manager::TimeManager;
@@ -24,6 +23,7 @@ pub struct GameAgent {
     pub history: History,
     pub rule: RuleKind,
     time_manager: TimeManager,
+    search_limit: SearchLimit,
     tt: TranspositionTable,
     ht: HistoryTable,
     aborted: Arc<AtomicBool>,
@@ -38,6 +38,7 @@ impl GameAgent {
             rule: RuleKind::Renju,
             history: History::default(),
             time_manager: TimeManager::default(),
+            search_limit: SearchLimit::Infinite,
             tt: TranspositionTable::new_with_size(1024 * 16),
             ht: HistoryTable {},
             aborted,
@@ -140,15 +141,18 @@ impl GameAgent {
             }
             Command::TotalTime(time) => {
                 self.time_manager.total_remaining = time;
+                self.search_limit = SearchLimit::Time { turn_time: time };
             },
             Command::TurnTime(time) => {
                 self.time_manager.turn = time;
+                self.search_limit = SearchLimit::Time { turn_time: time };
             },
             Command::IncrementTime(time) => {
                 self.time_manager.increment = time;
+                self.search_limit = SearchLimit::Time { turn_time: time };
             },
             Command::MaxNodes { in_1k } => {
-
+                self.search_limit = SearchLimit::Nodes { in_1k }
             },
             Command::Workers(workers) => {
                 self.config.workers = workers;
@@ -180,7 +184,7 @@ impl GameAgent {
                 MainThread::new(
                     response_sender,
                     std::time::Instant::now(),
-                    SearchLimit::Time { finish_at: running_time }
+                    SearchLimit::Time { turn_time: running_time }
                 ),
                 0,
                 self.config,

@@ -1,6 +1,6 @@
+use crate::config::SearchLimit;
 use crate::protocol::message::ResponseSender;
 use crate::protocol::response::Response;
-use crate::search_limit::SearchLimit;
 
 pub trait ThreadType {
 
@@ -44,12 +44,11 @@ impl ThreadType for MainThread {
 
     fn limit_exceeded(&self, total_nodes_in_1k: usize) -> bool {
         match self.search_limit {
-            SearchLimit::Time { finish_at } => {
-                self.start_time.elapsed() > finish_at
-            },
-            SearchLimit::Nodes { in_1k: finish_in_1k } => {
-                total_nodes_in_1k > finish_in_1k
-            },
+            SearchLimit::Time { turn_time } =>
+                self.start_time.elapsed() > turn_time,
+            SearchLimit::Nodes { in_1k: finish_in_1k } =>
+                total_nodes_in_1k > finish_in_1k,
+            SearchLimit::Infinite => false,
         }
     }
 }
