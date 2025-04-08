@@ -7,6 +7,7 @@ use std::num::NonZeroUsize;
 pub enum SearchObjective {
     #[default] Best,
     Zeroing,
+    Pondering
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -19,7 +20,6 @@ pub struct Config {
     pub workers: NonZeroUsize,
 
     pub max_vcf_depth: Depth,
-    pub max_nodes_in_1k: usize,
 
     pub report_search_status: bool,
     pub report_main_pv: bool,
@@ -31,12 +31,10 @@ impl Default for Config {
         Config {
             rule_kind: RuleKind::Renju,
             draw_condition: None,
-            search_objective: SearchObjective::Best,
-            workers: NonZeroUsize::new(1).unwrap(),
             max_vcf_depth: pos::U8_BOARD_SIZE,
-            max_nodes_in_1k: usize::MAX,
             report_search_status: false,
             report_main_pv: false,
+            .. Default::default()
         }
     }
 

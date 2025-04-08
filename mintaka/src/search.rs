@@ -1,7 +1,10 @@
 use crate::endgame::vcf_search::vcf_search;
+use crate::eval::evaluator::Evaluator;
+use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::game_state::GameState;
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind};
 use crate::movegen::move_picker::MovePicker;
+use crate::parameters::{ASPIRATION_WINDOW_BASE_DELTA, MAX_SEARCH_DEPTH};
 use crate::principal_variation::PrincipalVariation;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
@@ -41,19 +44,21 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
 ) -> Score {
+    const MAX_DEPTH: Depth = MAX_SEARCH_DEPTH as Depth;
 
     let mut score: Score = Score::MIN;
 
-    let max_depth: Depth = 0;
+    let mut pv = PrincipalVariation::new_const();
 
-    'iterative_deepening: for depth in 1 ..= max_depth {
+    'iterative_deepening: for depth in 1 ..= MAX_DEPTH {
+        td.depth = depth;
         score = if depth < 7 {
             pvs::<R, RootNode, TH>(td, state, depth, Score::MIN, Score::MAX)
         } else {
             aspiration::<R, TH>(td, state, depth, score)
         };
 
-        // TODO: set best-move
+        td.best_move = td.pvs[depth as usize].line[0];
 
         if td.is_aborted() {
             break 'iterative_deepening;
@@ -69,7 +74,7 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     max_depth: Depth,
     mut score: Score,
 ) -> Score {
-    let mut delta = 5 + score / 1000;
+    let mut delta = ASPIRATION_WINDOW_BASE_DELTA + score / 1000;
     let mut alpha = Score::MIN;
     let mut beta = Score::MAX;
     let mut depth = max_depth;
@@ -118,6 +123,8 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         .access(!state.board.player_color)
     { // defend immediate win
         state.set_mut(pos.into());
+        td.increase_ply_mut();
+
         return -pvs::<R, NT, TH>(td, state, depth_left, -beta, -alpha);
     }
 
@@ -135,7 +142,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     }
 
     if TH::IS_MAIN
-        && td.batch_counter.count_local_total() % 1024 == 0
+        && td.should_check_limit()
         && td.search_limit_exceeded()
     { // search limit exceeded
         td.set_aborted_mut();
@@ -144,32 +151,31 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         return 0;
     }
 
-    let pv = PrincipalVariation::default();
-
-    let mut static_eval = 0;
+    let mut static_eval = Evaluator::static_eval(&HeuristicEvaluator, state);
     let mut tt_move = MaybePos::NONE;
+    let mut tt_score = Score::MIN;
 
     if let Some(entry) = td.tt.probe(state.board.hash_key) {
         let score_kind = entry.tt_flag.score_kind();
         let endgame_flag = entry.tt_flag.endgame_flag();
-        let is_pv = entry.tt_flag.is_pv();
 
-        match endgame_flag {
-            EndgameFlag::Win => {
-                return Score::MAX;
-            },
-            EndgameFlag::Lose => {
-                return Score::MIN;
-            },
-            _ => {}
+        if !(endgame_flag == EndgameFlag::Win || endgame_flag == EndgameFlag::Lose)
+        { // endgame-tt-hit
+            return entry.score;
         }
 
-        tt_move = entry.best_move;
+        if match score_kind { // tt-hit
+            ScoreKind::Lower => entry.score >= beta,
+            ScoreKind::Upper => entry.score <= alpha,
+            ScoreKind::Exact => true,
+        } {
+            return entry.score;
+        }
 
-        if match score_kind {
-            ScoreKind::Lower => static_eval <= entry.score,
-            ScoreKind::Upper => static_eval >= entry.score,
-            _ => false
+        if !match score_kind { // load tt-score
+            ScoreKind::Lower => static_eval > entry.score,
+            ScoreKind::Upper => static_eval < entry.score,
+            ScoreKind::Exact => true
         } {
             static_eval = entry.score;
         }
@@ -184,20 +190,21 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     let mut best_score = i16::MIN;
     let mut best_move = tt_move;
 
-    let mut move_picker = MovePicker::new(tt_move, td.search_stack.last().unwrap().killer_moves);
+    let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
 
     let mut full_window = true;
     'position_search: while let Some((pos, move_score)) = move_picker.next(state) {
         let movegen_window = state.movegen_window;
         state.set_mut(pos);
+        td.increase_ply_mut();
 
         let score = if full_window { // full-window search
-            -pvs::<R, NT::NextType, _>(td, state, depth_left - 1, -beta, -alpha)
+            -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
         } else { // null-window search
-            let mut score = -pvs::<R, OffPVNode, _>(td, state, depth_left - 1, -alpha - 1, -alpha);
+            let mut score = -pvs::<R, OffPVNode, TH>(td, state, depth_left - 1, -alpha - 1, -alpha);
 
             if score > alpha { // null-window failed, full-window search
-                score = -pvs::<R, PVNode, _>(td, state, depth_left - 1, -beta, -alpha);
+                score = -pvs::<R, PVNode, TH>(td, state, depth_left - 1, -beta, -alpha);
             }
 
             score
@@ -217,6 +224,12 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         alpha = score;
         score_kind = ScoreKind::Exact;
 
+        if NT::IS_PV { // update pv-line
+            let tails = td.pvs[td.ply].clone();
+            let pv = &mut td.pvs[td.ply - 1];
+            pv.load(pos.into(), tails);
+        }
+
         if score < beta { // beta-cutoff
             continue 'position_search;
         }
@@ -229,6 +242,17 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     if td.is_aborted() {
         return 0;
     }
+
+    td.tt.store_mut(
+        state.board.hash_key,
+        best_move,
+        score_kind,
+        EndgameFlag::Unknown,
+        depth_left,
+        static_eval,
+        best_score,
+        NT::IS_PV
+    );
 
     best_score
 }

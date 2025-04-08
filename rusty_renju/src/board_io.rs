@@ -11,7 +11,7 @@ use crate::pattern::Pattern;
 use crate::slice::Slice;
 use crate::utils::str_utils::join_str_horizontally;
 use regex_lite::Regex;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::sync::OnceLock;
 
@@ -123,7 +123,7 @@ impl Board {
                     match item {
                         &BoardIterItem::Stone(color) => char::from(color).to_string(),
                         BoardIterItem::Pattern(pattern) => {
-                            let count = extract(&pattern.access(color));
+                            let count = extract(pattern.access(color));
 
                             if count > 0 {
                                 count.to_string()
@@ -288,15 +288,15 @@ impl FromStr for History {
         static RE: OnceLock<Regex> = OnceLock::new();
         let re = RE.get_or_init(|| Regex::from_str(r"[a-z][0-9][0-9]?").unwrap());
 
-        let history: Box<[Result<Pos, &str>]> = re.find_iter(source)
-            .map(|m| m.as_str().parse())
-            .collect();
+        let mut history = History::default();
 
-        if let Some(result) = history.iter().find(|x| x.is_err()) {
-            return Err(result.unwrap_err());
+        for result in re.find_iter(source)
+            .map(|m| m.as_str().parse::<Pos>())
+        {
+            history.set_mut(result?);
         }
 
-        Ok(todo!())
+        Ok(history)
     }
 
 }

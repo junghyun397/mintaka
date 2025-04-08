@@ -145,6 +145,14 @@ fn handle_command(
                             &_ => return Err("unknown time type.")
                         }
                     },
+                    "nodes" => {
+                        let nodes = args.get(1)
+                            .ok_or("nodes not provided.")?
+                            .parse::<usize>()
+                            .map_err(|_| "invalid nodes number.")?;
+
+                        command_sender.command(Command::MaxNodes { in_1k: nodes });
+                    },
                     "workers" => {
                         match *args.get(2)
                             .ok_or("workers not provided.")?

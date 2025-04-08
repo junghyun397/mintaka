@@ -23,13 +23,12 @@ impl From<HashKey> for TTEntryKey {
 
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
 pub enum ScoreKind {
-    #[default] None = 0,
-    Upper = 1,
-    Lower = 2,
-    Exact = 3,
+    Lower = 0,
+    Exact = 1,
+    Upper = 2,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]

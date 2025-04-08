@@ -6,6 +6,7 @@ use crate::protocol::command::Command;
 use crate::protocol::message::ResponseSender;
 use crate::protocol::response::Response;
 use crate::search;
+use crate::search_limit::SearchLimit;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, ThreadType, WorkerThread};
 use crate::utils::time_manager::TimeManager;
@@ -146,6 +147,9 @@ impl GameAgent {
             Command::IncrementTime(time) => {
                 self.time_manager.increment = time;
             },
+            Command::MaxNodes { in_1k } => {
+
+            },
             Command::Workers(workers) => {
                 self.config.workers = workers;
             },
@@ -176,7 +180,7 @@ impl GameAgent {
                 MainThread::new(
                     response_sender,
                     std::time::Instant::now(),
-                    running_time
+                    SearchLimit::Time { finish_at: running_time }
                 ),
                 0,
                 self.config,
@@ -189,7 +193,7 @@ impl GameAgent {
                 let score = search::iterative_deepening::<{ RuleKind::Renju }, _>(&mut main_td, &mut state);
 
                 main_td.thread_type.make_response(||
-                    Response::BestMove(main_td.best_move, score as f32)
+                    Response::BestMove(main_td.best_move.unwrap(), score as f32)
                 );
             });
 

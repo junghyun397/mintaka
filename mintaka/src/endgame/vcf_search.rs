@@ -137,8 +137,6 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             result = result.append_pos(frame.defend_pos, frame.four_pos);
         }
 
-        td.batch_counter.add_single_mut();
-
         result
     }
 
@@ -163,7 +161,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             }
 
             let mut position_board = board.set(four_pos);
-            td.batch_counter.add_single_mut();
+            td.increase_ply_mut();
 
             let defend_pos = position_board.patterns.unchecked_five_pos.player_unit::<C>().unwrap();
             let tt_key = position_board.hash_key.set(C.reversed(), defend_pos);
@@ -199,7 +197,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             }
 
             position_board.set_mut(defend_pos);
-            td.batch_counter.add_single_mut();
+            td.increase_ply_mut();
 
             td.vcf_stack.push(VcfFrame {
                 board,
@@ -242,7 +240,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 best_move: MaybePos::NONE,
                 depth: vcf_ply,
                 age: td.tt.age,
-                tt_flag: TTFlag::new(ScoreKind::None, EndgameFlag::Cold, false),
+                tt_flag: TTFlag::new(ScoreKind::Exact, EndgameFlag::Cold, false),
                 score: 0,
                 eval: 0,
             });

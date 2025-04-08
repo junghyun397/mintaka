@@ -66,9 +66,7 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
         vcf_moves_top += 1;
     }
 
-    let mut vcf_moves = VcfMoves { moves: vcf_moves, top: vcf_moves_top as u8 };
-
-    vcf_moves
+    VcfMoves { moves: vcf_moves, top: vcf_moves_top as u8 }
 }
 
 pub fn generate_neighbors_moves(state: &GameState, moves: &mut MoveList) {

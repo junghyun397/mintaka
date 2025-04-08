@@ -7,7 +7,7 @@ pub const KILLER_MOVE_SLOTS: usize = 2;
 pub struct SearchFrame {
     pub static_eval: Score,
     pub best_move: MaybePos,
-    pub killer_moves: [MaybePos; KILLER_MOVE_SLOTS],
+    pub pos: MaybePos,
     pub extensions: bool,
     pub on_pv: bool,
 }
@@ -25,7 +25,7 @@ impl SearchFrame {
     const EMPTY: Self = SearchFrame {
         static_eval: 0,
         best_move: MaybePos::NONE,
-        killer_moves: [MaybePos::NONE; KILLER_MOVE_SLOTS],
+        pos: MaybePos::NONE,
         extensions: false,
         on_pv: false,
     };

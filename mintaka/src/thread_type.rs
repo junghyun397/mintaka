@@ -1,5 +1,6 @@
 use crate::protocol::message::ResponseSender;
 use crate::protocol::response::Response;
+use crate::search_limit::SearchLimit;
 
 pub trait ThreadType {
 
@@ -7,14 +8,14 @@ pub trait ThreadType {
 
     fn make_response<F>(&self, produce: F) where F: FnOnce() -> Response;
 
-    fn time_limit_exceeded(&self) -> bool;
+    fn limit_exceeded(&self, total_nodes_in_1k: usize) -> bool;
 
 }
 
 pub struct MainThread {
     response_sender: ResponseSender,
     start_time: std::time::Instant,
-    time_limit: std::time::Duration,
+    search_limit: SearchLimit,
 }
 
 impl MainThread {
@@ -22,12 +23,12 @@ impl MainThread {
     pub fn new(
         response_sender: ResponseSender,
         start_time: std::time::Instant,
-        time_limit: std::time::Duration,
+        search_limit: SearchLimit,
     ) -> Self {
         Self {
             response_sender,
             start_time,
-            time_limit,
+            search_limit,
         }
     }
 
@@ -41,8 +42,15 @@ impl ThreadType for MainThread {
         self.response_sender.response(response);
     }
 
-    fn time_limit_exceeded(&self) -> bool {
-        self.start_time.elapsed() > self.time_limit
+    fn limit_exceeded(&self, total_nodes_in_1k: usize) -> bool {
+        match self.search_limit {
+            SearchLimit::Time { finish_at } => {
+                self.start_time.elapsed() > finish_at
+            },
+            SearchLimit::Nodes { in_1k: finish_in_1k } => {
+                total_nodes_in_1k > finish_in_1k
+            },
+        }
     }
 }
 
@@ -54,7 +62,7 @@ impl ThreadType for WorkerThread {
 
     fn make_response<F>(&self, _action: F) where F: FnOnce() -> Response { }
 
-    fn time_limit_exceeded(&self) -> bool {
+    fn limit_exceeded(&self, _total_nodes_in_1k: usize) -> bool {
         false
     }
 }

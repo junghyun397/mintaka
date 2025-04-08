@@ -25,6 +25,7 @@ pub enum Command {
     TotalTime(Duration),
     TurnTime(Duration),
     IncrementTime(Duration),
+    MaxNodes { in_1k: usize },
     Workers(NonZeroUsize),
     MaxMemory { in_kib: usize },
     Rule(RuleKind),
