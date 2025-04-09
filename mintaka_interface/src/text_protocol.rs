@@ -114,6 +114,46 @@ fn handle_command(
                 match *args.get(1)
                     .ok_or("data type not provided.")?
                 {
+                    "workers" => {
+                        match *args.get(2)
+                            .ok_or("workers not provided.")?
+                        {
+                            "auto" => {
+                                let cores = num_cpus::get_physical();
+
+                                println!("info: workers={cores}");
+
+                                command_sender.command(
+                                    Command::Workers(NonZeroUsize::new(cores).unwrap())
+                                );
+                            },
+                            &_ => {
+                                let workers = args.get(2)
+                                    .ok_or("workers not provided.")?
+                                    .parse::<usize>()
+                                    .map_err(|_| "invalid workers number.")?;
+
+                                command_sender.command(
+                                    Command::Workers(NonZeroUsize::new(workers).unwrap())
+                                );
+                            }
+                        }
+                    },
+                    "memory" => {
+                        let memory = args.get(2)
+                            .ok_or("memory not provided.")?
+                            .parse::<usize>()
+                            .map_err(|_| "invalid memory size.")?;
+
+                        command_sender.command(Command::MaxMemory { in_kib: memory });
+                    },
+                    &_ => return Err("data type not provided.")
+                }
+            },
+            "limit" => {
+                match *args.get(1)
+                    .ok_or("data type not provided.")?
+                {
                     "time" => {
                         fn parse_time_in_milliseconds(args: &Vec<&str>) -> Result<Duration, &'static str> {
                             let time = args.get(1)
@@ -153,42 +193,9 @@ fn handle_command(
 
                         command_sender.command(Command::MaxNodes { in_1k: nodes });
                     },
-                    "workers" => {
-                        match *args.get(2)
-                            .ok_or("workers not provided.")?
-                        {
-                            "auto" => {
-                                let cores = num_cpus::get_physical();
-
-                                println!("info: workers={cores}");
-
-                                command_sender.command(
-                                    Command::Workers(NonZeroUsize::new(cores).unwrap())
-                                );
-                            },
-                            &_ => {
-                                let workers = args.get(2)
-                                    .ok_or("workers not provided.")?
-                                    .parse::<usize>()
-                                    .map_err(|_| "invalid workers number.")?;
-
-                                command_sender.command(
-                                    Command::Workers(NonZeroUsize::new(workers).unwrap())
-                                );
-                            }
-                        }
-                    },
-                    "memory" => {
-                        let memory = args.get(2)
-                            .ok_or("memory not provided.")?
-                            .parse::<usize>()
-                            .map_err(|_| "invalid memory size.")?;
-
-                        command_sender.command(Command::MaxMemory { in_kib: memory });
-                    },
-                    &_ => return Err("data type not provided.")
+                    &_ => return Err("unknown limit type."),
                 }
-            },
+            }
             "parse" => {
                 match *args.get(1)
                     .ok_or("data type not provided.")?

@@ -4,9 +4,10 @@
 
 ### Configuration Commands
 
-* **config time match [milliseconds]**: Set the time limit for the entire match in milliseconds
-* **config time turn [milliseconds]**: Set the time limit for each turn in milliseconds
-* **config time increment [milliseconds]**: Set the time increment for each turn in milliseconds
+* **limit time match [milliseconds]**: Set the time limit for the entire match in milliseconds
+* **limit time turn [milliseconds]**: Set the time limit for each turn in milliseconds
+* **limit time increment [milliseconds]**: Set the time increment for each turn in milliseconds
+* **limit nodes [kilo-nodes]**: Set the maximum number of nodes to search
 * **config workers [number]**: Set the number of worker threads
 * **config workers auto**: Set the number of worker threads automatically based on physical CPU cores
 * **config memory [kilobytes]**: Set the maximum memory usage in KiB
