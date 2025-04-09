@@ -1,3 +1,4 @@
+use crate::bitfield::Bitfield;
 use crate::notation::color::{AlignedColorContainer, Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
@@ -205,6 +206,7 @@ pub struct Patterns {
     pub field: AlignedColorContainer<[Pattern; pos::BOARD_SIZE]>,
     pub unchecked_five_in_a_row: Option<Color>,
     pub unchecked_five_pos: ColorContainer<Option<Pos>>,
+    pub unchecked_double_three_field: Bitfield,
 }
 
 assert_struct_sizes!(Patterns, size=1920, align=64);
@@ -219,6 +221,7 @@ impl Default for Patterns {
                 black: None,
                 white: None
             },
+            unchecked_double_three_field: Bitfield::default(),
         }
     }
 
@@ -270,6 +273,20 @@ impl Patterns {
                     Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8))
                 })
         );
+
+        if C == Color::Black {
+            let mut three_mask = slice_pattern.patterns & SLICE_PATTERN_THREE_MASK;
+
+            while three_mask != 0 {
+                let three_slice_idx = three_mask.trailing_zeros() / 8;
+                three_mask &= three_mask - 1;
+
+                let three_idx: usize = step_idx!(D, slice.start_pos.idx_usize(), three_slice_idx as usize);
+                if self.field.player_unit::<C>()[three_idx].has_three() {
+                    self.unchecked_double_three_field.set_mut(Pos::from_index(three_idx as u8));
+                }
+            }
+        }
 
         let slice_pattern = unsafe { std::mem::transmute::<SlicePattern, [u8; 16]>(slice_pattern) };
 

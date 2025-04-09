@@ -212,31 +212,11 @@ impl Board {
     }
 
     fn validate_double_three_mut(&mut self) {
-        let field_ptr = self.patterns.field.black.as_ptr() as *const u32;
-
-        for start_idx in (0 .. pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
-            let mut vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
-                unsafe { std::slice::from_raw_parts(field_ptr.add(start_idx), platform::U32_LANE_N) }
-            );
-
-            vector &= Simd::splat(pattern::UNIT_OPEN_THREE_MASK);
-            vector &= vector - Simd::splat(1); // n &= n - 1
-
-            let mut bitmask = vector
-                .simd_ne(Simd::splat(0))
-                .to_bitmask();
-
-            while bitmask != 0 {
-                let lane_position = bitmask.trailing_zeros() as usize;
-                bitmask &= bitmask - 1;
-
-                let idx = start_idx + lane_position;
-
-                if self.is_valid_double_three(ValidateThreeRoot { root_pos: Pos::from_index(idx as u8) }) {
-                    self.patterns.field.black[idx].unmark_invalid_double_three();
-                } else {
-                    self.patterns.field.black[idx].mark_invalid_double_three();
-                }
+        for root_pos in self.patterns.unchecked_double_three_field.iter_hot_pos() {
+            if self.is_valid_double_three(ValidateThreeRoot { root_pos }) {
+                self.patterns.field.black[root_pos.idx_usize()].unmark_invalid_double_three();
+            } else {
+                self.patterns.field.black[root_pos.idx_usize()].mark_invalid_double_three();
             }
         }
     }
