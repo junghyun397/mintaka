@@ -8,7 +8,7 @@ use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::value::{Depth, Score};
+use rusty_renju::notation::value::{Depth, Score, Scores};
 use rusty_renju::pattern::{Pattern, PatternCount};
 
 pub trait VcfDestination {
@@ -271,8 +271,8 @@ fn build_vcf_win_tt_entry(depth: Depth, four_pos: Pos) -> TTEntry {
             EndgameFlag::Win,
             false,
         ),
-        score: Score::MAX,
-        eval: Score::MAX,
+        score: Score::INF,
+        eval: Score::INF,
     }
 }
 
@@ -287,7 +287,7 @@ fn build_vcf_lose_tt_entry(depth: Depth) -> TTEntry {
            EndgameFlag::Lose,
            false,
        ),
-       score: Score::MIN,
-       eval: Score::MIN,
+       score: -Score::INF,
+       eval: -Score::INF,
    }
 }

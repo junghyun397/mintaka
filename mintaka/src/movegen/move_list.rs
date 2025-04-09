@@ -1,6 +1,6 @@
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::value::{Score, Scores};
 
 #[derive(Debug)]
 pub struct MoveList {
@@ -17,7 +17,7 @@ impl Default for MoveList {
 impl MoveList {
 
     const EMPTY: Self = Self {
-        moves: [(MaybePos::NONE.unwrap(), Score::MIN); pos::BOARD_SIZE],
+        moves: [(MaybePos::NONE.unwrap(), -Score::INF); pos::BOARD_SIZE],
         top: 0,
     };
 

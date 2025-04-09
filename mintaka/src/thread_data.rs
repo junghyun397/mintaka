@@ -3,12 +3,12 @@ use crate::config::Config;
 use crate::endgame::vcf_search::VcfFrame;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
-use crate::parameters::MAX_SEARCH_DEPTH;
+use crate::parameters::MAX_PLY;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_frame::{SearchFrame, KILLER_MOVE_SLOTS};
 use crate::thread_type::ThreadType;
 use arrayvec::ArrayVec;
-use rusty_renju::notation::pos::MaybePos;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::value::Depth;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -20,9 +20,10 @@ pub struct ThreadData<'a, TH: ThreadType> {
 
     pub tt: TTView<'a>,
     pub ht: HistoryTable,
-    pub ss: ArrayVec<SearchFrame, MAX_SEARCH_DEPTH>,
-    pub pvs: ArrayVec<PrincipalVariation, MAX_SEARCH_DEPTH>,
-    pub killers: ArrayVec<[MaybePos; KILLER_MOVE_SLOTS], MAX_SEARCH_DEPTH>,
+    pub ss: ArrayVec<SearchFrame, MAX_PLY>,
+    pub pvs: ArrayVec<PrincipalVariation, MAX_PLY>,
+    pub killers: ArrayVec<[MaybePos; KILLER_MOVE_SLOTS], MAX_PLY>,
+    pub counters: ArrayVec<MaybePos, MAX_PLY>,
 
     pub vcf_stack: Vec<VcfFrame>,
 
@@ -52,6 +53,7 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
             ss: ArrayVec::new_const(),
             pvs: ArrayVec::new_const(),
             killers: ArrayVec::new_const(),
+            counters: ArrayVec::new_const(),
             vcf_stack: Vec::with_capacity(32),
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
@@ -80,6 +82,14 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
     pub fn increase_ply_mut(&mut self) {
         self.ply += 1;
         self.batch_counter.add_single_mut();
+    }
+
+    pub fn insert_killer_move_mut(&mut self, pos: Pos) {
+        if self.killers[self.ply][0].is_none() {
+            self.killers[self.ply][0] = pos.into();
+        } else {
+            self.killers[self.ply][1] = pos.into();
+        }
     }
 
 }

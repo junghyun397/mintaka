@@ -1,5 +1,5 @@
 use rusty_renju::notation::pos::Pos;
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::value::{Score, Scores};
 
 pub trait EndgameAccumulator {
 
@@ -52,7 +52,7 @@ impl EndgameAccumulator for Score {
 
     #[inline]
     fn unit(_pos: Pos) -> Self {
-        Score::MAX
+        Score::WIN
     }
 
     #[inline]

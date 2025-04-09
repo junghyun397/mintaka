@@ -4,14 +4,14 @@ use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::game_state::GameState;
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind};
 use crate::movegen::move_picker::MovePicker;
-use crate::parameters::{ASPIRATION_WINDOW_BASE_DELTA, MAX_SEARCH_DEPTH};
+use crate::parameters::{ASPIRATION_WINDOW_BASE_DELTA, MAX_PLY};
 use crate::principal_variation::PrincipalVariation;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::{Depth, Score};
+use rusty_renju::notation::value::{Depth, Score, Scores};
 
 pub trait NodeType {
 
@@ -44,16 +44,14 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
 ) -> Score {
-    const MAX_DEPTH: Depth = MAX_SEARCH_DEPTH as Depth;
-
-    let mut score: Score = Score::MIN;
+    let mut score: Score = -Score::INF;
 
     let mut pv = PrincipalVariation::new_const();
 
-    'iterative_deepening: for depth in 1 ..= MAX_DEPTH {
+    'iterative_deepening: for depth in 1 ..= MAX_PLY as u8 {
         td.depth = depth;
         score = if depth < 7 {
-            pvs::<R, RootNode, TH>(td, state, depth, Score::MIN, Score::MAX)
+            pvs::<R, RootNode, TH>(td, state, depth, -Score::INF, Score::INF)
         } else {
             aspiration::<R, TH>(td, state, depth, score)
         };
@@ -75,8 +73,8 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     mut score: Score,
 ) -> Score {
     let mut delta = ASPIRATION_WINDOW_BASE_DELTA + score / 1000;
-    let mut alpha = Score::MIN;
-    let mut beta = Score::MAX;
+    let mut alpha = -Score::INF;
+    let mut beta = Score::INF;
     let mut depth = max_depth;
 
     if max_depth >= 4 {
@@ -116,7 +114,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
         .access(state.board.player_color)
     { // immediate win
-        return Score::MAX
+        return Score::WIN
     }
 
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
@@ -129,9 +127,9 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     }
 
     if td.config.draw_condition
-        .is_some_and(|depth| state.board.stones + 1 >= depth)
+        .is_some_and(|depth| state.history.len() + 1 >= depth as usize)
         || state.board.stones > pos::U8_BOARD_BOUND
-    { // draw | depth limit
+    { // draw or depth limit
         return 0;
     }
 
@@ -153,11 +151,12 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
     let mut static_eval = Evaluator::static_eval(&HeuristicEvaluator, state);
     let mut tt_move = MaybePos::NONE;
-    let mut tt_score = Score::MIN;
+    let mut tt_pv = false;
 
     if let Some(entry) = td.tt.probe(state.board.hash_key) {
         let score_kind = entry.tt_flag.score_kind();
         let endgame_flag = entry.tt_flag.endgame_flag();
+        tt_pv = entry.tt_flag.is_pv();
 
         if !(endgame_flag == EndgameFlag::Win || endgame_flag == EndgameFlag::Lose)
         { // endgame-tt-hit
@@ -181,6 +180,8 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         }
     }
 
+    td.ss[td.ply].on_pv = NT::IS_PV || tt_pv;
+
     if depth_left == 0 {
         return vcf_search(td, state, td.config.max_vcf_depth) // drop into vcf search
             .unwrap_or(static_eval);
@@ -190,7 +191,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     let mut best_score = i16::MIN;
     let mut best_move = tt_move;
 
-    let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
+    let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply], td.counters[td.ply]);
 
     let mut full_window = true;
     'position_search: while let Some((pos, move_score)) = move_picker.next(state) {
@@ -200,11 +201,11 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
         let score = if full_window { // full-window search
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
-        } else { // null-window search
+        } else { // zero-window search
             let mut score = -pvs::<R, OffPVNode, TH>(td, state, depth_left - 1, -alpha - 1, -alpha);
 
-            if score > alpha { // null-window failed, full-window search
-                score = -pvs::<R, PVNode, TH>(td, state, depth_left - 1, -beta, -alpha);
+            if score > alpha { // zero-window failed, full-window search
+                score = -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha);
             }
 
             score
