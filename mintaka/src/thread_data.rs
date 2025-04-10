@@ -84,6 +84,10 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
         self.batch_counter.add_single_mut();
     }
 
+    pub fn decrease_ply_mut(&mut self) {
+        self.ply -= 1;
+    }
+
     pub fn insert_killer_move_mut(&mut self, pos: Pos) {
         if self.killers[self.ply][0].is_none() {
             self.killers[self.ply][0] = pos.into();

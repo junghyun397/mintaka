@@ -32,8 +32,10 @@ pub const UNIT_OVERLINE_MASK: u32           = repeat_4x(OVERLINE);
 
 pub const UNIT_PATTERN_MASK: u32            = repeat_4x(!MARKER);
 
-pub const SLICE_PATTERN_THREE_MASK: u128    = repeat_16x(OPEN_THREE);
-pub const SLICE_PATTERN_FIVE_MASK: u128     = repeat_16x(FIVE);
+pub const SLICE_PATTERN_THREE_MASK: u128        = repeat_16x(OPEN_THREE);
+pub const SLICE_PATTERN_CLOSED_FOUR_MASK: u128  = repeat_16x(CLOSED_FOUR_SINGLE);
+pub const SLICE_PATTERN_OPEN_FOUR_MASK: u128    = repeat_16x(OPEN_FOUR);
+pub const SLICE_PATTERN_FIVE_MASK: u128         = repeat_16x(FIVE);
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 #[repr(u8)]
@@ -201,6 +203,11 @@ impl Pattern {
 
 }
 
+pub struct SlicePatternCount {
+    pub threes: u8,
+    pub fours: u8,
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Patterns {
     pub field: AlignedColorContainer<[Pattern; pos::BOARD_SIZE]>,
@@ -276,8 +283,11 @@ impl Patterns {
 
         if C == Color::Black {
             let mut three_mask = slice_pattern.patterns & SLICE_PATTERN_THREE_MASK;
+            let three_count = three_mask.count_ones();
+            let closed_four_count = (slice_pattern.patterns & SLICE_PATTERN_CLOSED_FOUR_MASK).count_ones();
+            let open_four_count = (slice_pattern.patterns & SLICE_PATTERN_OPEN_FOUR_MASK).count_ones();
 
-            while three_mask != 0 {
+            while C == Color::Black && three_mask != 0 {
                 let three_slice_idx = three_mask.trailing_zeros() / 8;
                 three_mask &= three_mask - 1;
 
