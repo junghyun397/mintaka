@@ -3,6 +3,7 @@ use crate::config::Config;
 use crate::endgame::vcf_search::VcfFrame;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
+use crate::movegen::movegen_window::MovegenWindow;
 use crate::parameters::MAX_PLY;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_frame::{SearchFrame, KILLER_MOVE_SLOTS};
@@ -25,6 +26,7 @@ pub struct ThreadData<'a, TH: ThreadType> {
     pub killers: ArrayVec<[MaybePos; KILLER_MOVE_SLOTS], MAX_PLY>,
     pub counters: ArrayVec<MaybePos, MAX_PLY>,
 
+    pub movegen_stack: ArrayVec<MovegenWindow, MAX_PLY>,
     pub vcf_stack: Vec<VcfFrame>,
 
     pub batch_counter: BatchCounter<'a>,
@@ -54,6 +56,7 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
             pvs: ArrayVec::new_const(),
             killers: ArrayVec::new_const(),
             counters: ArrayVec::new_const(),
+            movegen_stack: ArrayVec::new_const(),
             vcf_stack: Vec::with_capacity(32),
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
@@ -79,13 +82,18 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
         self.aborted.load(Ordering::Relaxed)
     }
 
-    pub fn increase_ply_mut(&mut self) {
+    pub fn push_ply_mut(
+        &mut self,
+        movegen_window: MovegenWindow,
+    ) {
         self.ply += 1;
         self.batch_counter.add_single_mut();
+        self.movegen_stack[self.ply] = movegen_window;
     }
 
-    pub fn decrease_ply_mut(&mut self) {
+    pub fn pop_ply_mut(&mut self) -> MovegenWindow {
         self.ply -= 1;
+        self.movegen_stack[self.ply]
     }
 
     pub fn insert_killer_move_mut(&mut self, pos: Pos) {

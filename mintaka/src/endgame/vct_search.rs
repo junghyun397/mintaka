@@ -78,7 +78,7 @@ fn try_vct<const C: Color, ACC: EndgameAccumulator>(
             result = result.append_pos(frame.defend_pos, frame.threat_pos);
         }
 
-        td.increase_ply_mut();
+        td.batch_counter.add_single_mut();
 
         result
     }

@@ -249,7 +249,7 @@ impl Board {
             || (pattern.count_open_threes() > 2 && { // nested double-three
                 let mut new_overrides = context.branch_overrides();
 
-                if !C::IS_NESTED {
+                if C::IS_ROOT {
                     self.update_root_four_overrides(&mut new_overrides);
                 }
 
@@ -267,14 +267,14 @@ impl Board {
         let pos = context.parent_pos();
         let pattern_unit = self.patterns.field.black[pos.idx_usize()];
 
-        let mut total_threes = if C::IS_NESTED {
-            pattern_unit.count_open_threes() - 1
-        } else {
+        let mut total_threes = if C::IS_ROOT {
             pattern_unit.count_open_threes()
+        } else {
+            pattern_unit.count_open_threes() - 1
         };
 
         for direction in pattern_unit.iter_three_directions() {
-            if C::IS_NESTED && direction == context.parent_direction() {
+            if !C::IS_ROOT && direction == context.parent_direction() {
                 continue;
             }
 
@@ -426,7 +426,7 @@ enum MoveType {
 
 trait ValidateThreeContext : Copy {
 
-    const IS_NESTED: bool;
+    const IS_ROOT: bool;
 
     fn parent_pos(&self) -> Pos;
 
@@ -446,7 +446,7 @@ struct ValidateThreeRoot {
 }
 
 impl ValidateThreeContext for ValidateThreeRoot {
-    const IS_NESTED: bool = false;
+    const IS_ROOT: bool = true;
 
     fn parent_pos(&self) -> Pos {
         self.root_pos
@@ -478,7 +478,7 @@ struct ValidateThreeNode {
 }
 
 impl ValidateThreeContext for ValidateThreeNode {
-    const IS_NESTED: bool = true;
+    const IS_ROOT: bool = false;
 
     fn parent_pos(&self) -> Pos {
         self.parent_pos

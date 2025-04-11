@@ -10,12 +10,12 @@ use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
 
 #[derive(Debug, Copy, Clone)]
-pub struct VcfMoves {
+pub struct VcfMovesUnchecked {
     pub moves: [Pos; 31],
     pub top: u8,
 }
 
-impl VcfMoves {
+impl VcfMovesUnchecked {
 
     pub fn sort_moves(&mut self, ref_pos: Pos) {
         let ref_row = ref_pos.row();
@@ -33,7 +33,7 @@ fn score_move(state: &GameState, pos: Pos) -> i16 {
     state.move_scores.scores[pos.idx_usize()] as i16 * distance as i16
 }
 
-pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, recent_four: Pos) -> VcfMoves {
+pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, recent_four: Pos) -> VcfMovesUnchecked {
     let mut vcf_moves = [MaybePos::NONE.unwrap(); 31];
     let mut vcf_moves_top = 0;
 
@@ -66,7 +66,7 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
         vcf_moves_top += 1;
     }
 
-    VcfMoves { moves: vcf_moves, top: vcf_moves_top as u8 }
+    VcfMovesUnchecked { moves: vcf_moves, top: vcf_moves_top as u8 }
 }
 
 pub fn generate_neighbors_moves(state: &GameState, moves: &mut MoveList) {

@@ -83,7 +83,7 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     }
 
     loop {
-        score = pvs::<R, RootNode, _>(td, state, 0, alpha, beta);
+        score = pvs::<R, RootNode, _>(td, state, depth, alpha, beta);
 
         if td.is_aborted() {
             return score;
@@ -120,10 +120,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
         .access(!state.board.player_color)
     { // defend immediate win
+        td.push_ply_mut(state.movegen_window);
         state.set_mut(pos.into());
-        td.increase_ply_mut();
 
-        return -pvs::<R, NT, TH>(td, state, depth_left, -beta, -alpha);
+        return -pvs::<R, NT::NextType, TH>(td, state, depth_left, -beta, -alpha);
     }
 
     if td.config.draw_condition
@@ -195,9 +195,8 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
     let mut full_window = true;
     'position_search: while let Some((pos, move_score)) = move_picker.next(state) {
-        let movegen_window = state.movegen_window;
+        td.push_ply_mut(state.movegen_window);
         state.set_mut(pos);
-        td.increase_ply_mut();
 
         let score = if full_window { // full-window search
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
@@ -213,6 +212,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
         full_window = false;
 
+        let movegen_window = td.pop_ply_mut();
         state.unset_mut(movegen_window);
 
         best_score = best_score.max(score);

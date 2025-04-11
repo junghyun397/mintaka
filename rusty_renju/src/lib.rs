@@ -19,7 +19,6 @@ pub mod slice_pattern;
 pub mod board_iter;
 pub mod bitfield;
 pub mod history;
-pub mod slice_pattern_count;
-pub mod pattern_score;
+pub mod score_table;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

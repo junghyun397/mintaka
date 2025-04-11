@@ -1,7 +1,7 @@
 use crate::endgame::accumulator::{EndgameAccumulator, SequenceEndgameAccumulator};
 use crate::game_state::GameState;
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind, TTEntry, TTFlag};
-use crate::movegen::move_generator::{generate_vcf_moves, VcfMoves};
+use crate::movegen::move_generator::{generate_vcf_moves, VcfMovesUnchecked};
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
@@ -46,7 +46,7 @@ impl VcfDestination for VcfDefend {
 #[derive(Copy, Clone)]
 pub struct VcfFrame {
     board: Board,
-    vcf_moves: VcfMoves,
+    vcf_moves: VcfMovesUnchecked,
     next_move_counter: usize,
     depth: Depth,
     four_pos: Pos,
@@ -101,7 +101,7 @@ pub fn vcf_sequence(
 
 fn vcf<ACC: EndgameAccumulator>(
     td: &mut ThreadData<impl ThreadType>, dest: impl VcfDestination,
-    board: Board, vcf_moves: VcfMoves, max_depth: Depth
+    board: Board, vcf_moves: VcfMovesUnchecked, max_depth: Depth
 ) -> ACC {
     match board.player_color {
         Color::Black => try_vcf::<{ Color::Black }, ACC>(td, dest, board, vcf_moves, max_depth, 0),
@@ -112,7 +112,7 @@ fn vcf<ACC: EndgameAccumulator>(
 // depth-first search
 fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
     td: &mut ThreadData<impl ThreadType>, dest: impl VcfDestination,
-    mut board: Board, mut vcf_moves: VcfMoves,
+    mut board: Board, mut vcf_moves: VcfMovesUnchecked,
     max_depth: Depth, mut vcf_ply: Depth,
 ) -> ACC {
     let mut move_counter: usize = 0;
@@ -161,7 +161,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             }
 
             let mut position_board = board.set(four_pos);
-            td.increase_ply_mut();
+            td.batch_counter.add_single_mut();
 
             let defend_pos = position_board.patterns.unchecked_five_pos.player_unit::<C>().unwrap();
             let tt_key = position_board.hash_key.set(C.reversed(), defend_pos);
@@ -197,7 +197,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             }
 
             position_board.set_mut(defend_pos);
-            td.increase_ply_mut();
+            td.batch_counter.add_single_mut();
 
             td.vcf_stack.push(VcfFrame {
                 board,
@@ -219,7 +219,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
                 let mut moves = [MaybePos::NONE.unwrap(); 31];
                 moves[0] = position_board.patterns.unchecked_five_pos.opponent_unit::<C>().unwrap();
-                VcfMoves { moves, top: 1 }
+                VcfMovesUnchecked { moves, top: 1 }
             } else {
                 generate_vcf_moves(&position_board, C, ACC::DISTANCE_WINDOW, four_pos)
             };

@@ -281,20 +281,15 @@ impl Patterns {
                 })
         );
 
-        if C == Color::Black {
-            let mut three_mask = slice_pattern.patterns & SLICE_PATTERN_THREE_MASK;
-            let three_count = three_mask.count_ones();
-            let closed_four_count = (slice_pattern.patterns & SLICE_PATTERN_CLOSED_FOUR_MASK).count_ones();
-            let open_four_count = (slice_pattern.patterns & SLICE_PATTERN_OPEN_FOUR_MASK).count_ones();
+        let mut three_mask = slice_pattern.patterns & SLICE_PATTERN_THREE_MASK;
 
-            while C == Color::Black && three_mask != 0 {
-                let three_slice_idx = three_mask.trailing_zeros() / 8;
-                three_mask &= three_mask - 1;
+        while C == Color::Black && three_mask != 0 {
+            let three_slice_idx = three_mask.trailing_zeros() / 8;
+            three_mask &= three_mask - 1;
 
-                let three_idx: usize = step_idx!(D, slice.start_pos.idx_usize(), three_slice_idx as usize);
-                if self.field.player_unit::<C>()[three_idx].has_three() {
-                    self.unchecked_double_three_field.set_mut(Pos::from_index(three_idx as u8));
-                }
+            let three_idx: usize = step_idx!(D, slice.start_pos.idx_usize(), three_slice_idx as usize);
+            if self.field.player_unit::<C>()[three_idx].has_three() {
+                self.unchecked_double_three_field.set_mut(Pos::from_index(three_idx as u8));
             }
         }
 
