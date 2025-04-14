@@ -37,12 +37,12 @@ impl MoveScores {
 
     pub fn add_neighborhood_score(&mut self, pos: Pos) {
         for row in
-            pos.row().saturating_sub(2) .. (pos.row() + 2).min(pos::BOARD_WIDTH - 1)
+            pos.row_usize().saturating_sub(2) .. (pos.row_usize() + 2).min(pos::U_BOARD_WIDTH - 1)
         {
             for col in
-                pos.col().saturating_sub(2) .. (pos.col() + 2).min(pos::BOARD_WIDTH - 1)
+                pos.col_usize().saturating_sub(2) .. (pos.col_usize() + 2).min(pos::U_BOARD_WIDTH - 1)
             {
-                let idx = cartesian_to_index!(row, col) as usize;
+                let idx = cartesian_to_index!(row, col);
                 self.scores[idx] = self.scores[idx].saturating_add(1);
             }
         }

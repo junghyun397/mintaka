@@ -149,7 +149,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         return 0;
     }
 
-    let mut static_eval = Evaluator::static_eval(&HeuristicEvaluator, state);
+    let mut static_eval = Evaluator::eval_value(&HeuristicEvaluator, state);
     let mut tt_move = MaybePos::NONE;
     let mut tt_pv = false;
 

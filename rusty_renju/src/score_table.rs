@@ -1,5 +1,6 @@
-use crate::notation::color::ColorContainer;
+use crate::notation::color::{Color, ColorContainer};
 use crate::notation::pos;
+use crate::notation::pos::Pos;
 use crate::slice;
 use std::simd::Simd;
 
@@ -19,27 +20,38 @@ impl SlicePatternCount {
 }
 
 #[derive(Copy, Clone)]
-#[repr(align(32))]
-pub struct SlicePatternCounts {
-    pub entries: [SlicePatternCount; slice::TOTAL_SLICE_AMOUNT],
+pub struct ScoreTable {
+    pub slice_pattern_counts: ColorContainer<[SlicePatternCount; slice::TOTAL_SLICE_AMOUNT]>,
+    pub position_scores: ColorContainer<[i8; pos::BOARD_SIZE]>
 }
 
-impl SlicePatternCounts {
+pub trait ScoreTableOps {
 
-    pub fn set_mut(&mut self, idx: usize, threes: u8, fours: u8) {
-        self.entries[idx].threes = threes;
-        self.entries[idx].fours = fours;
+    fn set_slice_mut<const C: Color>(&mut self, idx: usize, threes: u8, fours: u8);
+
+    fn clear_slice_mut<const C: Color>(&mut self, idx: usize);
+
+    fn sum_slices<const C: Color>(&self) -> SlicePatternCount;
+
+    fn add_neighborhood_score_mut(&mut self, pos: Pos);
+
+    fn remove_neighborhood_score_mut(&mut self, pos: Pos);
+
+}
+
+impl ScoreTableOps for ScoreTable {
+    fn set_slice_mut<const C: Color>(&mut self, idx: usize, threes: u8, fours: u8) {
+        self.slice_pattern_counts.player_unit_mut::<C>().set_mut(idx, threes, fours);
     }
 
-    pub fn clear_mut(&mut self, idx: usize) {
-        self.entries[idx].threes = 0;
-        self.entries[idx].fours = 0;
+    fn clear_slice_mut<const C: Color>(&mut self, idx: usize) {
+        self.slice_pattern_counts.player_unit_mut::<C>().clear_mut(idx);
     }
 
-    pub fn sum(&self) -> SlicePatternCount {
+    fn sum_slices<const C: Color>(&self) -> SlicePatternCount {
         let mut acc = SlicePatternCount::EMPTY;
 
-        let mut entries_ptr = self.entries.as_ptr() as *const u8;
+        let mut entries_ptr = self.slice_pattern_counts.player_unit::<C>().as_ptr() as *const u8;
 
         // 72 % 8 = 0
         let mut vector_acc = Simd::splat(0);
@@ -58,28 +70,12 @@ impl SlicePatternCounts {
 
         acc
     }
-}
 
-#[derive(Copy, Clone)]
-pub struct ScoreTable {
-    pub slice_pattern_counts: ColorContainer<SlicePatternCounts>,
-    pub position_scores: ColorContainer<[i8; pos::BOARD_SIZE]>
-}
-
-pub trait ScoreTableOps {
-
-    fn set_slice_mut(&mut self, idx: usize, threes: u8, fours: u8);
-
-    fn clear_slice_mut(&mut self, idx: usize);
-
-}
-
-impl ScoreTableOps for ScoreTable {
-    fn set_slice_mut(&mut self, idx: usize, threes: u8, fours: u8) {
+    fn add_neighborhood_score_mut(&mut self, pos: Pos) {
         todo!()
     }
 
-    fn clear_slice_mut(&mut self, idx: usize) {
+    fn remove_neighborhood_score_mut(&mut self, pos: Pos) {
         todo!()
     }
 }
@@ -87,11 +83,15 @@ impl ScoreTableOps for ScoreTable {
 struct PassScoreTableOps;
 
 impl ScoreTableOps for PassScoreTableOps {
-    fn set_slice_mut(&mut self, idx: usize, threes: u8, fours: u8) {
-        todo!()
+    fn set_slice_mut<const C: Color>(&mut self, _idx: usize, _threes: u8, _fours: u8) {}
+
+    fn clear_slice_mut<const C: Color>(&mut self, _idx: usize) {}
+
+    fn sum_slices<const C: Color>(&self) -> SlicePatternCount {
+        SlicePatternCount::EMPTY
     }
 
-    fn clear_slice_mut(&mut self, idx: usize) {
-        todo!()
-    }
+    fn add_neighborhood_score_mut(&mut self, _pos: Pos) {}
+
+    fn remove_neighborhood_score_mut(&mut self, _pos: Pos) {}
 }

@@ -1,11 +1,10 @@
-use crate::eval::evaluator::Evaluator;
+use crate::eval::evaluator::{Evaluator, PolicyDistribution};
 use crate::game_state::GameState;
 use rusty_renju::notation::value::Score;
 
 pub struct NnueEvaluator {
-    black_weights: (),
-    white_weights: (),
-    general_weights: (),
+    black_network: (),
+    white_network: ()
 }
 
 impl Default for NnueEvaluator {
@@ -18,7 +17,11 @@ impl Default for NnueEvaluator {
 
 impl Evaluator for NnueEvaluator {
 
-    fn static_eval(&self, state: &GameState) -> Score {
+    fn eval_value(&self, state: &GameState) -> Score {
+        todo!()
+    }
+
+    fn eval_policy(&self, state: &GameState) -> PolicyDistribution {
         todo!()
     }
 

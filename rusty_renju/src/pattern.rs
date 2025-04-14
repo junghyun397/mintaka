@@ -188,12 +188,14 @@ impl Pattern {
     }
 
     #[inline(always)]
-    pub fn apply_mask_mut<const D: Direction>(&mut self, pattern: u8) {
-        match D {
-            Direction::Horizontal => self.horizontal = pattern,
-            Direction::Vertical => self.vertical = pattern,
-            Direction::Ascending => self.ascending = pattern,
-            Direction::Descending => self.descending = pattern | (self.descending & MARKER), // retain invalid three makers
+    pub fn apply_mask_mut<const C: Color, const D: Direction>(&mut self, pattern: u8) {
+        match (C, D) {
+            (_, Direction::Horizontal) => self.horizontal = pattern,
+            (_, Direction::Vertical) => self.vertical = pattern,
+            (_, Direction::Ascending) => self.ascending = pattern,
+            (Color::Black, Direction::Descending) =>
+                self.descending = pattern | (self.descending & MARKER), // retain invalid three makers
+            (Color::White, Direction::Descending) => self.descending = pattern
         }
     }
 
@@ -259,10 +261,16 @@ impl Patterns {
     #[inline]
     pub fn clear_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
         let mut idx = slice.start_pos.idx_usize();
-        self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(0);
-        for _ in 1 .. slice.length as usize {
+        let mut slice_idx = 0;
+        loop { // do-while style loop
+            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<C, D>(0);
+
+            slice_idx += 1;
+            if slice_idx == slice.length as usize {
+                break;
+            }
+
             idx = step_idx!(D, idx, 1);
-            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(0);
         }
 
         *slice.pattern_available.player_unit_mut::<C>() = false;
@@ -282,13 +290,15 @@ impl Patterns {
         );
 
         let mut three_mask = slice_pattern.patterns & SLICE_PATTERN_THREE_MASK;
+        let mut closed_four_mask = slice_pattern.patterns & SLICE_PATTERN_CLOSED_FOUR_MASK;
+        let mut open_four_mask = slice_pattern.patterns & SLICE_PATTERN_OPEN_FOUR_MASK;
 
         while C == Color::Black && three_mask != 0 {
             let three_slice_idx = three_mask.trailing_zeros() / 8;
             three_mask &= three_mask - 1;
 
             let three_idx: usize = step_idx!(D, slice.start_pos.idx_usize(), three_slice_idx as usize);
-            if self.field.player_unit::<C>()[three_idx].has_three() {
+            if self.field.black[three_idx].has_three() {
                 self.unchecked_double_three_field.set_mut(Pos::from_index(three_idx as u8));
             }
         }
@@ -296,10 +306,16 @@ impl Patterns {
         let slice_pattern = unsafe { std::mem::transmute::<SlicePattern, [u8; 16]>(slice_pattern) };
 
         let mut idx = slice.start_pos.idx_usize();
-        self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(slice_pattern[0]);
-        for pattern in slice_pattern.into_iter().take(slice.length as usize).skip(1) {
+        let mut pattern_idx = 0;
+        loop { // do-while style loop
+            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<C, D>(slice_pattern[pattern_idx]);
+
+            pattern_idx += 1;
+            if pattern_idx == slice.length as usize {
+                break;
+            }
+
             idx = step_idx!(D, idx, 1);
-            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<D>(pattern);
         }
 
         self.unchecked_five_in_a_row = self.unchecked_five_in_a_row.or(

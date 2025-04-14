@@ -3,15 +3,11 @@ use crate::bitfield::Bitfield;
 use crate::memo::hash_key::HashKey;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
-use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
 use crate::pattern;
 use crate::pattern::Patterns;
 use crate::slice::Slices;
-use crate::utils::platform;
 use std::marker::ConstParamTy;
-use std::simd::cmp::SimdPartialEq;
-use std::simd::Simd;
 
 #[derive(Copy, Clone, Default)]
 pub struct Board {

@@ -1,9 +1,9 @@
-use crate::eval::evaluator::Evaluator;
+use crate::eval::evaluator::{Evaluator, PolicyDistribution};
 use crate::game_state::GameState;
 use rusty_renju::board_iter::BoardIterItem;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::rule::ForbiddenKind;
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::value::{Score, Scores};
 use rusty_renju::pattern::{Pattern, PatternCount};
 
 struct HeuristicWeights {
@@ -116,7 +116,7 @@ impl HeuristicEvaluator {
 
 impl Evaluator for HeuristicEvaluator {
 
-    fn static_eval(&self, state: &GameState) -> Score {
+    fn eval_value(&self, state: &GameState) -> Score {
         let mut acc_black = [0; 9];
         let mut acc_white = [0; 9];
 
@@ -162,7 +162,11 @@ impl Evaluator for HeuristicEvaluator {
             }
         };
 
-        score.clamp(-10000, 10000) as Score
+        (score as Score).clamp(-Score::WIN, Score::WIN)
+    }
+
+    fn eval_policy(&self, _state: &GameState) -> PolicyDistribution {
+        todo!()
     }
 
 }
