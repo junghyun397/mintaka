@@ -1,6 +1,4 @@
 use crate::endgame::vcf_search::vcf_search;
-use crate::eval::evaluator::Evaluator;
-use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::game_state::GameState;
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind};
 use crate::movegen::move_picker::MovePicker;
@@ -149,7 +147,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         return 0;
     }
 
-    let mut static_eval = Evaluator::eval_value(&HeuristicEvaluator, state);
+    let mut static_eval = 0;
     let mut tt_move = MaybePos::NONE;
     let mut tt_pv = false;
 
