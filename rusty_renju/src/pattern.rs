@@ -8,6 +8,8 @@ use crate::slice::Slice;
 use crate::slice_pattern::{contains_five_in_a_row, SlicePattern};
 use crate::utils::lang_utils::{repeat_16x, repeat_4x};
 use crate::{assert_struct_sizes, step_idx};
+use std::simd::cmp::SimdPartialEq;
+use std::simd::Simd;
 
 pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
@@ -247,8 +249,8 @@ impl Patterns {
     pub fn update_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
         let slice_pattern = slice.calculate_slice_pattern::<C>();
 
-        match (slice.pattern_available.player_unit::<C>(), slice_pattern.is_empty()) {
-            (true, true) => {
+        match (*slice.pattern_bitmap.player_unit::<C>() == 0, slice_pattern.is_empty()) {
+            (false, true) => {
                 self.clear_with_slice_mut::<C, D>(slice);
             },
             (_, false) => {
@@ -260,20 +262,17 @@ impl Patterns {
 
     #[inline]
     pub fn clear_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
-        let mut idx = slice.start_pos.idx_usize();
-        let mut slice_idx = 0;
-        loop { // do-while style loop
+        let start_idx = slice.start_pos.idx_usize();
+        let mut clear_mask = *slice.pattern_bitmap.player_unit::<C>();
+        while clear_mask != 0 {
+            let pattern_idx = clear_mask.trailing_zeros() as usize;
+            clear_mask &= clear_mask - 1;
+
+            let idx = step_idx!(D, start_idx, pattern_idx);
             self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<C, D>(0);
-
-            slice_idx += 1;
-            if slice_idx == slice.length as usize {
-                break;
-            }
-
-            idx = step_idx!(D, idx, 1);
         }
 
-        *slice.pattern_available.player_unit_mut::<C>() = false;
+        *slice.pattern_bitmap.player_unit_mut::<C>() = 0;
     }
 
     #[inline]
@@ -281,12 +280,10 @@ impl Patterns {
         &mut self, slice: &mut Slice, slice_pattern: SlicePattern
     ) {
         *self.unchecked_five_pos.player_unit_mut::<C>() = self.unchecked_five_pos.player_unit::<C>().or(
-            (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK != 0)
-                .then(|| {
-                    let slice_idx = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8;
-
-                    Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8))
-                })
+            (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK != 0).then(|| {
+                let slice_idx = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8;
+                Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8))
+            })
         );
 
         let mut three_mask = slice_pattern.patterns & SLICE_PATTERN_THREE_MASK;
@@ -303,19 +300,17 @@ impl Patterns {
             }
         }
 
-        let slice_pattern = unsafe { std::mem::transmute::<SlicePattern, [u8; 16]>(slice_pattern) };
+        let pattern_bitmap = encode_u128_into_u16(slice_pattern.patterns);
+        let slice_patterns = unsafe { std::mem::transmute::<u128, [u8; 16]>(slice_pattern.patterns) };
 
-        let mut idx = slice.start_pos.idx_usize();
-        let mut pattern_idx = 0;
-        loop { // do-while style loop
-            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<C, D>(slice_pattern[pattern_idx]);
+        let start_idx = slice.start_pos.idx_usize();
+        let mut update_mask = (slice.pattern_bitmap.player_unit::<C>() ^ pattern_bitmap) | pattern_bitmap;
+        while update_mask != 0 {
+            let pattern_idx = update_mask.trailing_zeros() as usize;
+            update_mask &= update_mask - 1;
 
-            pattern_idx += 1;
-            if pattern_idx == slice.length as usize {
-                break;
-            }
-
-            idx = step_idx!(D, idx, 1);
+            let idx = step_idx!(D, start_idx, pattern_idx);
+            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<C, D>(slice_patterns[pattern_idx]);
         }
 
         self.unchecked_five_in_a_row = self.unchecked_five_in_a_row.or(
@@ -323,7 +318,7 @@ impl Patterns {
                 .then_some(C)
         );
 
-        *slice.pattern_available.player_unit_mut::<C>() = true;
+        *slice.pattern_bitmap.player_unit_mut::<C>() = pattern_bitmap;
     }
 
 }
@@ -345,4 +340,10 @@ impl Iterator for DirectionIterator {
         })
     }
 
+}
+
+fn encode_u128_into_u16(source: u128) -> u16 {
+    Simd::<u8, 16>::from(unsafe { std::mem::transmute::<u128, [u8; 16]>(source) })
+        .simd_ne(Simd::splat(0))
+        .to_bitmask() as u16 // _mm_movemask_epi8
 }

@@ -17,7 +17,7 @@ pub struct Slice {
     pub start_pos: Pos,
     pub black_stones: u16,
     pub white_stones: u16,
-    pub pattern_available: ColorContainer<bool>,
+    pub pattern_bitmap: ColorContainer<u16>,
 }
 
 assert_struct_sizes!(Slice, size=16, align=16);
@@ -34,7 +34,7 @@ impl Slice {
             start_pos: Pos::from_cartesian(start_row, start_col),
             black_stones: 0,
             white_stones: 0,
-            pattern_available: ColorContainer::new(false, false),
+            pattern_bitmap: ColorContainer::new(0, 0),
         }
     }
 

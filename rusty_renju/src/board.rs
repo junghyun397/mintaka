@@ -127,26 +127,26 @@ impl Board {
                 }
 
                 match (
-                    $slice.pattern_available.player_unit::<{ Color::Black }>(),
+                    *$slice.pattern_bitmap.player_unit::<{ Color::Black }>() == 0,
                     $slice.has_potential_pattern::<{ Color::Black }>()
                 ) {
                     (_, true) => {
                         self.patterns.update_with_slice_mut::<{ Color::Black }, { $direction }>($slice);
                     },
-                    (true, false) => {
+                    (false, false) => {
                         self.patterns.clear_with_slice_mut::<{ Color::Black }, { $direction }>($slice);
                     },
                     _ => {}
                 }
 
                 match (
-                    $slice.pattern_available.player_unit::<{ Color::White }>(),
+                    *$slice.pattern_bitmap.player_unit::<{ Color::White }>() == 0,
                     $slice.has_potential_pattern::<{ Color::White }>()
                 ) {
                     (_, true) => {
                         self.patterns.update_with_slice_mut::<{ Color::White }, { $direction }>($slice);
                     },
-                    (true, false) => {
+                    (false, false) => {
                         self.patterns.clear_with_slice_mut::<{ Color::White }, { $direction }>($slice);
                     },
                     _ => {}
@@ -310,6 +310,7 @@ impl Board {
                 if total_threes < 3 {
                     return false;
                 }
+
                 total_threes -= 1;
             }
         }
@@ -317,7 +318,6 @@ impl Board {
         true
     }
 
-    #[inline(always)]
     fn update_root_four_overrides(&self, overrides: &mut SetOverrides) {
         let pos = overrides.set[0];
 
@@ -326,7 +326,6 @@ impl Board {
         }
     }
 
-    #[inline(always)]
     fn update_four_overrides(&self, overrides: &mut SetOverrides, direction_from: Direction, pos: Pos) {
         for next_four_idx in (0 .. direction_from as u8 * 3).chain(direction_from as u8 * 4 .. 12) {
             let four_pos = overrides.next_four[next_four_idx as usize];
