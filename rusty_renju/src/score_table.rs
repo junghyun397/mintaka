@@ -46,19 +46,19 @@ pub trait ScoreTableOps {
 
 impl ScoreTableOps for ScoreTable {
     fn set_slice_mut<const C: Color>(&mut self, idx: usize, threes: u8, fours: u8) {
-        self.slice_pattern_counts.player_unit_mut::<C>()[idx].threes = threes;
-        self.slice_pattern_counts.player_unit_mut::<C>()[idx].fours = fours;
+        self.slice_pattern_counts.player_ref_mut::<C>()[idx].threes = threes;
+        self.slice_pattern_counts.player_ref_mut::<C>()[idx].fours = fours;
     }
 
     fn clear_slice_mut<const C: Color>(&mut self, idx: usize) {
-        self.slice_pattern_counts.player_unit_mut::<C>()[idx].threes = 0;
-        self.slice_pattern_counts.player_unit_mut::<C>()[idx].fours = 0;
+        self.slice_pattern_counts.player_ref_mut::<C>()[idx].threes = 0;
+        self.slice_pattern_counts.player_ref_mut::<C>()[idx].fours = 0;
     }
 
     fn sum_slices<const C: Color>(&self) -> SlicePatternCount {
         let mut acc = SlicePatternCount::EMPTY;
 
-        let mut entries_ptr = self.slice_pattern_counts.player_unit::<C>().as_ptr() as *const u8;
+        let mut entries_ptr = self.slice_pattern_counts.player_ref::<C>().as_ptr() as *const u8;
 
         // 72 % 8 = 0
         let mut vector_acc = Simd::splat(0);
@@ -79,12 +79,12 @@ impl ScoreTableOps for ScoreTable {
     }
 
     fn update_position_mut<const C: Color>(&mut self, idx: usize, pattern: Pattern) {
-        self.position_scores.player_unit_mut::<C>()[idx] =
-            PATTERN_SCORE_LUT.player_unit::<C>()[encode_pattern_to_score_key(pattern)]
+        self.position_scores.player_ref_mut::<C>()[idx] =
+            PATTERN_SCORE_LUT.player_ref::<C>()[encode_pattern_to_score_key(pattern)]
     }
 
     fn clear_position_mut<const C: Color>(&mut self, idx: usize) {
-        self.position_scores.player_unit_mut::<C>()[idx] = 0;
+        self.position_scores.player_ref_mut::<C>()[idx] = 0;
     }
 
     fn add_neighborhood_score_mut(&mut self, pos: Pos) {

@@ -15,8 +15,7 @@ pub struct Slice {
     pub start_row: u8,
     pub start_col: u8,
     pub start_pos: Pos,
-    pub black_stones: u16,
-    pub white_stones: u16,
+    pub stones: ColorContainer<u16>,
     pub pattern_bitmap: ColorContainer<u16>,
 }
 
@@ -32,8 +31,7 @@ impl Slice {
             start_row,
             start_col,
             start_pos: Pos::from_cartesian(start_row, start_col),
-            black_stones: 0,
-            white_stones: 0,
+            stones: ColorContainer::new(0, 0),
             pattern_bitmap: ColorContainer::new(0, 0),
         }
     }
@@ -49,46 +47,32 @@ impl Slice {
     }
 
     pub fn set_mut(&mut self, color: Color, idx: u8) {
-        let mask = 0b1 << idx;
-        match color {
-            Color::Black => self.black_stones |= mask,
-            Color::White => self.white_stones |= mask
-        };
+        *self.stones.access_mut(color) |= 0b1 << idx;
     }
 
     pub fn unset_mut(&mut self, color: Color, idx: u8) {
-        let mask = !(0b1 << idx);
-        match color {
-            Color::Black => self.black_stones &= mask,
-            Color::White => self.white_stones &= mask
-        };
+        *self.stones.access_mut(color) &= !(0b1 << idx);
     }
 
     pub fn stones<const C: Color>(&self) -> u16 {
-        match C {
-            Color::Black => self.black_stones,
-            Color::White => self.white_stones
-        }
+        self.stones.player::<C>()
     }
 
     pub fn stones_reversed_color<const C: Color>(&self) -> u16 {
-        match C {
-            Color::Black => self.white_stones,
-            Color::White => self.black_stones
-        }
+        self.stones.opponent::<C>()
     }
 
     pub fn is_empty(&self, idx: u8) -> bool {
         let mask = 0b1 << idx;
-        (self.black_stones | self.white_stones) & mask == 0
+        (self.stones.black | self.stones.white) & mask == 0
     }
 
     pub fn stone_kind(&self, idx: u8) -> Option<Color> {
         let mask = 0b1 << idx;
 
-        if self.black_stones & mask == mask {
+        if self.stones.black & mask == mask {
             Some(Color::Black)
-        } else if self.white_stones & mask == mask {
+        } else if self.stones.white & mask == mask {
             Some(Color::White)
         } else {
             None
@@ -115,8 +99,8 @@ impl Slice {
         }
 
         match C {
-            Color::Black => is_pattern_available(self.black_stones, self.white_stones),
-            Color::White => is_pattern_available(self.white_stones, self.black_stones),
+            Color::Black => is_pattern_available(self.stones.black, self.stones.white),
+            Color::White => is_pattern_available(self.stones.white, self.stones.black),
         }
     }
 

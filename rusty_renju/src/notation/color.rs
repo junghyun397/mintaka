@@ -72,28 +72,28 @@ macro_rules! impl_color_container {
                 }
             }
 
-            pub const fn player_unit<const C: Color>(&self) -> &T {
+            pub const fn player_ref<const C: Color>(&self) -> &T {
                 match C {
                     Color::Black => &self.black,
                     Color::White => &self.white
                 }
             }
 
-            pub const fn opponent_unit<const C: Color>(&self) -> &T {
+            pub const fn opponent_ref<const C: Color>(&self) -> &T {
                 match C {
                     Color::Black => &self.white,
                     Color::White => &self.black
                 }
             }
 
-            pub const fn player_unit_mut<const C: Color>(&mut self) -> &mut T {
+            pub const fn player_ref_mut<const C: Color>(&mut self) -> &mut T {
                 match C {
                     Color::Black => &mut self.black,
                     Color::White => &mut self.white
                 }
             }
 
-            pub const fn opponent_unit_mut<const C: Color>(&mut self) -> &mut T {
+            pub const fn opponent_ref_mut<const C: Color>(&mut self) -> &mut T {
                 match C {
                     Color::Black => &mut self.white,
                     Color::White => &mut self.black
@@ -104,6 +104,28 @@ macro_rules! impl_color_container {
     };
 }
 
+macro_rules! impl_color_container_copy {
+    ($name:ident) => {
+        impl<T: std::marker::Copy> $name<T> {
+
+            pub const fn player<const C: Color>(&self) -> T {
+                match C {
+                    Color::Black => self.black,
+                    Color::White => self.white
+                }
+            }
+
+            pub const fn opponent<const C: Color>(&self) -> T {
+                match C {
+                    Color::Black => self.white,
+                    Color::White => self.black
+                }
+            }
+
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
 pub struct ColorContainer<T: Copy> {
@@ -112,6 +134,7 @@ pub struct ColorContainer<T: Copy> {
 }
 
 impl_color_container!(ColorContainer, Copy);
+impl_color_container_copy!(ColorContainer);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(C)]
@@ -130,3 +153,4 @@ pub struct AlignedColorContainer<T: Copy> {
 }
 
 impl_color_container!(AlignedColorContainer, Copy);
+impl_color_container_copy!(AlignedColorContainer);

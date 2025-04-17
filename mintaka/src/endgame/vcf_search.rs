@@ -148,7 +148,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
         {
             let idx = four_pos.idx_usize();
 
-            let player_pattern = board.patterns.field.player_unit::<C>()[idx];
+            let player_pattern = board.patterns.field.player_ref::<C>()[idx];
 
             if C == Color::Black && player_pattern.is_forbidden() {
                 continue 'position_search;
@@ -163,11 +163,11 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             let mut position_board = board.set(four_pos);
             td.batch_counter.add_single_mut();
 
-            let defend_pos = position_board.patterns.unchecked_five_pos.player_unit::<C>().unwrap();
+            let defend_pos = position_board.patterns.unchecked_five_pos.player_ref::<C>().unwrap();
             let tt_key = position_board.hash_key.set(C.reversed(), defend_pos);
             td.tt.prefetch(tt_key);
 
-            let defend_pattern = position_board.patterns.field.opponent_unit::<C>()[defend_pos.idx_usize()];
+            let defend_pattern = position_board.patterns.field.opponent_ref::<C>()[defend_pos.idx_usize()];
             let defend_four_count = defend_pattern.count_fours();
             let defend_is_forbidden = C == Color::White && defend_pattern.is_forbidden();
 
@@ -209,16 +209,16 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             });
 
             vcf_moves = if defend_four_count != PatternCount::Cold {
-                let defend_move = position_board.patterns.unchecked_five_pos.opponent_unit::<C>().unwrap();
+                let defend_move = position_board.patterns.unchecked_five_pos.opponent_ref::<C>().unwrap();
 
-                if !position_board.patterns.field.player_unit::<C>()[defend_move.idx_usize()].has_any_four() {
+                if !position_board.patterns.field.player_ref::<C>()[defend_move.idx_usize()].has_any_four() {
                     board = position_board;
                     vcf_ply += 2;
                     break 'position_search;
                 }
 
                 let mut moves = [MaybePos::NONE.unwrap(); 31];
-                moves[0] = position_board.patterns.unchecked_five_pos.opponent_unit::<C>().unwrap();
+                moves[0] = position_board.patterns.unchecked_five_pos.opponent_ref::<C>().unwrap();
                 VcfMovesUnchecked { moves, top: 1 }
             } else {
                 generate_vcf_moves(&position_board, C, ACC::DISTANCE_WINDOW, four_pos)

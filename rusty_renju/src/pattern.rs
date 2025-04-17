@@ -249,7 +249,7 @@ impl Patterns {
     pub fn update_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
         let slice_pattern = slice.calculate_slice_pattern::<C>();
 
-        match (*slice.pattern_bitmap.player_unit::<C>() == 0, slice_pattern.is_empty()) {
+        match (slice.pattern_bitmap.player::<C>() == 0, slice_pattern.is_empty()) {
             (false, true) => {
                 self.clear_with_slice_mut::<C, D>(slice);
             },
@@ -263,23 +263,23 @@ impl Patterns {
     #[inline]
     pub fn clear_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
         let start_idx = slice.start_pos.idx_usize();
-        let mut clear_mask = *slice.pattern_bitmap.player_unit::<C>();
+        let mut clear_mask = slice.pattern_bitmap.player::<C>();
         while clear_mask != 0 {
             let pattern_idx = clear_mask.trailing_zeros() as usize;
             clear_mask &= clear_mask - 1;
 
             let idx = step_idx!(D, start_idx, pattern_idx);
-            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<C, D>(0);
+            self.field.player_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(0);
         }
 
-        *slice.pattern_bitmap.player_unit_mut::<C>() = 0;
+        *slice.pattern_bitmap.player_ref_mut::<C>() = 0;
     }
 
     #[inline]
     fn update_with_slice_pattern_mut<const C: Color, const D: Direction>(
         &mut self, slice: &mut Slice, slice_pattern: SlicePattern
     ) {
-        *self.unchecked_five_pos.player_unit_mut::<C>() = self.unchecked_five_pos.player_unit::<C>().or(
+        *self.unchecked_five_pos.player_ref_mut::<C>() = self.unchecked_five_pos.player_ref::<C>().or(
             (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK != 0).then(|| {
                 let slice_idx = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8;
                 Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8))
@@ -304,13 +304,13 @@ impl Patterns {
         let slice_patterns = unsafe { std::mem::transmute::<u128, [u8; 16]>(slice_pattern.patterns) };
 
         let start_idx = slice.start_pos.idx_usize();
-        let mut update_mask = (slice.pattern_bitmap.player_unit::<C>() ^ pattern_bitmap) | pattern_bitmap;
+        let mut update_mask = (slice.pattern_bitmap.player::<C>() ^ pattern_bitmap) | pattern_bitmap;
         while update_mask != 0 {
             let pattern_idx = update_mask.trailing_zeros() as usize;
             update_mask &= update_mask - 1;
 
             let idx = step_idx!(D, start_idx, pattern_idx);
-            self.field.player_unit_mut::<C>()[idx].apply_mask_mut::<C, D>(slice_patterns[pattern_idx]);
+            self.field.player_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(slice_patterns[pattern_idx]);
         }
 
         self.unchecked_five_in_a_row = self.unchecked_five_in_a_row.or(
@@ -318,7 +318,7 @@ impl Patterns {
                 .then_some(C)
         );
 
-        *slice.pattern_bitmap.player_unit_mut::<C>() = pattern_bitmap;
+        *slice.pattern_bitmap.player_ref_mut::<C>() = pattern_bitmap;
     }
 
 }

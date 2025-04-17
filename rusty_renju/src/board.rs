@@ -127,7 +127,7 @@ impl Board {
                 }
 
                 match (
-                    *$slice.pattern_bitmap.player_unit::<{ Color::Black }>() == 0,
+                    $slice.pattern_bitmap.player::<{ Color::Black }>() == 0,
                     $slice.has_potential_pattern::<{ Color::Black }>()
                 ) {
                     (_, true) => {
@@ -140,7 +140,7 @@ impl Board {
                 }
 
                 match (
-                    *$slice.pattern_bitmap.player_unit::<{ Color::White }>() == 0,
+                    $slice.pattern_bitmap.player::<{ Color::White }>() == 0,
                     $slice.has_potential_pattern::<{ Color::White }>()
                 ) {
                     (_, true) => {
@@ -404,8 +404,8 @@ impl Board {
         let slice_idx = slice.calculate_slice_idx(direction, pos);
 
         let stones = match C {
-            Color::Black => slice.black_stones,
-            Color::White => slice.white_stones
+            Color::Black => slice.stones.black,
+            Color::White => slice.stones.white
         } as u32;
 
         (((stones << 2) >> slice_idx) & 0b11111) as u8 // 0[00V00]0
