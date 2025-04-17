@@ -4,6 +4,7 @@ use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::notation::rule::ForbiddenKind;
+use crate::score_table::ScoreTable;
 use crate::slice::Slice;
 use crate::slice_pattern::{contains_five_in_a_row, SlicePattern};
 use crate::utils::lang_utils::{repeat_16x, repeat_4x};
@@ -215,18 +216,20 @@ pub struct SlicePatternCount {
 #[derive(Debug, Copy, Clone)]
 pub struct Patterns {
     pub field: AlignedColorContainer<[Pattern; pos::BOARD_SIZE]>,
+    pub score_table: ScoreTable,
     pub unchecked_five_in_a_row: Option<Color>,
     pub unchecked_five_pos: ColorContainer<Option<Pos>>,
     pub unchecked_double_three_field: Bitfield,
 }
 
-assert_struct_sizes!(Patterns, size=1920, align=64);
+assert_struct_sizes!(Patterns, size=3072, align=64);
 
 impl Default for Patterns {
 
     fn default() -> Self {
         Self {
             field: unsafe { std::mem::zeroed() },
+            score_table: ScoreTable::EMPTY,
             unchecked_five_in_a_row: None,
             unchecked_five_pos: ColorContainer {
                 black: None,
@@ -272,6 +275,8 @@ impl Patterns {
             self.field.player_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(0);
         }
 
+        self.score_table.clear_slice_mut::<C, D>(slice.idx as usize);
+
         *slice.pattern_bitmap.player_ref_mut::<C>() = 0;
     }
 
@@ -287,8 +292,13 @@ impl Patterns {
         );
 
         let mut three_mask = slice_pattern.patterns & SLICE_PATTERN_THREE_MASK;
-        let mut closed_four_mask = slice_pattern.patterns & SLICE_PATTERN_CLOSED_FOUR_MASK;
-        let mut open_four_mask = slice_pattern.patterns & SLICE_PATTERN_OPEN_FOUR_MASK;
+
+        self.score_table.set_slice_mut::<C, D>(
+            slice.idx as usize,
+            three_mask.count_ones() as u8,
+            (slice_pattern.patterns & SLICE_PATTERN_CLOSED_FOUR_MASK).count_ones() as u8,
+            (slice_pattern.patterns & SLICE_PATTERN_OPEN_FOUR_MASK).count_ones() as u8
+        );
 
         while C == Color::Black && three_mask != 0 {
             let three_slice_idx = three_mask.trailing_zeros() / 8;
@@ -301,7 +311,7 @@ impl Patterns {
         }
 
         let pattern_bitmap = encode_u128_into_u16(slice_pattern.patterns);
-        let slice_patterns = unsafe { std::mem::transmute::<u128, [u8; 16]>(slice_pattern.patterns) };
+        let slice_patterns = slice_pattern.patterns.to_ne_bytes();
 
         let start_idx = slice.start_pos.idx_usize();
         let mut update_mask = (slice.pattern_bitmap.player::<C>() ^ pattern_bitmap) | pattern_bitmap;
@@ -343,7 +353,7 @@ impl Iterator for DirectionIterator {
 }
 
 fn encode_u128_into_u16(source: u128) -> u16 {
-    Simd::<u8, 16>::from(unsafe { std::mem::transmute::<u128, [u8; 16]>(source) })
+    Simd::<u8, 16>::from(source.to_ne_bytes())
         .simd_ne(Simd::splat(0))
         .to_bitmask() as u16 // _mm_movemask_epi8
 }

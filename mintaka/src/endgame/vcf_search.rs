@@ -45,7 +45,6 @@ impl VcfDestination for VcfDefend {
 
 #[derive(Copy, Clone)]
 pub struct VcfFrame {
-    board: Board,
     vcf_moves: VcfMovesUnchecked,
     next_move_counter: usize,
     depth: Depth,
@@ -160,14 +159,14 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 return backtrace_frames(td, board, vcf_ply, four_pos);
             }
 
-            let mut position_board = board.set(four_pos);
+            board.set_mut(four_pos);
             td.batch_counter.add_single_mut();
 
-            let defend_pos = position_board.patterns.unchecked_five_pos.player_ref::<C>().unwrap();
-            let tt_key = position_board.hash_key.set(C.reversed(), defend_pos);
+            let defend_pos = board.patterns.unchecked_five_pos.player_ref::<C>().unwrap();
+            let tt_key = board.hash_key.set(C.reversed(), defend_pos);
             td.tt.prefetch(tt_key);
 
-            let defend_pattern = position_board.patterns.field.opponent_ref::<C>()[defend_pos.idx_usize()];
+            let defend_pattern = board.patterns.field.opponent_ref::<C>()[defend_pos.idx_usize()];
             let defend_four_count = defend_pattern.count_fours();
             let defend_is_forbidden = C == Color::White && defend_pattern.is_forbidden();
 
@@ -177,6 +176,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 Color::White => defend_pattern.has_open_four()
                     && !defend_is_forbidden
             } || dest.conditional_abort(defend_pattern) {
+                board.unset_mut(four_pos);
                 continue 'position_search;
             }
 
@@ -189,18 +189,18 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 return backtrace_frames(td, board, vcf_ply, four_pos);
             }
 
-            if position_board.stones + 3 >= pos::U8_BOARD_SIZE || vcf_ply + 4 > max_depth
+            if board.stones + 3 >= pos::U8_BOARD_SIZE || vcf_ply + 4 > max_depth
                 || td.tt.probe(tt_key)
                 .is_some_and(|entry| entry.tt_flag.endgame_flag() == EndgameFlag::Cold)
             {
+                board.unset_mut(four_pos);
                 continue 'position_search;
             }
 
-            position_board.set_mut(defend_pos);
+            board.set_mut(defend_pos);
             td.batch_counter.add_single_mut();
 
             td.vcf_stack.push(VcfFrame {
-                board,
                 vcf_moves,
                 next_move_counter: seq + 1,
                 depth: vcf_ply,
@@ -208,24 +208,23 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 defend_pos,
             });
 
-            vcf_moves = if defend_four_count != PatternCount::Cold {
-                let defend_move = position_board.patterns.unchecked_five_pos.opponent_ref::<C>().unwrap();
+            let next_vcf_moves = if defend_four_count != PatternCount::Cold {
+                let defend_move = board.patterns.unchecked_five_pos.opponent_ref::<C>().unwrap();
 
-                if !position_board.patterns.field.player_ref::<C>()[defend_move.idx_usize()].has_any_four() {
-                    board = position_board;
+                if !board.patterns.field.player_ref::<C>()[defend_move.idx_usize()].has_any_four() {
                     vcf_ply += 2;
                     break 'position_search;
                 }
 
                 let mut moves = [MaybePos::NONE.unwrap(); 31];
-                moves[0] = position_board.patterns.unchecked_five_pos.opponent_ref::<C>().unwrap();
+                moves[0] = board.patterns.unchecked_five_pos.opponent_ref::<C>().unwrap();
                 VcfMovesUnchecked { moves, top: 1 }
             } else {
-                generate_vcf_moves(&position_board, C, ACC::DISTANCE_WINDOW, four_pos)
+                generate_vcf_moves(&board, C, ACC::DISTANCE_WINDOW, four_pos)
             };
 
+            vcf_moves = next_vcf_moves;
             move_counter = 0;
-            board = position_board;
             vcf_ply += 2;
 
             continue 'vcf_search;
@@ -248,7 +247,9 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
         td.tt.store_entry_mut(board.hash_key, tt_entry);
 
         if let Some(frame) = td.vcf_stack.pop() {
-            board = frame.board;
+            board.unset_mut(frame.defend_pos);
+            board.unset_mut(frame.four_pos);
+
             vcf_moves = frame.vcf_moves;
             move_counter = frame.next_move_counter;
             vcf_ply = frame.depth;

@@ -30,19 +30,19 @@ impl Slice {
 
     pub fn calculate_slice_pattern<const C: Color>(&self) -> SlicePattern {
         // padding = 3
-        let block: u32 = !(!(u32::MAX << self.length as u32) << 3);
-        let extended_p: u32 = (self.stones::<C>() as u32) << 3;
-        let extended_q: u32 = ((self.stones_reversed_color::<C>() as u32) << 3) | block;
+        let block: usize = !(!(usize::MAX << self.length as u32) << 3);
+        let extended_p: usize = (self.stones::<C>() as usize) << 3;
+        let extended_q: usize = ((self.stones_reversed_color::<C>() as usize) << 3) | block;
 
         let mut acc: SlicePattern = SlicePattern::EMPTY;
-        for shift in 0 .. self.length as usize - 1 {
-            let p = (extended_p >> shift) as u16 & 0x00FF;
-            let q = (extended_q >> shift) as u16 & 0x00FF;
+        for shift in 0 .. self.length as isize - 1 {
+            let p = (extended_p >> shift) & 0x00FF;
+            let q = (extended_q >> shift) & 0x00FF;
 
             // little-endian
-            let shift_comp = (shift as isize - 3) * 8;
-            let shl = shift_comp.min(0).unsigned_abs();
-            let shr = shift_comp.max(0) as usize;
+            let shift_offset = (shift - 3) * 8;
+            let shl = shift_offset.min(0).abs();
+            let shr = shift_offset.max(0);
 
             lookup_patterns::<C>(
                 &mut acc,
@@ -62,23 +62,23 @@ impl Slice {
 #[inline(always)]
 fn lookup_patterns<const C: Color>(
     acc: &mut SlicePattern,
-    shift: usize,
-    vector: u16,
-    raw: u32,
-    shl: usize,
-    shr: usize
+    shift: isize,
+    vector: usize,
+    raw: usize,
+    shl: isize,
+    shr: isize
 ) {
     #[cold]
-    fn extended_match_for_black(direction: ExtendedMatch, b_raw: u32, shift: usize) -> bool {
+    fn extended_match_for_black(direction: ExtendedMatch, b_raw: usize, shift: isize) -> bool {
         match direction {
-            Left => b_raw & (0b1 << (shift.saturating_sub(1))) == 0,
+            Left => b_raw & (0b1 << (shift as usize).saturating_sub(1)) == 0,
             Right => b_raw & (0b1 << (shift + 8)) == 0
         }
     }
 
     let patch_pointer = match C {
-        Color::Black => SLICE_PATTERN_LUT.vector.black[vector as usize],
-        Color::White => SLICE_PATTERN_LUT.vector.white[vector as usize],
+        Color::Black => SLICE_PATTERN_LUT.vector.black[vector],
+        Color::White => SLICE_PATTERN_LUT.vector.white[vector],
     };
 
     if patch_pointer != 0 {

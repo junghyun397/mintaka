@@ -1,81 +1,118 @@
-use crate::notation::color::{Color, ColorContainer};
+use crate::notation::color::{AlignedColorContainer, Color, ColorContainer};
+use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::pattern::Pattern;
 use crate::{const_for, slice};
-use std::simd::Simd;
+use std::ops::{AddAssign, SubAssign};
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct SlicePatternCount {
     pub threes: u8,
-    pub fours: u8,
+    pub closed_fours: u8,
+    pub open_fours: u8,
+    pub padding: u8,
 }
 
 impl SlicePatternCount {
 
     pub const EMPTY: Self = Self {
         threes: 0,
-        fours: 0,
+        closed_fours: 0,
+        open_fours: 0,
+        padding: 0,
+    };
+
+    pub fn total_fours(&self) -> u8 {
+        self.closed_fours + self.open_fours
+    }
+
+}
+
+impl SubAssign for SlicePatternCount {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.threes -= rhs.threes;
+        self.closed_fours -= rhs.closed_fours;
+        self.open_fours -= rhs.open_fours;
+    }
+}
+
+impl AddAssign for SlicePatternCount {
+    fn add_assign(&mut self, rhs: Self) {
+        self.threes += rhs.threes;
+        self.closed_fours += rhs.closed_fours;
+        self.open_fours += rhs.open_fours;
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct SlicePatternCounts(pub [SlicePatternCount; slice::TOTAL_SLICE_AMOUNT]);
+
+impl SlicePatternCounts {
+
+    pub const EMPTY: Self = Self([SlicePatternCount::EMPTY; slice::TOTAL_SLICE_AMOUNT]);
+
+    pub fn access_mut<const D: Direction>(&mut self, slice_idx: usize) -> &mut SlicePatternCount {
+        &mut self.0[match D {
+            Direction::Horizontal => 0,
+            Direction::Vertical => pos::U_BOARD_WIDTH,
+            Direction::Ascending => pos::U_BOARD_WIDTH * 2,
+            Direction::Descending => pos::U_BOARD_WIDTH * 2 + slice::DIAGONAL_SLICE_AMOUNT,
+        } + slice_idx]
+    }
+
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct ScoreTable {
+    slice_pattern_counts: AlignedColorContainer<SlicePatternCounts>,
+    pub position_scores: AlignedColorContainer<[i8; pos::BOARD_SIZE]>,
+    pub slice_pattern_count: ColorContainer<SlicePatternCount>,
+}
+
+impl Default for ScoreTable {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
+
+impl ScoreTable {
+
+    pub const EMPTY: Self = Self {
+        slice_pattern_counts: AlignedColorContainer::new(SlicePatternCounts::EMPTY, SlicePatternCounts::EMPTY),
+        position_scores: AlignedColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
+        slice_pattern_count: ColorContainer::new(SlicePatternCount::EMPTY, SlicePatternCount::EMPTY),
     };
 
 }
 
-#[derive(Copy, Clone)]
-pub struct ScoreTable {
-    pub slice_pattern_counts: ColorContainer<[SlicePatternCount; slice::TOTAL_SLICE_AMOUNT]>,
-    pub position_scores: ColorContainer<[i8; pos::BOARD_SIZE]>,
-}
+impl ScoreTable {
 
-pub trait ScoreTableOps {
+    pub fn set_slice_mut<const C: Color, const D: Direction>(
+        &mut self, slice_idx: usize, threes: u8, closed_fours: u8, open_fours: u8
+    ) {
+        let global_count = self.slice_pattern_count.player_ref_mut::<C>();
+        let slice_count = self.slice_pattern_counts.player_ref_mut::<C>().access_mut::<D>(slice_idx);
 
-    fn set_slice_mut<const C: Color>(&mut self, idx: usize, threes: u8, fours: u8);
+        *global_count -= *slice_count;
 
-    fn clear_slice_mut<const C: Color>(&mut self, idx: usize);
+        *slice_count = SlicePatternCount {
+            threes,
+            closed_fours,
+            open_fours,
+            padding: 0,
+        };
 
-    fn sum_slices<const C: Color>(&self) -> SlicePatternCount;
-
-    fn update_position_mut<const C: Color>(&mut self, idx: usize, pattern: Pattern);
-
-    fn clear_position_mut<const C: Color>(&mut self, idx: usize);
-
-    fn add_neighborhood_score_mut(&mut self, pos: Pos);
-
-    fn remove_neighborhood_score_mut(&mut self, pos: Pos);
-
-}
-
-impl ScoreTableOps for ScoreTable {
-    fn set_slice_mut<const C: Color>(&mut self, idx: usize, threes: u8, fours: u8) {
-        self.slice_pattern_counts.player_ref_mut::<C>()[idx].threes = threes;
-        self.slice_pattern_counts.player_ref_mut::<C>()[idx].fours = fours;
+        *global_count += *slice_count;
     }
 
-    fn clear_slice_mut<const C: Color>(&mut self, idx: usize) {
-        self.slice_pattern_counts.player_ref_mut::<C>()[idx].threes = 0;
-        self.slice_pattern_counts.player_ref_mut::<C>()[idx].fours = 0;
-    }
+    pub fn clear_slice_mut<const C: Color, const D: Direction>(&mut self, slice_idx: usize) {
+        let global_count = self.slice_pattern_count.player_ref_mut::<C>();
+        let slice_count = self.slice_pattern_counts.player_ref_mut::<C>().access_mut::<D>(slice_idx);
 
-    fn sum_slices<const C: Color>(&self) -> SlicePatternCount {
-        let mut acc = SlicePatternCount::EMPTY;
+        *global_count -= *slice_count;
 
-        let mut entries_ptr = self.slice_pattern_counts.player_ref::<C>().as_ptr() as *const u8;
-
-        // 72 % 8 = 0
-        let mut vector_acc = Simd::splat(0);
-        for start_idx in (0 .. slice::TOTAL_SLICE_AMOUNT).step_by(8) {
-            vector_acc += Simd::<u8, 8>::from_slice(
-                unsafe { std::slice::from_raw_parts(entries_ptr.add(start_idx), 8) }
-            );
-        }
-
-        let result = vector_acc.to_array();
-
-        for idx in 0 .. 4 {
-            acc.threes += result[idx * 2];
-            acc.fours += result[idx * 2 + 1];
-        }
-
-        acc
+        *slice_count = SlicePatternCount::EMPTY;
     }
 
     fn update_position_mut<const C: Color>(&mut self, idx: usize, pattern: Pattern) {
@@ -94,26 +131,7 @@ impl ScoreTableOps for ScoreTable {
     fn remove_neighborhood_score_mut(&mut self, pos: Pos) {
         todo!()
     }
-}
 
-struct PassScoreTableOps;
-
-impl ScoreTableOps for PassScoreTableOps {
-    fn set_slice_mut<const C: Color>(&mut self, _idx: usize, _threes: u8, _fours: u8) {}
-
-    fn clear_slice_mut<const C: Color>(&mut self, _idx: usize) {}
-
-    fn sum_slices<const C: Color>(&self) -> SlicePatternCount {
-        SlicePatternCount::EMPTY
-    }
-
-    fn update_position_mut<const C: Color>(&mut self, _idx: usize, _pattern: Pattern) {}
-
-    fn clear_position_mut<const C: Color>(&mut self, _idx: usize) {}
-
-    fn add_neighborhood_score_mut(&mut self, _pos: Pos) {}
-
-    fn remove_neighborhood_score_mut(&mut self, _pos: Pos) {}
 }
 
 fn encode_pattern_to_score_key(pattern: Pattern) -> usize {
@@ -166,7 +184,7 @@ const fn build_pattern_score_lut() -> ColorContainer<[i8; 128]> {
                     } else if has_overline > 0 {
                         HeuristicScores::OVERLINE_FORBID
                     } else if closed_fours + open_fours > 1 {
-                        HeuristicScores::DOUBLE_FOUR_FORK
+                        HeuristicScores::DOUBLE_FOUR_FORBID
                     } else if open_threes > 1 {
                         HeuristicScores::DOUBLE_THREE_FORBID
                     } else if open_fours == 1 {

@@ -1,5 +1,6 @@
 use crate::endgame::accumulator::{EndgameAccumulator, SequenceEndgameAccumulator};
 use crate::memo::tt_entry::TTEntry;
+use crate::movegen::move_list::MoveList;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
@@ -10,11 +11,10 @@ use rusty_renju::notation::value::{Depth, Score};
 use smallvec::{smallvec, SmallVec};
 
 pub(crate) struct VCTFrame {
-    board: Board,
-    next_idx: usize,
+    vct_moves: MoveList,
+    next_move_counter: usize,
     depth: Depth,
     opponent_has_open_four: bool,
-    opponent_has_five: bool,
     threat_pos: Pos,
     defend_pos: Pos,
 }

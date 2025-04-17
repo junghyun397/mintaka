@@ -4,13 +4,14 @@ use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::{assert_struct_sizes, const_for, max};
 
-const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
+pub const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
 pub const TOTAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 + DIAGONAL_SLICE_AMOUNT * 2;
 
 #[derive(Debug, Copy, Clone)]
 #[repr(align(16))]
 pub struct Slice {
+    pub idx: u8,
     pub length: u8,
     pub start_row: u8,
     pub start_col: u8,
@@ -25,8 +26,9 @@ impl Slice {
 
     pub const PLACEHOLDER: Self = unsafe { std::mem::zeroed() };
 
-    pub const fn empty(length: u8, start_row: u8, start_col: u8) -> Self {
+    pub const fn empty(idx: u8, length: u8, start_row: u8, start_col: u8) -> Self {
         Slice {
+            idx,
             length,
             start_row,
             start_col,
@@ -131,19 +133,21 @@ impl Slices {
         let mut descending_slices = [Slice::PLACEHOLDER; DIAGONAL_SLICE_AMOUNT];
 
         const_for!(idx in 0, pos::U_BOARD_WIDTH; {
-            horizontal_slices[idx] = Slice::empty(pos::BOARD_WIDTH, idx as u8, 0);
-            vertical_slices[idx] = Slice::empty(pos::BOARD_WIDTH, 0, idx as u8);
+            horizontal_slices[idx] = Slice::empty(idx as u8, pos::BOARD_WIDTH, idx as u8, 0);
+            vertical_slices[idx] = Slice::empty(idx as u8, pos::BOARD_WIDTH, 0, idx as u8);
         });
 
         const_for!(idx in 0, DIAGONAL_SLICE_AMOUNT; {
             let seq_num = idx as isize + 5 - pos::I_BOARD_WIDTH;
 
             ascending_slices[idx] = Slice::empty(
+                idx as u8,
                 (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
                 max!(0, -seq_num) as u8,
                 max!(0, seq_num) as u8
             );
             descending_slices[idx] = Slice::empty(
+                idx as u8,
                 (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
                 pos::BOARD_WIDTH - 1 - max!(0, -seq_num) as u8,
                 max!(0, seq_num) as u8

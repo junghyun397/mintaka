@@ -119,7 +119,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         .access(!state.board.player_color)
     { // defend immediate win
         td.push_ply_mut(state.movegen_window);
-        state.set_mut(pos.into());
+        state.set_mut(pos);
 
         return -pvs::<R, NT::NextType, TH>(td, state, depth_left, -beta, -alpha);
     }

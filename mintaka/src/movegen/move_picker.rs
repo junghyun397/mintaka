@@ -1,5 +1,5 @@
 use crate::game_state::GameState;
-use crate::movegen::move_generator::{generate_defend_three_moves, generate_neighbors_moves, is_open_four_available};
+use crate::movegen::move_generator::{generate_defend_three_moves, generate_neighbors_moves};
 use crate::movegen::move_list::MoveList;
 use crate::search_frame::KILLER_MOVE_SLOTS;
 use rusty_renju::notation::pos::{MaybePos, Pos};
@@ -80,7 +80,7 @@ impl MovePicker {
                     return Some((counter_move, COUNTER_MOVE_SCORE));
                 }
 
-                if is_open_four_available(&state.board) {
+                if state.board.patterns.score_table.slice_pattern_count.access(state.board.opponent_color()).open_fours != 0 {
                     generate_defend_three_moves(state, &mut self.moves);
                     self.stage = MoveStage::DefendFour;
                 } else {

@@ -231,7 +231,7 @@ impl FromStr for Slice {
             Ok(IntoIterator::into_iter(fields)
                 .enumerate()
                 .fold(
-                    Slice::empty(field_len, 0, 0),
+                    Slice::empty(0, field_len, 0, 0),
                     |acc, (idx, field)| {
                         match field {
                             Some(color) => acc.set(color, idx as u8),
@@ -272,7 +272,7 @@ impl Display for History {
                 }
             )
             .collect::<Vec<_>>()
-            .join(format!("{HISTORY_LITERAL_SEPARATOR}").as_str());
+            .join(HISTORY_LITERAL_SEPARATOR);
 
         write!(f, "{history}")
     }
