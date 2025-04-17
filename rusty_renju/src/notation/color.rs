@@ -72,28 +72,28 @@ macro_rules! impl_color_container {
                 }
             }
 
-            pub const fn player_ref<const C: Color>(&self) -> &T {
+            pub const fn get_ref<const C: Color>(&self) -> &T {
                 match C {
                     Color::Black => &self.black,
                     Color::White => &self.white
                 }
             }
 
-            pub const fn opponent_ref<const C: Color>(&self) -> &T {
+            pub const fn get_reversed_ref<const C: Color>(&self) -> &T {
                 match C {
                     Color::Black => &self.white,
                     Color::White => &self.black
                 }
             }
 
-            pub const fn player_ref_mut<const C: Color>(&mut self) -> &mut T {
+            pub const fn get_ref_mut<const C: Color>(&mut self) -> &mut T {
                 match C {
                     Color::Black => &mut self.black,
                     Color::White => &mut self.white
                 }
             }
 
-            pub const fn opponent_ref_mut<const C: Color>(&mut self) -> &mut T {
+            pub const fn get_reversed_ref_mut<const C: Color>(&mut self) -> &mut T {
                 match C {
                     Color::Black => &mut self.white,
                     Color::White => &mut self.black
@@ -108,14 +108,14 @@ macro_rules! impl_color_container_copy {
     ($name:ident) => {
         impl<T: std::marker::Copy> $name<T> {
 
-            pub const fn player<const C: Color>(&self) -> T {
+            pub const fn get<const C: Color>(&self) -> T {
                 match C {
                     Color::Black => self.black,
                     Color::White => self.white
                 }
             }
 
-            pub const fn opponent<const C: Color>(&self) -> T {
+            pub const fn get_reversed<const C: Color>(&self) -> T {
                 match C {
                     Color::Black => self.white,
                     Color::White => self.black

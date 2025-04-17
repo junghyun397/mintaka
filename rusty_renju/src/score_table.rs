@@ -91,8 +91,8 @@ impl ScoreTable {
     pub fn set_slice_mut<const C: Color, const D: Direction>(
         &mut self, slice_idx: usize, threes: u8, closed_fours: u8, open_fours: u8
     ) {
-        let global_count = self.slice_pattern_count.player_ref_mut::<C>();
-        let slice_count = self.slice_pattern_counts.player_ref_mut::<C>().access_mut::<D>(slice_idx);
+        let global_count = self.slice_pattern_count.get_ref_mut::<C>();
+        let slice_count = self.slice_pattern_counts.get_ref_mut::<C>().access_mut::<D>(slice_idx);
 
         *global_count -= *slice_count;
 
@@ -107,8 +107,8 @@ impl ScoreTable {
     }
 
     pub fn clear_slice_mut<const C: Color, const D: Direction>(&mut self, slice_idx: usize) {
-        let global_count = self.slice_pattern_count.player_ref_mut::<C>();
-        let slice_count = self.slice_pattern_counts.player_ref_mut::<C>().access_mut::<D>(slice_idx);
+        let global_count = self.slice_pattern_count.get_ref_mut::<C>();
+        let slice_count = self.slice_pattern_counts.get_ref_mut::<C>().access_mut::<D>(slice_idx);
 
         *global_count -= *slice_count;
 
@@ -116,12 +116,12 @@ impl ScoreTable {
     }
 
     fn update_position_mut<const C: Color>(&mut self, idx: usize, pattern: Pattern) {
-        self.position_scores.player_ref_mut::<C>()[idx] =
-            PATTERN_SCORE_LUT.player_ref::<C>()[encode_pattern_to_score_key(pattern)]
+        self.position_scores.get_ref_mut::<C>()[idx] =
+            PATTERN_SCORE_LUT.get_ref::<C>()[encode_pattern_to_score_key(pattern)]
     }
 
     fn clear_position_mut<const C: Color>(&mut self, idx: usize) {
-        self.position_scores.player_ref_mut::<C>()[idx] = 0;
+        self.position_scores.get_ref_mut::<C>()[idx] = 0;
     }
 
     fn add_neighborhood_score_mut(&mut self, pos: Pos) {

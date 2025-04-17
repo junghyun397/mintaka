@@ -57,11 +57,11 @@ impl Slice {
     }
 
     pub fn stones<const C: Color>(&self) -> u16 {
-        self.stones.player::<C>()
+        self.stones.get::<C>()
     }
 
     pub fn stones_reversed_color<const C: Color>(&self) -> u16 {
-        self.stones.opponent::<C>()
+        self.stones.get_reversed::<C>()
     }
 
     pub fn is_empty(&self, idx: u8) -> bool {

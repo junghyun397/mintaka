@@ -39,14 +39,17 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
 
     let field_ptr = board.patterns.field.access(color).as_ptr() as *const u32;
 
+    let four_mask = Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
+    let zero_mask = Simd::splat(0);
+
     for start_idx in (0 .. pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
         let mut vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
             unsafe { std::slice::from_raw_parts(field_ptr.add(start_idx), platform::U32_LANE_N) }
         );
 
-        vector &= Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
+        vector &= four_mask;
         let mut bitmask = vector
-            .simd_ne(Simd::splat(0))
+            .simd_ne(zero_mask)
             .to_bitmask();
 
         while bitmask != 0 {
@@ -84,8 +87,12 @@ pub fn generate_defend_three_moves(state: &GameState, moves: &mut MoveList) {
 }
 
 fn generate_defend_three_moves_impl<const C: Color>(state: &GameState, moves: &mut MoveList) {
-    let player_ptr = state.board.patterns.field.player_ref::<C>().as_ptr() as *const u32;
-    let opponent_ptr = state.board.patterns.field.opponent_ref::<C>().as_ptr() as *const u32;
+    let player_ptr = state.board.patterns.field.get_ref::<C>().as_ptr() as *const u32;
+    let opponent_ptr = state.board.patterns.field.get_reversed_ref::<C>().as_ptr() as *const u32;
+
+    let zero_mask = Simd::splat(0);
+    let four_mask = Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
+    let close_three_mask = Simd::splat(pattern::UNIT_CLOSE_THREE_MASK);
 
     for start_idx in (0..pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
         let mut player_vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
@@ -96,11 +103,11 @@ fn generate_defend_three_moves_impl<const C: Color>(state: &GameState, moves: &m
             unsafe { std::slice::from_raw_parts(opponent_ptr.add(start_idx), platform::U32_LANE_N) }
         );
 
-        player_vector &= Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
-        opponent_vector &= Simd::splat(pattern::UNIT_CLOSE_THREE_MASK);
+        player_vector &= four_mask;
+        opponent_vector &= close_three_mask;
 
         let mut bitmask = (
-            player_vector.simd_ne(Simd::splat(0)) | opponent_vector.simd_ne(Simd::splat(0))
+            player_vector.simd_ne(zero_mask) | opponent_vector.simd_ne(zero_mask)
         ).to_bitmask();
 
         while bitmask != 0 {
@@ -108,7 +115,7 @@ fn generate_defend_three_moves_impl<const C: Color>(state: &GameState, moves: &m
             bitmask &= bitmask - 1;
 
             let idx = start_idx + lane_position;
-            let player_pattern = state.board.patterns.field.player_ref::<C>()[idx];
+            let player_pattern = state.board.patterns.field.get_ref::<C>()[idx];
 
             if C == Color::Black && player_pattern.is_forbidden() {
                 continue;
@@ -119,8 +126,8 @@ fn generate_defend_three_moves_impl<const C: Color>(state: &GameState, moves: &m
         }
     }
 
-    let player_pattern = state.board.patterns.field.player_ref::<C>()[pos::BOARD_BOUND];
-    let opponent_pattern = state.board.patterns.field.opponent_ref::<C>()[pos::BOARD_BOUND];
+    let player_pattern = state.board.patterns.field.get_ref::<C>()[pos::BOARD_BOUND];
+    let opponent_pattern = state.board.patterns.field.get_reversed_ref::<C>()[pos::BOARD_BOUND];
 
     if (!player_pattern.is_empty() || !opponent_pattern.is_empty())
         && (player_pattern.has_any_four() || opponent_pattern.has_close_three())

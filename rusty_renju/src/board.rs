@@ -127,7 +127,7 @@ impl Board {
                 }
 
                 match (
-                    $slice.pattern_bitmap.player::<{ Color::Black }>() == 0,
+                    $slice.pattern_bitmap.get::<{ Color::Black }>() == 0,
                     $slice.has_potential_pattern::<{ Color::Black }>()
                 ) {
                     (_, true) => {
@@ -140,7 +140,7 @@ impl Board {
                 }
 
                 match (
-                    $slice.pattern_bitmap.player::<{ Color::White }>() == 0,
+                    $slice.pattern_bitmap.get::<{ Color::White }>() == 0,
                     $slice.has_potential_pattern::<{ Color::White }>()
                 ) {
                     (_, true) => {
