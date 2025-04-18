@@ -1,73 +1,12 @@
+use crate::const_for;
 use crate::notation::color::{AlignedColorContainer, Color, ColorContainer};
-use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::pattern::Pattern;
-use crate::{const_for, slice};
-use std::ops::{AddAssign, SubAssign};
-
-#[derive(Debug, Copy, Clone)]
-pub struct SlicePatternCount {
-    pub threes: u8,
-    pub closed_fours: u8,
-    pub open_fours: u8,
-    pub padding: u8,
-}
-
-impl SlicePatternCount {
-
-    pub const EMPTY: Self = Self {
-        threes: 0,
-        closed_fours: 0,
-        open_fours: 0,
-        padding: 0,
-    };
-
-    pub fn total_fours(&self) -> u8 {
-        self.closed_fours + self.open_fours
-    }
-
-}
-
-impl SubAssign for SlicePatternCount {
-    fn sub_assign(&mut self, rhs: Self) {
-        self.threes -= rhs.threes;
-        self.closed_fours -= rhs.closed_fours;
-        self.open_fours -= rhs.open_fours;
-    }
-}
-
-impl AddAssign for SlicePatternCount {
-    fn add_assign(&mut self, rhs: Self) {
-        self.threes += rhs.threes;
-        self.closed_fours += rhs.closed_fours;
-        self.open_fours += rhs.open_fours;
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct SlicePatternCounts(pub [SlicePatternCount; slice::TOTAL_SLICE_AMOUNT]);
-
-impl SlicePatternCounts {
-
-    pub const EMPTY: Self = Self([SlicePatternCount::EMPTY; slice::TOTAL_SLICE_AMOUNT]);
-
-    pub fn access_mut<const D: Direction>(&mut self, slice_idx: usize) -> &mut SlicePatternCount {
-        &mut self.0[match D {
-            Direction::Horizontal => 0,
-            Direction::Vertical => pos::U_BOARD_WIDTH,
-            Direction::Ascending => pos::U_BOARD_WIDTH * 2,
-            Direction::Descending => pos::U_BOARD_WIDTH * 2 + slice::DIAGONAL_SLICE_AMOUNT,
-        } + slice_idx]
-    }
-
-}
 
 #[derive(Debug, Copy, Clone)]
 pub struct ScoreTable {
-    slice_pattern_counts: AlignedColorContainer<SlicePatternCounts>,
-    pub position_scores: AlignedColorContainer<[i8; pos::BOARD_SIZE]>,
-    pub slice_pattern_count: ColorContainer<SlicePatternCount>,
+    pub positions: AlignedColorContainer<[i8; pos::BOARD_SIZE]>,
 }
 
 impl Default for ScoreTable {
@@ -78,50 +17,19 @@ impl Default for ScoreTable {
 
 impl ScoreTable {
 
-    pub const EMPTY: Self = Self {
-        slice_pattern_counts: AlignedColorContainer::new(SlicePatternCounts::EMPTY, SlicePatternCounts::EMPTY),
-        position_scores: AlignedColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
-        slice_pattern_count: ColorContainer::new(SlicePatternCount::EMPTY, SlicePatternCount::EMPTY),
-    };
+    pub const EMPTY: Self = unsafe { std::mem::zeroed() };
 
 }
 
 impl ScoreTable {
 
-    pub fn set_slice_mut<const C: Color, const D: Direction>(
-        &mut self, slice_idx: usize, threes: u8, closed_fours: u8, open_fours: u8
-    ) {
-        let global_count = self.slice_pattern_count.get_ref_mut::<C>();
-        let slice_count = self.slice_pattern_counts.get_ref_mut::<C>().access_mut::<D>(slice_idx);
-
-        *global_count -= *slice_count;
-
-        *slice_count = SlicePatternCount {
-            threes,
-            closed_fours,
-            open_fours,
-            padding: 0,
-        };
-
-        *global_count += *slice_count;
-    }
-
-    pub fn clear_slice_mut<const C: Color, const D: Direction>(&mut self, slice_idx: usize) {
-        let global_count = self.slice_pattern_count.get_ref_mut::<C>();
-        let slice_count = self.slice_pattern_counts.get_ref_mut::<C>().access_mut::<D>(slice_idx);
-
-        *global_count -= *slice_count;
-
-        *slice_count = SlicePatternCount::EMPTY;
-    }
-
     fn update_position_mut<const C: Color>(&mut self, idx: usize, pattern: Pattern) {
-        self.position_scores.get_ref_mut::<C>()[idx] =
+        self.positions.get_ref_mut::<C>()[idx] =
             PATTERN_SCORE_LUT.get_ref::<C>()[encode_pattern_to_score_key(pattern)]
     }
 
     fn clear_position_mut<const C: Color>(&mut self, idx: usize) {
-        self.position_scores.get_ref_mut::<C>()[idx] = 0;
+        self.positions.get_ref_mut::<C>()[idx] = 0;
     }
 
     fn add_neighborhood_score_mut(&mut self, pos: Pos) {
@@ -145,7 +53,7 @@ fn encode_pattern_to_score_key(pattern: Pattern) -> usize {
     pattern_key as usize // 19 instructions
 }
 
-struct HeuristicScores; impl HeuristicScores {
+struct HeuristicPositionScores; impl HeuristicPositionScores {
     const OPEN_THREE: i8 = 5;
     const CLOSED_FOUR: i8 = 2;
     const OPEN_FOUR: i8 = 80;
@@ -180,38 +88,38 @@ const fn build_pattern_score_lut() -> ColorContainer<[i8; 128]> {
             lut[pattern_key] = match color {
                 Color::Black => {
                     if has_five != 0 {
-                        HeuristicScores::FIVE
+                        HeuristicPositionScores::FIVE
                     } else if has_overline > 0 {
-                        HeuristicScores::OVERLINE_FORBID
+                        HeuristicPositionScores::OVERLINE_FORBID
                     } else if closed_fours + open_fours > 1 {
-                        HeuristicScores::DOUBLE_FOUR_FORBID
+                        HeuristicPositionScores::DOUBLE_FOUR_FORBID
                     } else if open_threes > 1 {
-                        HeuristicScores::DOUBLE_THREE_FORBID
+                        HeuristicPositionScores::DOUBLE_THREE_FORBID
                     } else if open_fours == 1 {
-                        HeuristicScores::OPEN_FOUR
+                        HeuristicPositionScores::OPEN_FOUR
                     } else if closed_fours == 1 && open_threes == 1 {
-                        HeuristicScores::THREE_FOUR_FORK
+                        HeuristicPositionScores::THREE_FOUR_FORK
                     } else if open_threes == 1 {
-                        HeuristicScores::OPEN_THREE
+                        HeuristicPositionScores::OPEN_THREE
                     } else {
                         0
                     }
                 },
                 Color::White => {
                     if has_five != 0 {
-                        HeuristicScores::FIVE
+                        HeuristicPositionScores::FIVE
                     } else if open_fours > 0 {
-                        HeuristicScores::OPEN_FOUR
+                        HeuristicPositionScores::OPEN_FOUR
                     } else if closed_fours > 1 {
-                        HeuristicScores::DOUBLE_FOUR_FORK
+                        HeuristicPositionScores::DOUBLE_FOUR_FORK
                     } else if closed_fours > 0 && open_threes > 0 {
-                        HeuristicScores::THREE_FOUR_FORK
+                        HeuristicPositionScores::THREE_FOUR_FORK
                     } else if open_threes > 1 {
-                        HeuristicScores::DOUBLE_THREE_FORK
+                        HeuristicPositionScores::DOUBLE_THREE_FORK
                     } else if open_threes == 1 {
-                        HeuristicScores::OPEN_THREE
+                        HeuristicPositionScores::OPEN_THREE
                     } else if closed_fours == 1 {
-                        HeuristicScores::CLOSED_FOUR
+                        HeuristicPositionScores::CLOSED_FOUR
                     } else {
                         0
                     }

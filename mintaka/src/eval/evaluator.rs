@@ -6,6 +6,8 @@ pub type PolicyDistribution = [f32; pos::BOARD_SIZE];
 
 pub trait Evaluator {
 
+    const POLICY_EVALUATION: bool;
+
     fn eval_value(&self, state: &GameState) -> Score;
 
     fn eval_policy(&self, state: &GameState) -> PolicyDistribution;

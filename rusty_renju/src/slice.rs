@@ -106,6 +106,11 @@ impl Slice {
         }
     }
 
+    pub fn eval_score<const C: Color>(&self) -> i16 {
+        // TODO: implement
+        0
+    }
+
 }
 
 #[derive(Copy, Clone)]

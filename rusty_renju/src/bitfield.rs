@@ -39,6 +39,14 @@ impl Bitfield {
         self.0[pos.idx_usize() / 8] &= !(0b1 << (pos.idx() % 8));
     }
 
+    pub fn count_ones(&self) -> u32 {
+        self.to_u256().count_ones()
+    }
+
+    pub fn count_zeros(&self) -> u32 {
+        pos::BOARD_SIZE as u32 - self.count_ones()
+    }
+
     pub fn iter(&self) -> impl Iterator<Item=bool> + '_ {
         BitfieldIterator::from(self.to_u256())
     }

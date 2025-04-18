@@ -79,14 +79,14 @@ pub fn generate_neighbors_moves(state: &GameState, moves: &mut MoveList) {
     }
 }
 
-pub fn generate_defend_three_moves(state: &GameState, moves: &mut MoveList) {
+pub fn generate_defend_open_four_moves(state: &GameState, moves: &mut MoveList) {
     match state.board.player_color {
-        Color::Black => generate_defend_three_moves_impl::<{ Color::Black }>(state, moves),
-        Color::White => generate_defend_three_moves_impl::<{ Color::White }>(state, moves)
+        Color::Black => generate_defend_open_four_moves_impl::<{ Color::Black }>(state, moves),
+        Color::White => generate_defend_open_four_moves_impl::<{ Color::White }>(state, moves)
     }
 }
 
-fn generate_defend_three_moves_impl<const C: Color>(state: &GameState, moves: &mut MoveList) {
+fn generate_defend_open_four_moves_impl<const C: Color>(state: &GameState, moves: &mut MoveList) {
     let player_ptr = state.board.patterns.field.get_ref::<C>().as_ptr() as *const u32;
     let opponent_ptr = state.board.patterns.field.get_reversed_ref::<C>().as_ptr() as *const u32;
 

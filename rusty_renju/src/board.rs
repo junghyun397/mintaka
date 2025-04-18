@@ -136,7 +136,12 @@ impl Board {
                     (false, false) => {
                         self.patterns.clear_with_slice_mut::<{ Color::Black }, { $direction }>($slice);
                     },
-                    _ => {}
+                    _ => {
+                        self.patterns.pattern_counts.update_slice_score_mut::<{ Color::Black }, { $direction }>(
+                            $slice_idx as usize,
+                            $slice.eval_score::<{ Color::Black }>()
+                        );
+                    }
                 }
 
                 match (
@@ -149,7 +154,12 @@ impl Board {
                     (false, false) => {
                         self.patterns.clear_with_slice_mut::<{ Color::White }, { $direction }>($slice);
                     },
-                    _ => {}
+                    _ => {
+                        self.patterns.pattern_counts.update_slice_score_mut::<{ Color::White }, { $direction }>(
+                            $slice_idx as usize,
+                            $slice.eval_score::<{ Color::White }>()
+                        );
+                    }
                 }
             }};
         }

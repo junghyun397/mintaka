@@ -7,6 +7,7 @@ use crate::notation::rule::ForbiddenKind;
 use crate::score_table::ScoreTable;
 use crate::slice::Slice;
 use crate::slice_pattern::{contains_five_in_a_row, SlicePattern};
+use crate::slice_pattern_count::SlicePatternCounts;
 use crate::utils::lang_utils::{repeat_16x, repeat_4x};
 use crate::{assert_struct_sizes, step_idx};
 use std::simd::cmp::SimdPartialEq;
@@ -216,19 +217,21 @@ pub struct SlicePatternCount {
 #[derive(Debug, Copy, Clone)]
 pub struct Patterns {
     pub field: AlignedColorContainer<[Pattern; pos::BOARD_SIZE]>,
+    pub pattern_counts: SlicePatternCounts,
     pub score_table: ScoreTable,
     pub unchecked_five_in_a_row: Option<Color>,
     pub unchecked_five_pos: ColorContainer<Option<Pos>>,
     pub unchecked_double_three_field: Bitfield,
 }
 
-assert_struct_sizes!(Patterns, size=3072, align=64);
+assert_struct_sizes!(Patterns, size=3008, align=64);
 
 impl Default for Patterns {
 
     fn default() -> Self {
         Self {
             field: unsafe { std::mem::zeroed() },
+            pattern_counts: SlicePatternCounts::EMPTY,
             score_table: ScoreTable::EMPTY,
             unchecked_five_in_a_row: None,
             unchecked_five_pos: ColorContainer {
@@ -275,7 +278,7 @@ impl Patterns {
             self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(0);
         }
 
-        self.score_table.clear_slice_mut::<C, D>(slice.idx as usize);
+        self.pattern_counts.clear_slice_mut::<C, D>(slice.idx as usize, slice.eval_score::<C>());
 
         *slice.pattern_bitmap.get_ref_mut::<C>() = 0;
     }
@@ -293,11 +296,12 @@ impl Patterns {
 
         let mut three_mask = slice_pattern.patterns & SLICE_PATTERN_THREE_MASK;
 
-        self.score_table.set_slice_mut::<C, D>(
+        self.pattern_counts.set_slice_mut::<C, D>(
             slice.idx as usize,
             three_mask.count_ones() as u8,
             (slice_pattern.patterns & SLICE_PATTERN_CLOSED_FOUR_MASK).count_ones() as u8,
-            (slice_pattern.patterns & SLICE_PATTERN_OPEN_FOUR_MASK).count_ones() as u8
+            (slice_pattern.patterns & SLICE_PATTERN_OPEN_FOUR_MASK).count_ones() as u8,
+            slice.eval_score::<C>()
         );
 
         while C == Color::Black && three_mask != 0 {

@@ -17,6 +17,8 @@ impl Default for NnueEvaluator {
 
 impl Evaluator for NnueEvaluator {
 
+    const POLICY_EVALUATION: bool = true;
+
     fn eval_value(&self, state: &GameState) -> Score {
         todo!()
     }
