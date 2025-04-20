@@ -50,9 +50,9 @@ pub const fn pos_unchecked(source: &str) -> Pos {
     Pos::from_cartesian(row, col)
 }
 
-pub fn chebyshev_distance(ref_row: u8, ref_col: u8, row: u8, col: u8) -> i16 {
-    let row_diff = (ref_row as i16 - row as i16).abs();
-    let col_diff = (ref_col as i16 - col as i16).abs();
+pub fn chebyshev_distance(ref_row: i16, ref_col: i16, row: i16, col: i16) -> i16 {
+    let row_diff = (ref_row - row).abs();
+    let col_diff = (ref_col - col).abs();
 
     row_diff.max(col_diff)
 }
@@ -134,7 +134,7 @@ impl Pos {
     }
 
     pub fn distance(&self, other: Self) -> u8 {
-        chebyshev_distance(self.row(), self.col(), other.row(), other.col()) as u8
+        chebyshev_distance(self.row() as i16, self.col() as i16, other.row() as i16, other.col() as i16) as u8
     }
 
 }

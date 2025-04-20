@@ -114,6 +114,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
     mut board: Board, mut vcf_moves: VcfMovesUnchecked,
     max_depth: Depth, mut vcf_ply: Depth,
 ) -> ACC {
+    let mut score = 0;
     let mut move_counter: usize = 0;
 
     #[inline]
@@ -199,6 +200,15 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
             board.set_mut(defend_pos);
             td.batch_counter.add_single_mut();
+
+            if {
+                let pattern_count = board.patterns.pattern_counts.global.get_ref::<C>();
+                pattern_count.closed_fours + pattern_count.open_fours == 0
+            } {
+                board.unset_mut(defend_pos);
+                board.unset_mut(four_pos);
+                continue 'position_search;
+            }
 
             td.vcf_stack.push(VcfFrame {
                 vcf_moves,

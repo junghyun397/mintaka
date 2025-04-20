@@ -44,7 +44,9 @@ impl SlicePatternCounts {
 
     pub const EMPTY: Self = unsafe { std::mem::zeroed() };
 
-    fn access_local_mut<const C: Color, const D: Direction>(locals: &mut ColorContainer<[SlicePatternCount; slice::TOTAL_SLICE_AMOUNT]>, slice_idx: usize) -> &mut SlicePatternCount {
+    fn access_local_mut<const C: Color, const D: Direction>(
+        locals: &mut ColorContainer<[SlicePatternCount; slice::TOTAL_SLICE_AMOUNT]>, slice_idx: usize
+    ) -> &mut SlicePatternCount {
         &mut locals.get_ref_mut::<C>()[match D {
             Direction::Horizontal => 0,
             Direction::Vertical => pos::U_BOARD_WIDTH,
@@ -91,7 +93,7 @@ impl SlicePatternCounts {
         slice_count.score = score as u8;
     }
 
-    // TODO: performance optimization
+    // TODO: performance optimization; this function is took 10% of the total time
     pub fn update_slice_score_mut<const C: Color, const D: Direction>(&mut self, slice_idx: usize, score: i16) {
         let global_count = self.global.get_ref_mut::<C>();
         let slice_count = Self::access_local_mut::<C, D>(&mut self.locals, slice_idx);

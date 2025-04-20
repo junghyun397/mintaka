@@ -6,6 +6,7 @@ use crate::parameters::{ASPIRATION_WINDOW_BASE_DELTA, MAX_PLY};
 use crate::principal_variation::PrincipalVariation;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
+use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
@@ -193,6 +194,12 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
     let mut full_window = true;
     'position_search: while let Some((pos, move_score)) = move_picker.next(state) {
+        if state.board.player_color == Color::Black
+            && state.board.patterns.field.black[pos.idx_usize()].is_forbidden()
+        {
+            continue 'position_search;
+        }
+
         td.push_ply_mut(state.movegen_window);
         state.set_mut(pos);
 

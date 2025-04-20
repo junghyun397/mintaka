@@ -3,7 +3,7 @@ use crate::notation::pos;
 use crate::notation::pos::Pos;
 use ethnum::u256;
 use std::ops::{BitAnd, BitOr, BitOrAssign, BitXor, Not};
-use std::simd::u64x4;
+use std::simd::u8x32;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 #[repr(align(32))]
@@ -59,8 +59,8 @@ impl Bitfield {
         BitfieldPosIterator::from(!self.to_u256())
     }
 
-    pub fn to_simd(self) -> u64x4 {
-        u64x4::from_array(unsafe { std::mem::transmute::<[u8; 32], [u64; 4]>(self.0) })
+    pub fn to_simd(self) -> u8x32 {
+        u8x32::from_array(self.0)
     }
 
     pub fn to_u256(self) -> u256 {
@@ -109,10 +109,10 @@ impl BitOrAssign for Bitfield {
 
 }
 
-impl From<u64x4> for Bitfield {
+impl From<u8x32> for Bitfield {
 
-    fn from(x: u64x4) -> Self {
-        Self(unsafe { std::mem::transmute::<[u64; 4], [u8; 32]>(x.to_array()) })
+    fn from(x: u8x32) -> Self {
+        Self(x.to_array())
     }
 
 }

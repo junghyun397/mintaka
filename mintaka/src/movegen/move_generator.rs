@@ -4,8 +4,8 @@ use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::pattern;
 use rusty_renju::utils::platform;
+use rusty_renju::{cartesian_to_index, pattern};
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
 
@@ -18,11 +18,11 @@ pub struct VcfMovesUnchecked {
 impl VcfMovesUnchecked {
 
     pub fn sort_moves(&mut self, ref_pos: Pos) {
-        let ref_row = ref_pos.row();
-        let ref_col = ref_pos.col();
+        let ref_row = ref_pos.row() as i16;
+        let ref_col = ref_pos.col() as i16;
 
         self.moves[..self.top as usize].sort_by_key(|&pos|
-            pos::chebyshev_distance(ref_row, ref_col, pos.row(), pos.col())
+            pos::chebyshev_distance(ref_row, ref_col, pos.row() as i16, pos.col() as i16)
         );
     }
 
@@ -42,7 +42,23 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
     let four_mask = Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
     let zero_mask = Simd::splat(0);
 
-    for start_idx in (0 .. pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
+    let begin_idx = {
+        let begin_row = recent_four.row_usize().saturating_sub(distance_window as usize);
+        let begin_col = recent_four.col_usize().saturating_sub(distance_window as usize);
+
+        let begin_idx = cartesian_to_index!(begin_row, begin_col);
+        begin_idx - begin_idx % platform::U32_LANE_N
+    };
+
+    let end_idx = {
+        let end_row = (recent_four.row_usize() + distance_window as usize).max(pos::U_BOARD_WIDTH);
+        let end_col = (recent_four.col_usize() + distance_window as usize).max(pos::U_BOARD_WIDTH);
+
+        let end_idx = cartesian_to_index!(end_row, end_col);
+        (end_idx + platform::U32_LANE_N).min(pos::BOARD_BOUND) - end_idx % platform::U32_LANE_N
+    };
+
+    for start_idx in (begin_idx .. end_idx).step_by(platform::U32_LANE_N) {
         let mut vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
             unsafe { std::slice::from_raw_parts(field_ptr.add(start_idx), platform::U32_LANE_N) }
         );
@@ -95,9 +111,8 @@ fn generate_defend_open_four_moves_impl<const C: Color>(state: &GameState, moves
     let close_three_mask = Simd::splat(pattern::UNIT_CLOSE_THREE_MASK);
 
     for start_idx in (0..pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
-        let mut player_vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
-            unsafe { std::slice::from_raw_parts(player_ptr.add(start_idx), platform::U32_LANE_N) }
-        );
+        let player_chunk = unsafe { std::slice::from_raw_parts(player_ptr.add(start_idx), platform::U32_LANE_N) };
+        let mut player_vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(player_chunk);
 
         let mut opponent_vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
             unsafe { std::slice::from_raw_parts(opponent_ptr.add(start_idx), platform::U32_LANE_N) }
@@ -106,32 +121,20 @@ fn generate_defend_open_four_moves_impl<const C: Color>(state: &GameState, moves
         player_vector &= four_mask;
         opponent_vector &= close_three_mask;
 
-        let mut bitmask = (
-            player_vector.simd_ne(zero_mask) | opponent_vector.simd_ne(zero_mask)
-        ).to_bitmask();
+        let mut bitmask = (player_vector.simd_ne(zero_mask) | opponent_vector.simd_ne(zero_mask))
+            .to_bitmask();
 
         while bitmask != 0 {
             let lane_position = bitmask.trailing_zeros() as usize;
             bitmask &= bitmask - 1;
 
-            let idx = start_idx + lane_position;
-            let player_pattern = state.board.patterns.field.get_ref::<C>()[idx];
-
-            if C == Color::Black && player_pattern.is_forbidden() {
-                continue;
-            }
-
-            let pos = Pos::from_index(idx as u8);
+            let pos = Pos::from_index((start_idx + lane_position) as u8);
             moves.push(pos, score_move(state, pos));
         }
     }
 
-    let player_pattern = state.board.patterns.field.get_ref::<C>()[pos::BOARD_BOUND];
-    let opponent_pattern = state.board.patterns.field.get_reversed_ref::<C>()[pos::BOARD_BOUND];
-
-    if (!player_pattern.is_empty() || !opponent_pattern.is_empty())
-        && (player_pattern.has_any_four() || opponent_pattern.has_close_three())
-        && !(C == Color::Black && player_pattern.is_forbidden())
+    if state.board.patterns.field.get_ref::<C>()[pos::BOARD_BOUND].has_any_four()
+        || state.board.patterns.field.get_reversed_ref::<C>()[pos::BOARD_BOUND].has_close_three()
     {
         const POS: Pos = Pos::from_index(pos::U8_BOARD_BOUND);
         moves.push(POS, score_move(state, POS));

@@ -262,7 +262,9 @@ impl Patterns {
             (_, false) => {
                 self.update_with_slice_pattern_mut::<C, D>(slice, slice_pattern);
             },
-            _ => {}
+            _ => {
+                self.pattern_counts.update_slice_score_mut::<C, D>(slice.idx as usize, slice.eval_score::<C>());
+            }
         };
     }
 

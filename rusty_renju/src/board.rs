@@ -119,6 +119,28 @@ impl Board {
     }
 
     fn incremental_update_mut<const M: MoveType>(&mut self, pos: Pos) {
+        macro_rules! update_by_slice_each_color {
+            ($color:expr,$direction:expr,$slice:expr,$slice_idx:expr) => {
+                match (
+                    $slice.pattern_bitmap.get::<{ $color }>() == 0,
+                    $slice.has_potential_pattern::<{ $color }>()
+                ) {
+                    (_, true) => {
+                        self.patterns.update_with_slice_mut::<{ $color }, { $direction }>($slice);
+                    },
+                    (false, false) => {
+                        self.patterns.clear_with_slice_mut::<{ $color }, { $direction }>($slice);
+                    },
+                    _ => {
+                        self.patterns.pattern_counts.update_slice_score_mut::<{ $color }, { $direction }>(
+                            $slice_idx as usize,
+                            $slice.eval_score::<{ $color }>()
+                        );
+                    }
+                }
+            };
+        }
+
         macro_rules! update_by_slice {
             ($direction:expr,$slice:expr,$slice_idx:expr) => {{
                 match M {
@@ -126,41 +148,8 @@ impl Board {
                     MoveType::Unset => $slice.unset_mut(self.player_color, $slice_idx)
                 }
 
-                match (
-                    $slice.pattern_bitmap.get::<{ Color::Black }>() == 0,
-                    $slice.has_potential_pattern::<{ Color::Black }>()
-                ) {
-                    (_, true) => {
-                        self.patterns.update_with_slice_mut::<{ Color::Black }, { $direction }>($slice);
-                    },
-                    (false, false) => {
-                        self.patterns.clear_with_slice_mut::<{ Color::Black }, { $direction }>($slice);
-                    },
-                    _ => {
-                        self.patterns.pattern_counts.update_slice_score_mut::<{ Color::Black }, { $direction }>(
-                            $slice_idx as usize,
-                            $slice.eval_score::<{ Color::Black }>()
-                        );
-                    }
-                }
-
-                match (
-                    $slice.pattern_bitmap.get::<{ Color::White }>() == 0,
-                    $slice.has_potential_pattern::<{ Color::White }>()
-                ) {
-                    (_, true) => {
-                        self.patterns.update_with_slice_mut::<{ Color::White }, { $direction }>($slice);
-                    },
-                    (false, false) => {
-                        self.patterns.clear_with_slice_mut::<{ Color::White }, { $direction }>($slice);
-                    },
-                    _ => {
-                        self.patterns.pattern_counts.update_slice_score_mut::<{ Color::White }, { $direction }>(
-                            $slice_idx as usize,
-                            $slice.eval_score::<{ Color::White }>()
-                        );
-                    }
-                }
+                update_by_slice_each_color!(Color::Black, $direction, $slice, $slice_idx);
+                update_by_slice_each_color!(Color::White, $direction, $slice, $slice_idx);
             }};
         }
 

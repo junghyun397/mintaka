@@ -38,11 +38,8 @@ impl HeuristicEvaluator {
     fn eval_slice_pattern_counts(color: Color, state: &GameState) -> Score {
         let mut counts = *state.board.patterns.pattern_counts.global.access(color);
 
-        match color {
-            Color::Black => {
-                counts.threes -= state.board.patterns.unchecked_double_three_field.count_ones() as i16;
-            },
-            _ => {}
+        if color == Color::Black {
+            counts.threes -= state.board.patterns.unchecked_double_three_field.count_ones() as i16;
         }
 
         counts.closed_fours * HeuristicThreatScores::CLOSED_FOUR
