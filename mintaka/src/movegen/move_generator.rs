@@ -33,7 +33,7 @@ fn score_move(state: &GameState, pos: Pos) -> i16 {
     state.move_scores.scores[pos.idx_usize()] as i16 * distance as i16
 }
 
-pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, recent_four: Pos) -> VcfMovesUnchecked {
+pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, recent_move: Pos) -> VcfMovesUnchecked {
     let mut vcf_moves = [MaybePos::NONE.unwrap(); 31];
     let mut vcf_moves_top = 0;
 
@@ -43,16 +43,16 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
     let zero_mask = Simd::splat(0);
 
     let begin_idx = {
-        let begin_row = recent_four.row_usize().saturating_sub(distance_window as usize);
-        let begin_col = recent_four.col_usize().saturating_sub(distance_window as usize);
+        let begin_row = recent_move.row_usize().saturating_sub(distance_window as usize);
+        let begin_col = recent_move.col_usize().saturating_sub(distance_window as usize);
 
         let begin_idx = cartesian_to_index!(begin_row, begin_col);
         begin_idx - begin_idx % platform::U32_LANE_N
     };
 
     let end_idx = {
-        let end_row = (recent_four.row_usize() + distance_window as usize).max(pos::U_BOARD_WIDTH);
-        let end_col = (recent_four.col_usize() + distance_window as usize).max(pos::U_BOARD_WIDTH);
+        let end_row = (recent_move.row_usize() + distance_window as usize).max(pos::U_BOARD_WIDTH);
+        let end_col = (recent_move.col_usize() + distance_window as usize).max(pos::U_BOARD_WIDTH);
 
         let end_idx = cartesian_to_index!(end_row, end_col);
         (end_idx + platform::U32_LANE_N).min(pos::BOARD_BOUND) - end_idx % platform::U32_LANE_N
@@ -73,7 +73,7 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
             bitmask &= bitmask - 1;
 
             let pos = Pos::from_index((start_idx + lane_position) as u8);
-            if recent_four.distance(pos) <= distance_window {
+            if recent_move.distance(pos) <= distance_window {
                 vcf_moves[vcf_moves_top] = pos;
                 vcf_moves_top += 1;
             }
@@ -89,8 +89,7 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
 }
 
 pub fn generate_neighbors_moves(state: &GameState, moves: &mut MoveList) {
-
-    for pos in (state.board.hot_field ^ state.movegen_window.movegen_field).iter_hot_pos() {
+    for pos in (!state.board.hot_field & state.movegen_window.movegen_field).iter_hot_pos() {
         moves.push(pos, score_move(state, pos));
     }
 }
