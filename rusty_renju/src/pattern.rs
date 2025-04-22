@@ -170,12 +170,14 @@ impl Pattern {
     }
 
     pub fn is_forbidden(&self) -> bool {
-        !self.is_empty()
-            && (self.has_fours()
-                || (self.has_threes() && !self.has_invalid_double_three())
-                || self.has_overline()
-            )
-            && !self.has_five()
+        let four_count = self.apply_mask(UNIT_ANY_FOUR_MASK).count_ones();
+        let three_count = self.apply_mask(UNIT_OPEN_THREE_MASK).count_ones();
+        let overline_masked = self.apply_mask(UNIT_OVERLINE_MASK);
+        let five_masked = self.apply_mask(UNIT_FIVE_MASK);
+        let marker_masked = self.apply_mask(!UNIT_PATTERN_MASK);
+
+        (four_count > 1 || (three_count > 1 && marker_masked == 0) || overline_masked != 0)
+            && five_masked == 0
     }
 
     pub fn forbidden_kind(&self) -> Option<ForbiddenKind> {

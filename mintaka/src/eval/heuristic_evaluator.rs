@@ -39,7 +39,7 @@ impl HeuristicEvaluator {
         let mut counts = *state.board.patterns.pattern_counts.global.access(color);
 
         if color == Color::Black {
-            counts.threes -= state.board.patterns.unchecked_double_three_field.count_ones() as i16;
+            counts.threes -= state.board.patterns.forbidden_field.count_ones() as i16;
         }
 
         counts.closed_fours * HeuristicThreatScores::CLOSED_FOUR
