@@ -36,10 +36,11 @@ pub const UNIT_OVERLINE_MASK: u32           = repeat_4x(OVERLINE);
 
 pub const UNIT_PATTERN_MASK: u32            = repeat_4x(!MARKER);
 
-pub const SLICE_PATTERN_THREE_MASK: u128        = repeat_16x(OPEN_THREE);
 pub const SLICE_PATTERN_CLOSED_FOUR_MASK: u128  = repeat_16x(CLOSED_FOUR_SINGLE);
 pub const SLICE_PATTERN_OPEN_FOUR_MASK: u128    = repeat_16x(OPEN_FOUR);
 pub const SLICE_PATTERN_FIVE_MASK: u128         = repeat_16x(FIVE);
+pub const SLICE_PATTERN_THREE_MASK: u128        = repeat_16x(OPEN_THREE);
+pub const SLICE_PATTERN_OVERLINE_MASK: u128     = repeat_16x(OVERLINE);
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 #[repr(u8)]
@@ -221,7 +222,7 @@ pub struct Patterns {
     pub score_table: ScoreTable,
     pub unchecked_five_in_a_row: Option<Color>,
     pub unchecked_five_pos: ColorContainer<Option<Pos>>,
-    pub unchecked_double_three_field: Bitfield,
+    pub forbidden_field: Bitfield,
 }
 
 assert_struct_sizes!(Patterns, size=3008, align=64);
@@ -238,7 +239,7 @@ impl Default for Patterns {
                 black: None,
                 white: None
             },
-            unchecked_double_three_field: Bitfield::default(),
+            forbidden_field: Bitfield::default(),
         }
     }
 
@@ -312,7 +313,7 @@ impl Patterns {
 
             let three_idx: usize = step_idx!(D, slice.start_pos.idx_usize(), three_slice_idx as usize);
             if self.field.black[three_idx].has_three() {
-                self.unchecked_double_three_field.set_mut(Pos::from_index(three_idx as u8));
+                self.forbidden_field.set_mut(Pos::from_index(three_idx as u8));
             }
         }
 

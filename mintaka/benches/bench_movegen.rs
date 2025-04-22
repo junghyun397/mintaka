@@ -82,18 +82,18 @@ mod bench_movegen {
 
     #[bench]
     fn all_moves(b: &mut Bencher) {
-        // let case = indoc! {"\
-        // "};
-        //
-        // bench_movegen!(b, case, pos_unchecked("a1"), pos_unchecked("a1"), pos_unchecked("a1"));
+        let case = indoc! {"\
+        "};
+
+        bench_movegen!(b, case, pos_unchecked("a1"), pos_unchecked("a1"), pos_unchecked("a1"));
     }
 
     #[bench]
     fn defend_three_moves(b: &mut Bencher) {
-        // let case = indoc! {"\
-        // "};
-        //
-        // bench_movegen!(b, case, pos_unchecked("a1"), pos_unchecked("a1"), pos_unchecked("a1"));
+        let case = indoc! {"\
+        "};
+
+        bench_movegen!(b, case, pos_unchecked("a1"), pos_unchecked("a1"), pos_unchecked("a1"));
     }
 
 }

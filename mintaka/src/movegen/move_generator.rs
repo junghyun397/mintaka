@@ -5,7 +5,7 @@ use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::utils::platform;
-use rusty_renju::{cartesian_to_index, pattern};
+use rusty_renju::{cartesian_to_index, chebyshev_distance, index_to_col, index_to_row, pattern};
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
 
@@ -22,7 +22,7 @@ impl VcfMovesUnchecked {
         let ref_col = ref_pos.col() as i16;
 
         self.moves[..self.top as usize].sort_by_key(|&pos|
-            pos::chebyshev_distance(ref_row, ref_col, pos.row() as i16, pos.col() as i16)
+            chebyshev_distance!(ref_row, ref_col, pos.row() as i16, pos.col() as i16)
         );
     }
 
@@ -33,7 +33,7 @@ fn score_move(state: &GameState, pos: Pos) -> i16 {
     state.move_scores.scores[pos.idx_usize()] as i16 * distance as i16
 }
 
-pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, recent_move: Pos) -> VcfMovesUnchecked {
+pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: isize, recent_move: Pos) -> VcfMovesUnchecked {
     let mut vcf_moves = [MaybePos::NONE.unwrap(); 31];
     let mut vcf_moves_top = 0;
 
@@ -42,17 +42,20 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
     let four_mask = Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
     let zero_mask = Simd::splat(0);
 
+    let recent_move_row = recent_move.row_usize();
+    let recent_move_col = recent_move.col_usize();
+
     let begin_idx = {
-        let begin_row = recent_move.row_usize().saturating_sub(distance_window as usize);
-        let begin_col = recent_move.col_usize().saturating_sub(distance_window as usize);
+        let begin_row = recent_move_row.saturating_sub(distance_window as usize);
+        let begin_col = recent_move_col.saturating_sub(distance_window as usize);
 
         let begin_idx = cartesian_to_index!(begin_row, begin_col);
         begin_idx - begin_idx % platform::U32_LANE_N
     };
 
     let end_idx = {
-        let end_row = (recent_move.row_usize() + distance_window as usize).max(pos::U_BOARD_WIDTH);
-        let end_col = (recent_move.col_usize() + distance_window as usize).max(pos::U_BOARD_WIDTH);
+        let end_row = (recent_move_row + distance_window as usize).max(pos::U_BOARD_WIDTH);
+        let end_col = (recent_move_col + distance_window as usize).max(pos::U_BOARD_WIDTH);
 
         let end_idx = cartesian_to_index!(end_row, end_col);
         (end_idx + platform::U32_LANE_N).min(pos::BOARD_BOUND) - end_idx % platform::U32_LANE_N
@@ -72,11 +75,18 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: u8, rece
             let lane_position = bitmask.trailing_zeros() as usize;
             bitmask &= bitmask - 1;
 
-            let pos = Pos::from_index((start_idx + lane_position) as u8);
-            if recent_move.distance(pos) <= distance_window {
-                vcf_moves[vcf_moves_top] = pos;
-                vcf_moves_top += 1;
+            let pos_idx = start_idx + lane_position;
+            let distance = chebyshev_distance!(
+                recent_move_row as isize,recent_move_col as isize,
+                index_to_row!(pos_idx) as isize, index_to_col!(pos_idx) as isize
+            );
+
+            if distance > distance_window {
+                continue;
             }
+
+            vcf_moves[vcf_moves_top] = Pos::from_index(pos_idx as u8);
+            vcf_moves_top += 1;
         }
     }
 

@@ -3,7 +3,7 @@ use rusty_renju::notation::value::{Score, Scores};
 
 pub trait EndgameAccumulator {
 
-    const DISTANCE_WINDOW: u8;
+    const DISTANCE_WINDOW: isize;
 
     const ZERO: Self;
 
@@ -17,7 +17,7 @@ pub type SequenceEndgameAccumulator = Option<Vec<Pos>>;
 
 impl EndgameAccumulator for SequenceEndgameAccumulator {
 
-    const DISTANCE_WINDOW: u8 = 7;
+    const DISTANCE_WINDOW: isize = 7;
 
     const ZERO: Self = None;
 
@@ -39,7 +39,7 @@ impl EndgameAccumulator for SequenceEndgameAccumulator {
 
 impl EndgameAccumulator for Score {
 
-    const DISTANCE_WINDOW: u8 = 5;
+    const DISTANCE_WINDOW: isize = 5;
 
     const ZERO: Self = 0;
 

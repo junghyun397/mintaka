@@ -80,12 +80,12 @@ impl MovePicker {
                     return Some((counter_move, COUNTER_MOVE_SCORE));
                 }
 
-                if state.board.patterns.pattern_counts.global.access(state.board.opponent_color()).open_fours != 0 {
-                    generate_defend_open_four_moves(state, &mut self.moves);
-                    self.stage = MoveStage::DefendFour;
-                } else {
+                if state.board.patterns.pattern_counts.global.access(state.board.opponent_color()).open_fours == 0 {
                     generate_neighbors_moves(state, &mut self.moves);
                     self.stage = MoveStage::Neighbor;
+                } else {
+                    generate_defend_open_four_moves(state, &mut self.moves);
+                    self.stage = MoveStage::DefendFour;
                 }
 
                 self.next(state)

@@ -171,7 +171,7 @@ impl Board {
             update_by_slice!(Direction::Descending, descending_slice, pos.col() - descending_slice.start_col);
         }
 
-        self.validate_double_three_mut();
+        self.validate_forbidden_moves_mut();
     }
 
     fn full_update_mut(&mut self) {
@@ -203,11 +203,11 @@ impl Board {
             update_by_slice!(descending_slice, Direction::Descending);
         }
 
-        self.validate_double_three_mut();
+        self.validate_forbidden_moves_mut();
     }
 
-    fn validate_double_three_mut(&mut self) {
-        for root_pos in self.patterns.unchecked_double_three_field.iter_hot_pos() {
+    fn validate_forbidden_moves_mut(&mut self) {
+        for root_pos in self.patterns.forbidden_field.iter_hot_pos() {
             if self.is_valid_double_three(ValidateThreeRoot { root_pos }) {
                 self.patterns.field.black[root_pos.idx_usize()].unmark_invalid_double_three();
             } else {
