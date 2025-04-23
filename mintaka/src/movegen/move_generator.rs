@@ -99,7 +99,13 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: isize, r
 }
 
 pub fn generate_neighbors_moves(state: &GameState, moves: &mut MoveList) {
-    for pos in (!state.board.hot_field & state.movegen_window.movegen_field).iter_hot_pos() {
+    let mut field = !state.board.hot_field & state.movegen_window.movegen_field;
+
+    if state.board.player_color == Color::Black {
+        field &= !state.board.patterns.forbidden_field;
+    }
+
+    for pos in field.iter_hot_pos() {
         moves.push(pos, score_move(state, pos));
     }
 }

@@ -207,11 +207,41 @@ impl Board {
     }
 
     fn validate_forbidden_moves_mut(&mut self) {
-        for root_pos in self.patterns.forbidden_field.iter_hot_pos() {
-            if self.is_valid_double_three(ValidateThreeRoot { root_pos }) {
-                self.patterns.field.black[root_pos.idx_usize()].unmark_invalid_double_three();
+        for root_pos in self.patterns.forbidden_field.clone().iter_hot_pos() {
+            let pattern = self.patterns.field.black[root_pos.idx_usize()];
+
+            let unmark_forbidden: bool;
+            let pattern_marker_update: Option<bool>;
+
+            if pattern.has_five() {
+                unmark_forbidden = true;
+                pattern_marker_update = None;
+            } else if pattern.has_fours() || pattern.has_overline() {
+                unmark_forbidden = false;
+                pattern_marker_update = None;
+            } else if pattern.has_threes() && !pattern.has_invalid_double_three() {
+                if self.is_valid_double_three(ValidateThreeRoot { root_pos }) {
+                    unmark_forbidden = false;
+                    pattern_marker_update = Some(false);
+                } else {
+                    unmark_forbidden = true;
+                    pattern_marker_update = Some(true);
+                }
             } else {
-                self.patterns.field.black[root_pos.idx_usize()].mark_invalid_double_three();
+                unmark_forbidden = true;
+                pattern_marker_update = None;
+            }
+
+            if let Some(mark) = pattern_marker_update {
+                if mark {
+                    self.patterns.field.black[root_pos.idx_usize()].mark_invalid_double_three();
+                } else {
+                    self.patterns.field.black[root_pos.idx_usize()].unmark_invalid_double_three();
+                }
+            }
+
+            if unmark_forbidden {
+                self.patterns.forbidden_field.unset_mut(root_pos);
             }
         }
     }

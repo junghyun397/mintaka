@@ -2,7 +2,7 @@ use crate::assert_struct_sizes;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use ethnum::u256;
-use std::ops::{BitAnd, BitOr, BitOrAssign, BitXor, Not};
+use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
 use std::simd::u8x32;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -102,11 +102,21 @@ impl BitXor for Bitfield {
 }
 
 impl BitOrAssign for Bitfield {
-
     fn bitor_assign(&mut self, rhs: Self) {
         *self = self.bitor(rhs);
     }
+}
 
+impl BitAndAssign for Bitfield {
+    fn bitand_assign(&mut self, rhs: Self) {
+        *self = self.bitand(rhs);
+    }
+}
+
+impl BitXorAssign for Bitfield {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        *self = self.bitxor(rhs);
+    }
 }
 
 impl From<u8x32> for Bitfield {

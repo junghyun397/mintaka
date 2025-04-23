@@ -2,6 +2,7 @@ use crate::game_state::GameState;
 use crate::movegen::move_generator::{generate_defend_open_four_moves, generate_neighbors_moves};
 use crate::movegen::move_list::MoveList;
 use crate::search_frame::KILLER_MOVE_SLOTS;
+use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::value::{Score, Scores};
 
@@ -80,17 +81,31 @@ impl MovePicker {
                     return Some((counter_move, COUNTER_MOVE_SCORE));
                 }
 
-                if state.board.patterns.pattern_counts.global.access(state.board.opponent_color()).open_fours == 0 {
-                    generate_neighbors_moves(state, &mut self.moves);
-                    self.stage = MoveStage::Neighbor;
-                } else {
+                if Self::has_open_four(state) {
                     generate_defend_open_four_moves(state, &mut self.moves);
                     self.stage = MoveStage::DefendFour;
+                } else {
+                    generate_neighbors_moves(state, &mut self.moves);
+                    self.stage = MoveStage::Neighbor;
                 }
 
                 self.next(state)
             },
-            MoveStage::DefendFour | MoveStage::Neighbor => {
+            MoveStage::DefendFour => {
+                let next_move = self.moves.consume_best();
+
+                match next_move {
+                    None => self.stage = MoveStage::Done,
+                    Some((pos, _)) => {
+                        if state.board.patterns.forbidden_field.is_hot(pos) {
+                            self.next(state);
+                        }
+                    }
+                }
+
+                next_move
+            },
+            MoveStage::Neighbor => {
                 let next_move = self.moves.consume_best();
 
                 if next_move.is_none() {
@@ -101,6 +116,29 @@ impl MovePicker {
             },
             MoveStage::Done => None
         }
+    }
+
+    fn has_open_four(state: &GameState) -> bool {
+        let total_fours = match state.board.player_color {
+            Color::Black => {
+                let mut total_fours = state.board.patterns.pattern_counts.global
+                    .white.open_fours as u32;
+
+                total_fours -= state.board.patterns.forbidden_field.iter_hot_pos()
+                    .map(|pos|
+                        state.board.patterns.field.black[pos.idx_usize()].count_open_fours()
+                    )
+                    .sum::<u32>();
+
+                total_fours
+            },
+            Color::White => {
+                state.board.patterns.pattern_counts.global
+                    .white.open_fours as u32
+            }
+        };
+
+        total_fours != 0
     }
 
 }

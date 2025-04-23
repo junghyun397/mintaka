@@ -8,6 +8,26 @@ pub enum RuleKind {
     #[default] Renju = 2
 }
 
+impl RuleKind {
+
+    pub const fn relaxed(&self) -> Self {
+        match self {
+            Self::Renju => Self::SimplifiedRenju,
+            Self::SimplifiedRenju => Self::Gomoku,
+            _ => Self::Gomoku
+        }
+    }
+
+    pub const fn strict(&self) -> Self {
+        match self {
+            Self::SimplifiedRenju => Self::Renju,
+            Self::Gomoku => Self::SimplifiedRenju,
+            _ => Self::Renju
+        }
+    }
+
+}
+
 #[derive(PartialEq, Eq, Copy, Clone)]
 pub enum ForbiddenKind {
     DoubleThree = 1,

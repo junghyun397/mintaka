@@ -170,14 +170,26 @@ impl Pattern {
     }
 
     pub fn is_forbidden(&self) -> bool {
-        let four_count = self.apply_mask(UNIT_ANY_FOUR_MASK).count_ones();
-        let three_count = self.apply_mask(UNIT_OPEN_THREE_MASK).count_ones();
+        let four_masked = self.apply_mask(UNIT_ANY_FOUR_MASK);
+        let three_masked = self.apply_mask(UNIT_OPEN_THREE_MASK);
         let overline_masked = self.apply_mask(UNIT_OVERLINE_MASK);
         let five_masked = self.apply_mask(UNIT_FIVE_MASK);
         let marker_masked = self.apply_mask(!UNIT_PATTERN_MASK);
 
-        (four_count > 1 || (three_count > 1 && marker_masked == 0) || overline_masked != 0)
-            && five_masked == 0
+        (four_masked.count_ones() > 1
+            || (three_masked.count_ones() > 1 && marker_masked == 0)
+            || overline_masked != 0
+        ) && five_masked == 0
+    }
+
+    fn is_forbidden_ignoring_marker(&self) -> bool {
+        let four_masked = self.apply_mask(UNIT_ANY_FOUR_MASK);
+        let three_masked = self.apply_mask(UNIT_OPEN_THREE_MASK);
+        let overline_masked = self.apply_mask(UNIT_OVERLINE_MASK);
+
+        four_masked.count_ones() > 1
+            || (three_masked.count_ones() > 1)
+            || overline_masked != 0
     }
 
     pub fn forbidden_kind(&self) -> Option<ForbiddenKind> {
@@ -299,25 +311,13 @@ impl Patterns {
             })
         );
 
-        let mut three_mask = slice_pattern.patterns & SLICE_PATTERN_THREE_MASK;
-
         self.pattern_counts.set_slice_mut::<C, D>(
             slice.idx as usize,
-            three_mask.count_ones() as u8,
+            (slice_pattern.patterns & SLICE_PATTERN_THREE_MASK).count_ones() as u8,
             (slice_pattern.patterns & SLICE_PATTERN_CLOSED_FOUR_MASK).count_ones() as u8,
             (slice_pattern.patterns & SLICE_PATTERN_OPEN_FOUR_MASK).count_ones() as u8,
             slice.eval_score::<C>()
         );
-
-        while C == Color::Black && three_mask != 0 {
-            let three_slice_idx = three_mask.trailing_zeros() / 8;
-            three_mask &= three_mask - 1;
-
-            let three_idx: usize = step_idx!(D, slice.start_pos.idx_usize(), three_slice_idx as usize);
-            if self.field.black[three_idx].has_three() {
-                self.forbidden_field.set_mut(Pos::from_index(three_idx as u8));
-            }
-        }
 
         let pattern_bitmap = encode_u128_into_u16(slice_pattern.patterns);
         let slice_patterns = slice_pattern.patterns.to_ne_bytes();
@@ -330,6 +330,10 @@ impl Patterns {
 
             let idx = step_idx!(D, start_idx, pattern_idx);
             self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(slice_patterns[pattern_idx]);
+
+            if C == Color::Black && self.field.black[idx].is_forbidden_ignoring_marker() {
+                self.forbidden_field.set_mut(Pos::from_index(idx as u8));
+            }
         }
 
         self.unchecked_five_in_a_row = self.unchecked_five_in_a_row.or(
