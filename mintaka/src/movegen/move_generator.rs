@@ -126,8 +126,9 @@ fn generate_defend_open_four_moves_impl<const C: Color>(state: &GameState, moves
     let close_three_mask = Simd::splat(pattern::UNIT_CLOSE_THREE_MASK);
 
     for start_idx in (0..pos::BOARD_BOUND).step_by(platform::U32_LANE_N) {
-        let player_chunk = unsafe { std::slice::from_raw_parts(player_ptr.add(start_idx), platform::U32_LANE_N) };
-        let mut player_vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(player_chunk);
+        let mut player_vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
+            unsafe { std::slice::from_raw_parts(player_ptr.add(start_idx), platform::U32_LANE_N) }
+        );
 
         let mut opponent_vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
             unsafe { std::slice::from_raw_parts(opponent_ptr.add(start_idx), platform::U32_LANE_N) }

@@ -219,7 +219,7 @@ impl Board {
             } else if pattern.has_fours() || pattern.has_overline() {
                 unmark_forbidden = false;
                 pattern_marker_update = None;
-            } else if pattern.has_threes() && !pattern.has_invalid_double_three() {
+            } else if pattern.has_threes() {
                 if self.is_valid_double_three(ValidateThreeRoot { root_pos }) {
                     unmark_forbidden = false;
                     pattern_marker_update = Some(false);
@@ -356,8 +356,8 @@ impl Board {
     }
 
     fn update_four_overrides(&self, overrides: &mut SetOverrides, direction_from: Direction, pos: Pos) {
-        for next_four_idx in (0 .. direction_from as u8 * 3).chain(direction_from as u8 * 4 .. 12) {
-            let four_pos = overrides.next_four[next_four_idx as usize];
+        for next_four_idx in (0 .. direction_from as usize * 3).chain((direction_from as usize + 1) * 3 .. 12) {
+            let four_pos = overrides.next_four[next_four_idx];
             if four_pos != MaybePos::NONE.unwrap() {
                 overrides.four[overrides.four_top as usize] = four_pos;
                 overrides.four_top += 1;
