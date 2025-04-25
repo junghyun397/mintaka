@@ -323,7 +323,7 @@ impl Patterns {
         let slice_patterns = slice_pattern.patterns.to_ne_bytes();
 
         let start_idx = slice.start_pos.idx_usize();
-        let mut update_mask = (slice.pattern_bitmap.get::<C>() ^ pattern_bitmap) | pattern_bitmap;
+        let mut update_mask = slice.pattern_bitmap.get::<C>() | pattern_bitmap;
         while update_mask != 0 {
             let pattern_idx = update_mask.trailing_zeros() as usize;
             update_mask &= update_mask - 1;
