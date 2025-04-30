@@ -7,6 +7,7 @@ use std::simd::Simd;
 use std::slice;
 
 #[derive(Debug, Copy, Clone)]
+#[repr(align(64))]
 pub struct MoveScores {
     pub scores: [u8; 256],
 }
@@ -34,63 +35,73 @@ impl MoveScores {
     };
 
     pub fn add_neighborhood_score(&mut self, pos: Pos) {
-        for row in
-            pos.row().saturating_sub(2) .. (pos.row() + 2).min(pos::BOARD_WIDTH - 1)
-        {
-            for col in
-                pos.col().saturating_sub(2) .. (pos.col() + 2).min(pos::BOARD_WIDTH - 1)
-            {
-                let idx = cartesian_to_index!(row, col) as usize;
-                self.scores[idx] += 1;
-            }
-        }
+        self.adjust_neighborhood_score::<{ true }>(pos);
     }
 
     pub fn remove_neighborhood_score(&mut self, pos: Pos) {
-        for row in
-            pos.row().saturating_sub(2) .. (pos.row() + 2).min(pos::BOARD_WIDTH - 1)
-        {
-            for col in
-                pos.col().saturating_sub(2) .. (pos.col() + 2).min(pos::BOARD_WIDTH - 1)
-            {
-                let idx = cartesian_to_index!(row, col) as usize;
-                self.scores[idx] = self.scores[idx].saturating_sub(1);
-            }
-        }
+        self.adjust_neighborhood_score::<{ false }>(pos);
     }
 
-    pub fn add_neighborhood_score_simd(&mut self, pos: Pos) {
-        let mut ptr = self.scores.as_mut_ptr();
+    #[inline]
+    fn adjust_neighborhood_score<const INC: bool>(&mut self, pos: Pos) {
+        let scores_ptr = self.scores.as_mut_slice().as_mut_ptr();
+        let mask_ptr   = NEIGHBORHOOD_SCORE_LUT[pos.idx_usize()].as_ptr();
+
+        unsafe { for offset in (0..256).step_by(platform::U8_LANE_N) {
+            let mut acc = Simd::<u8, { platform::U8_LANE_N }>::from_slice(
+                slice::from_raw_parts(scores_ptr.add(offset), platform::U8_LANE_N),
+            );
+
+            let mask = Simd::<u8, { platform::U8_LANE_N }>::from_slice(
+                slice::from_raw_parts(mask_ptr.add(offset), platform::U8_LANE_N),
+            );
+
+            acc = if INC { acc + mask } else { acc - mask };
+
+            acc.copy_to_slice(slice::from_raw_parts_mut(scores_ptr.add(offset), platform::U8_LANE_N));
+        } }
+    }
+
+    #[inline]
+    fn modify_neighborhood_score_unroll<const INC: bool>(&mut self, pos: Pos) {
+        let scores_ptr = self.scores.as_mut_slice().as_mut_ptr();
         let mask_ptr = NEIGHBORHOOD_SCORE_LUT[pos.idx_usize()].as_ptr();
 
-        unsafe { for start_idx in (0 .. 256).step_by(platform::U8_LANE_N * 4) {
-            let mut acc0 = Simd::<u8, { platform::U8_LANE_N }>::from_slice(slice::from_raw_parts(
-                ptr.add(start_idx), platform::U8_LANE_N)
+        unsafe { for start_idx in (0..256).step_by(platform::U8_LANE_N * 4) {
+            let offset0 = start_idx;
+            let offset1 = start_idx + platform::U8_LANE_N;
+            let offset2 = start_idx + platform::U8_LANE_N * 2;
+            let offset3 = start_idx + platform::U8_LANE_N * 3;
+
+            let mut acc0 = Simd::<u8, { platform::U8_LANE_N }>::from_slice(
+                slice::from_raw_parts(scores_ptr.add(offset0), platform::U8_LANE_N)
             );
-            acc0 += Simd::from_slice(slice::from_raw_parts(
-                mask_ptr.add(start_idx), platform::U8_LANE_N)
+            let mut acc1 = Simd::<u8, { platform::U8_LANE_N }>::from_slice(
+                slice::from_raw_parts(scores_ptr.add(offset1), platform::U8_LANE_N)
+            );
+            let mut acc2 = Simd::<u8, { platform::U8_LANE_N }>::from_slice(
+                slice::from_raw_parts(scores_ptr.add(offset2), platform::U8_LANE_N)
+            );
+            let mut acc3 = Simd::<u8, { platform::U8_LANE_N }>::from_slice(
+                slice::from_raw_parts(scores_ptr.add(offset3), platform::U8_LANE_N)
             );
 
-            let mut acc1 = Simd::<u8, { platform::U8_LANE_N }>::from_slice(slice::from_raw_parts(
-                ptr.add(start_idx), platform::U8_LANE_N)
-            );
-            acc1 += Simd::from_slice(slice::from_raw_parts(
-                mask_ptr.add(start_idx + platform::U8_LANE_N), platform::U8_LANE_N)
-            );
+            if INC {
+                acc0 += Simd::from_slice(slice::from_raw_parts(mask_ptr.add(offset0), platform::U8_LANE_N));
+                acc1 += Simd::from_slice(slice::from_raw_parts(mask_ptr.add(offset1), platform::U8_LANE_N));
+                acc2 += Simd::from_slice(slice::from_raw_parts(mask_ptr.add(offset2), platform::U8_LANE_N));
+                acc3 += Simd::from_slice(slice::from_raw_parts(mask_ptr.add(offset3), platform::U8_LANE_N));
+            } else {
+                acc0 -= Simd::from_slice(slice::from_raw_parts(mask_ptr.add(offset0), platform::U8_LANE_N));
+                acc1 -= Simd::from_slice(slice::from_raw_parts(mask_ptr.add(offset1), platform::U8_LANE_N));
+                acc2 -= Simd::from_slice(slice::from_raw_parts(mask_ptr.add(offset2), platform::U8_LANE_N));
+                acc3 -= Simd::from_slice(slice::from_raw_parts(mask_ptr.add(offset3), platform::U8_LANE_N));
+            }
 
-            let mut acc2 = Simd::<u8, { platform::U8_LANE_N }>::from_slice(slice::from_raw_parts(
-                ptr.add(start_idx), platform::U8_LANE_N)
-            );
-            acc2 += Simd::from_slice(slice::from_raw_parts(
-                mask_ptr.add(start_idx + (platform::U8_LANE_N * 2)), platform::U8_LANE_N)
-            );
-
-            let mut acc3 = Simd::<u8, { platform::U8_LANE_N }>::from_slice(slice::from_raw_parts(
-                ptr.add(start_idx), platform::U8_LANE_N)
-            );
-            acc3 += Simd::from_slice(
-                slice::from_raw_parts(mask_ptr.add(start_idx + (platform::U8_LANE_N * 3)), platform::U8_LANE_N)
-            );
+            acc0.copy_to_slice(slice::from_raw_parts_mut(scores_ptr.add(offset0), platform::U8_LANE_N));
+            acc1.copy_to_slice(slice::from_raw_parts_mut(scores_ptr.add(offset1), platform::U8_LANE_N));
+            acc2.copy_to_slice(slice::from_raw_parts_mut(scores_ptr.add(offset2), platform::U8_LANE_N));
+            acc3.copy_to_slice(slice::from_raw_parts_mut(scores_ptr.add(offset3), platform::U8_LANE_N));
         } }
     }
 

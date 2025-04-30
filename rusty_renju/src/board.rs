@@ -444,7 +444,7 @@ impl Board {
 
 //noinspection RsUnresolvedPath
 #[derive(ConstParamTy, Eq, PartialEq,)]
-enum MoveType {
+pub enum MoveType {
     Set, Unset
 }
 
