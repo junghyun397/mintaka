@@ -14,3 +14,13 @@ pub const U8_LANE_N: usize = {
         16
     }
 };
+
+pub const U8_UNROLL_N: usize = {
+    if cfg!(target_feature = "avx512f") {
+        4
+    } else if cfg!(target_feature = "avx2") {
+        8
+    } else {
+        16
+    }
+};

@@ -18,7 +18,7 @@ impl GameState {
         self.board.set_mut(pos);
         self.history.set_mut(pos);
 
-        self.move_scores.add_neighborhood_score(pos);
+        self.move_scores.add_neighbor_score(pos);
         self.movegen_window.expand_window_mut(pos);
     }
 
@@ -30,7 +30,7 @@ impl GameState {
         let pos = self.history.pop_mut().unwrap().unwrap();
         self.board.unset_mut(pos);
 
-        self.move_scores.remove_neighborhood_score(pos);
+        self.move_scores.remove_neighbor_score(pos);
         self.movegen_window = movegen_window;
     }
 
