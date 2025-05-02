@@ -20,11 +20,13 @@ impl Default for MoveScores {
 
 impl From<Bitfield> for MoveScores {
     fn from(value: Bitfield) -> Self {
-        value.iter_hot_pos()
-            .fold(Self::default(), |mut acc, pos| {
-                acc.add_neighbor_score(pos);
-                acc
-            })
+        let mut acc = Self::default();
+
+        for pos in value.iter_hot_pos() {
+            acc.add_neighbor_score(pos);
+        }
+
+        acc
     }
 }
 
@@ -50,16 +52,14 @@ impl MoveScores {
         unsafe {
             for start_idx in (0..256).step_by(platform::U8_LANE_N * platform::U8_UNROLL_N) {
                 let mut registers: [Simd<u8, { platform::U8_LANE_N }>; platform::U8_UNROLL_N] =
-                    std::mem::MaybeUninit::uninit().assume_init();
-
-                for idx in 0 .. platform::U8_UNROLL_N {
-                    registers[idx] = Simd::<u8, { platform::U8_LANE_N }>::from_slice(
-                        slice::from_raw_parts(
-                            scores_ptr.add(start_idx + platform::U8_LANE_N * idx),
-                            platform::U8_LANE_N
+                    std::array::from_fn(|idx|
+                        Simd::<u8, { platform::U8_LANE_N }>::from_slice(
+                            slice::from_raw_parts(
+                                scores_ptr.add(start_idx + platform::U8_LANE_N * idx),
+                                platform::U8_LANE_N
+                            )
                         )
                     );
-                }
 
                 for idx in 0 .. platform::U8_UNROLL_N {
                     if INC {

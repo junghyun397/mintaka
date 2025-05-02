@@ -65,12 +65,12 @@ fn parse_board_elements(source: &str) -> Result<Box<[Option<Color>]>, &'static s
     Ok(elements)
 }
 
-fn extract_stones_by_color<const C: Color>(source: &[Option<Color>]) -> Box<[Pos]> {
+fn extract_stones_by_color(color: Color, source: &[Option<Color>]) -> Box<[Pos]> {
     source.iter()
         .enumerate()
         .filter_map(|(idx, symbol)|
-            symbol.and_then(|color|
-                (color == C).then(|| Pos::from_index(idx as u8))
+            symbol.and_then(|sym_color|
+                (sym_color == color).then(|| Pos::from_index(idx as u8))
             )
         )
         .collect()
@@ -153,8 +153,21 @@ impl Board {
 
 }
 
-impl Display for Board {
+impl From<History> for Board {
+    fn from(value: History) -> Self {
+        let mut board = Board::default();
 
+        board.batch_set_mut(
+            &value.iter()
+                .map(|maybe_pos| maybe_pos.unwrap())
+                .collect::<Vec<Pos>>()
+        );
+
+        board
+    }
+}
+
+impl Display for Board {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.build_attribute_string(|item|
             match item {
@@ -166,20 +179,18 @@ impl Display for Board {
             }.to_string()
         ))
     }
-
 }
 
 impl_debug_from_display!(Board);
 
 impl FromStr for Board {
-
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
         let elements = parse_board_elements(source)?;
 
-        let blacks = extract_stones_by_color::<{ Color::Black }>(&elements);
-        let whites = extract_stones_by_color::<{ Color::White }>(&elements);
+        let blacks = extract_stones_by_color(Color::Black, &elements);
+        let whites = extract_stones_by_color(Color::White, &elements);
 
         let mut board = Board::default();
         let player_color = Color::player_color_from_each_moves(blacks.len(), whites.len());
@@ -188,13 +199,11 @@ impl FromStr for Board {
 
         Ok(board)
     }
-
 }
 
 pub const BIN_BOARD_SIZE: usize = size_of::<[Bitfield; 2]>();
 
 impl From<&Board> for [u8; BIN_BOARD_SIZE] {
-
     fn from(value: &Board) -> Self {
         let mut black_field = Bitfield::default();
         let mut white_field = Bitfield::default();
@@ -211,11 +220,9 @@ impl From<&Board> for [u8; BIN_BOARD_SIZE] {
 
         unsafe { std::mem::transmute::<[[u8; 32]; 2], [u8; 64]>([black_field.0, white_field.0]) }
     }
-
 }
 
 impl FromStr for Slice {
-
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
@@ -242,12 +249,10 @@ impl FromStr for Slice {
             )
         }
     }
-
 }
 
 impl Display for Slice {
-
-fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let content = (0..self.length)
             .map(|idx| match self.stone_kind(idx) {
                 Some(color) => char::from(color),
@@ -262,7 +267,6 @@ fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 }
 
 impl Display for History {
-
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let history = self.iter()
             .map(|&mv|
@@ -276,11 +280,9 @@ impl Display for History {
 
         write!(f, "{history}")
     }
-
 }
 
 impl FromStr for History {
-
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
@@ -298,11 +300,9 @@ impl FromStr for History {
 
         Ok(history)
     }
-
 }
 
 impl FromStr for Color {
-
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -312,11 +312,9 @@ impl FromStr for Color {
             &_ => Err("unknown color")
         }
     }
-
 }
 
 impl FromStr for Pos {
-
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
@@ -331,32 +329,26 @@ impl FromStr for Pos {
                     .ok_or("invalid range")
             })
     }
-
 }
 
 impl Display for Pos {
-
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}", (self.col() + b'a') as char, self.row() + 1)
     }
-
 }
 
 impl_debug_from_display!(Pos);
 
 impl From<Color> for char {
-
     fn from(value: Color) -> Self {
         match value {
             Color::Black => SYMBOL_BLACK,
             Color::White => SYMBOL_WHITE
         }
     }
-
 }
 
 impl From<ForbiddenKind> for char {
-
     fn from(value: ForbiddenKind) -> Self {
         match value {
             ForbiddenKind::DoubleThree => SYMBOL_FORBID_DOUBLE_THREE,
@@ -364,23 +356,19 @@ impl From<ForbiddenKind> for char {
             ForbiddenKind::Overline => SYMBOL_FORBID_OVERLINE
         }
     }
-
 }
 
 impl_debug_from_display!(ForbiddenKind);
 
 impl Display for ForbiddenKind {
-
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", char::from(*self))
     }
-
 }
 
 impl_debug_from_display!(Bitfield);
 
 impl Display for Bitfield {
-
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let content = self.iter()
             .map(|is_hot|
@@ -395,7 +383,6 @@ impl Display for Bitfield {
 
         write!(f, "{}", content)
     }
-
 }
 
 pub fn add_move_marker(mut board_string: String, color: Color, pos: Pos, pre_marker: char, post_marker: char) -> String {
@@ -411,4 +398,33 @@ pub fn add_move_marker(mut board_string: String, color: Color, pos: Pos, pre_mar
 
     board_string.replace_range(offset .. offset + 3, &format!("{pre_marker}{}{post_marker}", char::from(color)));
     board_string
+}
+
+#[macro_export] macro_rules! history {
+    ($($move_str:expr),+ $(,)?) => {{
+        use std::str::FromStr;
+
+        let mut history = $crate::history::History::default();
+
+        $(history.set_mut($crate::notation::pos::Pos::from_str($move_str).unwrap());)*
+
+        history
+    }};
+    () => {
+        $crate::history::History::default()
+    };
+}
+
+#[macro_export] macro_rules! board {
+    ($board_str:expr) => {{
+        use std::str::FromStr;
+
+        $crate::board::Board::from_str($board_str).unwrap()
+    }};
+    ($($move_str:expr),+ $(,)?) => {{
+        $crate::board::Board::from($crate::history!($($move_str),+))
+    }};
+    () => {
+        $crate::board::Board::default()
+    };
 }

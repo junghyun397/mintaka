@@ -1,11 +1,12 @@
 #[cfg(test)]
 mod test_nested_forbid {
     use indoc::indoc;
+    use rusty_renju::board;
     use rusty_renju::board::Board;
 
     #[test]
     fn single_nested_double_three() {
-        let case = indoc! {"
+        let case = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -22,7 +23,7 @@ mod test_nested_forbid {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
+           A B C D E F G H I J K L M N O"});
 
         let expected = indoc! {"
            A B C D E F G H I J K L M N O
@@ -43,13 +44,13 @@ mod test_nested_forbid {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
+        assert_eq!(case.to_string(), expected);
     }
 
     #[cfg(feature = "strict_renju")]
     #[test]
     fn double_nested_double_three() {
-        let case = indoc! {"
+        let case = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -66,8 +67,8 @@ mod test_nested_forbid {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
-
+           A B C D E F G H I J K L M N O"});
+    
         let expected = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
@@ -86,10 +87,10 @@ mod test_nested_forbid {
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
-
-        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
-
-        let case = indoc! {"
+    
+        assert_eq!(case.to_string(), expected);
+    
+        let case = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -106,8 +107,8 @@ mod test_nested_forbid {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
-
+           A B C D E F G H I J K L M N O"});
+    
         let expected = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
@@ -126,14 +127,14 @@ mod test_nested_forbid {
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
-
-        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
+    
+        assert_eq!(case.to_string(), expected);
     }
 
     #[cfg(feature = "strict_renju")]
     #[test]
     fn pseudo_double_nested_double_three() {
-        let case = indoc! {"
+        let case = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -150,8 +151,8 @@ mod test_nested_forbid {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
-
+           A B C D E F G H I J K L M N O"});
+    
         let expected = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
@@ -170,14 +171,14 @@ mod test_nested_forbid {
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
-
-        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
+    
+        assert_eq!(case.to_string(), expected);
     }
 
     #[cfg(feature = "strict_renju")]
     #[test]
     fn multiple_nested_double_three() {
-        let case = indoc! {"
+        let case = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -194,8 +195,8 @@ mod test_nested_forbid {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
-
+           A B C D E F G H I J K L M N O"});
+    
         let expected = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
@@ -214,10 +215,10 @@ mod test_nested_forbid {
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
-
-        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
-
-        let case = indoc! {"
+    
+        assert_eq!(case.to_string(), expected);
+    
+        let case = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -234,8 +235,8 @@ mod test_nested_forbid {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
-
+           A B C D E F G H I J K L M N O"});
+    
         let expected = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
@@ -254,8 +255,8 @@ mod test_nested_forbid {
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
-
-        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
+    
+        assert_eq!(case.to_string(), expected);
     }
 
     #[test]

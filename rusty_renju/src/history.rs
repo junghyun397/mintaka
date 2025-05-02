@@ -39,6 +39,10 @@ impl History {
         self.top
     }
 
+    pub fn slice(&self) -> &[MaybePos] {
+        &self.entries[..self.top]
+    }
+
     pub fn pop_mut(&mut self) -> Option<MaybePos> {
         if self.top == 0 {
             return None;

@@ -368,5 +368,5 @@ impl Iterator for DirectionIterator {
 fn encode_u128_into_u16(source: u128) -> u16 {
     Simd::<u8, 16>::from(source.to_ne_bytes())
         .simd_ne(Simd::splat(0))
-        .to_bitmask() as u16 // _mm_movemask_epi8
+        .to_bitmask() as u16
 }

@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod test_forbid {
     use indoc::indoc;
-    use rusty_renju::board::Board;
+    use rusty_renju::board;
 
     #[test]
     fn basic_forbidden_moves() {
-        let case = indoc! {"
+        let case = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . X . . . . 15
         14 . . . . . . . . . . X . . . . 14
@@ -22,8 +22,8 @@ mod test_forbid {
          3 . X . X . . . . . . X . . . . 3
          2 . . . X . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
-
+           A B C D E F G H I J K L M N O"});
+    
         let expected = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . X . . . . 15
@@ -42,13 +42,13 @@ mod test_forbid {
          2 . . . X . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
-
-        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
+    
+        assert_eq!(case.to_string(), expected);
     }
 
     #[test]
     fn pseudo_double_three() {
-        let case = indoc! {"
+        let case = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -65,8 +65,8 @@ mod test_forbid {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
-
+           A B C D E F G H I J K L M N O"});
+    
         let expected = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
@@ -85,10 +85,29 @@ mod test_forbid {
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
-
-        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
-
-        let case = indoc! {"
+    
+        assert_eq!(case.to_string(), expected);
+    
+        let case = board!(indoc! {"
+           A B C D E F G H I J K L M N O
+        15 . . . . . . . . . . . . . . . 15
+        14 . . . . . . . . . . . . . . . 14
+        13 . . . . . . . . . . . . . . . 13
+        12 . . . . . . . . . . . . . . . 12
+        11 . . . . . . . O . . . . . . . 11
+        10 . . . . . O . . . . . . . . . 10
+         9 . . . . . X X . . . . . . . . 9
+         8 . . . . . . O X O . . . . . . 8
+         7 . . . . . . O X O . . . . . . 7
+         6 . . . . . . . . X X X O . . . 6
+         5 . . . . . . . . . . . . . . . 5
+         4 . . . . . . . . . . . . . . . 4
+         3 . . . . . . . . . . . . . . . 3
+         2 . . . . . . . . . . . . . . . 2
+         1 . . . . . . . . . . . . . . . 1
+           A B C D E F G H I J K L M N O"});
+    
+        let expected = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -106,29 +125,10 @@ mod test_forbid {
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
-
-        let expected = indoc! {"
-           A B C D E F G H I J K L M N O
-        15 . . . . . . . . . . . . . . . 15
-        14 . . . . . . . . . . . . . . . 14
-        13 . . . . . . . . . . . . . . . 13
-        12 . . . . . . . . . . . . . . . 12
-        11 . . . . . . . O . . . . . . . 11
-        10 . . . . . O . . . . . . . . . 10
-         9 . . . . . X X . . . . . . . . 9
-         8 . . . . . . O X O . . . . . . 8
-         7 . . . . . . O X O . . . . . . 7
-         6 . . . . . . . . X X X O . . . 6
-         5 . . . . . . . . . . . . . . . 5
-         4 . . . . . . . . . . . . . . . 4
-         3 . . . . . . . . . . . . . . . 3
-         2 . . . . . . . . . . . . . . . 2
-         1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
-
-        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
-
-        let case = indoc! {"
+    
+        assert_eq!(case.to_string(), expected);
+    
+        let case = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -145,8 +145,8 @@ mod test_forbid {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
-
+           A B C D E F G H I J K L M N O"});
+    
         let expected = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
@@ -165,10 +165,10 @@ mod test_forbid {
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
-
-        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
-
-        let case = indoc! {"
+    
+        assert_eq!(case.to_string(), expected);
+    
+        let case = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -185,8 +185,8 @@ mod test_forbid {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
-
+           A B C D E F G H I J K L M N O"});
+    
         let expected = indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
@@ -205,8 +205,8 @@ mod test_forbid {
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
-
-        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
+    
+        assert_eq!(case.to_string(), expected);
     }
 
 }

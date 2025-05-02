@@ -2,7 +2,7 @@ use crate::movegen::move_scores::MoveScores;
 use crate::movegen::movegen_window::MovegenWindow;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
-use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 
 #[derive(Default, Debug, Copy, Clone)]
 pub struct GameState {
@@ -34,4 +34,19 @@ impl GameState {
         self.movegen_window = movegen_window;
     }
 
+}
+
+impl From<History> for GameState {
+    fn from(value: History) -> Self {
+        let mut game_state = GameState::default();
+
+        for &maybe_pos in value.iter() {
+            match maybe_pos {
+                MaybePos::NONE => game_state.pass_mut(),
+                pos => game_state.set_mut(pos.unwrap()),
+            }
+        }
+
+        game_state
+    }
 }
