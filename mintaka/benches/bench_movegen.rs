@@ -6,6 +6,7 @@ extern crate test;
 mod bench_movegen {
     use indoc::indoc;
     use mintaka::movegen::move_generator::generate_vcf_moves;
+    use rusty_renju::board;
     use rusty_renju::board::Board;
     use rusty_renju::notation::pos::pos_unchecked;
     use test::Bencher;
@@ -46,7 +47,7 @@ mod bench_movegen {
 
     #[bench]
     fn vcf_moves(b: &mut Bencher) {
-        let case = indoc! {"
+        let board = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -63,9 +64,8 @@ mod bench_movegen {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
+           A B C D E F G H I J K L M N O"});
 
-        let board = case.parse::<Board>().unwrap();
         let recent_four = pos_unchecked("i6");
 
         b.iter(|| {
@@ -82,18 +82,18 @@ mod bench_movegen {
 
     #[bench]
     fn all_moves(b: &mut Bencher) {
-        let case = indoc! {"\
-        "};
+        let board = board!(indoc! {"\
+        "});
 
-        bench_movegen!(b, case, pos_unchecked("a1"), pos_unchecked("a1"), pos_unchecked("a1"));
+        bench_movegen!(b, board, pos_unchecked("a1"), pos_unchecked("a1"), pos_unchecked("a1"));
     }
 
     #[bench]
     fn defend_three_moves(b: &mut Bencher) {
-        let case = indoc! {"\
-        "};
+        let board = board!(indoc! {"\
+        "});
 
-        bench_movegen!(b, case, pos_unchecked("a1"), pos_unchecked("a1"), pos_unchecked("a1"));
+        bench_movegen!(b, board, pos_unchecked("a1"), pos_unchecked("a1"), pos_unchecked("a1"));
     }
 
 }

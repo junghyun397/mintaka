@@ -232,7 +232,7 @@ pub struct SlicePatternCount {
 #[derive(Debug, Copy, Clone)]
 pub struct Patterns {
     pub field: AlignedColorContainer<[Pattern; pos::BOARD_SIZE]>,
-    pub pattern_counts: SlicePatternCounts,
+    pub counts: SlicePatternCounts,
     pub score_table: ScoreTable,
     pub unchecked_five_in_a_row: Option<Color>,
     pub unchecked_five_pos: ColorContainer<Option<Pos>>,
@@ -246,7 +246,7 @@ impl Default for Patterns {
     fn default() -> Self {
         Self {
             field: unsafe { std::mem::zeroed() },
-            pattern_counts: SlicePatternCounts::EMPTY,
+            counts: SlicePatternCounts::EMPTY,
             score_table: ScoreTable::EMPTY,
             unchecked_five_in_a_row: None,
             unchecked_five_pos: ColorContainer {
@@ -278,7 +278,7 @@ impl Patterns {
                 self.update_with_slice_pattern_mut::<C, D>(slice, slice_pattern);
             },
             _ => {
-                self.pattern_counts.update_slice_score_mut::<C, D>(slice.idx as usize, slice.eval_score::<C>());
+                self.counts.update_slice_score_mut::<C, D>(slice.idx as usize, slice.eval_score::<C>());
             }
         };
     }
@@ -295,7 +295,7 @@ impl Patterns {
             self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(0);
         }
 
-        self.pattern_counts.clear_slice_mut::<C, D>(slice.idx as usize, slice.eval_score::<C>());
+        self.counts.clear_slice_mut::<C, D>(slice.idx as usize, slice.eval_score::<C>());
 
         *slice.pattern_bitmap.get_ref_mut::<C>() = 0;
     }
@@ -311,7 +311,7 @@ impl Patterns {
             })
         );
 
-        self.pattern_counts.set_slice_mut::<C, D>(
+        self.counts.set_slice_mut::<C, D>(
             slice.idx as usize,
             (slice_pattern.patterns & SLICE_PATTERN_THREE_MASK).count_ones() as u8,
             (slice_pattern.patterns & SLICE_PATTERN_CLOSED_FOUR_MASK).count_ones() as u8,

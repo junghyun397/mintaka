@@ -11,7 +11,7 @@ mod bench_vcf {
     use mintaka::memo::transposition_table::TranspositionTable;
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
-    use rusty_renju::board::Board;
+    use rusty_renju::board;
     use rusty_renju::history::History;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use rusty_renju::notation::pos::pos_unchecked;
@@ -20,11 +20,9 @@ mod bench_vcf {
     use test::Bencher;
 
     macro_rules! bench_vcf {
-        ($bencher:expr,$case:expr,$score:expr,$player_move:expr,$opponent_move:expr) => {{
-            let board = $case.parse::<Board>().unwrap();
-
+        ($bencher:expr,$board:expr,$score:expr,$player_move:expr,$opponent_move:expr) => {{
             let game_state = GameState {
-                board,
+                board: $board,
                 history: {
                     let mut history = History::default();
 
@@ -56,7 +54,7 @@ mod bench_vcf {
 
     #[bench]
     fn white_vcf(b: &mut Bencher) {
-        let case = indoc! {"\
+        let case = board!(indoc! {"\
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -74,7 +72,7 @@ mod bench_vcf {
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"
-        };
+        });
 
         bench_vcf!(b, case, Some(Score::WIN), pos_unchecked("h6"), pos_unchecked("i6"));
     }
@@ -85,7 +83,7 @@ mod bench_vcf {
 
     #[bench]
     fn black_vcf(b: &mut Bencher) {
-        let case = indoc! {"\
+        let case = board!(indoc! {"\
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -103,7 +101,7 @@ mod bench_vcf {
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"
-        };
+        });
 
         bench_vcf!(b, case, Some(Score::WIN), pos_unchecked("e8"), pos_unchecked("e7"));
     }

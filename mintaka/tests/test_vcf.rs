@@ -7,15 +7,14 @@ mod test_vcf {
     use mintaka::memo::transposition_table::TranspositionTable;
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
-    use rusty_renju::board::Board;
+    use rusty_renju::board;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use rusty_renju::notation::pos::pos_unchecked;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
 
     macro_rules! vcf {
-        ($case:expr) => {{
-            let mut board = $case.parse::<Board>().unwrap();
-
+        ($board:expr) => {{
+            let mut board = $board;
             let config = Config::default();
 
             let tt = TranspositionTable::new_with_size(512);
@@ -45,7 +44,7 @@ mod test_vcf {
 
     #[test]
     fn basic_vcf() {
-        let case = indoc! {"}
+        let board = board!(indoc! {"}
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -62,11 +61,11 @@ mod test_vcf {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
+           A B C D E F G H I J K L M N O"});
 
-        assert_eq!(vcf!(case), pos_unchecked("i10"));
+        assert_eq!(vcf!(board), pos_unchecked("i10"));
 
-        let case = indoc! {"
+        let board = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -83,11 +82,11 @@ mod test_vcf {
          3 . . . . . . O . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
+           A B C D E F G H I J K L M N O"});
 
-        assert_eq!(vcf!(case), pos_unchecked("k7"));
+        assert_eq!(vcf!(board), pos_unchecked("k7"));
 
-        let case = indoc! {"
+        let board = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -104,11 +103,11 @@ mod test_vcf {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
+           A B C D E F G H I J K L M N O"});
 
-        assert_eq!(vcf!(case), pos_unchecked("m10"));
+        assert_eq!(vcf!(board), pos_unchecked("m10"));
 
-        let case = indoc! {"
+        let board = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -125,11 +124,11 @@ mod test_vcf {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
+           A B C D E F G H I J K L M N O"});
 
-        assert_eq!(vcf!(case), pos_unchecked("l11"));
+        assert_eq!(vcf!(board), pos_unchecked("l11"));
 
-        let case = indoc! {"
+        let board = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -146,14 +145,14 @@ mod test_vcf {
          3 . . . . . . O . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
+           A B C D E F G H I J K L M N O"});
 
-        assert_eq!(vcf!(case), pos_unchecked("g8"));
+        assert_eq!(vcf!(board), pos_unchecked("g8"));
     }
 
     #[test]
     fn trap_vcf() {
-        let case = indoc! {"
+        let board = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -170,11 +169,11 @@ mod test_vcf {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
+           A B C D E F G H I J K L M N O"});
 
-        assert_eq!(vcf!(case), pos_unchecked("d15"));
+        assert_eq!(vcf!(board), pos_unchecked("d15"));
 
-        let case = indoc! {"
+        let board = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . X . . . . . . . 15
         14 . . . . . X O . . O . . . . . 14
@@ -191,11 +190,11 @@ mod test_vcf {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
+           A B C D E F G H I J K L M N O"});
 
-        assert_eq!(vcf!(case), pos_unchecked("m12"));
+        assert_eq!(vcf!(board), pos_unchecked("m12"));
 
-        let case = indoc! {"
+        let board = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . O . . . O . . . 14
@@ -212,14 +211,14 @@ mod test_vcf {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
+           A B C D E F G H I J K L M N O"});
 
-        assert_eq!(vcf!(case), pos_unchecked("g12"));
+        assert_eq!(vcf!(board), pos_unchecked("g12"));
     }
 
     #[test]
     fn deep_vcf() {
-        let case = indoc! {"
+        let board = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 O O . . X . X . . O X O O X . 15
         14 O . X . . O . . . . X . . . X 14
@@ -236,11 +235,11 @@ mod test_vcf {
          3 . X . . . . . . . . . . . . O 3
          2 . O . . . . . . . . O . . X O 2
          1 X O . O . O . X . X O O X O . 1
-           A B C D E F G H I J K L M N O"};
+           A B C D E F G H I J K L M N O"});
 
-        assert_eq!(vcf!(case), pos_unchecked("f15"));
+        assert_eq!(vcf!(board), pos_unchecked("f15"));
 
-        let case = indoc! {"
+        let board = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 O . . . X . . . . . . . X . X 15
         14 X . . . . O . . . O . . O . X 14
@@ -257,9 +256,9 @@ mod test_vcf {
          3 X . . . . . . . . . . . . X . 3
          2 . . . . . . . X . . . . . . O 2
          1 X O O O . X . . X . X . . . . 1
-           A B C D E F G H I J K L M N O"};
+           A B C D E F G H I J K L M N O"});
 
-        assert_eq!(vcf!(case), pos_unchecked("b13"));
+        assert_eq!(vcf!(board), pos_unchecked("b13"));
     }
 
 }

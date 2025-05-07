@@ -1,5 +1,3 @@
-mod stdio_utils;
-
 use mintaka::config::Config;
 use mintaka::game_agent::GameAgent;
 use mintaka::protocol::command::Command;

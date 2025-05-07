@@ -132,7 +132,7 @@ impl Board {
                         self.patterns.clear_with_slice_mut::<{ $color }, { $direction }>($slice);
                     },
                     _ => {
-                        self.patterns.pattern_counts.update_slice_score_mut::<{ $color }, { $direction }>(
+                        self.patterns.counts.update_slice_score_mut::<{ $color }, { $direction }>(
                             $slice_idx as usize,
                             $slice.eval_score::<{ $color }>()
                         );

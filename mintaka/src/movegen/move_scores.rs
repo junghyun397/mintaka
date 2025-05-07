@@ -53,7 +53,7 @@ impl MoveScores {
             for start_idx in (0..256).step_by(platform::U8_LANE_N * platform::U8_UNROLL_N) {
                 let mut registers: [Simd<u8, { platform::U8_LANE_N }>; platform::U8_UNROLL_N] =
                     std::array::from_fn(|idx|
-                        Simd::<u8, { platform::U8_LANE_N }>::from_slice(
+                        Simd::from_slice(
                             slice::from_raw_parts(
                                 scores_ptr.add(start_idx + platform::U8_LANE_N * idx),
                                 platform::U8_LANE_N
@@ -63,14 +63,14 @@ impl MoveScores {
 
                 for idx in 0 .. platform::U8_UNROLL_N {
                     if INC {
-                        registers[idx] += Simd::<u8, { platform::U8_LANE_N }>::from_slice(
+                        registers[idx] += Simd::from_slice(
                             slice::from_raw_parts(
                                 mask_ptr.add(start_idx + platform::U8_LANE_N * idx),
                                 platform::U8_LANE_N
                             )
                         );
                     } else {
-                        registers[idx] -= Simd::<u8, { platform::U8_LANE_N }>::from_slice(
+                        registers[idx] -= Simd::from_slice(
                             slice::from_raw_parts(
                                 mask_ptr.add(start_idx + platform::U8_LANE_N * idx),
                                 platform::U8_LANE_N

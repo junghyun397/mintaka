@@ -66,7 +66,7 @@ pub fn vcf_search(
     (vcf_moves.top != 0).then(|| {
         vcf_moves.sort_moves(state.history.recent_player_move_unchecked());
 
-        vcf::<Score>(td, VcfWin, state.board, vcf_moves, max_depth)
+        vcf::<Score>(td, VcfWin, state.board, vcf_moves, max_depth, Score::MIN, Score::MAX)
     })
 }
 
@@ -82,7 +82,7 @@ pub fn vcf_defend(
         state.history.recent_opponent_move_unchecked()
     );
 
-    vcf::<Score>(td, VcfDefend { target_pos }, state.board, vcf_moves, max_depth)
+    vcf::<Score>(td, VcfDefend { target_pos }, state.board, vcf_moves, max_depth, Score::MIN, Score::MAX)
 }
 
 pub fn vcf_sequence(
@@ -91,7 +91,7 @@ pub fn vcf_sequence(
 ) -> Option<Vec<Pos>> {
     let vcf_moves = generate_vcf_moves(board, board.player_color, 8, pos::CENTER);
 
-    vcf::<SequenceEndgameAccumulator>(td, VcfWin, *board, vcf_moves, max_depth)
+    vcf::<SequenceEndgameAccumulator>(td, VcfWin, *board, vcf_moves, max_depth, Score::MIN, Score::MAX)
         .map(|mut sequence| {
             sequence.reverse();
             sequence
@@ -100,11 +100,12 @@ pub fn vcf_sequence(
 
 fn vcf<ACC: EndgameAccumulator>(
     td: &mut ThreadData<impl ThreadType>, dest: impl VcfDestination,
-    board: Board, vcf_moves: VcfMovesUnchecked, max_depth: Depth
+    board: Board, vcf_moves: VcfMovesUnchecked, max_depth: Depth,
+    alpha: Score, beta: Score,
 ) -> ACC {
     match board.player_color {
-        Color::Black => try_vcf::<{ Color::Black }, ACC>(td, dest, board, vcf_moves, max_depth, 0),
-        Color::White => try_vcf::<{ Color::White }, ACC>(td, dest, board, vcf_moves, max_depth, 0),
+        Color::Black => try_vcf::<{ Color::Black }, ACC>(td, dest, board, vcf_moves, max_depth, 0, alpha, beta),
+        Color::White => try_vcf::<{ Color::White }, ACC>(td, dest, board, vcf_moves, max_depth, 0, alpha, beta),
     }
 }
 
@@ -113,6 +114,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
     td: &mut ThreadData<impl ThreadType>, dest: impl VcfDestination,
     mut board: Board, mut vcf_moves: VcfMovesUnchecked,
     max_depth: Depth, mut vcf_ply: Depth,
+    mut alpha: Score, mut beta: Score,
 ) -> ACC {
     let mut score = 0;
     let mut move_counter: usize = 0;
@@ -187,6 +189,8 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             ) {
                 td.tt.store_entry_mut(board.hash_key, build_vcf_win_tt_entry(vcf_ply, four_pos));
 
+                score = Score::WIN;
+
                 return backtrace_frames(td, board, vcf_ply, four_pos);
             }
 
@@ -202,7 +206,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             td.batch_counter.add_single_mut();
 
             if {
-                let pattern_count = board.patterns.pattern_counts.global.get_ref::<C>();
+                let pattern_count = board.patterns.counts.global.get_ref::<C>();
                 pattern_count.closed_fours + pattern_count.open_fours == 0
             } {
                 board.unset_mut(defend_pos);

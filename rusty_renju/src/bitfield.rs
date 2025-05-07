@@ -51,12 +51,23 @@ impl Bitfield {
         BitfieldIterator::from(self.to_u256())
     }
 
+    pub fn iter_hot_idx(&self) -> impl Iterator<Item=usize> + '_ {
+        BitfieldSetBitsIterator::from(self.to_u256())
+            .map(|x| x as usize)
+    }
+
     pub fn iter_hot_pos(&self) -> impl Iterator<Item=Pos> + '_ {
-        BitfieldPosIterator::from(self.to_u256())
+        BitfieldSetBitsIterator::from(self.to_u256())
+            .map(|x| Pos::from_index(x as u8))
     }
 
     pub fn iter_cold_pos(&self) -> impl Iterator<Item=Pos> + '_ {
-        BitfieldPosIterator::from(!self.to_u256())
+        BitfieldSetBitsIterator::from(!self.to_u256())
+            .map(|x| Pos::from_index(x as u8))
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.to_u256() == u256::MIN
     }
 
     pub fn to_simd(self) -> u8x32 {
@@ -137,7 +148,7 @@ impl From<u256> for Bitfield {
 
 struct BitfieldIterator {
     value: u256,
-    position: u8,
+    position: usize,
 }
 
 impl From<u256> for BitfieldIterator {
@@ -163,7 +174,7 @@ impl Iterator for BitfieldIterator {
     type Item = bool;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.position == pos::U8_BOARD_SIZE {
+        if self.position == pos::BOARD_SIZE {
             None
         } else {
             let result = self.value.as_u8() & 0b1 == 1;
@@ -175,11 +186,11 @@ impl Iterator for BitfieldIterator {
 
 }
 
-struct BitfieldPosIterator {
+struct BitfieldSetBitsIterator {
     value: u256
 }
 
-impl From<u256> for BitfieldPosIterator {
+impl From<u256> for BitfieldSetBitsIterator {
 
     fn from(value: u256) -> Self {
         Self { value }
@@ -187,15 +198,15 @@ impl From<u256> for BitfieldPosIterator {
 
 }
 
-impl Iterator for BitfieldPosIterator {
+impl Iterator for BitfieldSetBitsIterator {
 
-    type Item = Pos;
+    type Item = u32;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.value != u256::MIN {
-            let pos = Pos::from_index(self.value.trailing_zeros() as u8);
+            let idx = self.value.trailing_zeros();
             self.value &= self.value - 1;
-            Some(pos)
+            Some(idx)
         } else {
             None
         }
@@ -203,7 +214,7 @@ impl Iterator for BitfieldPosIterator {
 
 }
 
-impl ExactSizeIterator for BitfieldPosIterator {
+impl ExactSizeIterator for BitfieldSetBitsIterator {
 
     fn len(&self) -> usize {
         self.value.count_ones() as usize
