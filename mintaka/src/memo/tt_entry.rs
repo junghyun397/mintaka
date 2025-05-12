@@ -138,7 +138,7 @@ assert_struct_sizes!(TTEntryBucket, size=64, align=64);
 
 impl AbstractTTEntry for TTEntryBucket {
 
-    const BUCKET_SIZE: usize = 6;
+    const BUCKET_SIZE: u64 = 6;
 
     fn clear_mut(&self) {
         for keys in &self.keys {
@@ -166,7 +166,7 @@ impl TTEntryBucket {
 
     #[inline(always)]
     fn calculate_entry_index(entry_key: TTEntryKey) -> usize {
-        (((entry_key.lower_21_bits << 11) * 6) >> 32) as usize
+        (((entry_key.lower_21_bits << 11) * Self::BUCKET_SIZE) >> 32) as usize
     }
 
     #[inline]

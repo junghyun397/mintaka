@@ -29,7 +29,7 @@ impl VcfMovesUnchecked {
 }
 
 fn score_move(state: &GameState, pos: Pos) -> i16 {
-    let distance = 5u8.saturating_sub(state.history.multi_distance(pos));
+    let distance = 5u8.saturating_sub(state.history.avg_distance_to_recent_moves());
     state.move_scores.scores[pos.idx_usize()] as i16 * distance as i16
 }
 

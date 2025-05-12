@@ -2,6 +2,7 @@ use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
+use crate::notation::value::Score;
 use crate::{assert_struct_sizes, const_for, max};
 
 pub const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
@@ -106,9 +107,34 @@ impl Slice {
         }
     }
 
-    pub fn eval_score<const C: Color>(&self) -> i16 {
-        // TODO: implement
-        0
+    // TODO: add pre-check and optimization
+    #[inline(always)]
+    pub fn evaluate_score<const C: Color>(&self) -> Score {
+        let blocks = self.stones.get_reversed::<C>() | self.pattern_bitmap.get_reversed::<C>();
+
+        let s2 = blocks >> 2;
+        let s3 = blocks >> 3;
+        let s4 = blocks >> 4;
+        let s5 = blocks >> 5;
+
+        let p1 = blocks & s2;
+        let p2 = blocks & s3;
+        let p3 = blocks & s4;
+        let p4 = blocks & s5;
+
+        let mut blinds = ((p1 | p2 | p3 | p4) << 1)
+            | ((p2 | p3 | p4) << 2)
+            | ((p3 | p4) << 3)
+            | (p4 << 4);
+
+        if blinds == 0 {
+            let tail_len = blocks.trailing_zeros() as u16;
+            if tail_len <= 4 {
+                blinds |= (1u16 << tail_len) - 1;
+            }
+        }
+
+        ((!blinds) & self.stones.get::<C>().count_ones() as u16) as Score
     }
 
 }

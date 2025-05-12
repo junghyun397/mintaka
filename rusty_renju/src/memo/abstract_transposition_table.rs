@@ -1,6 +1,6 @@
 pub trait AbstractTTEntry : Sync + Send {
 
-    const BUCKET_SIZE: usize;
+    const BUCKET_SIZE: u64;
 
     fn clear_mut(&self);
 
@@ -75,7 +75,7 @@ pub trait AbstractTranspositionTable {
             .map(Self::EntryType::usage)
             .sum();
 
-        sum as f64 / (samples * Self::EntryType::BUCKET_SIZE) as f64 * 100.0
+        sum as f64 / (samples as u64 * Self::EntryType::BUCKET_SIZE) as f64 * 100.0
     }
 
     fn total_entries(&self) -> usize {

@@ -74,10 +74,6 @@ impl History {
         self.entries[..self.top].iter()
     }
 
-    pub fn recent_move(&self) -> MaybePos {
-        self.entries[self.top]
-    }
-
     pub fn recent_move_pair(&self) -> [Option<MaybePos>; 2] {
         match self.len() {
             0 => [None, None],
@@ -86,19 +82,39 @@ impl History {
         }
     }
 
-    pub fn recent_player_move_unchecked(&self) -> Pos {
-        self.entries[self.top - 2].unwrap()
+    pub fn recent_move_unchecked(&self) -> Pos {
+        debug_assert_ne!(self.top, 0);
+        self.entries[self.top].unwrap()
     }
 
     pub fn recent_opponent_move_unchecked(&self) -> Pos {
+        debug_assert!(self.top > 0);
         self.entries[self.top - 1].unwrap()
     }
 
+    pub fn recent_player_move_unchecked(&self) -> Pos {
+        debug_assert!(self.top > 1);
+        self.entries[self.top - 2].unwrap()
+    }
+
     pub fn recent_move_pair_unchecked(&self) -> [Pos; 2] {
+        debug_assert!(self.top > 0);
         [self.recent_player_move_unchecked(), self.recent_opponent_move_unchecked()]
     }
 
-    pub fn multi_distance(&self, pos: Pos) -> u8 {
+    pub fn avg_distance_to_recent_moves(&self) -> u8 {
+        debug_assert_ne!(self.top, 0);
+
+        let pos = self.entries[self.top].unwrap();
+
+        if self.top > 3 {
+            let distance1 = self.entries[self.top - 4].unwrap().distance(pos);
+            let distance2 = self.entries[self.top - 3].unwrap().distance(pos);
+            let distance3 = self.entries[self.top - 2].unwrap().distance(pos);
+            let distance4 = self.entries[self.top - 1].unwrap().distance(pos);
+            return (distance1 + distance2 + distance3 + distance4) / 4
+        }
+
         match self.top {
             1 => self.entries[0].unwrap().distance(pos),
             2 => {
@@ -112,13 +128,7 @@ impl History {
                 let distance3 = self.entries[self.top - 1].unwrap().distance(pos);
                 (distance1 + distance2 + distance3) / 3
             },
-            _ => {
-                let distance1 = self.entries[self.top - 4].unwrap().distance(pos);
-                let distance2 = self.entries[self.top - 3].unwrap().distance(pos);
-                let distance3 = self.entries[self.top - 2].unwrap().distance(pos);
-                let distance4 = self.entries[self.top - 1].unwrap().distance(pos);
-                (distance1 + distance2 + distance3 + distance4) / 4
-            }
+            _ => unreachable!()
         }
     }
 

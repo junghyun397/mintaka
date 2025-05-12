@@ -278,7 +278,7 @@ impl Patterns {
                 self.update_with_slice_pattern_mut::<C, D>(slice, slice_pattern);
             },
             _ => {
-                self.counts.update_slice_score_mut::<C, D>(slice.idx as usize, slice.eval_score::<C>());
+                self.counts.update_slice_score_mut::<C, D>(slice.idx as usize, slice.evaluate_score::<C>());
             }
         };
     }
@@ -295,7 +295,7 @@ impl Patterns {
             self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(0);
         }
 
-        self.counts.clear_slice_mut::<C, D>(slice.idx as usize, slice.eval_score::<C>());
+        self.counts.clear_slice_mut::<C, D>(slice.idx as usize, slice.evaluate_score::<C>());
 
         *slice.pattern_bitmap.get_ref_mut::<C>() = 0;
     }
@@ -316,7 +316,7 @@ impl Patterns {
             (slice_pattern.patterns & SLICE_PATTERN_THREE_MASK).count_ones() as u8,
             (slice_pattern.patterns & SLICE_PATTERN_CLOSED_FOUR_MASK).count_ones() as u8,
             (slice_pattern.patterns & SLICE_PATTERN_OPEN_FOUR_MASK).count_ones() as u8,
-            slice.eval_score::<C>()
+            slice.evaluate_score::<C>()
         );
 
         let pattern_bitmap = encode_u128_into_u16(slice_pattern.patterns);
