@@ -110,31 +110,25 @@ impl Slice {
     // TODO: add pre-check and optimization
     #[inline(always)]
     pub fn evaluate_score<const C: Color>(&self) -> Score {
-        let blocks = self.stones.get_reversed::<C>() | self.pattern_bitmap.get_reversed::<C>();
+        let blocks = {
+            let raw = self.stones.get_reversed::<C>() as u32 | self.pattern_bitmap.get::<C>() as u32;
 
-        let s2 = blocks >> 2;
-        let s3 = blocks >> 3;
-        let s4 = blocks >> 4;
-        let s5 = blocks >> 5;
+            (raw << 1) | 0b1
+        };
 
-        let p1 = blocks & s2;
-        let p2 = blocks & s3;
-        let p3 = blocks & s4;
-        let p4 = blocks & s5;
+        let p1 = blocks & (blocks >> 2);
+        let p2 = blocks & (blocks >> 3);
+        let p3 = blocks & (blocks >> 4);
+        let p4 = blocks & (blocks >> 5);
 
-        let mut blinds = ((p1 | p2 | p3 | p4) << 1)
-            | ((p2 | p3 | p4) << 2)
-            | ((p3 | p4) << 3)
-            | (p4 << 4);
+        let filled = (p1 << 1)
+            | (p2 << 1) | (p2 << 2)
+            | (p3 << 1) | (p3 << 2) | (p3 << 3)
+            | (p4 << 1) | (p4 << 2) | (p4 << 3) | (p4 << 4);
 
-        if blinds == 0 {
-            let tail_len = blocks.trailing_zeros() as u16;
-            if tail_len <= 4 {
-                blinds |= (1u16 << tail_len) - 1;
-            }
-        }
+        let stones = (self.stones.get::<C>() as u32) << 1;
 
-        ((!blinds) & self.stones.get::<C>().count_ones() as u16) as Score
+        (!filled & stones).count_ones() as Score
     }
 
 }
