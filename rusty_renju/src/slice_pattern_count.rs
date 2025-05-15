@@ -93,7 +93,7 @@ impl SlicePatternCounts {
         slice_count.score = score as u8;
     }
 
-    // TODO: optimization;
+    // TODO: optimization; 3%.
     pub fn update_slice_score_mut<const C: Color, const D: Direction>(&mut self, slice_idx: usize, score: i16) {
         let global_score = &mut self.global.get_ref_mut::<C>().score;
         let slice_score = &mut Self::access_local_mut::<C, D>(&mut self.locals, slice_idx).score;

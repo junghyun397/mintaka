@@ -107,14 +107,17 @@ impl Slice {
         }
     }
 
-    // TODO: add pre-check and optimization
+    // TODO: add pre-check and optimization; 7%.
     #[inline(always)]
     pub fn evaluate_score<const C: Color>(&self) -> Score {
         let blocks = {
-            let raw = self.stones.get_reversed::<C>() as u32 | self.pattern_bitmap.get::<C>() as u32;
+            let raw = self.stones.get_reversed::<C>() as u32
+                | self.pattern_bitmap.get::<C>() as u32;
 
             (raw << 1) | 0b1
         };
+
+        let stones = (self.stones.get::<C>() as u32) << 1;
 
         let p1 = blocks & (blocks >> 2);
         let p2 = blocks & (blocks >> 3);
@@ -125,8 +128,6 @@ impl Slice {
             | (p2 << 1) | (p2 << 2)
             | (p3 << 1) | (p3 << 2) | (p3 << 3)
             | (p4 << 1) | (p4 << 2) | (p4 << 3) | (p4 << 4);
-
-        let stones = (self.stones.get::<C>() as u32) << 1;
 
         (!filled & stones).count_ones() as Score
     }

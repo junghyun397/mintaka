@@ -91,7 +91,7 @@ impl Board {
     where F: Fn(&BoardIterItem) -> String
     {
         let content = self.iter_items()
-            .collect::<Box<[_]>>()
+            .collect::<Vec<_>>()
             .chunks(pos::U_BOARD_WIDTH)
             .enumerate()
             .map(|(row_idx, item_row)| {
