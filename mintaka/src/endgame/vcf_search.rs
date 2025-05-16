@@ -104,16 +104,19 @@ fn vcf<ACC: EndgameAccumulator>(
     alpha: Score, beta: Score,
 ) -> ACC {
     match board.player_color {
-        Color::Black => try_vcf::<{ Color::Black }, ACC>(td, dest, board, vcf_moves, max_depth, 0, alpha, beta),
-        Color::White => try_vcf::<{ Color::White }, ACC>(td, dest, board, vcf_moves, max_depth, 0, alpha, beta),
+        Color::Black => try_vcf::<{ Color::Black }, ACC>(td, dest, board, vcf_moves, max_depth as usize, 0, alpha, beta),
+        Color::White => try_vcf::<{ Color::White }, ACC>(td, dest, board, vcf_moves, max_depth as usize, 0, alpha, beta),
     }
 }
 
 // depth-first search
 fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
-    td: &mut ThreadData<impl ThreadType>, dest: impl VcfDestination,
-    mut board: Board, mut vcf_moves: VcfMovesUnchecked,
-    max_depth: Depth, mut vcf_ply: Depth,
+    td: &mut ThreadData<impl ThreadType>,
+    dest: impl VcfDestination,
+    mut board: Board,
+    mut vcf_moves: VcfMovesUnchecked,
+    max_ply: usize,
+    mut vcf_ply: usize,
     mut alpha: Score, mut beta: Score,
 ) -> ACC {
     let mut score = 0;
@@ -122,7 +125,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
     #[inline]
     fn backtrace_frames<ACC: EndgameAccumulator>(
         td: &mut ThreadData<impl ThreadType>,
-        board: Board, depth: Depth, four_pos: Pos
+        board: Board, vcf_ply: usize, four_pos: Pos
     ) -> ACC {
         let mut result = ACC::unit(four_pos);
         let mut hash_key = board.hash_key;
@@ -131,10 +134,10 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
         while let Some(frame) = td.vcf_stack.pop() {
             hash_key = hash_key.set(opponent_color, frame.defend_pos);
-            td.tt.store_entry_mut(hash_key, build_vcf_lose_tt_entry(depth));
+            td.tt.store_entry_mut(hash_key, build_vcf_lose_tt_entry(vcf_ply));
 
             hash_key = hash_key.set(board.player_color, frame.four_pos);
-            td.tt.store_entry_mut(hash_key, build_vcf_win_tt_entry(depth, frame.four_pos));
+            td.tt.store_entry_mut(hash_key, build_vcf_win_tt_entry(vcf_ply, frame.four_pos));
 
             result = result.append_pos(frame.defend_pos, frame.four_pos);
         }
@@ -194,12 +197,43 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 return backtrace_frames(td, board, vcf_ply, four_pos);
             }
 
-            if board.stones + 3 >= pos::U8_BOARD_SIZE || vcf_ply + 4 > max_depth
-                || td.tt.probe(tt_key)
-                .is_some_and(|entry| entry.tt_flag.endgame_flag() == EndgameFlag::Cold)
-            {
+            if board.stones + 3 >= pos::U8_BOARD_SIZE || vcf_ply + 4 > max_ply {
                 board.unset_mut(four_pos);
                 continue 'position_search;
+            }
+
+            alpha = alpha.max(Score::win_in(td.ply + vcf_ply));
+            beta = beta.min(Score::lose_in(td.ply));
+
+            if alpha >= beta {
+                score = alpha;
+                board.unset_mut(four_pos);
+                continue 'position_search;
+            }
+
+            let tt_entry = td.tt.probe(tt_key);
+
+            if let Some(entry) = tt_entry {
+                match entry.tt_flag.score_kind() {
+                    ScoreKind::Lower => {
+                        alpha = alpha.max(entry.score);
+                    }
+                    ScoreKind::Upper => {
+                        beta = beta.min(entry.score);
+                    }
+                    _ => {}
+                }
+
+                if alpha >= beta {
+                    score = entry.score;
+                    board.unset_mut(four_pos);
+                    continue 'position_search;
+                }
+
+                if entry.tt_flag.endgame_flag() == EndgameFlag::Cold {
+                    board.unset_mut(four_pos);
+                    continue 'position_search;
+                }
             }
 
             board.set_mut(defend_pos);
@@ -217,7 +251,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             td.vcf_stack.push(VcfFrame {
                 vcf_moves,
                 next_move_counter: seq + 1,
-                depth: vcf_ply,
+                depth: vcf_ply as Depth,
                 four_pos,
                 defend_pos,
             });
@@ -251,7 +285,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             })
             .unwrap_or_else(|| TTEntry {
                 best_move: MaybePos::NONE,
-                depth: vcf_ply,
+                depth: vcf_ply as Depth,
                 age: td.tt.age,
                 tt_flag: TTFlag::new(ScoreKind::Exact, EndgameFlag::Cold, false),
                 score: 0,
@@ -266,7 +300,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
             vcf_moves = frame.vcf_moves;
             move_counter = frame.next_move_counter;
-            vcf_ply = frame.depth;
+            vcf_ply = frame.depth as usize;
         } else {
             break 'vcf_search;
         }
@@ -276,10 +310,10 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 }
 
 #[inline]
-fn build_vcf_win_tt_entry(depth: Depth, four_pos: Pos) -> TTEntry {
+fn build_vcf_win_tt_entry(vcf_ply: usize, four_pos: Pos) -> TTEntry {
     TTEntry {
         best_move: MaybePos::new(four_pos),
-        depth,
+        depth: vcf_ply as u8,
         age: u8::MAX,
         tt_flag: TTFlag::new(
             ScoreKind::Exact,
@@ -292,10 +326,10 @@ fn build_vcf_win_tt_entry(depth: Depth, four_pos: Pos) -> TTEntry {
 }
 
 #[inline]
-fn build_vcf_lose_tt_entry(depth: Depth) -> TTEntry {
+fn build_vcf_lose_tt_entry(vcf_ply: usize) -> TTEntry {
    TTEntry {
        best_move: MaybePos::NONE,
-       depth,
+       depth: vcf_ply as u8,
        age: u8::MAX,
        tt_flag: TTFlag::new(
            ScoreKind::Exact,

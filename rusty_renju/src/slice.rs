@@ -8,6 +8,7 @@ use crate::{assert_struct_sizes, const_for, max};
 pub const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
 pub const TOTAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 + DIAGONAL_SLICE_AMOUNT * 2;
+const DIAGONAL_BOARD_PADDING: isize = 5 - pos::I_BOARD_WIDTH;
 
 #[derive(Debug, Copy, Clone)]
 #[repr(align(16))]
@@ -164,19 +165,22 @@ impl Slices {
         });
 
         const_for!(idx in 0, DIAGONAL_SLICE_AMOUNT; {
-            let seq_num = idx as isize + 5 - pos::I_BOARD_WIDTH;
+            let seq_num = idx as isize + DIAGONAL_BOARD_PADDING;
+            let len = (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8;
+            let start_offset = max!(0, -seq_num) as u8;
+            let end_offset = max!(0, seq_num) as u8;
 
             ascending_slices[idx] = Slice::empty(
                 idx as u8,
-                (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
-                max!(0, -seq_num) as u8,
-                max!(0, seq_num) as u8
+                len,
+                start_offset,
+                end_offset,
             );
             descending_slices[idx] = Slice::empty(
                 idx as u8,
-                (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8,
-                pos::BOARD_WIDTH - 1 - max!(0, -seq_num) as u8,
-                max!(0, seq_num) as u8
+                len,
+                pos::BOARD_WIDTH - 1 - start_offset,
+                end_offset
             );
         });
 

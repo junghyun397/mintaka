@@ -114,7 +114,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
         .access(state.board.player_color)
     { // immediate win
-        return Score::WIN
+        return Score::win_in(td.ply)
     }
 
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
