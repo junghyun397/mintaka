@@ -1,7 +1,7 @@
 use crate::endgame::accumulator::{EndgameAccumulator, SequenceEndgameAccumulator};
 use crate::game_state::GameState;
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind, TTEntry, TTFlag};
-use crate::movegen::move_generator::{generate_vcf_moves, VcfMovesUnchecked};
+use crate::movegen::move_generator::{generate_vcf_moves, VcfMovesUnchecked, VCF_MAX_MOVES};
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
@@ -10,6 +10,7 @@ use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::value::{Depth, Score, Scores};
 use rusty_renju::pattern::{Pattern, PatternCount};
+use std::mem;
 
 pub trait VcfDestination {
 
@@ -151,6 +152,10 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             .take(vcf_moves.top as usize)
             .skip(move_counter)
         {
+            if td.is_aborted() {
+                return ACC::ZERO;
+            }
+
             let idx = four_pos.idx_usize();
 
             let player_pattern = board.patterns.field.get_ref::<C>()[idx];
@@ -202,8 +207,8 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 continue 'position_search;
             }
 
-            alpha = alpha.max(Score::win_in(td.ply + vcf_ply));
-            beta = beta.min(Score::lose_in(td.ply));
+            alpha = alpha.max(Score::lose_in(td.ply + vcf_ply));
+            beta = beta.min(Score::win_in(td.ply + vcf_ply));
 
             if alpha >= beta {
                 score = alpha;
@@ -264,9 +269,14 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                     break 'position_search;
                 }
 
-                let mut moves = [MaybePos::NONE.unwrap(); 31];
-                moves[0] = board.patterns.unchecked_five_pos.get_reversed_ref::<C>().unwrap();
-                VcfMovesUnchecked { moves, top: 1 }
+                VcfMovesUnchecked {
+                    moves: {
+                        let mut moves: [Pos; VCF_MAX_MOVES] = unsafe { mem::MaybeUninit::uninit().assume_init() };
+                        moves[0] = board.patterns.unchecked_five_pos.get_reversed_ref::<C>().unwrap();
+                        moves
+                    },
+                    top: 1
+                }
             } else {
                 generate_vcf_moves(&board, C, ACC::DISTANCE_WINDOW, four_pos)
             };

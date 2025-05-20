@@ -17,7 +17,7 @@ pub type SequenceEndgameAccumulator = Option<Vec<Pos>>;
 
 impl EndgameAccumulator for SequenceEndgameAccumulator {
 
-    const DISTANCE_WINDOW: isize = 7;
+    const DISTANCE_WINDOW: isize = 5;
 
     const ZERO: Self = None;
 

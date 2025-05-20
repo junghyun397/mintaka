@@ -9,9 +9,11 @@ use rusty_renju::{cartesian_to_index, chebyshev_distance, index_to_col, index_to
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
 
+pub const VCF_MAX_MOVES: usize = 31;
+
 #[derive(Debug, Copy, Clone)]
 pub struct VcfMovesUnchecked {
-    pub moves: [Pos; 31],
+    pub moves: [Pos; VCF_MAX_MOVES],
     pub top: u8,
 }
 
@@ -34,7 +36,7 @@ fn score_move(state: &GameState, pos: Pos) -> i16 {
 }
 
 pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: isize, recent_move: Pos) -> VcfMovesUnchecked {
-    let mut vcf_moves = [MaybePos::NONE.unwrap(); 31];
+    let mut vcf_moves = [MaybePos::NONE.unwrap(); VCF_MAX_MOVES];
     let mut vcf_moves_top = 0;
 
     let field_ptr = board.patterns.field.access(color).as_ptr() as *const u32;
@@ -77,7 +79,7 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: isize, r
 
             let pos_idx = start_idx + lane_position;
             let distance = chebyshev_distance!(
-                recent_move_row as isize,recent_move_col as isize,
+                recent_move_row as isize, recent_move_col as isize,
                 index_to_row!(pos_idx) as isize, index_to_col!(pos_idx) as isize
             );
 

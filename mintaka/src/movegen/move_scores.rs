@@ -37,11 +37,11 @@ impl MoveScores {
     };
 
     pub fn add_neighbor_score(&mut self, pos: Pos) {
-        self.adjust_neighbor_score::<{ true }>(pos);
+        self.adjust_neighbor_score::<true>(pos);
     }
 
     pub fn remove_neighbor_score(&mut self, pos: Pos) {
-        self.adjust_neighbor_score::<{ false }>(pos);
+        self.adjust_neighbor_score::<false>(pos);
     }
 
     #[inline]
