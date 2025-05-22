@@ -149,7 +149,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         return 0;
     }
 
-    let mut static_eval = HeuristicEvaluator::default().eval_value(&state);
+    let mut static_eval = HeuristicEvaluator.eval_value(&state.board);
     let mut tt_move = MaybePos::NONE;
     let mut tt_pv = false;
 
@@ -183,7 +183,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     td.ss[td.ply].on_pv = NT::IS_PV || tt_pv;
 
     if depth_left == 0 {
-        return vcf_search(td, state, td.config.max_vcf_depth) // drop into vcf search
+        return vcf_search(td, state, td.config.max_vcf_depth)
             .unwrap_or(static_eval);
     }
 
@@ -197,6 +197,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     'position_search: while let Some((pos, move_score)) = move_picker.next(state) {
         td.push_ply_mut(state.movegen_window);
         state.set_mut(pos);
+        td.tt.prefetch(state.board.hash_key);
 
         let score = if full_window { // full-window search
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)

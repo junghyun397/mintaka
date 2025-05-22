@@ -288,10 +288,10 @@ impl Patterns {
         let start_idx = slice.start_pos.idx_usize();
         let mut clear_mask = slice.pattern_bitmap.get::<C>();
         while clear_mask != 0 {
-            let pattern_idx = clear_mask.trailing_zeros() as usize;
+            let slice_idx = clear_mask.trailing_zeros() as usize;
             clear_mask &= clear_mask - 1;
 
-            let idx = step_idx!(D, start_idx, pattern_idx);
+            let idx = step_idx!(D, start_idx, slice_idx);
             self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(0);
         }
 
@@ -325,11 +325,11 @@ impl Patterns {
         let start_idx = slice.start_pos.idx_usize();
         let mut update_mask = slice.pattern_bitmap.get::<C>() | pattern_bitmap;
         while update_mask != 0 {
-            let pattern_idx = update_mask.trailing_zeros() as usize;
+            let slice_idx = update_mask.trailing_zeros() as usize;
             update_mask &= update_mask - 1;
 
-            let idx = step_idx!(D, start_idx, pattern_idx);
-            self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(slice_patterns[pattern_idx]);
+            let idx = step_idx!(D, start_idx, slice_idx);
+            self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(slice_patterns[slice_idx]);
 
             if C == Color::Black && self.field.black[idx].is_forbidden_ignoring_marker() {
                 self.forbidden_field.set_mut(Pos::from_index(idx as u8));

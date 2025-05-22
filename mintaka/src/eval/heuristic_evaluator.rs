@@ -1,5 +1,5 @@
 use crate::eval::evaluator::{Evaluator, PolicyDistribution};
-use crate::game_state::GameState;
+use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::value::Score;
 use rusty_renju::slice_pattern_count::GlobalPatternCount;
@@ -18,17 +18,17 @@ impl Evaluator for HeuristicEvaluator {
 
     const POLICY_EVALUATION: bool = false;
 
-    fn eval_value(&self, state: &GameState) -> Score {
-        let score_black = Self::eval_slice_pattern_counts::<{ Color::Black }>(state);
-        let score_white = Self::eval_slice_pattern_counts::<{ Color::White }>(state);
+    fn eval_value(&self, board: &Board) -> Score {
+        let score_black = Self::eval_slice_pattern_counts::<{ Color::Black }>(board);
+        let score_white = Self::eval_slice_pattern_counts::<{ Color::White }>(board);
 
-        match state.board.player_color {
+        match board.player_color {
             Color::Black => score_black - score_white,
             Color::White => score_white - score_black,
         }
     }
 
-    fn eval_policy(&self, _state: &GameState) -> PolicyDistribution {
+    fn eval_policy(&self, _board: &Board) -> PolicyDistribution {
         unreachable!()
     }
 
@@ -36,12 +36,12 @@ impl Evaluator for HeuristicEvaluator {
 
 impl HeuristicEvaluator {
 
-    fn eval_slice_pattern_counts<const C: Color>(state: &GameState) -> Score {
-        let mut counts: GlobalPatternCount = state.board.patterns.counts.global.get::<C>();
+    fn eval_slice_pattern_counts<const C: Color>(board: &Board) -> Score {
+        let mut counts: GlobalPatternCount =board.patterns.counts.global.get::<C>();
 
         if C == Color::Black {
-            for idx in state.board.patterns.forbidden_field.iter_hot_idx() {
-                let pattern = state.board.patterns.field.black[idx];
+            for idx in board.patterns.forbidden_field.iter_hot_idx() {
+                let pattern = board.patterns.field.black[idx];
 
                 counts.threes -= pattern.count_closed_fours() as i16;
                 counts.closed_fours -= pattern.count_closed_fours() as i16;

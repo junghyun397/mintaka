@@ -1,5 +1,4 @@
 use crate::eval::evaluator::{Evaluator, PolicyDistribution};
-use crate::game_state::GameState;
 use rusty_renju::board::Board;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::value::Score;
@@ -30,11 +29,11 @@ impl Evaluator for NnueEvaluator {
 
     const POLICY_EVALUATION: bool = true;
 
-    fn eval_value(&self, state: &GameState) -> Score {
+    fn eval_value(&self, board: &Board) -> Score {
         todo!()
     }
 
-    fn eval_policy(&self, state: &GameState) -> PolicyDistribution {
+    fn eval_policy(&self, board: &Board) -> PolicyDistribution {
         todo!()
     }
 
@@ -42,7 +41,7 @@ impl Evaluator for NnueEvaluator {
 
 impl NnueEvaluator {
 
-    fn shape_inputs(&self, board: Board) -> [i8; pos::BOARD_SIZE] {
+    fn shape_inputs(&self, board: &Board) -> [i8; pos::BOARD_SIZE] {
         todo!()
     }
 

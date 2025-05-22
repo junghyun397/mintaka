@@ -19,6 +19,19 @@ pub struct VcfMovesUnchecked {
 
 impl VcfMovesUnchecked {
 
+    pub fn unit(pos: Pos) -> Self {
+        Self {
+            moves: {
+                const EMPTY_MOVES: [Pos; VCF_MAX_MOVES] = [MaybePos::NONE.unwrap(); VCF_MAX_MOVES];
+
+                let mut new_moves = EMPTY_MOVES;
+                new_moves[0] = pos;
+                new_moves
+            },
+            top: 1,
+        }
+    }
+
     pub fn sort_moves(&mut self, ref_pos: Pos) {
         let ref_row = ref_pos.row() as i16;
         let ref_col = ref_pos.col() as i16;
