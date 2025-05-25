@@ -3,12 +3,12 @@ use crate::memo::tt_entry::TTEntry;
 use crate::movegen::move_list::MoveList;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
+use arrayvec::ArrayVec;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::value::{Depth, Score};
-use smallvec::{smallvec, SmallVec};
 
 pub(crate) struct VCTFrame {
     vct_moves: MoveList,
@@ -56,11 +56,9 @@ fn try_vct<const C: Color, ACC: EndgameAccumulator>(
 ) -> ACC {
     let mut idx: usize = 0;
 
-    let mut stack: SmallVec<VCTFrame, 32> = smallvec![];
-
     #[inline]
     fn backtrace_frames<ACC: EndgameAccumulator>(
-        td: &mut ThreadData<impl ThreadType>, mut stack: SmallVec<VCTFrame, 32>,
+        td: &mut ThreadData<impl ThreadType>, mut stack: ArrayVec<VCTFrame, 32>,
         board: Board, depth: Depth, killer_pos: Pos
     ) -> ACC {
         let mut result = ACC::unit(killer_pos);

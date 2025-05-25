@@ -44,7 +44,6 @@ impl MoveScores {
         self.adjust_neighbor_score::<false>(pos);
     }
 
-    #[inline]
     fn adjust_neighbor_score<const INC: bool>(&mut self, pos: Pos) {
         let scores_ptr = self.scores.as_mut_slice().as_mut_ptr();
         let mask_ptr = NEIGHBORHOOD_SCORE_LUT[pos.idx_usize()].as_ptr();
