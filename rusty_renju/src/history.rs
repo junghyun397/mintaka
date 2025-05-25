@@ -102,10 +102,8 @@ impl History {
         [self.recent_player_move_unchecked(), self.recent_opponent_move_unchecked()]
     }
 
-    pub fn avg_distance_to_recent_moves(&self) -> u8 {
+    pub fn avg_distance_to_recent_moves(&self, pos: Pos) -> u8 {
         debug_assert_ne!(self.top, 0);
-
-        let pos = self.entries[self.top].unwrap();
 
         if self.top > 3 {
             let distance1 = self.entries[self.top - 4].unwrap().distance(pos);

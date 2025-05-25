@@ -236,6 +236,11 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             let tt_entry = td.tt.probe(tt_key);
 
             if let Some(entry) = tt_entry {
+                if entry.tt_flag.endgame_flag() == EndgameFlag::Cold {
+                    board.unset_mut(four_pos);
+                    continue 'position_search;
+                }
+
                 match entry.tt_flag.score_kind() {
                     ScoreKind::Lower => {
                         alpha = alpha.max(entry.score);
@@ -248,11 +253,6 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
                 if alpha >= beta {
                     score = entry.score;
-                    board.unset_mut(four_pos);
-                    continue 'position_search;
-                }
-
-                if entry.tt_flag.endgame_flag() == EndgameFlag::Cold {
                     board.unset_mut(four_pos);
                     continue 'position_search;
                 }

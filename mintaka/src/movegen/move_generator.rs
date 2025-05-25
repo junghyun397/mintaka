@@ -4,6 +4,7 @@ use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::notation::value::Score;
 use rusty_renju::utils::platform;
 use rusty_renju::{cartesian_to_index, chebyshev_distance, index_to_col, index_to_row, pattern};
 use std::simd::cmp::SimdPartialEq;
@@ -43,9 +44,11 @@ impl VcfMovesUnchecked {
 
 }
 
-fn score_move(state: &GameState, pos: Pos) -> i16 {
-    let distance = 5u8.saturating_sub(state.history.avg_distance_to_recent_moves());
-    state.move_scores.scores[pos.idx_usize()] as i16 * distance as i16
+fn score_move(state: &GameState, pos: Pos) -> Score {
+    let neighborhood_score = state.move_scores.scores[pos.idx_usize()] as f32;
+    let distance = (state.history.avg_distance_to_recent_moves(pos).max(8) + 3) as f32;
+
+    ((neighborhood_score / distance) * 16.0) as Score
 }
 
 pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: isize, recent_move: Pos) -> VcfMovesUnchecked {

@@ -195,9 +195,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
     let mut full_window = true;
     'position_search: while let Some((pos, move_score)) = move_picker.next(state) {
+        td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
+
         td.push_ply_mut(state.movegen_window);
         state.set_mut(pos);
-        td.tt.prefetch(state.board.hash_key);
 
         let score = if full_window { // full-window search
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
@@ -205,7 +206,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             let mut score = -pvs::<R, OffPVNode, TH>(td, state, depth_left - 1, -alpha - 1, -alpha);
 
             if score > alpha { // zero-window failed, full-window search
-                score = -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha);
+                score = -pvs::<R, PVNode, TH>(td, state, depth_left - 1, -beta, -alpha);
             }
 
             score
@@ -219,6 +220,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         best_score = best_score.max(score);
 
         if score <= alpha { // improve alpha
+            alpha = score;
             continue 'position_search;
         }
 
@@ -239,10 +241,6 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         score_kind = ScoreKind::Lower;
 
         break 'position_search;
-    }
-
-    if td.is_aborted() {
-        return 0;
     }
 
     td.tt.store_mut(
