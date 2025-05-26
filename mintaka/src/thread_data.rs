@@ -104,4 +104,8 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
         }
     }
 
+    pub fn insert_counter_mut(&mut self, pos: Pos) {
+        self.counters[self.ply] = pos.into();
+    }
+
 }

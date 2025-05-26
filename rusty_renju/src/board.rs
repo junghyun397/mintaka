@@ -29,6 +29,18 @@ impl Board {
         self.slices.horizontal_slices[pos.row_usize()].is_empty(pos.col())
     }
 
+    pub fn is_legal_move(&self, pos: Pos) -> bool {
+        if !self.is_pos_empty(pos) {
+            return false;
+        }
+
+        if self.player_color == Color::Black {
+            return self.patterns.forbidden_field.is_hot(pos)
+        }
+
+        true
+    }
+
     pub fn stone_kind(&self, pos: Pos) -> Option<Color> {
         self.slices.horizontal_slices[pos.row_usize()].stone_kind(pos.col())
     }

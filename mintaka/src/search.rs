@@ -8,6 +8,7 @@ use crate::parameters::{ASPIRATION_WINDOW_BASE_DELTA, MAX_PLY};
 use crate::principal_variation::PrincipalVariation;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
+use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
@@ -70,20 +71,20 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
     max_depth: Depth,
-    mut score: Score,
+    prev_score: Score,
 ) -> Score {
-    let mut delta = ASPIRATION_WINDOW_BASE_DELTA + score / 1000;
     let mut alpha = -Score::INF;
     let mut beta = Score::INF;
+    let mut delta = ASPIRATION_WINDOW_BASE_DELTA + prev_score / 1000;
     let mut depth = max_depth;
 
     if max_depth >= 4 {
-        alpha = alpha.max(score - delta);
-        beta = beta.min(score + delta);
+        alpha = alpha.max(prev_score - delta);
+        beta = beta.min(prev_score + delta);
     }
 
     loop {
-        score = pvs::<R, RootNode, _>(td, state, depth, alpha, beta);
+        let score = pvs::<R, RootNode, TH>(td, state, depth, alpha, beta);
 
         if td.is_aborted() {
             return score;
@@ -91,12 +92,12 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
 
         if score <= alpha { // fail-low
             beta = (alpha + beta) / 2;
-            alpha = score.saturating_sub(delta);
+            alpha = (alpha - delta).max(-Score::WIN);
             depth = max_depth;
         } else if score >= beta { // fail-high
-            beta = score.saturating_add(delta);
+            beta = (beta + delta).min(Score::WIN);
             depth -= 1;
-        } else { // exact
+        } else { // expected
             return score;
         }
 
@@ -120,23 +121,36 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
         .access(!state.board.player_color)
     { // defend immediate win
+        if state.board.player_color == Color::Black
+            && state.board.patterns.forbidden_field.is_hot(pos)
+        { // trapped
+            return Score::lose_in(td.ply + 2)
+        }
+
         td.push_ply_mut(state.movegen_window);
         state.set_mut(pos);
 
         return -pvs::<R, NT::NextType, TH>(td, state, depth_left, -beta, -alpha);
     }
 
-    if td.config.draw_condition
-        .is_some_and(|depth| state.history.len() + 1 >= depth as usize)
-        || state.board.stones > pos::U8_BOARD_BOUND
-    { // draw or depth limit
-        return 0;
+    if td.config.draw_condition.is_some_and(|depth|
+        state.history.len() + 1 >= depth as usize
+    )
+        || state.board.stones == pos::U8_BOARD_SIZE
+    {
+        return Score::DRAW;
     }
 
-    if !NT::IS_ROOT
-        && alpha >= beta
-    { // alpha-beta cutoff
-        return alpha;
+    if !NT::IS_ROOT {
+        if td.ply >= MAX_PLY {
+            return HeuristicEvaluator.eval_value(&state.board);
+        }
+
+        alpha = alpha.max(Score::win_in(td.ply));
+        beta = beta.min(Score::lose_in(td.ply));
+        if alpha >= beta { // mate distance pruning
+            return alpha;
+        }
     }
 
     if TH::IS_MAIN
@@ -195,6 +209,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
     let mut full_window = true;
     'position_search: while let Some((pos, move_score)) = move_picker.next(state) {
+        if !state.board.is_legal_move(pos) {
+            continue;
+        }
+
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
         td.push_ply_mut(state.movegen_window);
@@ -202,10 +220,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
         let score = if full_window { // full-window search
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
-        } else { // zero-window search
+        } else { // null-window search
             let mut score = -pvs::<R, OffPVNode, TH>(td, state, depth_left - 1, -alpha - 1, -alpha);
 
-            if score > alpha { // zero-window failed, full-window search
+            if score > alpha { // null-window failed, full-window search
                 score = -pvs::<R, PVNode, TH>(td, state, depth_left - 1, -beta, -alpha);
             }
 
@@ -217,31 +235,33 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         let movegen_window = td.pop_ply_mut();
         state.unset_mut(movegen_window);
 
-        best_score = best_score.max(score);
+        if score > best_score {
+            best_score = score;
+            best_move = pos.into();
 
-        if score <= alpha { // improve alpha
-            alpha = score;
-            continue 'position_search;
+            if score > alpha { // improve alpha
+                alpha = score;
+            }
+
+            if alpha >= beta { // beta cutoff
+                break 'position_search;
+            }
         }
-
-        best_move = pos.into();
-        alpha = score;
-        score_kind = ScoreKind::Exact;
 
         if NT::IS_PV { // update pv-line
             let tails = td.pvs[td.ply].clone();
             let pv = &mut td.pvs[td.ply - 1];
             pv.load(pos.into(), tails);
         }
-
-        if score < beta { // beta-cutoff
-            continue 'position_search;
-        }
-
-        score_kind = ScoreKind::Lower;
-
-        break 'position_search;
     }
+
+    let score_kind = if best_score >= beta {
+        ScoreKind::Lower
+    } else if true {
+        ScoreKind::Exact
+    } else {
+        ScoreKind::Upper
+    };
 
     td.tt.store_mut(
         state.board.hash_key,

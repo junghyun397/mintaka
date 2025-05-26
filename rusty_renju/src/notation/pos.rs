@@ -142,6 +142,7 @@ impl Pos {
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
+#[repr(transparent)]
 pub struct MaybePos(Pos);
 
 impl MaybePos {

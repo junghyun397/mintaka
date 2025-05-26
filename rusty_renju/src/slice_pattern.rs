@@ -4,6 +4,7 @@ use crate::slice_pattern::ExtendedMatch::{Left, Right};
 use crate::{assert_struct_sizes, const_for, pattern};
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
+#[repr(transparent)]
 pub struct SlicePattern {
     pub patterns: u128
 }
