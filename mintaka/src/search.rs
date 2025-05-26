@@ -197,11 +197,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     td.ss[td.ply].on_pv = NT::IS_PV || tt_pv;
 
     if depth_left == 0 {
-        return vcf_search(td, state, td.config.max_vcf_depth)
+        return vcf_search(td, td.config.max_vcf_depth, state, alpha, beta)
             .unwrap_or(static_eval);
     }
 
-    let mut score_kind = ScoreKind::Upper;
     let mut best_score = i16::MIN;
     let mut best_move = tt_move;
 

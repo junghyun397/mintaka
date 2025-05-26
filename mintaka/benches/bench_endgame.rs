@@ -45,7 +45,7 @@ mod bench_vcf {
             let td = ThreadData::new(WorkerThread, 0, config, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
-                let result = vcf_search::vcf_search(&mut td.clone(), &game_state, u8::MAX);
+                let result = vcf_search::vcf_search(&mut td.clone(), usize::MAX, &game_state, -Score::INF, Score::INF);
                 assert_eq!(result, $score);
                 tt.clear_mut(1);
             })

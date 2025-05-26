@@ -104,3 +104,11 @@ impl SlicePatternCounts {
     }
 
 }
+
+impl GlobalPatternCount {
+
+    pub fn total_fours(&self) -> i16 {
+        self.closed_fours + self.open_fours
+    }
+
+}

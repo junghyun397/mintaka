@@ -27,7 +27,7 @@ pub struct Config {
 
     pub workers: NonZeroUsize,
 
-    pub max_vcf_depth: Depth,
+    pub max_vcf_depth: usize,
 
     pub report_search_status: bool,
     pub report_main_pv: bool,
@@ -41,7 +41,7 @@ impl Default for Config {
             draw_condition: None,
             search_objective: SearchObjective::Best,
             workers: NonZeroUsize::new(1).unwrap(),
-            max_vcf_depth: pos::U8_BOARD_SIZE,
+            max_vcf_depth: pos::BOARD_SIZE,
             report_search_status: false,
             report_main_pv: false,
         }
