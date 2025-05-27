@@ -204,10 +204,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     let mut best_score = i16::MIN;
     let mut best_move = tt_move;
 
-    let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply], td.counters[td.ply]);
+    let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
 
     let mut full_window = true;
-    'position_search: while let Some((pos, move_score)) = move_picker.next(state) {
+    'position_search: while let Some((pos, _)) = move_picker.next(state) {
         if !state.board.is_legal_move(pos) {
             continue;
         }

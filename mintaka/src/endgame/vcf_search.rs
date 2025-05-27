@@ -159,9 +159,8 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
     }
 
     'vcf_search: loop {
-        'position_search: for (seq, four_pos) in vcf_moves.moves.into_iter()
+        'position_search: for (seq, &four_pos) in vcf_moves.moves[.. vcf_moves.top as usize].iter()
             .enumerate()
-            .take(vcf_moves.top as usize)
             .skip(move_counter)
         {
             if td.is_aborted() {
@@ -229,6 +228,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
             if should_abort {
                 board.unset_mut(four_pos);
+                vcf_ply -= 1;
                 continue 'position_search;
             }
 
@@ -238,6 +238,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             if alpha >= beta { // mate distance pruning
                 score = alpha;
                 board.unset_mut(four_pos);
+                vcf_ply -= 1;
                 continue 'position_search;
             }
 
@@ -246,6 +247,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             if let Some(entry) = tt_entry {
                 if entry.tt_flag.endgame_flag() == EndgameFlag::Cold {
                     board.unset_mut(four_pos);
+                    vcf_ply -= 1;
                     continue 'position_search;
                 }
 
@@ -262,6 +264,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 if alpha >= beta {
                     score = entry.score;
                     board.unset_mut(four_pos);
+                    vcf_ply -= 1;
                     continue 'position_search;
                 }
             }
@@ -273,6 +276,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             if board.patterns.counts.global.get_ref::<C>().total_fours() == 0 {
                 board.unset_mut(defend_pos);
                 board.unset_mut(four_pos);
+                vcf_ply -= 2;
                 continue 'position_search;
             }
 
@@ -298,6 +302,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             } else {
                 generate_vcf_moves(&board, C, ACC::DISTANCE_WINDOW, four_pos)
             };
+
             move_counter = 0;
 
             continue 'vcf_search;
@@ -323,10 +328,10 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             board.unset_mut(frame.defend_pos);
             board.unset_mut(frame.four_pos);
 
+            vcf_ply -= 2;
+
             vcf_moves = frame.vcf_moves;
             move_counter = frame.next_move_counter;
-
-            vcf_ply -= 2;
         } else {
             break 'vcf_search;
         }

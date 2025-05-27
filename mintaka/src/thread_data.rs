@@ -24,7 +24,6 @@ pub struct ThreadData<'a, TH: ThreadType> {
     pub ss: ArrayVec<SearchFrame, MAX_PLY>,
     pub pvs: ArrayVec<PrincipalVariation, MAX_PLY>,
     pub killers: ArrayVec<[MaybePos; KILLER_MOVE_SLOTS], MAX_PLY>,
-    pub counters: ArrayVec<MaybePos, MAX_PLY>,
 
     pub movegen_stack: ArrayVec<MovegenWindow, MAX_PLY>,
     pub vcf_stack: Vec<VcfFrame>,
@@ -55,7 +54,6 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
             ss: ArrayVec::new_const(),
             pvs: ArrayVec::new_const(),
             killers: ArrayVec::new_const(),
-            counters: ArrayVec::new_const(),
             movegen_stack: ArrayVec::new_const(),
             vcf_stack: Vec::with_capacity(32),
             batch_counter: BatchCounter::new(global_counter_in_1k),
@@ -97,15 +95,8 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
     }
 
     pub fn insert_killer_move_mut(&mut self, pos: Pos) {
-        if self.killers[self.ply][0].is_none() {
-            self.killers[self.ply][0] = pos.into();
-        } else {
-            self.killers[self.ply][1] = pos.into();
-        }
-    }
-
-    pub fn insert_counter_mut(&mut self, pos: Pos) {
-        self.counters[self.ply] = pos.into();
+        self.killers[self.ply][1] = self.killers[self.ply][0];
+        self.killers[self.ply][0] = pos.into();
     }
 
 }
