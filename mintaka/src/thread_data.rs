@@ -98,4 +98,8 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
         self.killers[self.ply][0] = pos.into();
     }
 
+    pub fn update_history_table_mut(&mut self, pos: Pos) {
+        // TODO
+    }
+
 }

@@ -163,25 +163,23 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         return 0;
     }
 
-    let mut static_eval;
-    let mut tt_move;
-    let mut tt_pv;
-    let mut tt_endgame_flag;
+    let mut static_eval: Score;
+    let mut tt_move: MaybePos;
+    let mut tt_pv: bool;
+    let mut tt_endgame_flag: EndgameFlag;
 
     if let Some(entry) = td.tt.probe(state.board.hash_key) {
-        let score_kind = entry.tt_flag.score_kind();
         tt_endgame_flag = entry.tt_flag.endgame_flag();
-
-        static_eval = entry.eval;
-        tt_move = entry.best_move;
-        tt_pv = entry.tt_flag.is_pv();
-
         if tt_endgame_flag == EndgameFlag::Win || tt_endgame_flag == EndgameFlag::Lose
         { // endgame tt-hit
             return entry.score;
         }
 
-        if match score_kind {
+        static_eval = entry.eval;
+        tt_move = entry.best_move;
+        tt_pv = entry.tt_flag.is_pv();
+
+        if match entry.tt_flag.score_kind() {
             ScoreKind::LowerBound => entry.score >= beta,
             ScoreKind::UpperBound => entry.score <= alpha,
             ScoreKind::Exact => true,
@@ -191,9 +189,9 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
         static_eval = entry.score;
     } else {
+        tt_endgame_flag = EndgameFlag::Unknown;
         static_eval = HeuristicEvaluator.eval_value(&state.board);
         tt_move = MaybePos::NONE;
-        tt_endgame_flag = EndgameFlag::Unknown;
         tt_pv = false;
     }
 
@@ -204,24 +202,28 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             .unwrap_or(static_eval);
     }
 
+    let original_alpha = alpha;
+
     let mut best_score = -Score::INF;
     let mut best_move = MaybePos::NONE;
-    let mut score_kind = ScoreKind::UpperBound;
 
     let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
 
+    let mut moves = 0;
     let mut full_window = true;
     'position_search: while let Some((pos, _)) = move_picker.next(state) {
         if !state.board.is_legal_move(pos) {
             continue;
         }
 
+        moves += 1;
+
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
         td.push_ply_mut(state.movegen_window);
         state.set_mut(pos);
 
-        let score = if full_window { // full-window search
+        let score = if moves == 1 { // full-window search
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
         } else { // null-window search
             let mut score = -pvs::<R, OffPVNode, TH>(td, state, depth_left - 1, -alpha - 1, -alpha);
@@ -233,35 +235,34 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             score
         };
 
-        full_window = false;
-
         let movegen_window = td.pop_ply_mut();
         state.unset_mut(movegen_window);
 
-        if score > best_score {
-            best_score = score;
+        if score <= best_score {
+            continue;
+        }
+
+        best_score = score;
+
+        if score > alpha { // improve alpha
             best_move = pos.into();
+            alpha = score;
 
-            if score > alpha { // improve alpha
-                alpha = score;
-            }
-
-            if alpha >= beta { // beta cutoff
-                score_kind = ScoreKind::LowerBound;
-                break 'position_search;
+            if NT::IS_PV { // update pv-line
+                // td.pvs[td.ply].load();
             }
         }
 
-        if NT::IS_PV { // update pv-line
-            let tails = td.pvs[td.ply].clone();
-            let pv = &mut td.pvs[td.ply - 1];
-            pv.load(pos.into(), tails);
+        if alpha >= beta { // beta cutoff
+            td.insert_killer_move_mut(pos);
+            td.update_history_table_mut(pos);
+            break 'position_search;
         }
     }
 
     let score_kind = if best_score >= beta {
         ScoreKind::LowerBound
-    } else if NT::IS_PV && best_score != 0 {
+    } else if best_score > original_alpha {
         ScoreKind::Exact
     } else {
         ScoreKind::UpperBound
