@@ -1,5 +1,7 @@
 # mintaka
-(WIP) A high-performance PVS-based Renju engine with strict rule implementation.
+(WIP) mintaka is a Renju engine written in Rust, currently in pre-alpha and under active development;
+mintaka features a Principal Variation Search core, a simple evaluation function for now, 
+and plans to integrate an AlphaZero-based value and policy network.
 
 ## Features
 

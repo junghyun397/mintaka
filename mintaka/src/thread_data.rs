@@ -10,7 +10,6 @@ use crate::search_frame::{SearchFrame, KILLER_MOVE_SLOTS};
 use crate::thread_type::ThreadType;
 use arrayvec::ArrayVec;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::value::Depth;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 #[derive(Clone)]
@@ -32,7 +31,7 @@ pub struct ThreadData<'a, TH: ThreadType> {
     aborted: &'a AtomicBool,
 
     pub best_move: MaybePos,
-    pub depth: Depth,
+    pub depth: usize,
     pub ply: usize,
 }
 

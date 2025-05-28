@@ -61,7 +61,7 @@ fn try_vct<const C: Color, ACC: EndgameAccumulator>(
         td: &mut ThreadData<impl ThreadType>, mut stack: ArrayVec<VCTFrame, 32>,
         board: Board, depth: Depth, killer_pos: Pos
     ) -> ACC {
-        let mut result = ACC::unit(killer_pos);
+        let mut result = ACC::unit(killer_pos, 0);
         let mut hash_key = board.hash_key;
 
         let opponent_color = board.opponent_color();

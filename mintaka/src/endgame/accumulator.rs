@@ -1,5 +1,5 @@
 use rusty_renju::notation::pos::Pos;
-use rusty_renju::notation::value::{Score, Scores};
+use rusty_renju::notation::value::Score;
 
 pub trait EndgameAccumulator {
 
@@ -7,7 +7,7 @@ pub trait EndgameAccumulator {
 
     const ZERO: Self;
 
-    fn unit(pos: Pos) -> Self;
+    fn unit(pos: Pos, score: Score) -> Self;
 
     fn append_pos(self, defend: Pos, threat: Pos) -> Self;
 
@@ -22,7 +22,7 @@ impl EndgameAccumulator for SequenceEndgameAccumulator {
     const ZERO: Self = None;
 
     #[inline]
-    fn unit(pos: Pos) -> Self {
+    fn unit(pos: Pos, _score: Score) -> Self {
         Some(vec![pos])
     }
 
@@ -44,8 +44,8 @@ impl EndgameAccumulator for Score {
     const ZERO: Self = 0;
 
     #[inline]
-    fn unit(_pos: Pos) -> Self {
-        Score::WIN
+    fn unit(_pos: Pos, score: Score) -> Self {
+        score
     }
 
     #[inline]

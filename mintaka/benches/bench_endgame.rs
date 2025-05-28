@@ -46,7 +46,7 @@ mod bench_vcf {
 
             $bencher.iter(|| {
                 let result = vcf_search::vcf_search(&mut td.clone(), usize::MAX, &game_state, -Score::INF, Score::INF);
-                assert_eq!(result, $score);
+                assert!(result.unwrap() > $score);
                 tt.clear_mut(1);
             })
         }};
@@ -74,7 +74,7 @@ mod bench_vcf {
            A B C D E F G H I J K L M N O"
         });
 
-        bench_vcf!(b, case, Some(Score::WIN), pos_unchecked("h6"), pos_unchecked("i6"));
+        bench_vcf!(b, case, Score::WIN - 256, pos_unchecked("h6"), pos_unchecked("i6"));
     }
 
     #[bench]
@@ -103,7 +103,7 @@ mod bench_vcf {
            A B C D E F G H I J K L M N O"
         });
 
-        bench_vcf!(b, case, Some(Score::WIN), pos_unchecked("e8"), pos_unchecked("e7"));
+        bench_vcf!(b, case, Score::WIN - 256, pos_unchecked("e8"), pos_unchecked("e7"));
     }
 
     #[bench]

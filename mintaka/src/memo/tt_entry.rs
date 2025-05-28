@@ -26,9 +26,9 @@ impl From<HashKey> for TTEntryKey {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
 pub enum ScoreKind {
-    Lower = 0,
-    Exact = 1,
-    Upper = 2,
+    LowerBound = 0,
+    UpperBound = 1,
+    Exact = 2,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]

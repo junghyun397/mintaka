@@ -49,7 +49,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
 
     let mut pv = PrincipalVariation::new_const();
 
-    'iterative_deepening: for depth in 1 ..= MAX_PLY as u8 {
+    'iterative_deepening: for depth in 1 ..= MAX_PLY {
         td.depth = depth;
         score = if depth < 7 {
             pvs::<R, RootNode, TH>(td, state, depth, -Score::INF, Score::INF)
@@ -70,7 +70,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
 pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
-    max_depth: Depth,
+    max_depth: usize,
     prev_score: Score,
 ) -> Score {
     let mut alpha = -Score::INF;
@@ -108,9 +108,9 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
 pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
-    mut depth_left: Depth,
-    mut alpha: i16,
-    mut beta: i16,
+    depth_left: usize,
+    mut alpha: Score,
+    mut beta: Score,
 ) -> Score {
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
         .access(state.board.player_color)
@@ -156,42 +156,45 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     if TH::IS_MAIN
         && td.should_check_limit()
         && td.search_limit_exceeded()
-    { // search limit exceeded
+    {
         td.set_aborted_mut();
         return 0;
     } else if td.is_aborted() {
         return 0;
     }
 
-    let mut static_eval = HeuristicEvaluator.eval_value(&state.board);
-    let mut tt_move = MaybePos::NONE;
-    let mut tt_pv = false;
+    let mut static_eval;
+    let mut tt_move;
+    let mut tt_pv;
+    let mut tt_endgame_flag;
 
     if let Some(entry) = td.tt.probe(state.board.hash_key) {
         let score_kind = entry.tt_flag.score_kind();
-        let endgame_flag = entry.tt_flag.endgame_flag();
+        tt_endgame_flag = entry.tt_flag.endgame_flag();
+
+        static_eval = entry.eval;
+        tt_move = entry.best_move;
         tt_pv = entry.tt_flag.is_pv();
 
-        if !(endgame_flag == EndgameFlag::Win || endgame_flag == EndgameFlag::Lose)
-        { // endgame-tt-hit
+        if tt_endgame_flag == EndgameFlag::Win || tt_endgame_flag == EndgameFlag::Lose
+        { // endgame tt-hit
             return entry.score;
         }
 
-        if match score_kind { // tt-hit
-            ScoreKind::Lower => entry.score >= beta,
-            ScoreKind::Upper => entry.score <= alpha,
+        if match score_kind {
+            ScoreKind::LowerBound => entry.score >= beta,
+            ScoreKind::UpperBound => entry.score <= alpha,
             ScoreKind::Exact => true,
         } {
             return entry.score;
         }
 
-        if !match score_kind { // load tt-score
-            ScoreKind::Lower => static_eval > entry.score,
-            ScoreKind::Upper => static_eval < entry.score,
-            ScoreKind::Exact => true
-        } {
-            static_eval = entry.score;
-        }
+        static_eval = entry.score;
+    } else {
+        static_eval = HeuristicEvaluator.eval_value(&state.board);
+        tt_move = MaybePos::NONE;
+        tt_endgame_flag = EndgameFlag::Unknown;
+        tt_pv = false;
     }
 
     td.ss[td.ply].on_pv = NT::IS_PV || tt_pv;
@@ -201,8 +204,9 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             .unwrap_or(static_eval);
     }
 
-    let mut best_score = i16::MIN;
-    let mut best_move = tt_move;
+    let mut best_score = -Score::INF;
+    let mut best_move = MaybePos::NONE;
+    let mut score_kind = ScoreKind::UpperBound;
 
     let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
 
@@ -243,6 +247,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             }
 
             if alpha >= beta { // beta cutoff
+                score_kind = ScoreKind::LowerBound;
                 break 'position_search;
             }
         }
@@ -255,19 +260,19 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     }
 
     let score_kind = if best_score >= beta {
-        ScoreKind::Lower
-    } else if true {
+        ScoreKind::LowerBound
+    } else if NT::IS_PV && best_score != 0 {
         ScoreKind::Exact
     } else {
-        ScoreKind::Upper
+        ScoreKind::UpperBound
     };
 
     td.tt.store_mut(
         state.board.hash_key,
         best_move,
         score_kind,
-        EndgameFlag::Unknown,
-        depth_left,
+        tt_endgame_flag,
+        td.ply as Depth,
         static_eval,
         best_score,
         NT::IS_PV
