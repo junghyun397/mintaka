@@ -49,10 +49,10 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
             config,
             tt,
             ht: Box::new(ht),
-            ss: Box::new([SearchFrame::EMPTY; MAX_PLY]),
-            pvs: Box::new([PrincipalVariation::new_const(); MAX_PLY]),
-            killers: Box::new([[MaybePos::NONE; KILLER_MOVE_SLOTS]; MAX_PLY]),
-            vcf_stack: Box::new(unsafe { std::mem::zeroed() }),
+            ss: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
+            pvs: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
+            killers: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
+            vcf_stack: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             vcf_stack_top: 0,
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
@@ -93,6 +93,7 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
 
     pub fn push_vcf_frame_mut(&mut self, frame: VcfFrame) {
         self.vcf_stack[self.vcf_stack_top] = frame;
+        self.vcf_stack_top += 1;
     }
 
     pub fn pop_vcf_frame_mut(&mut self) -> Option<VcfFrame> {

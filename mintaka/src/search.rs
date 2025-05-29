@@ -4,7 +4,7 @@ use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::game_state::GameState;
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind};
 use crate::movegen::move_picker::MovePicker;
-use crate::parameters::{ASPIRATION_WINDOW_BASE_DELTA, MAX_PLY};
+use crate::parameters::{ASPIRATION_INITIAL_DELTA, MAX_PLY};
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::notation::color::Color;
@@ -44,7 +44,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH>,
     state: &mut GameState,
 ) -> Score {
-    let mut score: Score = -Score::INF;
+    let mut score: Score = 0;
 
     'iterative_deepening: for depth in 1 ..= MAX_PLY {
         td.depth = depth;
@@ -70,15 +70,10 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     max_depth: usize,
     prev_score: Score,
 ) -> Score {
-    let mut alpha = -Score::INF;
-    let mut beta = Score::INF;
-    let mut delta = ASPIRATION_WINDOW_BASE_DELTA + prev_score / 1000;
+    let mut delta = ASPIRATION_INITIAL_DELTA + prev_score / 1024;
+    let mut alpha = (prev_score - delta).max(-Score::INF);
+    let mut beta = (prev_score + delta).min(Score::INF);
     let mut depth = max_depth;
-
-    if max_depth >= 4 {
-        alpha = alpha.max(prev_score - delta);
-        beta = beta.min(prev_score + delta);
-    }
 
     loop {
         let score = pvs::<R, RootNode, TH>(td, state, depth, alpha, beta);
@@ -89,10 +84,10 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
 
         if score <= alpha { // fail-low
             beta = (alpha + beta) / 2;
-            alpha = (alpha - delta).max(-Score::WIN);
+            alpha = (alpha - delta).max(-Score::INF);
             depth = max_depth;
         } else if score >= beta { // fail-high
-            beta = (beta + delta).min(Score::WIN);
+            beta = (beta + delta).min(Score::INF);
             depth -= 1;
         } else { // expected
             return score;
