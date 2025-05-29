@@ -132,6 +132,8 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
     mut vcf_moves: VcfMovesUnchecked,
     mut alpha: Score, mut beta: Score,
 ) -> ACC {
+    td.clear_vcf_stack_mut();
+
     let mut vcf_ply = 0;
     let mut score = 0;
     let mut move_counter: usize = 0;
@@ -152,7 +154,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
         let opponent_color = board.opponent_color();
 
-        while let Some(frame) = td.vcf_stack.pop() {
+        while let Some(frame) = td.pop_vcf_frame_mut() {
             hash_key = hash_key.set(opponent_color, frame.defend_pos);
             td.tt.store_entry_mut(hash_key, build_vcf_lose_tt_entry(lose_score, vcf_ply));
 
@@ -287,7 +289,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 continue 'position_search;
             }
 
-            td.vcf_stack.push(VcfFrame {
+            td.push_vcf_frame_mut(VcfFrame {
                 vcf_moves,
                 next_move_counter: seq + 1,
                 four_pos,
@@ -300,7 +302,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 if !board.patterns.field.get_ref::<C>()[defend_move.idx_usize()].has_any_four()
                     || (C == Color::Black && defend_pattern.is_forbidden())
                 {
-                    td.vcf_stack.pop();
+                    td.vcf_stack_top -= 1;
                     board.unset_mut(defend_pos);
                     board.unset_mut(four_pos);
                     vcf_ply -= 2;
@@ -335,7 +337,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
         td.tt.store_entry_mut(board.hash_key, tt_entry);
 
-        if let Some(frame) = td.vcf_stack.pop() {
+        if let Some(frame) = td.pop_vcf_frame_mut() {
             board.unset_mut(frame.defend_pos);
             board.unset_mut(frame.four_pos);
 

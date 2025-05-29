@@ -5,10 +5,9 @@ pub const KILLER_MOVE_SLOTS: usize = 2;
 
 #[derive(Debug, Copy, Clone)]
 pub struct SearchFrame {
-    pub static_eval: Score,
-    pub best_move: MaybePos,
     pub pos: MaybePos,
-    pub extensions: bool,
+    pub best_move: MaybePos,
+    pub static_eval: Score,
     pub on_pv: bool,
 }
 
@@ -22,11 +21,10 @@ impl Default for SearchFrame {
 
 impl SearchFrame {
 
-    const EMPTY: Self = SearchFrame {
-        static_eval: 0,
-        best_move: MaybePos::NONE,
+    pub const EMPTY: Self = SearchFrame {
         pos: MaybePos::NONE,
-        extensions: false,
+        best_move: MaybePos::NONE,
+        static_eval: 0,
         on_pv: false,
     };
 

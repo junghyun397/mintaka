@@ -5,7 +5,6 @@ use crate::game_state::GameState;
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind};
 use crate::movegen::move_picker::MovePicker;
 use crate::parameters::{ASPIRATION_WINDOW_BASE_DELTA, MAX_PLY};
-use crate::principal_variation::PrincipalVariation;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::notation::color::Color;
@@ -47,8 +46,6 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
 ) -> Score {
     let mut score: Score = -Score::INF;
 
-    let mut pv = PrincipalVariation::new_const();
-
     'iterative_deepening: for depth in 1 ..= MAX_PLY {
         td.depth = depth;
         score = if depth < 7 {
@@ -57,7 +54,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
             aspiration::<R, TH>(td, state, depth, score)
         };
 
-        td.best_move = td.pvs[depth as usize].line[0];
+        td.best_move = td.pvs[0].line[0];
 
         if td.is_aborted() {
             break 'iterative_deepening;
@@ -127,19 +124,23 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             return Score::lose_in(td.ply + 2)
         }
 
-        td.push_ply_mut(state.movegen_window);
+        td.push_ply_mut();
         state.set_mut(pos);
 
         return -pvs::<R, NT::NextType, TH>(td, state, depth_left, -beta, -alpha);
     }
 
-    if td.config.draw_condition.is_some_and(|depth|
-        state.history.len() + 1 >= depth as usize
-    )
+    if td.config.draw_condition
+        .is_some_and(|depth|
+            state.history.len() + 1 >= depth as usize
+        )
         || state.board.stones == pos::U8_BOARD_SIZE
     {
         return Score::DRAW;
     }
+
+    // clear pv-line
+    td.pvs[td.ply].clear();
 
     if !NT::IS_ROOT {
         if td.ply >= MAX_PLY {
@@ -210,7 +211,9 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
 
     let mut moves = 0;
-    let mut full_window = true;
+
+    td.push_ply_mut();
+
     'position_search: while let Some((pos, _)) = move_picker.next(state) {
         if !state.board.is_legal_move(pos) {
             continue;
@@ -220,7 +223,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
-        td.push_ply_mut(state.movegen_window);
+        let movegen_window = state.movegen_window;
         state.set_mut(pos);
 
         let score = if moves == 1 { // full-window search
@@ -235,7 +238,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             score
         };
 
-        let movegen_window = td.pop_ply_mut();
+        td.pop_ply_mut();
         state.unset_mut(movegen_window);
 
         if score <= best_score {
@@ -249,7 +252,8 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             alpha = score;
 
             if NT::IS_PV { // update pv-line
-                // td.pvs[td.ply].load();
+                let sub_pv = td.pvs[td.ply].clone();
+                td.pvs[td.ply - 1].load(pos.into(), sub_pv);
             }
         }
 
@@ -259,6 +263,8 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             break 'position_search;
         }
     }
+
+    td.pop_ply_mut();
 
     let score_kind = if best_score >= beta {
         ScoreKind::LowerBound

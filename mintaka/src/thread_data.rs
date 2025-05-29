@@ -3,12 +3,10 @@ use crate::config::Config;
 use crate::endgame::vcf_search::VcfFrame;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
-use crate::movegen::movegen_window::MovegenWindow;
 use crate::parameters::MAX_PLY;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_frame::{SearchFrame, KILLER_MOVE_SLOTS};
 use crate::thread_type::ThreadType;
-use arrayvec::ArrayVec;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -19,13 +17,13 @@ pub struct ThreadData<'a, TH: ThreadType> {
     pub config: Config,
 
     pub tt: TTView<'a>,
-    pub ht: HistoryTable,
-    pub ss: ArrayVec<SearchFrame, MAX_PLY>,
-    pub pvs: ArrayVec<PrincipalVariation, MAX_PLY>,
-    pub killers: ArrayVec<[MaybePos; KILLER_MOVE_SLOTS], MAX_PLY>,
+    pub ht: Box<HistoryTable>,
+    pub ss: Box<[SearchFrame; MAX_PLY]>,
+    pub pvs: Box<[PrincipalVariation; MAX_PLY]>,
+    pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; MAX_PLY]>,
 
-    pub movegen_stack: ArrayVec<MovegenWindow, MAX_PLY>,
-    pub vcf_stack: Vec<VcfFrame>,
+    pub vcf_stack: Box<[VcfFrame; MAX_PLY]>,
+    pub vcf_stack_top: usize,
 
     pub batch_counter: BatchCounter<'a>,
     aborted: &'a AtomicBool,
@@ -49,12 +47,13 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
             thread_type,
             tid,
             config,
-            tt, ht,
-            ss: ArrayVec::new_const(),
-            pvs: ArrayVec::new_const(),
-            killers: ArrayVec::new_const(),
-            movegen_stack: ArrayVec::new_const(),
-            vcf_stack: Vec::with_capacity(32),
+            tt,
+            ht: Box::new(ht),
+            ss: Box::new([SearchFrame::EMPTY; MAX_PLY]),
+            pvs: Box::new([PrincipalVariation::new_const(); MAX_PLY]),
+            killers: Box::new([[MaybePos::NONE; KILLER_MOVE_SLOTS]; MAX_PLY]),
+            vcf_stack: Box::new(unsafe { std::mem::zeroed() }),
+            vcf_stack_top: 0,
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
             best_move: MaybePos::NONE,
@@ -79,18 +78,30 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
         self.aborted.load(Ordering::Relaxed)
     }
 
-    pub fn push_ply_mut(
-        &mut self,
-        movegen_window: MovegenWindow,
-    ) {
+    pub fn push_ply_mut(&mut self) {
         self.ply += 1;
         self.batch_counter.add_single_mut();
-        self.movegen_stack[self.ply] = movegen_window;
     }
 
-    pub fn pop_ply_mut(&mut self) -> MovegenWindow {
+    pub fn pop_ply_mut(&mut self) {
         self.ply -= 1;
-        self.movegen_stack[self.ply]
+    }
+
+    pub fn clear_vcf_stack_mut(&mut self) {
+        self.vcf_stack_top = 0;
+    }
+
+    pub fn push_vcf_frame_mut(&mut self, frame: VcfFrame) {
+        self.vcf_stack[self.vcf_stack_top] = frame;
+    }
+
+    pub fn pop_vcf_frame_mut(&mut self) -> Option<VcfFrame> {
+        if self.vcf_stack_top == 0 {
+            None
+        } else {
+            self.vcf_stack_top -= 1;
+            Some(self.vcf_stack[self.vcf_stack_top])
+        }
     }
 
     pub fn insert_killer_move_mut(&mut self, pos: Pos) {
