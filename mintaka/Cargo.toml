@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 rusty_renju = {path = "../rusty_renju" }
-arrayvec = "0.7.6"
 
 [dev-dependencies]
 indoc = "2.0.5"

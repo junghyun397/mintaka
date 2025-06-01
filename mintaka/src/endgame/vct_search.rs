@@ -3,10 +3,8 @@ use crate::memo::tt_entry::TTEntry;
 use crate::movegen::move_list::MoveList;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
-use arrayvec::ArrayVec;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
-use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::value::{Depth, Score};
 
@@ -54,38 +52,7 @@ fn try_vct<const C: Color, ACC: EndgameAccumulator>(
     mut board: Board,
     max_depth: Depth, mut depth: Depth, mut opponent_has_open_four: bool, mut opponent_has_five: bool,
 ) -> ACC {
-    let mut idx: usize = 0;
-
-    #[inline]
-    fn backtrace_frames<ACC: EndgameAccumulator>(
-        td: &mut ThreadData<impl ThreadType>, mut stack: ArrayVec<VCTFrame, 32>,
-        board: Board, depth: Depth, killer_pos: Pos
-    ) -> ACC {
-        let mut result = ACC::unit(killer_pos, 0);
-        let mut hash_key = board.hash_key;
-
-        let opponent_color = board.opponent_color();
-
-        while let Some(frame) = stack.pop() {
-            hash_key = hash_key.set(opponent_color, frame.defend_pos);
-            td.tt.store_entry_mut(hash_key, build_vcf_lose_tt_entry(depth));
-
-            hash_key = hash_key.set(board.player_color, frame.threat_pos);
-            td.tt.store_entry_mut(hash_key, build_vct_win_tt_entry(depth, frame.threat_pos));
-
-            result = result.append_pos(frame.defend_pos, frame.threat_pos);
-        }
-
-        td.batch_counter.add_single_mut();
-
-        result
-    }
-
-    'vct_search: loop {
-        'position_search: while idx < pos::BOARD_SIZE {
-            idx += 1;
-        }
-    }
+    // TODO: implement
 
     ACC::ZERO
 }

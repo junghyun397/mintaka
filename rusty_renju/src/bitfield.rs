@@ -1,7 +1,6 @@
 use crate::assert_struct_sizes;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use ethnum::u256;
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
 use std::simd::u8x32;
 
@@ -40,42 +39,50 @@ impl Bitfield {
     }
 
     pub fn count_ones(&self) -> u32 {
-        self.to_u256().count_ones()
+        self.to_chunks()
+            .iter()
+            .map(|x| x.count_ones())
+            .sum()
     }
 
     pub fn count_zeros(&self) -> u32 {
-        pos::BOARD_SIZE as u32 - self.count_ones()
+        self.to_chunks()
+            .iter()
+            .map(|x| x.count_zeros())
+            .sum()
     }
 
     pub fn iter(&self) -> impl Iterator<Item=bool> + '_ {
-        BitfieldIterator::from(self.to_u256())
+        BitfieldIterator {
+            chunks: self.to_chunks(),
+            position: 0,
+        }
     }
 
     pub fn iter_hot_idx(&self) -> impl Iterator<Item=usize> + '_ {
-        BitfieldSetBitsIterator::from(self.to_u256())
-            .map(|x| x as usize)
+        BitfieldSetBitsIterator::from(self.to_chunks())
     }
 
     pub fn iter_hot_pos(&self) -> impl Iterator<Item=Pos> + '_ {
-        BitfieldSetBitsIterator::from(self.to_u256())
+        self.iter_hot_idx()
             .map(|x| Pos::from_index(x as u8))
     }
 
     pub fn iter_cold_pos(&self) -> impl Iterator<Item=Pos> + '_ {
-        BitfieldSetBitsIterator::from(!self.to_u256())
+        BitfieldSetBitsIterator::from((!*self).to_chunks())
             .map(|x| Pos::from_index(x as u8))
     }
 
     pub fn is_empty(&self) -> bool {
-        self.to_u256() == u256::MIN
+        self.0 == [0; 32]
     }
 
     pub fn to_simd(self) -> u8x32 {
         u8x32::from_array(self.0)
     }
 
-    pub fn to_u256(self) -> u256 {
-        u256::from_ne_bytes(self.0)
+    pub fn to_chunks(self) -> [u64; 4] {
+        unsafe { std::mem::transmute::<[u8; 32], [u64; 4]>(self.0) }
     }
 
 }
@@ -138,28 +145,9 @@ impl From<u8x32> for Bitfield {
 
 }
 
-impl From<u256> for Bitfield {
-
-    fn from(x: u256) -> Self {
-        Self(x.to_ne_bytes())
-    }
-
-}
-
 struct BitfieldIterator {
-    value: u256,
+    chunks: [u64; 4],
     position: usize,
-}
-
-impl From<u256> for BitfieldIterator {
-
-    fn from(value: u256) -> Self {
-        Self {
-            value,
-            position: 0,
-        }
-    }
-
 }
 
 impl ExactSizeIterator for BitfieldIterator {
@@ -175,49 +163,61 @@ impl Iterator for BitfieldIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.position == pos::BOARD_SIZE {
-            None
-        } else {
-            let result = self.value.as_u8() & 0b1 == 1;
-            self.position += 1;
-            self.value >>= 1;
-            Some(result)
+            return None;
         }
+
+        let result = self.chunks[self.position / 4] & 0b1 == 0b1;
+        self.chunks[self.position / 4] >>= 1;
+        self.position += 1;
+        Some(result)
     }
 
 }
 
 struct BitfieldSetBitsIterator {
-    value: u256
+    chunks: [u64; 4],
+    chunk_mask: usize,
 }
 
-impl From<u256> for BitfieldSetBitsIterator {
+impl From<[u64; 4]> for BitfieldSetBitsIterator {
+    fn from(chunks: [u64; 4]) -> Self {
+        let mut chunk_mask = 0;
 
-    fn from(value: u256) -> Self {
-        Self { value }
-    }
+        chunk_mask |= (chunks[0] != 0) as usize;
+        chunk_mask |= ((chunks[1] != 0) as usize) << 1;
+        chunk_mask |= ((chunks[2] != 0) as usize) << 2;
+        chunk_mask |= ((chunks[3] != 0) as usize) << 3;
 
-}
-
-impl Iterator for BitfieldSetBitsIterator {
-
-    type Item = u32;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.value != u256::MIN {
-            let idx = self.value.trailing_zeros();
-            self.value &= self.value - 1;
-            Some(idx)
-        } else {
-            None
+        Self {
+            chunks,
+            chunk_mask,
         }
     }
-
 }
 
 impl ExactSizeIterator for BitfieldSetBitsIterator {
-
     fn len(&self) -> usize {
-        self.value.count_ones() as usize
+        self.chunks.iter()
+            .map(|x| x.count_ones() as usize)
+            .sum()
+    }
+}
+
+impl Iterator for BitfieldSetBitsIterator {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.chunk_mask == 0 {
+            return None;
+        }
+
+        let chunk_idx = self.chunk_mask.trailing_zeros() as usize;
+        let idx = chunk_idx * 64 + self.chunks[chunk_idx].trailing_zeros() as usize;
+
+        self.chunks[chunk_idx] &= self.chunks[chunk_idx] - 1;
+        self.chunk_mask &= !(((self.chunks[chunk_idx] == 0) as usize) << chunk_idx);
+
+        Some(idx)
     }
 
 }

@@ -191,8 +191,6 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         tt_pv = false;
     }
 
-    td.ss[td.ply].on_pv = NT::IS_PV || tt_pv;
-
     if depth_left == 0 {
         return vcf_search(td, td.config.max_vcf_depth, state, alpha, beta)
             .unwrap_or(static_eval);
@@ -208,6 +206,8 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     let mut moves = 0;
 
     td.push_ply_mut();
+    td.ss[td.ply].static_eval = static_eval;
+    td.ss[td.ply].on_pv = NT::IS_PV || tt_pv;
 
     'position_search: while let Some((pos, _)) = move_picker.next(state) {
         if !state.board.is_legal_move(pos) {
@@ -233,7 +233,6 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             score
         };
 
-        td.pop_ply_mut();
         state.unset_mut(movegen_window);
 
         if score <= best_score {
@@ -248,16 +247,19 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
             if NT::IS_PV { // update pv-line
                 let sub_pv = td.pvs[td.ply].clone();
-                td.pvs[td.ply - 1].load(pos.into(), sub_pv);
+                td.pvs[td.ply - 1].load(pos.into(), &sub_pv);
             }
         }
 
         if alpha >= beta { // beta cutoff
+            td.ss[td.ply].cutoffs += 1;
             td.insert_killer_move_mut(pos);
             td.update_history_table_mut(pos);
             break 'position_search;
         }
     }
+
+    td.ss[td.ply].best_move = best_move;
 
     td.pop_ply_mut();
 

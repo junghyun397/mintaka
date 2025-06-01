@@ -115,12 +115,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
-name = "ethnum"
-version = "1.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca81e6b4777c89fd810c25a4be2b1bd93ea034fbe58e6a75216a34c6b82c539b"
-
-[[package]]
 name = "fdeflate"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -260,7 +254,6 @@ dependencies = [
 name = "mintaka"
 version = "0.1.0-pre-alpha"
 dependencies = [
- "arrayvec",
  "indoc",
  "rusty_renju",
 ]
@@ -421,7 +414,6 @@ checksum = "f7c45b9784283f1b2e7fb61b42047c2fd678ef0960d4f6f1eba131594cc369d4"
 name = "rusty_renju"
 version = "0.9.0"
 dependencies = [
- "ethnum",
  "indoc",
  "rand",
  "regex-lite",

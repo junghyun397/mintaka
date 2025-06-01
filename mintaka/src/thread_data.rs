@@ -87,6 +87,15 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
         self.ply -= 1;
     }
 
+    pub fn insert_killer_move_mut(&mut self, pos: Pos) {
+        self.killers[self.ply][1] = self.killers[self.ply][0];
+        self.killers[self.ply][0] = pos.into();
+    }
+
+    pub fn update_history_table_mut(&mut self, pos: Pos) {
+        // TODO
+    }
+
     pub fn clear_vcf_stack_mut(&mut self) {
         self.vcf_stack_top = 0;
     }
@@ -98,20 +107,11 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
 
     pub fn pop_vcf_frame_mut(&mut self) -> Option<VcfFrame> {
         if self.vcf_stack_top == 0 {
-            None
-        } else {
-            self.vcf_stack_top -= 1;
-            Some(self.vcf_stack[self.vcf_stack_top])
+            return None;
         }
-    }
 
-    pub fn insert_killer_move_mut(&mut self, pos: Pos) {
-        self.killers[self.ply][1] = self.killers[self.ply][0];
-        self.killers[self.ply][0] = pos.into();
-    }
-
-    pub fn update_history_table_mut(&mut self, pos: Pos) {
-        // TODO
+        self.vcf_stack_top -= 1;
+        Some(self.vcf_stack[self.vcf_stack_top])
     }
 
 }

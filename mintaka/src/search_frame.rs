@@ -9,14 +9,7 @@ pub struct SearchFrame {
     pub best_move: MaybePos,
     pub static_eval: Score,
     pub on_pv: bool,
-}
-
-impl Default for SearchFrame {
-
-    fn default() -> Self {
-        Self::EMPTY
-    }
-
+    pub cutoffs: usize,
 }
 
 impl SearchFrame {
@@ -26,6 +19,7 @@ impl SearchFrame {
         best_move: MaybePos::NONE,
         static_eval: 0,
         on_pv: false,
+        cutoffs: 0,
     };
 
 }
