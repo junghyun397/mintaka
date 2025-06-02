@@ -166,8 +166,8 @@ impl Iterator for BitfieldIterator {
             return None;
         }
 
-        let result = self.chunks[self.position / 4] & 0b1 == 0b1;
-        self.chunks[self.position / 4] >>= 1;
+        let result = self.chunks[self.position / 64] & 0b1 == 0b1;
+        self.chunks[self.position / 64] >>= 1;
         self.position += 1;
         Some(result)
     }

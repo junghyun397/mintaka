@@ -25,17 +25,22 @@ const SYMBOL_FORBID_OVERLINE: char = '6';
 const HISTORY_LITERAL_SEPARATOR: &str = ",";
 const HISTORY_LITERAL_PASS: &str = "PASS";
 
-fn match_symbol(c: char) -> Option<Option<Color>> {
+enum BoardElement {
+    Stone(Color),
+    Empty
+}
+
+fn match_symbol(c: char) -> Option<BoardElement> {
     match c {
-        SYMBOL_BLACK => Some(Some(Color::Black)),
-        SYMBOL_WHITE => Some(Some(Color::White)),
+        SYMBOL_BLACK => Some(BoardElement::Stone(Color::Black)),
+        SYMBOL_WHITE => Some(BoardElement::Stone(Color::White)),
         SYMBOL_EMPTY | SYMBOL_FORBID_DOUBLE_THREE | SYMBOL_FORBID_DOUBLE_FOUR | SYMBOL_FORBID_OVERLINE =>
-            Some(None),
+            Some(BoardElement::Empty),
         _ => None
     }
 }
 
-fn parse_board_elements(source: &str) -> Result<Box<[Option<Color>]>, &'static str> {
+fn parse_board_elements(source: &str) -> Result<Box<[BoardElement]>, &'static str> {
     const BOARD_WIDTH: usize = pos::U_BOARD_WIDTH;
     static RE: OnceLock<Regex> = OnceLock::new();
     let re = RE.get_or_init(||
@@ -46,7 +51,7 @@ fn parse_board_elements(source: &str) -> Result<Box<[Option<Color>]>, &'static s
             .unwrap()
     );
 
-    let elements: Box<[Option<Color>]> = re.find_iter(source)
+    let elements: Box<[BoardElement]> = re.find_iter(source)
         .map(|m| m.as_str())
         .collect::<Box<[&str]>>()
         .iter().rev()
@@ -65,13 +70,15 @@ fn parse_board_elements(source: &str) -> Result<Box<[Option<Color>]>, &'static s
     Ok(elements)
 }
 
-fn extract_stones_by_color(color: Color, source: &[Option<Color>]) -> Box<[Pos]> {
+fn extract_stones_by_color(color: Color, source: &[BoardElement]) -> Box<[Pos]> {
     source.iter()
         .enumerate()
-        .filter_map(|(idx, symbol)|
-            symbol.and_then(|sym_color|
-                (sym_color == color).then(|| Pos::from_index(idx as u8))
-            )
+        .filter_map(|(idx, &symbol)|
+            match symbol {
+                BoardElement::Stone(sym_color) if sym_color == color =>
+                    Some(Pos::from_index(idx as u8)),
+                _ => None
+            }
         )
         .collect()
 }
