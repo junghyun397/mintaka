@@ -73,9 +73,9 @@ fn parse_board_elements(source: &str) -> Result<Box<[BoardElement]>, &'static st
 fn extract_stones_by_color(color: Color, source: &[BoardElement]) -> Box<[Pos]> {
     source.iter()
         .enumerate()
-        .filter_map(|(idx, &symbol)|
+        .filter_map(|(idx, symbol)|
             match symbol {
-                BoardElement::Stone(sym_color) if sym_color == color =>
+                &BoardElement::Stone(sym_color) if sym_color == color =>
                     Some(Pos::from_index(idx as u8)),
                 _ => None
             }
@@ -233,7 +233,7 @@ impl FromStr for Slice {
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        let fields: Box<[Option<Color>]> = source.chars()
+        let fields: Box<[BoardElement]> = source.chars()
             .filter_map(match_symbol)
             .collect();
 
@@ -248,7 +248,7 @@ impl FromStr for Slice {
                     Slice::empty(0, field_len, 0, 0),
                     |acc, (idx, field)| {
                         match field {
-                            Some(color) => acc.set(color, idx as u8),
+                            BoardElement::Stone(color) => acc.set(color, idx as u8),
                             _ => acc
                         }
                     }
@@ -293,16 +293,38 @@ impl FromStr for History {
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        // regex: [a-z][0-9][0-9]?
-        static RE: OnceLock<Regex> = OnceLock::new();
-        let re = RE.get_or_init(|| Regex::from_str(r"[a-z][0-9][0-9]?").unwrap());
-
         let mut history = History::default();
+        let source = source.to_lowercase();
+        let bytes = source.as_bytes();
+        let mut idx = 0;
 
-        for result in re.find_iter(source)
-            .map(|m| m.as_str().parse::<Pos>())
-        {
-            history.set_mut(result?);
+        fn detect_token(bytes: &[u8]) -> Option<(Pos, usize)> {
+            if bytes.len() < 2
+                || !(b'a' .. (b'a' + pos::BOARD_WIDTH)).contains(&bytes[0])
+            {
+                return None;
+            }
+
+            let len =
+                if bytes.len() > 2 && bytes[2].is_ascii_digit() {
+                    3
+                } else if bytes[1].is_ascii_digit() {
+                    2
+                } else {
+                    return None;
+                };
+
+            Pos::from_str(str::from_utf8(&bytes[.. len]).unwrap()).ok()
+                .map(|pos| (pos, len))
+        }
+
+        while idx < bytes.len() {
+            if let Some((pos, len)) = detect_token(&bytes[idx ..]) {
+                history.set_mut(pos);
+                idx += len;
+            } else {
+                idx += 1;
+            }
         }
 
         Ok(history)

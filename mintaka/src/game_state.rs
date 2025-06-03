@@ -19,11 +19,12 @@ impl GameState {
         self.history.set_mut(pos);
 
         self.move_scores.add_neighbor_score(pos);
-        self.movegen_window.expand_window_mut(pos);
+        self.movegen_window.imprint_window_mut(pos);
     }
 
     pub fn pass_mut(&mut self) {
         self.board.pass_mut();
+        self.history.pass_mut();
     }
 
     pub fn unset_mut(&mut self, movegen_window: MovegenWindow) {

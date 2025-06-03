@@ -15,7 +15,7 @@ pub struct MovegenWindow {
 impl Default for MovegenWindow {
 
     fn default() -> Self {
-        Self::EMPTY
+        Self::DEFAULT
     }
 
 }
@@ -26,12 +26,17 @@ const MOVEGEN_IMPRINT_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_movegen_impr
 
 impl MovegenWindow {
 
-    pub const EMPTY: MovegenWindow = MovegenWindow {
-        start_row: pos::CENTER_ROW_COL,
-        start_col: pos::CENTER_ROW_COL,
-        end_row: pos::CENTER_ROW_COL,
-        end_col: pos::CENTER_ROW_COL,
-        movegen_field: Bitfield::ZERO_FILLED,
+    pub const DEFAULT: MovegenWindow = {
+        let mut movegen_field = Bitfield::ZERO_FILLED;
+        movegen_field.0[pos::CENTER_ROW_COL as usize / 8] |= 0b1 << (pos::CENTER_ROW_COL / 8);
+
+        MovegenWindow {
+            start_row: pos::CENTER_ROW_COL,
+            start_col: pos::CENTER_ROW_COL,
+            end_row: pos::CENTER_ROW_COL,
+            end_col: pos::CENTER_ROW_COL,
+            movegen_field: Bitfield::ZERO_FILLED,
+        }
     };
 
     fn expand_bounds_mut(&mut self, pos: Pos) {

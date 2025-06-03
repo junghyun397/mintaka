@@ -1,5 +1,6 @@
 use crate::game_state::GameState;
 use crate::movegen::move_list::MoveList;
+use crate::movegen::score_table::probe_score_table_lut;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
@@ -46,9 +47,17 @@ impl VcfMovesUnchecked {
 
 fn score_move(state: &GameState, pos: Pos) -> Score {
     let neighborhood_score = state.move_scores.scores[pos.idx_usize()] as f32;
-    let distance = (state.history.avg_distance_to_recent_moves(pos).max(8) + 3) as f32;
+    let score =
+        probe_score_table_lut::<{ Color::Black }>(
+            state.board.patterns.field.get::<{ Color::Black }>()[pos.idx_usize()]
+        ) as f32
+            + probe_score_table_lut::<{ Color::White }>(
+            state.board.patterns.field.get::<{ Color::White }>()[pos.idx_usize()]
+        ) as f32;
 
-    ((neighborhood_score / distance) * 16.0) as Score
+    let distance = (state.history.avg_distance_to_recent_moves(pos).max(8) + 4) as f32;
+
+    (((score + neighborhood_score) / distance) * 16.0) as Score
 }
 
 pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: isize, recent_move: Pos) -> VcfMovesUnchecked {

@@ -4,7 +4,6 @@ use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::notation::rule::ForbiddenKind;
-use crate::score_table::ScoreTable;
 use crate::slice::Slice;
 use crate::slice_pattern::{contains_five_in_a_row, SlicePattern};
 use crate::slice_pattern_count::SlicePatternCounts;
@@ -233,13 +232,12 @@ pub struct SlicePatternCount {
 pub struct Patterns {
     pub field: AlignedColorContainer<[Pattern; pos::BOARD_SIZE]>,
     pub counts: SlicePatternCounts,
-    pub score_table: ScoreTable,
     pub unchecked_five_in_a_row: Option<Color>,
     pub unchecked_five_pos: ColorContainer<Option<Pos>>,
     pub forbidden_field: Bitfield,
 }
 
-assert_struct_sizes!(Patterns, size=3008, align=64);
+assert_struct_sizes!(Patterns, size=2496, align=64);
 
 impl Default for Patterns {
 
@@ -247,7 +245,6 @@ impl Default for Patterns {
         Self {
             field: unsafe { std::mem::zeroed() },
             counts: SlicePatternCounts::EMPTY,
-            score_table: ScoreTable::EMPTY,
             unchecked_five_in_a_row: None,
             unchecked_five_pos: ColorContainer {
                 black: None,

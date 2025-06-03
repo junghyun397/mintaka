@@ -49,20 +49,16 @@ impl GameAgent {
         match command {
             Command::Play(action) => {
                 match action {
-                    MaybePos::NONE => {
-                        self.state.board.pass_mut();
-                        self.history.pass_mut();
-                    },
-                    pos => {
-                        self.state.board.set_mut(pos.unwrap());
-                        self.history.set_mut(pos.unwrap());
-                    }
+                    MaybePos::NONE => self.state.pass_mut(),
+                    pos => self.state.set_mut(pos.unwrap())
                 }
             },
             Command::Set { pos, color } => {
                 if !self.state.board.is_pos_empty(pos) {
                     return Err("stone already exists");
                 }
+
+                self.state.movegen_window.imprint_window_mut(pos);
 
                 if self.state.board.player_color == color {
                     self.state.board.set_mut(pos);
@@ -194,7 +190,9 @@ impl GameAgent {
             );
 
             s.spawn(move || {
-                let score = search::iterative_deepening::<{ RuleKind::Renju }, _>(&mut main_td, &mut state);
+                let score = search::iterative_deepening::<{ RuleKind::Renju }, MainThread>(
+                    &mut main_td, &mut state
+                );
 
                 main_td.thread_type.make_response(||
                     Response::BestMove(main_td.best_move.unwrap(), score as f32)
@@ -213,7 +211,9 @@ impl GameAgent {
                 let mut state = self.state;
 
                 s.spawn(move || {
-                    search::iterative_deepening::<{ RuleKind::Renju }, _>(&mut worker_td, &mut state);
+                    search::iterative_deepening::<{ RuleKind::Renju }, WorkerThread>(
+                        &mut worker_td, &mut state
+                    );
                 });
             }
         });

@@ -74,6 +74,7 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     let mut alpha = (prev_score - delta).max(-Score::INF);
     let mut beta = (prev_score + delta).min(Score::INF);
     let mut depth = max_depth;
+    let min_depth = (depth / 2).max(1);
 
     loop {
         let score = pvs::<R, RootNode, TH>(td, state, depth, alpha, beta);
@@ -88,7 +89,7 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
             depth = max_depth;
         } else if score >= beta { // fail-high
             beta = (beta + delta).min(Score::INF);
-            depth -= 1;
+            depth = (depth - 1).max(min_depth);
         } else { // expected
             return score;
         }
