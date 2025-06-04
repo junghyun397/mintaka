@@ -195,7 +195,7 @@ impl GameAgent {
                 );
 
                 main_td.thread_type.make_response(||
-                    Response::BestMove(main_td.best_move.unwrap(), score as f32)
+                    Response::BestMove(main_td.best_move.unwrap(), score)
                 );
             });
 

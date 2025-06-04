@@ -231,7 +231,7 @@ fn handle_command(
                     Box::new((Board::default(), History::default()))
                 ));
             },
-            "board" => {
+            "b" | "board" => {
                 command_sender.status(StatusCommand::Board);
             },
             "history" => {
@@ -241,26 +241,26 @@ fn handle_command(
                 command_sender.status(StatusCommand::Version);
             },
             "set" => {
-                let pos = args.get(1).ok_or("pos not provided.")?.parse()?;
+                let pos = args.get(1).ok_or("position not provided.")?.parse()?;
                 let color = args.get(2).ok_or("color not provided.")?.parse()?;
 
                 command_sender.command(Command::Set { pos, color });
             },
             "unset" => {
-                let pos = args.get(1).ok_or("pos not provided.")?.parse()?;
+                let pos = args.get(1).ok_or("position not provided.")?.parse()?;
                 let color = args.get(2).ok_or("color not provided.")?.parse()?;
 
                 command_sender.command(Command::Unset { pos, color });
             },
-            "play" => {
-                let pos: Pos = args.get(1).ok_or("pos not provided.")?.parse()?;
+            "p" | "play" => {
+                let pos: Pos = args.get(1).ok_or("position not provided.")?.parse()?;
 
                 command_sender.command(Command::Play(pos.into()));
             },
-            "undo" => {
+            "u" | "undo" => {
                 command_sender.command(Command::Undo);
             },
-            "gen" => {
+            "g" | "gen" => {
                 command_sender.launch();
             },
             &_ => return Err("unknown command."),

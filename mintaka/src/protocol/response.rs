@@ -1,5 +1,6 @@
 use crate::principal_variation::PrincipalVariation;
 use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::value::Score;
 
 pub enum Response {
     Info(String),
@@ -9,9 +10,9 @@ pub enum Response {
     Status {
         eval: f32,
         total_nodes_in_1k: usize,
-        best_moves: Vec<(Pos, f32)>,
+        best_moves: Vec<(Pos, Score)>,
         hash_usage: f32,
     },
     Pv(Vec<(Pos, PrincipalVariation)>),
-    BestMove(Pos, f32),
+    BestMove(Pos, Score),
 }

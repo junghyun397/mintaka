@@ -28,14 +28,14 @@ impl MovegenWindow {
 
     pub const DEFAULT: MovegenWindow = {
         let mut movegen_field = Bitfield::ZERO_FILLED;
-        movegen_field.0[pos::CENTER_ROW_COL as usize / 8] |= 0b1 << (pos::CENTER_ROW_COL / 8);
+        movegen_field.set_mut(pos::CENTER);
 
         MovegenWindow {
             start_row: pos::CENTER_ROW_COL,
             start_col: pos::CENTER_ROW_COL,
             end_row: pos::CENTER_ROW_COL,
             end_col: pos::CENTER_ROW_COL,
-            movegen_field: Bitfield::ZERO_FILLED,
+            movegen_field,
         }
     };
 

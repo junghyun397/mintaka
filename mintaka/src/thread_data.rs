@@ -80,7 +80,7 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
 
     pub fn push_ply_mut(&mut self) {
         self.ply += 1;
-        self.batch_counter.add_single_mut();
+        self.batch_counter.increment_single_mut();
     }
 
     pub fn pop_ply_mut(&mut self) {
@@ -90,6 +90,10 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
     pub fn insert_killer_move_mut(&mut self, pos: Pos) {
         self.killers[self.ply][1] = self.killers[self.ply][0];
         self.killers[self.ply][0] = pos.into();
+    }
+
+    pub fn clear_killer_move_mut(&mut self) {
+        self.killers[self.ply] = [MaybePos::NONE; 2];
     }
 
     pub fn update_history_table_mut(&mut self, pos: Pos) {

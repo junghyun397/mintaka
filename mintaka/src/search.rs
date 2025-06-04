@@ -54,8 +54,6 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
             aspiration::<R, TH>(td, state, depth, score)
         };
 
-        td.best_move = td.pvs[0].line[0];
-
         if td.is_aborted() {
             break 'iterative_deepening;
         }
@@ -108,7 +106,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
         .access(state.board.player_color)
     { // immediate win
-        return Score::win_in(td.ply)
+        return Score::win_in(td.ply + 1)
     }
 
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
@@ -121,6 +119,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         }
 
         td.push_ply_mut();
+        td.batch_counter.increment_single_mut();
         state.set_mut(pos);
 
         return -pvs::<R, NT::NextType, TH>(td, state, depth_left, -beta, -alpha);
@@ -143,8 +142,8 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             return HeuristicEvaluator.eval_value(&state.board);
         }
 
-        alpha = alpha.max(Score::win_in(td.ply));
-        beta = beta.min(Score::lose_in(td.ply));
+        alpha = alpha.max(Score::lose_in(td.ply));
+        beta = beta.min(Score::win_in(td.ply));
         if alpha >= beta { // mate distance pruning
             return alpha;
         }
@@ -196,12 +195,12 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         return vcf_search(td, td.config.max_vcf_depth, state, alpha, beta)
             .unwrap_or(static_eval);
     }
-
     let original_alpha = alpha;
 
     let mut best_score = -Score::INF;
     let mut best_move = MaybePos::NONE;
 
+    td.killers[td.ply] = [MaybePos::NONE; 2]; // todo: DEBUG
     let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
 
     let mut moves = 0;
@@ -220,6 +219,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
         let movegen_window = state.movegen_window;
+        td.batch_counter.increment_single_mut();
         state.set_mut(pos);
 
         let score = if moves == 1 { // full-window search
@@ -260,7 +260,15 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         }
     }
 
+    if moves == 0 {
+        println!("zero?");
+    }
+
     td.ss[td.ply].best_move = best_move;
+
+    if NT::IS_ROOT {
+        td.best_move = best_move;
+    }
 
     td.pop_ply_mut();
 

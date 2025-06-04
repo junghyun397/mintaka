@@ -34,11 +34,7 @@ impl Board {
             return false;
         }
 
-        if self.player_color == Color::Black {
-            return self.patterns.forbidden_field.is_hot(pos)
-        }
-
-        true
+        self.player_color != Color::Black || !self.patterns.forbidden_field.is_hot(pos)
     }
 
     pub fn stone_kind(&self, pos: Pos) -> Option<Color> {

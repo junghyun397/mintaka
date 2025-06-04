@@ -351,11 +351,10 @@ impl FromStr for Pos {
             .map_err(|_| "invalid row charter")
             .and_then(|row| {
                 let col = source.chars().next().unwrap() as u8 - b'a';
-                let pos = Pos::from_cartesian(row - 1 , col);
 
-                (pos.col() < pos::BOARD_WIDTH && pos.row() < pos::BOARD_WIDTH)
-                    .then_some(pos)
-                    .ok_or("invalid range")
+                (col < pos::BOARD_WIDTH && row < pos::BOARD_WIDTH)
+                    .then(|| Pos::from_cartesian(row - 1 , col))
+                    .ok_or("column or row out of range")
             })
     }
 }
@@ -367,6 +366,17 @@ impl Display for Pos {
 }
 
 impl_debug_from_display!(Pos);
+
+impl Display for MaybePos {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            MaybePos::NONE => write!(f, "None"),
+            _ => write!(f, "Pos({})", self.unwrap())
+        }
+    }
+}
+
+impl_debug_from_display!(MaybePos);
 
 impl From<Color> for char {
     fn from(value: Color) -> Self {

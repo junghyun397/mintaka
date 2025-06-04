@@ -1,6 +1,6 @@
 use crate::notation::pos;
 
-pub const EMPTY_HASH: u64 = 0;
+pub const EMPTY_HASH: u64 = 0x20FC58598E432543;
 
 pub const HASH_TABLE: [[u64; pos::BOARD_SIZE]; 2] = [
     [

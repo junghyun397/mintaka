@@ -17,6 +17,10 @@ mod codegen {
         for _ in 0..pos::BOARD_SIZE {
             println!("0x{:016X},", rng.random::<u64>());
         }
+
+        println!("---");
+
+        println!("0x{:016X},", rng.random::<u64>());
     }
 
 }

@@ -194,7 +194,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             }
 
             board.set_mut(four_pos);
-            td.batch_counter.add_single_mut();
+            td.batch_counter.increment_single_mut();
             vcf_ply += 1;
 
             let defend_pos = board.patterns.unchecked_five_pos.get_ref::<C>().unwrap();
@@ -279,7 +279,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             }
 
             board.set_mut(defend_pos);
-            td.batch_counter.add_single_mut();
+            td.batch_counter.increment_single_mut();
             vcf_ply += 1;
 
             if board.patterns.counts.global.get_ref::<C>().total_fours() == 0 { // cold branch pruning

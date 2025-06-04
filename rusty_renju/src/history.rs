@@ -103,8 +103,6 @@ impl History {
     }
 
     pub fn avg_distance_to_recent_moves(&self, pos: Pos) -> u8 {
-        debug_assert_ne!(self.top, 0);
-
         if self.top > 3 {
             let distance1 = self.entries[self.top - 4].unwrap().distance(pos);
             let distance2 = self.entries[self.top - 3].unwrap().distance(pos);
@@ -126,7 +124,7 @@ impl History {
                 let distance3 = self.entries[self.top - 1].unwrap().distance(pos);
                 (distance1 + distance2 + distance3) / 3
             },
-            _ => unreachable!()
+            _ => 0
         }
     }
 
