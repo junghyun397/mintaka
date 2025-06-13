@@ -1,4 +1,5 @@
 use crate::notation::color::Color;
+use crate::notation::rule::RuleKind;
 use crate::slice::Slice;
 use crate::slice_pattern::ExtendedMatch::{Left, Right};
 use crate::{assert_struct_sizes, const_for, pattern};
@@ -29,7 +30,7 @@ impl SlicePattern {
 
 impl Slice {
 
-    pub fn calculate_slice_pattern<const C: Color>(&self) -> SlicePattern {
+    pub fn calculate_slice_pattern<const R: RuleKind, const C: Color>(&self) -> SlicePattern {
         // padding = 3
         let block: usize = !(!(usize::MAX << self.length as u32) << 3);
         let extended_p: usize = (self.stones::<C>() as usize) << 3;
@@ -45,7 +46,7 @@ impl Slice {
             let shl = shift_offset.min(0).abs();
             let shr = shift_offset.max(0);
 
-            lookup_patterns::<C>(
+            lookup_patterns::<R, C>(
                 &mut acc,
                 shift,
                 p | (q << 8),
@@ -61,7 +62,7 @@ impl Slice {
 }
 
 #[inline(always)]
-fn lookup_patterns<const C: Color>(
+fn lookup_patterns<const R: RuleKind, const C: Color>(
     acc: &mut SlicePattern,
     shift: isize,
     vector: usize,
@@ -77,9 +78,9 @@ fn lookup_patterns<const C: Color>(
         }
     }
 
-    let patch_pointer = match C {
-        Color::Black => SLICE_PATTERN_LUT.vector.black[vector],
-        Color::White => SLICE_PATTERN_LUT.vector.white[vector],
+    let patch_pointer = match (R, C) {
+        (RuleKind::Renju, Color::Black) => SLICE_PATTERN_LUT.vector.black[vector],
+        _ => SLICE_PATTERN_LUT.vector.white[vector],
     };
 
     if patch_pointer != 0 {
@@ -88,7 +89,8 @@ fn lookup_patterns<const C: Color>(
             Color::White => SLICE_PATTERN_LUT.patch.white.get_unchecked(patch_pointer as usize),
         } };
 
-        if C == Color::Black && slice_patch_data.extended_match.is_some_and(|extended_match|
+        if R == RuleKind::Renju && C == Color::Black
+            && slice_patch_data.extended_match.is_some_and(|extended_match|
             !extended_match_for_black(extended_match, raw, shift)
         ) {
             return;

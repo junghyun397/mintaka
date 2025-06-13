@@ -2,11 +2,12 @@
 mod test_search {
     use mintaka::config::Config;
     use mintaka::game_agent::GameAgent;
-    use mintaka::protocol::message::ResponseSender;
+    use mintaka::protocol::command::Command;
+    use mintaka::protocol::message::{Message, ResponseSender};
     use mintaka::protocol::response::Response;
-    use rusty_renju::board;
     use std::sync::atomic::AtomicBool;
     use std::sync::{mpsc, Arc};
+    use std::time::Duration;
 
     macro_rules! search {
         ($board:expr) => {{
@@ -21,8 +22,6 @@ mod test_search {
     }
 
     fn empty_position() {
-        let mut board = board!("");
-
         let config = Config::default();
         let aborted = Arc::new(AtomicBool::new(false));
 
@@ -33,11 +32,15 @@ mod test_search {
 
         let mut game_agent = GameAgent::new(config, aborted.clone());
 
+        game_agent.command(Command::TotalTime(Duration::ZERO)).unwrap();
+        game_agent.command(Command::IncrementTime(Duration::from_secs(1))).unwrap();
         game_agent.launch(response_sender.clone());
 
         while let Ok(response) = message_receiver.try_recv() {
-            if let Response::BestMove(pos, score) = response {
+            if let Message::Response(Response::BestMove(pos, score)) = response {
                 println!("solution: pos={pos}, score={score}");
+                game_agent.command(Command::Play(pos.into())).unwrap();
+                game_agent.launch(response_sender.clone());
             }
         }
     }

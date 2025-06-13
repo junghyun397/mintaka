@@ -3,7 +3,7 @@ use crate::notation::color::{AlignedColorContainer, Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::notation::rule::ForbiddenKind;
+use crate::notation::rule::{ForbiddenKind, RuleKind};
 use crate::slice::Slice;
 use crate::slice_pattern::{contains_five_in_a_row, SlicePattern};
 use crate::slice_pattern_count::SlicePatternCounts;
@@ -264,8 +264,8 @@ impl Patterns {
     };
 
     #[inline]
-    pub fn update_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
-        let slice_pattern = slice.calculate_slice_pattern::<C>();
+    pub fn update_with_slice_mut<const R: RuleKind, const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
+        let slice_pattern = slice.calculate_slice_pattern::<R, C>();
 
         match (slice.pattern_bitmap.get::<C>() == 0, slice_pattern.is_empty()) {
             (false, true) => {

@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test_slice_pattern {
     use rusty_renju::notation::color::*;
+    use rusty_renju::notation::rule::RuleKind;
     use rusty_renju::pattern::*;
     use rusty_renju::slice::*;
     use std::str::FromStr;
@@ -10,8 +11,8 @@ mod test_slice_pattern {
             assert_eq!($case.len(), $expected.len());
 
             let slice = Slice::from_str($case).unwrap();
-            let black_patterns = slice.calculate_slice_pattern::<{ Color::Black }>();
-            let white_patterns = slice.calculate_slice_pattern::<{ Color::White }>();
+            let black_patterns = slice.calculate_slice_pattern::<{ RuleKind::Renju }, { Color::Black }>();
+            let white_patterns = slice.calculate_slice_pattern::<{ RuleKind::Renju }, { Color::White }>();
 
             let content_pattern = black_patterns.patterns.to_ne_bytes().iter()
                 .zip(white_patterns.patterns.to_ne_bytes().iter())

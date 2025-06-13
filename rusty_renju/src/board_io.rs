@@ -467,3 +467,12 @@ pub fn add_move_marker(mut board_string: String, color: Color, pos: Pos, pre_mar
         $crate::board::Board::default()
     };
 }
+
+#[macro_export] macro_rules! board_with_history {
+    ($history_str:expr) => {{
+        let history = $crate::board::History::from_str($history_str).unwrap();
+        let board = $crate::board::Board::from(&history).unwrap();
+
+        (board, history)
+    }}
+}

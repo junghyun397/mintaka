@@ -4,6 +4,7 @@ use crate::memo::hash_key::HashKey;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::{MaybePos, Pos};
+use crate::notation::rule::RuleKind;
 use crate::pattern;
 use crate::pattern::Patterns;
 use crate::slice::Slices;
@@ -134,7 +135,7 @@ impl Board {
                     $slice.has_potential_pattern::<{ $color }>()
                 ) {
                     (_, true) => {
-                        self.patterns.update_with_slice_mut::<{ $color }, { $direction }>($slice);
+                        self.patterns.update_with_slice_mut::<{ RuleKind::Renju }, { $color }, { $direction }>($slice);
                     },
                     (false, false) => {
                         self.patterns.clear_with_slice_mut::<{ $color }, { $direction }>($slice);
@@ -186,11 +187,11 @@ impl Board {
         macro_rules! update_by_slice {
             ($slice:expr,$direction:expr) => {{
                 if $slice.has_potential_pattern::<{ Color::Black }>() {
-                    self.patterns.update_with_slice_mut::<{ Color::Black }, { $direction }>($slice);
+                    self.patterns.update_with_slice_mut::<{ RuleKind::Renju }, { Color::Black }, { $direction }>($slice);
                 }
 
                 if $slice.has_potential_pattern::<{ Color::White }>() {
-                    self.patterns.update_with_slice_mut::<{ Color::White }, { $direction }>($slice);
+                    self.patterns.update_with_slice_mut::<{ RuleKind::Renju }, { Color::White }, { $direction }>($slice);
                 }
             }};
         }
