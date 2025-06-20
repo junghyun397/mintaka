@@ -13,7 +13,7 @@ pub trait AbstractTranspositionTable {
     type EntryType: AbstractTTEntry;
 
     fn size_in_kib(&self) -> usize {
-        size_of_val(self.internal_table()) / 1024
+        self.internal_table().len() * size_of::<Self::EntryType>() / 1024
     }
 
     fn calculate_table_len_in_kib(size_in_kib: usize) -> usize {

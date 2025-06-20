@@ -43,6 +43,10 @@ impl VcfMovesUnchecked {
         );
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.top == 0
+    }
+
 }
 
 fn score_move(state: &GameState, pos: Pos) -> Score {
@@ -60,11 +64,11 @@ fn score_move(state: &GameState, pos: Pos) -> Score {
     (((score + neighborhood_score) / distance) * 16.0) as Score
 }
 
-pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: isize, recent_move: Pos) -> VcfMovesUnchecked {
+pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Pos) -> VcfMovesUnchecked {
     let mut vcf_moves = [MaybePos::NONE.unwrap(); VCF_MAX_MOVES];
     let mut vcf_moves_top = 0;
 
-    let field_ptr = board.patterns.field.access(color).as_ptr() as *const u32;
+    let field_ptr = board.patterns.field.access(board.player_color).as_ptr() as *const u32;
 
     let four_mask = Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
     let zero_mask = Simd::splat(0);
@@ -117,7 +121,7 @@ pub fn generate_vcf_moves(board: &Board, color: Color, distance_window: isize, r
         }
     }
 
-    if board.patterns.field.access(color)[pos::BOARD_BOUND].has_any_four() {
+    if board.patterns.field.access(board.player_color)[pos::BOARD_BOUND].has_any_four() {
         vcf_moves[vcf_moves_top] = Pos::from_index(pos::U8_BOARD_BOUND);
         vcf_moves_top += 1;
     }
@@ -138,15 +142,8 @@ pub fn generate_neighbors_moves(state: &GameState, moves: &mut MoveList) {
 }
 
 pub fn generate_defend_open_four_moves(state: &GameState, moves: &mut MoveList) {
-    match state.board.player_color {
-        Color::Black => generate_defend_open_four_moves_impl::<{ Color::Black }>(state, moves),
-        Color::White => generate_defend_open_four_moves_impl::<{ Color::White }>(state, moves)
-    }
-}
-
-fn generate_defend_open_four_moves_impl<const C: Color>(state: &GameState, moves: &mut MoveList) {
-    let player_ptr = state.board.patterns.field.get_ref::<C>().as_ptr() as *const u32;
-    let opponent_ptr = state.board.patterns.field.get_reversed_ref::<C>().as_ptr() as *const u32;
+    let player_ptr = state.board.patterns.field.access(state.board.player_color).as_ptr() as *const u32;
+    let opponent_ptr = state.board.patterns.field.access(state.board.opponent_color()).as_ptr() as *const u32;
 
     let zero_mask = Simd::splat(0);
     let four_mask = Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
@@ -176,8 +173,8 @@ fn generate_defend_open_four_moves_impl<const C: Color>(state: &GameState, moves
         }
     }
 
-    if state.board.patterns.field.get_ref::<C>()[pos::BOARD_BOUND].has_any_four()
-        || state.board.patterns.field.get_reversed_ref::<C>()[pos::BOARD_BOUND].has_close_three()
+    if state.board.patterns.field.access(state.board.player_color)[pos::BOARD_BOUND].has_any_four()
+        || state.board.patterns.field.access(state.board.opponent_color())[pos::BOARD_BOUND].has_close_three()
     {
         const POS: Pos = Pos::from_index(pos::U8_BOARD_BOUND);
         moves.push(POS, score_move(state, POS));

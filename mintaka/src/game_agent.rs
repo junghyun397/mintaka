@@ -170,8 +170,15 @@ impl GameAgent {
         self.aborted.store(false, Ordering::Relaxed);
         let global_counter_in_1k = AtomicUsize::new(0);
 
+        self.time_manager.append_mut(self.time_manager.increment);
         let running_time = self.time_manager.next_running_time();
-        self.time_manager.consume_mut(running_time);
+        let started_time = std::time::Instant::now();
+
+        response_sender.response(Response::Begins {
+            workers: self.config.workers.get(),
+            running_time,
+            tt_size_in_kib: self.tt.size_in_kib(),
+        });
 
         std::thread::scope(|s| {
             let mut state = self.state;
@@ -179,7 +186,7 @@ impl GameAgent {
             let mut main_td = ThreadData::new(
                 MainThread::new(
                     response_sender,
-                    std::time::Instant::now(),
+                    started_time,
                     SearchLimit::Time { turn_time: running_time }
                 ),
                 0,
@@ -195,7 +202,12 @@ impl GameAgent {
                 );
 
                 main_td.thread_type.make_response(||
-                    Response::BestMove(main_td.best_move.unwrap(), score)
+                    Response::BestMove {
+                        best_move: main_td.best_move.unwrap(),
+                        score,
+                        total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
+                        time_elapsed: started_time.elapsed(),
+                    }
                 );
             });
 
@@ -219,6 +231,7 @@ impl GameAgent {
         });
 
         self.tt.increase_age();
+        self.time_manager.consume_mut(started_time.elapsed());
     }
 
     pub fn abort(&self) {

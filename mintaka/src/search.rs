@@ -103,6 +103,14 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     mut alpha: Score,
     mut beta: Score,
 ) -> Score {
+    if td.config.draw_condition.is_some_and(|depth|
+        state.history.len() + 1 >= depth
+    )
+        || state.board.stones == pos::U8_BOARD_SIZE
+    {
+        return Score::DRAW;
+    }
+
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
         .access(state.board.player_color)
     { // immediate win
@@ -123,15 +131,6 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         state.set_mut(pos);
 
         return -pvs::<R, NT::NextType, TH>(td, state, depth_left, -beta, -alpha);
-    }
-
-    if td.config.draw_condition
-        .is_some_and(|depth|
-            state.history.len() + 1 >= depth as usize
-        )
-        || state.board.stones == pos::U8_BOARD_SIZE
-    {
-        return Score::DRAW;
     }
 
     // clear pv-line
@@ -195,6 +194,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         return vcf_search(td, td.config.max_vcf_depth, state, alpha, beta)
             .unwrap_or(static_eval);
     }
+
     let original_alpha = alpha;
 
     let mut best_score = -Score::INF;
@@ -214,20 +214,20 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             continue;
         }
 
-        moves += 1;
-
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
         let movegen_window = state.movegen_window;
         td.batch_counter.increment_single_mut();
         state.set_mut(pos);
 
+        moves += 1;
+
         let score = if moves == 1 { // full-window search
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
-        } else { // null-window search
+        } else { // zero-window search
             let mut score = -pvs::<R, OffPVNode, TH>(td, state, depth_left - 1, -alpha - 1, -alpha);
 
-            if score > alpha { // null-window failed, full-window search
+            if score > alpha { // zero-window failed, full-window search
                 score = -pvs::<R, PVNode, TH>(td, state, depth_left - 1, -beta, -alpha);
             }
 
@@ -255,13 +255,8 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         if alpha >= beta { // beta cutoff
             td.ss[td.ply].cutoffs += 1;
             td.insert_killer_move_mut(pos);
-            td.update_history_table_mut(pos);
             break 'position_search;
         }
-    }
-
-    if moves == 0 {
-        println!("zero?");
     }
 
     td.ss[td.ply].best_move = best_move;

@@ -66,12 +66,11 @@ pub fn vcf_search(
 
     let mut vcf_moves = generate_vcf_moves(
         &state.board,
-        state.board.player_color,
         Score::DISTANCE_WINDOW,
         state.history.recent_player_move_unchecked()
     );
 
-    if vcf_moves.top == 0 {
+    if vcf_moves.is_empty() {
         return None;
     }
 
@@ -88,7 +87,6 @@ pub fn vcf_defend(
 ) -> Score {
     let vcf_moves = generate_vcf_moves(
         &state.board,
-        state.board.player_color,
         8,
         state.history.recent_opponent_move_unchecked()
     );
@@ -100,7 +98,7 @@ pub fn vcf_sequence(
     td: &mut ThreadData<impl ThreadType>,
     board: &Board
 ) -> Option<Vec<Pos>> {
-    let vcf_moves = generate_vcf_moves(board, board.player_color, 8, pos::CENTER);
+    let vcf_moves = generate_vcf_moves(board, 8, pos::CENTER);
 
     vcf::<SequenceEndgameAccumulator>(td, VcfWin, usize::MAX, *board, vcf_moves, Score::MIN, Score::MAX)
         .map(|mut sequence| {
@@ -313,7 +311,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                     board.patterns.unchecked_five_pos.get_reversed_ref::<C>().unwrap()
                 );
             } else {
-                vcf_moves = generate_vcf_moves(&board, C, ACC::DISTANCE_WINDOW, four_pos)
+                vcf_moves = generate_vcf_moves(&board, ACC::DISTANCE_WINDOW, four_pos)
             }
 
             move_counter = 0;

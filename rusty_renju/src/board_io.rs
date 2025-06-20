@@ -273,6 +273,50 @@ impl Display for Slice {
     }
 }
 
+impl From<&Board> for History {
+    fn from(value: &Board) -> Self {
+        let mut black_history = vec![];
+        let mut white_history = vec![];
+
+        for distance_from_center in 0 .. pos::CENTER_ROW_COL {
+            let begin_idx = pos::CENTER_ROW_COL - distance_from_center;
+            let end_idx = pos::CENTER_ROW_COL + distance_from_center;
+
+            for pos in
+                (0 .. distance_from_center * 2 + 1) // horizontal-up
+                    .map(|offset| Pos::from_cartesian(begin_idx, begin_idx + offset))
+                .chain((0 .. distance_from_center * 2 + 1)
+                    .map(|offset| Pos::from_cartesian(end_idx, begin_idx + offset))
+                ) // horizontal-down
+                .chain((0 .. (distance_from_center * 2 + 1).saturating_sub(2))
+                    .map(|offset| Pos::from_cartesian(begin_idx + 1 + offset, begin_idx))
+                ) // vertical-left
+                .chain((0 .. (distance_from_center * 2 + 1).saturating_sub(2))
+                    .map(|offset| Pos::from_cartesian(begin_idx + 1 + offset, end_idx))
+                ) // vertical-right
+            {
+                match value.stone_kind(pos) {
+                    Some(Color::Black) => black_history.push(pos),
+                    Some(Color::White) => white_history.push(pos),
+                    _ => {}
+                }
+            }
+        }
+
+        let mut history = History::default();
+
+        while let Some(black_pos) = black_history.pop() {
+            history.set_mut(black_pos);
+
+            if let Some(white_pos) = white_history.pop() {
+                history.set_mut(white_pos);
+            }
+        }
+
+        history
+    }
+}
+
 impl Display for History {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let history = self.iter()

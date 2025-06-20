@@ -41,6 +41,8 @@ fn main() -> Result<(), &'static str> {
                         println!("warning: {}", message),
                     Response::Error(message) =>
                         println!("error: {}", message),
+                    Response::Begins { workers, running_time, tt_size_in_kib } =>
+                        println!("begins: workers={workers}, running_time={:?}, tt-size={tt_size_in_kib}kib", running_time),
                     Response::Status { eval, total_nodes_in_1k, best_moves, hash_usage } =>
                         println!(
                             "status: eval={eval}\
@@ -50,10 +52,10 @@ fn main() -> Result<(), &'static str> {
                         ),
                     Response::Pv(pvs) =>
                         println!("pvs={pvs:?}"),
-                    Response::BestMove(pos, score) => {
+                    Response::BestMove { best_move, score, total_nodes_in_1k, time_elapsed} => {
                         launched.store(false, Ordering::Relaxed);
 
-                        println!("solution: pos={pos}, score={score}");
+                        println!("solution: pos={best_move}, score={score}, nodes={total_nodes_in_1k}k, elapsed={:?}", time_elapsed);
                     }
                 }
             },
@@ -105,7 +107,7 @@ fn handle_command(
             "abort" => {
                 abort.store(true, Ordering::Relaxed);
             },
-            "quite" => todo!(),
+            "quite" => std::process::exit(0),
             &_ => return Err("unknown command.")
         }
     } else {

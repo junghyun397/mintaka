@@ -71,13 +71,14 @@ fn main() -> Result<(), &'static str> {
                     Response::Pv(pvs) => {
                         PiskvorkResponse::Info(format!("pvs={pvs:?}"))
                     },
-                    Response::BestMove(pos, _) => {
+                    Response::BestMove { best_move, .. } => {
                         launched.store(false, Ordering::Relaxed);
 
-                        game_agent.command(Command::Play(pos.into()))?;
+                        game_agent.command(Command::Play(best_move.into()))?;
 
-                        PiskvorkResponse::Pos(pos)
-                    }
+                        PiskvorkResponse::Pos(best_move)
+                    },
+                    _ => PiskvorkResponse::None
                 };
 
                 stdio_out(piskvork_response);

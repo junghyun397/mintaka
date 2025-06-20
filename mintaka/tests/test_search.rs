@@ -34,13 +34,21 @@ mod test_search {
 
         game_agent.command(Command::TotalTime(Duration::ZERO)).unwrap();
         game_agent.command(Command::IncrementTime(Duration::from_secs(1))).unwrap();
+        game_agent.command(Command::TurnTime(Duration::from_secs(1))).unwrap();
+
         game_agent.launch(response_sender.clone());
 
         while let Ok(response) = message_receiver.try_recv() {
-            if let Message::Response(Response::BestMove(pos, score)) = response {
-                println!("solution: pos={pos}, score={score}");
-                game_agent.command(Command::Play(pos.into())).unwrap();
-                game_agent.launch(response_sender.clone());
+            match response {
+                Message::Response(Response::Begins { workers, running_time, tt_size_in_kib }) => {
+                    println!("begins: workers={workers}, tt-size={tt_size_in_kib}");
+                }
+                Message::Response(Response::BestMove { best_move, score, total_nodes_in_1k, time_elapsed }) => {
+                    println!("solution: pos={best_move}, score={score}, nodes={total_nodes_in_1k}, elapsed={:?}", time_elapsed);
+                    game_agent.command(Command::Play(best_move.into())).unwrap();
+                    game_agent.launch(response_sender.clone());
+                }
+                _ => {}
             }
         }
     }

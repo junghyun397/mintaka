@@ -49,8 +49,7 @@ impl History {
         }
 
         self.top -= 1;
-        let pos = self.entries[self.top];
-        Some(pos)
+        Some(self.entries[self.top])
     }
 
     pub fn is_empty(&self) -> bool {

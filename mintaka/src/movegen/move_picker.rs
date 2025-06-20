@@ -21,7 +21,7 @@ enum MoveStage {
 
 pub struct MovePicker {
     stage: MoveStage,
-    moves: MoveList,
+    moves_buffer: MoveList,
     tt_move: MaybePos,
     killer_moves: [MaybePos; KILLER_MOVE_SLOTS],
 }
@@ -34,7 +34,7 @@ impl MovePicker {
     ) -> Self {
         Self {
             stage: MoveStage::TT,
-            moves: MoveList::default(),
+            moves_buffer: MoveList::default(),
             tt_move,
             killer_moves,
         }
@@ -64,15 +64,15 @@ impl MovePicker {
                     }
 
                     if Self::has_open_four(state) {
-                        generate_defend_open_four_moves(state, &mut self.moves);
+                        generate_defend_open_four_moves(state, &mut self.moves_buffer);
                         self.stage = MoveStage::DefendFour;
                     } else {
-                        generate_neighbors_moves(state, &mut self.moves);
+                        generate_neighbors_moves(state, &mut self.moves_buffer);
                         self.stage = MoveStage::Neighbor;
                     }
                 },
                 MoveStage::DefendFour | MoveStage::Neighbor => {
-                    return self.moves.consume_best();
+                    return self.moves_buffer.consume_best();
                 },
                 MoveStage::Done => break None
             }
@@ -82,21 +82,15 @@ impl MovePicker {
     fn has_open_four(state: &GameState) -> bool {
         let total_fours = match state.board.player_color {
             Color::Black => {
-                let mut total_fours = state.board.patterns.counts.global
-                    .white.open_fours as u32;
+                let mut total_fours = state.board.patterns.counts.global.white.open_fours as u32;
 
-                total_fours -= state.board.patterns.forbidden_field.iter_hot_pos()
-                    .map(|pos|
-                        state.board.patterns.field.black[pos.idx_usize()].count_open_fours()
-                    )
+                total_fours -= state.board.patterns.forbidden_field.iter_hot_idx()
+                    .map(|idx| state.board.patterns.field.black[idx].count_open_fours())
                     .sum::<u32>();
 
                 total_fours
             },
-            Color::White => {
-                state.board.patterns.counts.global
-                    .white.open_fours as u32
-            }
+            Color::White => state.board.patterns.counts.global.white.open_fours as u32
         };
 
         total_fours != 0

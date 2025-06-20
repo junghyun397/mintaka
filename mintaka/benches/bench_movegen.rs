@@ -69,7 +69,7 @@ mod bench_movegen {
         let recent_four = pos_unchecked("i6");
 
         b.iter(|| {
-            let vcf_moves = generate_vcf_moves(&board, board.player_color, 5, recent_four);
+            let vcf_moves = generate_vcf_moves(&board, 5, recent_four);
 
             let mut acc = 0;
             for vcf_move in vcf_moves {

@@ -48,7 +48,7 @@ impl ThreadType for MainThread {
                 self.start_time.elapsed() > turn_time,
             SearchLimit::Nodes { in_1k: finish_in_1k } =>
                 total_nodes_in_1k > finish_in_1k,
-            SearchLimit::Infinite => false,
+            _ => false,
         }
     }
 }

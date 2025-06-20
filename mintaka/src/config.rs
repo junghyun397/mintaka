@@ -1,6 +1,5 @@
 use rusty_renju::notation::pos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::Depth;
 use std::num::NonZeroUsize;
 use std::time::Duration;
 
@@ -15,13 +14,14 @@ pub enum SearchObjective {
 pub enum SearchLimit {
     Time { turn_time: Duration },
     Nodes { in_1k: usize },
+    Depth { depth: usize },
     Infinite,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Config {
     pub rule_kind: RuleKind,
-    pub draw_condition: Option<Depth>,
+    pub draw_condition: Option<usize>,
 
     pub search_objective: SearchObjective,
 
