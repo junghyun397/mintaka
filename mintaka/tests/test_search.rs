@@ -21,6 +21,7 @@ mod test_search {
         }};
     }
 
+    #[test]
     fn empty_position() {
         let config = Config::default();
         let aborted = Arc::new(AtomicBool::new(false));
@@ -40,8 +41,8 @@ mod test_search {
 
         while let Ok(response) = message_receiver.try_recv() {
             match response {
-                Message::Response(Response::Begins { workers, running_time, tt_size_in_kib }) => {
-                    println!("begins: workers={workers}, tt-size={tt_size_in_kib}");
+                Message::Response(Response::Begins { workers, running_time, tt_size }) => {
+                    println!("begins: workers={workers}, tt-size={tt_size}");
                 }
                 Message::Response(Response::BestMove { best_move, score, total_nodes_in_1k, time_elapsed }) => {
                     println!("solution: pos={best_move}, score={score}, nodes={total_nodes_in_1k}, elapsed={:?}", time_elapsed);

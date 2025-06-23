@@ -3,6 +3,7 @@ use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::value::{Depth, Score};
+use rusty_renju::utils::byte_size::ByteSize;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 pub struct TranspositionTable {
@@ -38,13 +39,13 @@ impl AbstractTranspositionTable for TranspositionTable {
 
 impl TranspositionTable {
 
-    pub fn new_with_size(size_in_kib: usize) -> Self {
+    pub fn new_with_size(size: ByteSize) -> Self {
         let mut new = Self {
             table: Vec::new(),
             age: AtomicU8::new(0),
         };
 
-        new.resize_mut(size_in_kib);
+        new.resize_mut(size);
 
         new
     }

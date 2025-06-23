@@ -6,6 +6,7 @@ use mintaka::protocol::response::Response;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::utils::byte_size::ByteSize;
 use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
@@ -41,8 +42,8 @@ fn main() -> Result<(), &'static str> {
                         println!("warning: {}", message),
                     Response::Error(message) =>
                         println!("error: {}", message),
-                    Response::Begins { workers, running_time, tt_size_in_kib } =>
-                        println!("begins: workers={workers}, running_time={:?}, tt-size={tt_size_in_kib}kib", running_time),
+                    Response::Begins { workers, running_time, tt_size } =>
+                        println!("begins: workers={workers}, running_time={:?}, tt-size={tt_size}", running_time),
                     Response::Status { eval, total_nodes_in_1k, best_moves, hash_usage } =>
                         println!(
                             "status: eval={eval}\
@@ -142,12 +143,12 @@ fn handle_command(
                         }
                     },
                     "memory" => {
-                        let memory = args.get(2)
+                        let memory_size_in_kib = args.get(2)
                             .ok_or("memory not provided.")?
                             .parse::<usize>()
                             .map_err(|_| "invalid memory size.")?;
 
-                        command_sender.command(Command::MaxMemory { in_kib: memory });
+                        command_sender.command(Command::MaxMemory(ByteSize::from_kib(memory_size_in_kib)));
                     },
                     &_ => return Err("data type not provided.")
                 }
@@ -158,7 +159,7 @@ fn handle_command(
                 {
                     "time" => {
                         fn parse_time_in_milliseconds(args: &Vec<&str>) -> Result<Duration, &'static str> {
-                            let time = args.get(1)
+                            let time = args.get(3)
                                 .ok_or("time not provided.")?
                                 .parse::<u64>()
                                 .map_err(|_| "invalid time.")?;

@@ -82,7 +82,7 @@ impl MovePicker {
     fn has_open_four(state: &GameState) -> bool {
         let total_fours = match state.board.player_color {
             Color::Black => {
-                let mut total_fours = state.board.patterns.counts.global.white.open_fours as u32;
+                let mut total_fours = state.board.patterns.counts.global.black.open_fours as u32;
 
                 total_fours -= state.board.patterns.forbidden_field.iter_hot_idx()
                     .map(|idx| state.board.patterns.field.black[idx].count_open_fours())

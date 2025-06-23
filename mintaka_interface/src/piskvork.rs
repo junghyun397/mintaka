@@ -7,6 +7,7 @@ use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::rule::RuleKind;
+use rusty_renju::utils::byte_size::ByteSize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
@@ -234,7 +235,7 @@ fn match_command(
                             .map_err(|_| "memory parsing failed.")?;
 
                         command_sender.command(
-                            Command::MaxMemory { in_kib: max_memory_in_bytes / 1024 }
+                            Command::MaxMemory(ByteSize::from_bytes(max_memory_in_bytes))
                         );
 
                         PiskvorkResponse::Ok

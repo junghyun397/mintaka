@@ -13,7 +13,7 @@ fn encode_pattern_to_score_key(pattern: Pattern) -> usize {
     pattern_key |= (pattern.count_open_fours() & 0b11) << 2;
     pattern_key |= (pattern.count_open_threes() & 0b11) << 4;
     pattern_key |= (pattern.has_close_three() as u32) << 6;
-    pattern_key |= (pattern.has_overline() as u32) << 7;
+    pattern_key |= (pattern.has_overline() as u32) * 127;
 
     pattern_key as usize
 }
@@ -48,11 +48,10 @@ const fn build_pattern_score_lut() -> ColorContainer<[i8; 128]> {
             let open_fours = (pattern_key & 0b1100) >> 2;
             let open_threes = (pattern_key & 0b110000) >> 4;
             let close_threes = (pattern_key & 0b1000000) >> 6;
-            let has_overline = (pattern_key & 0b10000000) >> 7;
 
             lut[pattern_key] = match color {
                 Color::Black => {
-                    if has_overline > 0 {
+                    if pattern_key == 127 {
                         HeuristicPositionScores::OVERLINE_FORBID
                     } else if closed_fours + open_fours > 1 {
                         HeuristicPositionScores::DOUBLE_FOUR_FORBID

@@ -1,6 +1,7 @@
 use crate::principal_variation::PrincipalVariation;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::value::Score;
+use rusty_renju::utils::byte_size::ByteSize;
 use std::time::Duration;
 
 pub enum Response {
@@ -11,7 +12,7 @@ pub enum Response {
     Begins {
         workers: usize,
         running_time: Duration,
-        tt_size_in_kib: usize,
+        tt_size: ByteSize,
     },
     Status {
         eval: f32,

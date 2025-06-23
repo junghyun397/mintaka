@@ -14,6 +14,7 @@ use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
+use rusty_renju::utils::byte_size::ByteSize;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -39,7 +40,7 @@ impl GameAgent {
             history: History::default(),
             time_manager: TimeManager::default(),
             search_limit: SearchLimit::Infinite,
-            tt: TranspositionTable::new_with_size(1024 * 16),
+            tt: TranspositionTable::new_with_size(ByteSize::from_mib(16)),
             ht: HistoryTable {},
             aborted,
         }
@@ -156,10 +157,10 @@ impl GameAgent {
             Command::Rule(kind) => {
                 self.rule = kind;
             },
-            Command::MaxMemory { in_kib } => {
+            Command::MaxMemory(size) => {
                 const HEAP_MEMORY_MARGIN_IN_KIB: usize = 1024 * 10;
 
-                self.tt.resize_mut(in_kib + HEAP_MEMORY_MARGIN_IN_KIB);
+                self.tt.resize_mut(ByteSize::from_kib(size.kib() + HEAP_MEMORY_MARGIN_IN_KIB));
             },
         };
 
@@ -177,7 +178,7 @@ impl GameAgent {
         response_sender.response(Response::Begins {
             workers: self.config.workers.get(),
             running_time,
-            tt_size_in_kib: self.tt.size_in_kib(),
+            tt_size: self.tt.size(),
         });
 
         std::thread::scope(|s| {

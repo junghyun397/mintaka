@@ -3,6 +3,7 @@ use rusty_renju::history::History;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
+use rusty_renju::utils::byte_size::ByteSize;
 use std::num::NonZeroUsize;
 use std::time::Duration;
 
@@ -27,6 +28,6 @@ pub enum Command {
     IncrementTime(Duration),
     MaxNodes { in_1k: usize },
     Workers(NonZeroUsize),
-    MaxMemory { in_kib: usize },
+    MaxMemory(ByteSize),
     Rule(RuleKind),
 }

@@ -1,3 +1,5 @@
+use crate::utils::byte_size::ByteSize;
+
 pub trait AbstractTTEntry : Sync + Send {
 
     const BUCKET_SIZE: u64;
@@ -12,12 +14,12 @@ pub trait AbstractTranspositionTable {
 
     type EntryType: AbstractTTEntry;
 
-    fn size_in_kib(&self) -> usize {
-        self.internal_table().len() * size_of::<Self::EntryType>() / 1024
+    fn size(&self) -> ByteSize {
+        (self.internal_table().len() * size_of::<Self::EntryType>()).into()
     }
 
-    fn calculate_table_len_in_kib(size_in_kib: usize) -> usize {
-        size_in_kib * 1024 / size_of::<Self::EntryType>()
+    fn calculate_table_len(size: ByteSize) -> usize {
+        size.kib() / size_of::<Self::EntryType>()
     }
 
     fn internal_table(&self) -> &Vec<Self::EntryType>;
@@ -33,7 +35,7 @@ pub trait AbstractTranspositionTable {
     fn clear_mut(&self, threads: usize) {
         self.clear_age();
 
-        if self.size_in_kib() < 1024 * 32 {
+        if self.size().kib() < 1024 * 32 {
             for entry in self.internal_table().iter() {
                 entry.clear_mut();
             }
@@ -50,10 +52,10 @@ pub trait AbstractTranspositionTable {
         }
     }
 
-    fn resize_mut(&mut self, size_in_kib: usize) {
+    fn resize_mut(&mut self, size: ByteSize) {
         self.clear_age();
 
-        let len = Self::calculate_table_len_in_kib(size_in_kib);
+        let len = Self::calculate_table_len(size);
 
         *self.internal_table_mut() = Vec::new();
 

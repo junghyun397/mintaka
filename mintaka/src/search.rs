@@ -133,9 +133,6 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         return -pvs::<R, NT::NextType, TH>(td, state, depth_left, -beta, -alpha);
     }
 
-    // clear pv-line
-    td.pvs[td.ply].clear();
-
     if !NT::IS_ROOT {
         if td.ply >= MAX_PLY {
             return HeuristicEvaluator.eval_value(&state.board);
@@ -158,6 +155,9 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         return 0;
     }
 
+    // clear pv-line
+    td.pvs[td.ply].clear();
+
     let mut static_eval: Score;
     let mut tt_move: MaybePos;
     let mut tt_pv: bool;
@@ -179,7 +179,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             ScoreKind::UpperBound => entry.score <= alpha,
             ScoreKind::Exact => true,
         } {
-            return entry.score;
+            // return entry.score;
         }
 
         static_eval = entry.score;

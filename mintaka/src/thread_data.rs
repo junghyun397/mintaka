@@ -18,11 +18,11 @@ pub struct ThreadData<'a, TH: ThreadType> {
 
     pub tt: TTView<'a>,
     pub ht: Box<HistoryTable>,
-    pub ss: Box<[SearchFrame; MAX_PLY]>,
-    pub pvs: Box<[PrincipalVariation; MAX_PLY]>,
-    pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; MAX_PLY]>,
+    pub ss: Box<[SearchFrame; MAX_PLY + 1]>,
+    pub pvs: Box<[PrincipalVariation; MAX_PLY + 1]>,
+    pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; MAX_PLY + 1]>,
 
-    pub vcf_stack: Box<[VcfFrame; MAX_PLY]>,
+    pub vcf_stack: Box<[VcfFrame; MAX_PLY + 1]>,
     pub vcf_stack_top: usize,
 
     pub batch_counter: BatchCounter<'a>,
