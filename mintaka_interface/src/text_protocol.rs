@@ -62,7 +62,7 @@ fn main() -> Result<(), &'static str> {
             },
             Message::Status(command) => match command {
                 StatusCommand::Version =>
-                    println!("version: engine=mintaka-{}, model=unknown", mintaka::VERSION),
+                    println!("version: renju=rusty-renju-{}, engine=mintaka-{}, model=unknown", rusty_renju::VERSION, mintaka::VERSION),
                 StatusCommand::Board =>
                     println!("{}", game_agent.state.board),
                 StatusCommand::History =>

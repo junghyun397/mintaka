@@ -11,9 +11,9 @@ impl Default for TimeManager {
 
     fn default() -> Self {
         Self {
-            total_remaining: Duration::from_secs(60 * 30),
+            total_remaining: Duration::from_secs(60 * 10),
             increment: Duration::from_secs(30),
-            turn: Duration::from_secs(30),
+            turn: Duration::from_secs(60),
         }
     }
 

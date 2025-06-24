@@ -6,12 +6,12 @@ use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::value::{Depth, Score};
+use rusty_renju::notation::value::Score;
 
 pub(crate) struct VCTFrame {
     vct_moves: MoveList,
     next_move_counter: usize,
-    depth: Depth,
+    depth: usize,
     opponent_has_open_four: bool,
     threat_pos: Pos,
     defend_pos: Pos,
@@ -19,14 +19,14 @@ pub(crate) struct VCTFrame {
 
 pub fn vct_search(
     td: &mut ThreadData<impl ThreadType>,
-    board: &Board, max_depth: Depth
+    board: &Board, max_depth: usize
 ) -> Score {
     vct::<Score>(td, board, max_depth)
 }
 
 pub fn vct_sequence(
     td: &mut ThreadData<impl ThreadType>,
-    board: &Board, max_depth: Depth
+    board: &Board, max_depth: usize
 ) -> Option<Vec<Pos>> {
     vct::<SequenceEndgameAccumulator>(td, board, max_depth)
         .map(|mut sequence| {
@@ -37,7 +37,7 @@ pub fn vct_sequence(
 
 fn vct<ACC: EndgameAccumulator>(
     td: &mut ThreadData<impl ThreadType>,
-    board: &Board, max_depth: Depth
+    board: &Board, max_depth: usize
 ) -> ACC {
     let mut board = *board;
     match board.player_color {
@@ -50,7 +50,7 @@ fn vct<ACC: EndgameAccumulator>(
 fn try_vct<const C: Color, ACC: EndgameAccumulator>(
     td: &mut ThreadData<impl ThreadType>,
     mut board: Board,
-    max_depth: Depth, mut depth: Depth, mut opponent_has_open_four: bool, mut opponent_has_five: bool,
+    max_depth: usize, mut depth: usize, mut opponent_has_open_four: bool, mut opponent_has_five: bool,
 ) -> ACC {
     // TODO: implement
 
@@ -68,11 +68,11 @@ fn find_vcf_to_defend_pos<const C: Color>(board: &Board) -> MaybePos {
 }
 
 #[inline]
-fn build_vct_win_tt_entry(depth: Depth, four_pos: Pos) -> TTEntry {
+fn build_vct_win_tt_entry(depth: usize, four_pos: Pos) -> TTEntry {
     todo!()
 }
 
 #[inline]
-fn build_vcf_lose_tt_entry(depth: Depth) -> TTEntry {
+fn build_vcf_lose_tt_entry(depth: usize) -> TTEntry {
     todo!()
 }

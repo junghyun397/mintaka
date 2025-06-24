@@ -19,10 +19,9 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 pub struct GameAgent {
-    pub config: Config,
     pub state: GameState,
     pub history: History,
-    pub rule: RuleKind,
+    config: Config,
     time_manager: TimeManager,
     search_limit: SearchLimit,
     tt: TranspositionTable,
@@ -34,10 +33,9 @@ impl GameAgent {
 
     pub fn new(config: Config, aborted: Arc<AtomicBool>) -> Self {
         Self {
-            config,
             state: GameState::default(),
-            rule: RuleKind::Renju,
             history: History::default(),
+            config,
             time_manager: TimeManager::default(),
             search_limit: SearchLimit::Infinite,
             tt: TranspositionTable::new_with_size(ByteSize::from_mib(16)),
@@ -155,7 +153,7 @@ impl GameAgent {
                 self.config.workers = workers;
             },
             Command::Rule(kind) => {
-                self.rule = kind;
+                self.config.rule_kind = kind;
             },
             Command::MaxMemory(size) => {
                 const HEAP_MEMORY_MARGIN_IN_KIB: usize = 1024 * 10;
@@ -165,6 +163,11 @@ impl GameAgent {
         };
 
         Ok(())
+    }
+
+    pub fn commands(&mut self, commands: Vec<Command>) -> Result<(), &'static str> {
+        commands.into_iter()
+            .try_for_each(|command| self.command(command))
     }
 
     pub fn launch(&mut self, response_sender: ResponseSender) {

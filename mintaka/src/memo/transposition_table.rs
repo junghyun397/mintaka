@@ -2,7 +2,7 @@ use crate::memo::tt_entry::{EndgameFlag, ScoreKind, TTEntry, TTEntryBucket, TTFl
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
-use rusty_renju::notation::value::{Depth, Score};
+use rusty_renju::notation::value::Score;
 use rusty_renju::utils::byte_size::ByteSize;
 use std::sync::atomic::{AtomicU8, Ordering};
 
@@ -90,7 +90,7 @@ impl TTView<'_> {
         maybe_best_move: MaybePos,
         score_kind: ScoreKind,
         endgame_flag: EndgameFlag,
-        depth: Depth,
+        depth: u8,
         eval: Score,
         mut score: Score,
         is_pv: bool,

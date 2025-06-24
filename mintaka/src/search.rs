@@ -11,7 +11,7 @@ use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::{Depth, Score, Scores};
+use rusty_renju::notation::value::{Score, Scores};
 
 pub trait NodeType {
 
@@ -280,7 +280,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         best_move,
         score_kind,
         tt_endgame_flag,
-        td.ply as Depth,
+        td.ply as u8,
         static_eval,
         best_score,
         NT::IS_PV

@@ -33,9 +33,11 @@ mod test_search {
 
         let mut game_agent = GameAgent::new(config, aborted.clone());
 
-        game_agent.command(Command::TotalTime(Duration::ZERO)).unwrap();
-        game_agent.command(Command::IncrementTime(Duration::from_secs(1))).unwrap();
-        game_agent.command(Command::TurnTime(Duration::from_secs(1))).unwrap();
+        game_agent.commands(vec![
+            Command::TotalTime(Duration::ZERO),
+            Command::IncrementTime(Duration::from_secs(1)),
+            Command::TurnTime(Duration::from_secs(1)),
+        ]).unwrap();
 
         game_agent.launch(response_sender.clone());
 

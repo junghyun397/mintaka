@@ -7,10 +7,11 @@ use crate::movegen::move_generator::{generate_vcf_moves, VcfMovesUnchecked};
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
+use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::value::{Depth, Score, Scores};
+use rusty_renju::notation::value::{Score, Scores};
 use rusty_renju::pattern::{Pattern, PatternCount};
 
 pub trait VcfDestination {
@@ -154,10 +155,10 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
         while let Some(frame) = td.pop_vcf_frame_mut() {
             hash_key = hash_key.set(opponent_color, frame.defend_pos);
-            td.tt.store_entry_mut(hash_key, build_vcf_lose_tt_entry(lose_score, vcf_ply));
+            tt_store_vcf_lose(td, hash_key, td.ply + vcf_ply, lose_score, true);
 
             hash_key = hash_key.set(board.player_color, frame.four_pos);
-            td.tt.store_entry_mut(hash_key, build_vcf_win_tt_entry(win_score, td.ply + vcf_ply, frame.four_pos));
+            tt_store_vcf_win(td, hash_key, frame.four_pos, td.ply + vcf_ply, win_score, true);
 
             result = result.append_pos(frame.defend_pos, frame.four_pos);
         }
@@ -186,7 +187,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 let total_ply = td.ply + vcf_ply;
                 let win_score = Score::win_in(total_ply);
 
-                td.tt.store_entry_mut(board.hash_key, build_vcf_win_tt_entry(win_score, total_ply, four_pos));
+                tt_store_vcf_win(td, board.hash_key, four_pos, total_ply, win_score, false);
 
                 return backtrace_frames(td, board, vcf_ply, four_pos);
             }
@@ -210,6 +211,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                     && !defend_is_forbidden
             } || dest.conditional_abort(defend_pattern) {
                 board.unset_mut(four_pos);
+                vcf_ply -= 1;
                 continue 'position_search;
             }
 
@@ -220,7 +222,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 let total_ply = td.ply + vcf_ply;
                 let win_score = Score::win_in(total_ply);
 
-                td.tt.store_entry_mut(board.hash_key, build_vcf_win_tt_entry(win_score, total_ply, four_pos));
+                tt_store_vcf_win(td, board.hash_key, four_pos, total_ply, win_score, false);
 
                 return backtrace_frames(td, board, vcf_ply, four_pos);
             }
@@ -326,7 +328,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             })
             .unwrap_or_else(|| TTEntry {
                 best_move: MaybePos::NONE,
-                depth: (td.ply + vcf_ply) as Depth,
+                depth: (td.ply + vcf_ply) as u8,
                 age: td.tt.age,
                 tt_flag: TTFlag::new(ScoreKind::Exact, EndgameFlag::Cold, false),
                 score: 0,
@@ -352,33 +354,42 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 }
 
 #[inline]
-fn build_vcf_win_tt_entry(score: Score, total_ply: usize, four_pos: Pos) -> TTEntry {
-    TTEntry {
-        best_move: MaybePos::new(four_pos),
-        depth: total_ply as u8,
-        age: u8::MAX,
-        tt_flag: TTFlag::new(
-            ScoreKind::Exact,
-            EndgameFlag::Win,
-            false,
-        ),
+fn tt_store_vcf_win(
+    td: &ThreadData<impl ThreadType>,
+    hash_key: HashKey,
+    four_pos: Pos,
+    total_ply: usize,
+    score: Score,
+    is_pv: bool,
+) {
+    td.tt.store_mut(
+        hash_key,
+        four_pos.into(),
+        ScoreKind::LowerBound,
+        EndgameFlag::Win,
+        total_ply as u8,
         score,
-        eval: Score::WIN,
-    }
+        score,
+        is_pv,
+    )
 }
 
 #[inline]
-fn build_vcf_lose_tt_entry(score: Score, total_ply: usize) -> TTEntry {
-   TTEntry {
-       best_move: MaybePos::NONE,
-       depth: total_ply as u8,
-       age: u8::MAX,
-       tt_flag: TTFlag::new(
-           ScoreKind::Exact,
-           EndgameFlag::Lose,
-           false,
-       ),
-       score,
-       eval: -Score::WIN,
-   }
+fn tt_store_vcf_lose(
+    td: &ThreadData<impl ThreadType>,
+    hash_key: HashKey,
+    total_ply: usize,
+    score: Score,
+    is_pv: bool,
+) {
+    td.tt.store_mut(
+        hash_key,
+        MaybePos::NONE,
+        ScoreKind::UpperBound,
+        EndgameFlag::Lose,
+        total_ply as u8,
+        score,
+        score,
+        is_pv,
+    )
 }
