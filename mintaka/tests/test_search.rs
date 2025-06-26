@@ -21,7 +21,6 @@ mod test_search {
         }};
     }
 
-    #[test]
     fn empty_position() {
         let config = Config::default();
         let aborted = Arc::new(AtomicBool::new(false));

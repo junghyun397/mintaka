@@ -24,7 +24,7 @@ impl VcfMovesUnchecked {
     pub fn unit(pos: Pos) -> Self {
         Self {
             moves: {
-                const EMPTY_MOVES: [Pos; VCF_MAX_MOVES] = [MaybePos::NONE.unwrap(); VCF_MAX_MOVES];
+                const EMPTY_MOVES: [Pos; VCF_MAX_MOVES] = [MaybePos::INVALID_POS; VCF_MAX_MOVES];
 
                 let mut new_moves = EMPTY_MOVES;
                 new_moves[0] = pos;
@@ -65,7 +65,7 @@ fn score_move(state: &GameState, pos: Pos) -> Score {
 }
 
 pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Pos) -> VcfMovesUnchecked {
-    let mut vcf_moves = [MaybePos::NONE.unwrap(); VCF_MAX_MOVES];
+    let mut vcf_moves = [MaybePos::INVALID_POS; VCF_MAX_MOVES];
     let mut vcf_moves_top = 0;
 
     let field_ptr = board.patterns.field.access(board.player_color).as_ptr() as *const u32;

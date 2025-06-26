@@ -147,7 +147,7 @@ pub struct MaybePos(Pos);
 
 impl MaybePos {
 
-    const INVALID_POS: Pos = Pos(u8::MAX);
+    pub const INVALID_POS: Pos = Pos(u8::MAX);
 
     pub const NONE: Self = Self(Self::INVALID_POS);
 
@@ -164,6 +164,7 @@ impl MaybePos {
     }
 
     pub const fn unwrap(self) -> Pos {
+        assert!(self.is_some());
         self.0
     }
 

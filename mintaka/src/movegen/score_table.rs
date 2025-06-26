@@ -63,7 +63,7 @@ const fn build_pattern_score_lut() -> ColorContainer<[i8; 128]> {
                         HeuristicPositionScores::THREE_FOUR_FORK
                     } else if open_threes == 1 {
                         HeuristicPositionScores::OPEN_THREE
-                    } else if close_threes > 0 {
+                    } else if close_threes != 0 {
                         HeuristicPositionScores::CLOSE_THREE
                     } else {
                         0
@@ -82,7 +82,7 @@ const fn build_pattern_score_lut() -> ColorContainer<[i8; 128]> {
                         HeuristicPositionScores::OPEN_THREE
                     } else if closed_fours == 1 {
                         HeuristicPositionScores::CLOSED_FOUR
-                    } else if close_threes > 0 {
+                    } else if close_threes != 0 {
                         HeuristicPositionScores::CLOSE_THREE
                     } else {
                         0

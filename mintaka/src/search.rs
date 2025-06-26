@@ -174,12 +174,12 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         tt_move = entry.best_move;
         tt_pv = entry.tt_flag.is_pv();
 
-        if match entry.tt_flag.score_kind() {
+        if !NT::IS_PV && match entry.tt_flag.score_kind() { // tt-cutoff
             ScoreKind::LowerBound => entry.score >= beta,
             ScoreKind::UpperBound => entry.score <= alpha,
             ScoreKind::Exact => true,
         } {
-            // return entry.score;
+            return entry.score;
         }
 
         static_eval = entry.score;
@@ -203,12 +203,11 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     td.killers[td.ply] = [MaybePos::NONE; 2]; // todo: DEBUG
     let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
 
-    let mut moves = 0;
-
     td.push_ply_mut();
     td.ss[td.ply].static_eval = static_eval;
     td.ss[td.ply].on_pv = NT::IS_PV || tt_pv;
 
+    let mut moves_searched = 0;
     'position_search: while let Some((pos, _)) = move_picker.next(state) {
         if !state.board.is_legal_move(pos) {
             continue;
@@ -220,9 +219,9 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         td.batch_counter.increment_single_mut();
         state.set_mut(pos);
 
-        moves += 1;
+        moves_searched += 1;
 
-        let score = if moves == 1 { // full-window search
+        let score = if moves_searched == 1 { // full-window search
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
         } else { // zero-window search
             let mut score = -pvs::<R, OffPVNode, TH>(td, state, depth_left - 1, -alpha - 1, -alpha);

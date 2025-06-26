@@ -60,7 +60,7 @@ pub fn find_forbidden_symmetry_moves(history: &[Pos; 4], fifth_move: Pos) -> Has
 }
 
 pub fn generate_random_opening_moves<const N: usize>() -> [Pos; N] {
-    let mut raw_moves: [u8; N] = [MaybePos::NONE.unwrap().idx(); N];
+    let mut raw_moves: [u8; N] = [MaybePos::INVALID_POS.idx(); N];
     raw_moves[0] = pos::CENTER.idx();
 
     fn generate_move_in(width: u8) -> u8 {

@@ -367,13 +367,13 @@ impl Board {
     fn update_four_overrides(&self, overrides: &mut SetOverrides, direction_from: Direction, pos: Pos) {
         for next_four_idx in (0 .. direction_from as usize * 3).chain((direction_from as usize + 1) * 3 .. 12) {
             let four_pos = overrides.next_four[next_four_idx];
-            if four_pos != MaybePos::NONE.unwrap() {
+            if four_pos != MaybePos::INVALID_POS {
                 overrides.four[overrides.four_top as usize] = four_pos;
                 overrides.four_top += 1;
             }
         }
 
-        overrides.next_four = [MaybePos::NONE.unwrap(); 12];
+        overrides.next_four = [MaybePos::INVALID_POS; 12];
 
         for direction in self.patterns.field.black[pos.idx_usize()].iter_three_directions() {
             if direction == direction_from {
@@ -551,15 +551,15 @@ impl SetOverrides {
     fn new(root: Pos) -> Self {
         Self {
             set: {
-                const SET: [Pos; 6] = [MaybePos::NONE.unwrap(); 6];
+                const SET: [Pos; 6] = [MaybePos::INVALID_POS; 6];
                 let mut set = SET;
                 set[0] = root;
                 set
             },
             set_top: 1,
-            four: [MaybePos::NONE.unwrap(); 20],
+            four: [MaybePos::INVALID_POS; 20],
             four_top: 0,
-            next_four: [MaybePos::NONE.unwrap(); 12],
+            next_four: [MaybePos::INVALID_POS; 12],
         }
     }
 

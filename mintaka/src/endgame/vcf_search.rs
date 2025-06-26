@@ -227,19 +227,15 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 return backtrace_frames(td, board, vcf_ply, four_pos);
             }
 
-            let mut should_abort = false;
-
             if board.stones + 2 >= pos::U8_BOARD_SIZE {
                 score = 0;
-                should_abort = true;
+                board.unset_mut(four_pos);
+                vcf_ply -= 1;
+                continue 'position_search;
             }
 
             if vcf_ply + 2 >= vcf_max_ply {
                 score = HeuristicEvaluator.eval_value(&board);
-                should_abort = true;
-            }
-
-            if should_abort {
                 board.unset_mut(four_pos);
                 vcf_ply -= 1;
                 continue 'position_search;
@@ -266,7 +262,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                         alpha = alpha.max(entry.score),
                     ScoreKind::UpperBound =>
                         beta = beta.min(entry.score),
-                    _ => {} // skip the exact score
+                    _ => {}
                 }
 
                 if alpha >= beta { // beta cutoff

@@ -16,6 +16,7 @@ mod bench_vcf {
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use rusty_renju::notation::pos::pos_unchecked;
     use rusty_renju::notation::value::{Score, Scores};
+    use rusty_renju::utils::byte_size::ByteSize;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
     use test::Bencher;
 
@@ -36,7 +37,7 @@ mod bench_vcf {
 
             let config = Config::default();
 
-            let tt = TranspositionTable::new_with_size(512);
+            let tt = TranspositionTable::new_with_size(ByteSize::from_kib(512));
             let ht = HistoryTable {};
 
             let global_counter_in_1k = AtomicUsize::new(0);

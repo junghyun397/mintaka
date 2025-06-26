@@ -17,7 +17,7 @@ impl Default for MoveList {
 impl MoveList {
 
     const EMPTY: Self = Self {
-        moves: [(MaybePos::NONE.unwrap(), -Score::INF); pos::BOARD_SIZE],
+        moves: [(MaybePos::INVALID_POS, -Score::INF); pos::BOARD_SIZE],
         top: 0,
     };
 
