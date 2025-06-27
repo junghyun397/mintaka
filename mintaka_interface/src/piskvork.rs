@@ -42,19 +42,19 @@ fn main() -> Result<(), &'static str> {
     let launched = Arc::new(AtomicBool::new(false));
     let aborted = Arc::new(AtomicBool::new(false));
 
-    let mut game_agent = GameAgent::new(Config::default(), aborted.clone());
+    let mut game_agent = GameAgent::new(Config::default());
 
     let (command_sender, response_sender, message_receiver) = {
         let (message_sender, message_receiver) = mpsc::channel();
         (CommandSender::new(message_sender.clone()), ResponseSender::new(message_sender), message_receiver)
     };
 
-    spawn_command_listener(launched.clone(), aborted, command_sender);
+    spawn_command_listener(launched.clone(), aborted.clone(), command_sender);
 
     for message in message_receiver {
         match message {
             Message::Command(command) => {
-                game_agent.command(command)?;
+                game_agent.command(&response_sender, command)?;
             },
             Message::Response(response) => {
                 let piskvork_response = match response {
@@ -75,7 +75,7 @@ fn main() -> Result<(), &'static str> {
                     Response::BestMove { best_move, .. } => {
                         launched.store(false, Ordering::Relaxed);
 
-                        game_agent.command(Command::Play(best_move.into()))?;
+                        game_agent.command(&response_sender, Command::Play(best_move.into()))?;
 
                         PiskvorkResponse::Pos(best_move)
                     },
@@ -86,7 +86,7 @@ fn main() -> Result<(), &'static str> {
             },
             Message::Launch => {
                 launched.store(true, Ordering::Relaxed);
-                game_agent.launch(response_sender.clone());
+                game_agent = game_agent.launch(response_sender.clone(), aborted.clone());
             },
             _ => unreachable!()
         }

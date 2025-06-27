@@ -16,19 +16,19 @@ fn main() -> Result<(), &'static str> {
     let launched = Arc::new(AtomicBool::new(false));
     let aborted = Arc::new(AtomicBool::new(false));
 
-    let mut game_agent = GameAgent::new(Config::default(), aborted.clone());
+    let mut game_agent = GameAgent::new(Config::default());
 
     let (command_sender, response_sender, message_receiver) = {
         let (message_sender, message_receiver) = mpsc::channel();
         (CommandSender::new(message_sender.clone()), ResponseSender::new(message_sender), message_receiver)
     };
 
-    spawn_command_listener(launched.clone(), aborted, command_sender);
+    spawn_command_listener(launched.clone(), aborted.clone(), command_sender);
 
     for message in message_receiver {
         match message {
             Message::Command(command) => {
-                let result = game_agent.command(command);
+                let result = game_agent.command(&response_sender, command);
 
                 if let Err(err) = result {
                     println!("error: {}", err);
@@ -57,7 +57,10 @@ fn main() -> Result<(), &'static str> {
                         launched.store(false, Ordering::Relaxed);
 
                         println!("solution: pos={best_move}, score={score}, nodes={total_nodes_in_1k}k, elapsed={:?}", time_elapsed);
-                    }
+                    },
+                    Response::Finished(result) => {
+                        println!("finished: winner={result}")
+                    },
                 }
             },
             Message::Status(command) => match command {
@@ -70,7 +73,7 @@ fn main() -> Result<(), &'static str> {
             },
             Message::Launch => {
                 launched.store(true, Ordering::Relaxed);
-                game_agent.launch(response_sender.clone());
+                game_agent = game_agent.launch(response_sender.clone(), aborted.clone());
             },
         }
     }

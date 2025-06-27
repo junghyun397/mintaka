@@ -4,6 +4,7 @@ use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::protocol::command::Command;
 use crate::protocol::message::ResponseSender;
+use crate::protocol::response;
 use crate::protocol::response::Response;
 use crate::search;
 use crate::thread_data::ThreadData;
@@ -12,6 +13,7 @@ use crate::utils::time_manager::TimeManager;
 use rusty_renju::history::History;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::notation::color::Color;
+use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
@@ -26,12 +28,11 @@ pub struct GameAgent {
     search_limit: SearchLimit,
     tt: TranspositionTable,
     ht: HistoryTable,
-    aborted: Arc<AtomicBool>,
 }
 
 impl GameAgent {
 
-    pub fn new(config: Config, aborted: Arc<AtomicBool>) -> Self {
+    pub fn new(config: Config) -> Self {
         Self {
             state: GameState::default(),
             history: History::default(),
@@ -40,16 +41,39 @@ impl GameAgent {
             search_limit: SearchLimit::Infinite,
             tt: TranspositionTable::new_with_size(ByteSize::from_mib(16)),
             ht: HistoryTable {},
-            aborted,
         }
     }
 
-    pub fn command(&mut self, command: Command) -> Result<(), &'static str> {
+    pub fn command(&mut self, response_sender: &ResponseSender, command: Command) -> Result<(), &'static str> {
         match command {
             Command::Play(action) => {
                 match action {
                     MaybePos::NONE => self.state.pass_mut(),
-                    pos => self.state.set_mut(pos.unwrap())
+                    pos => {
+                        if !self.state.board.is_pos_empty(pos.unwrap()) {
+                            return Err("stone already exists");
+                        }
+
+                        if !self.state.board.is_legal_move(pos.unwrap()) {
+                            return Err("forbidden move");
+                        }
+
+                        self.state.set_mut(pos.unwrap())
+                    }
+                }
+
+                match self.state.board.find_winner() {
+                    Some(winner) =>
+                        response_sender.response(Response::Finished(response::GameResult::Win(winner))),
+                    None => {
+                        if self.state.board.stones == pos::U8_BOARD_SIZE {
+                            response_sender.response(Response::Finished(response::GameResult::Full));
+                        } else if self.config.draw_condition.is_some_and(|draw_in|
+                            draw_in >= self.state.history.len()
+                        ) {
+                            response_sender.response(Response::Finished(response::GameResult::Draw));
+                        }
+                    }
                 }
             },
             Command::Set { pos, color } => {
@@ -165,13 +189,13 @@ impl GameAgent {
         Ok(())
     }
 
-    pub fn commands(&mut self, commands: Vec<Command>) -> Result<(), &'static str> {
+    pub fn commands(&mut self, response_sender: &ResponseSender, commands: Vec<Command>) -> Result<(), &'static str> {
         commands.into_iter()
-            .try_for_each(|command| self.command(command))
+            .try_for_each(|command| self.command(response_sender, command))
     }
 
-    pub fn launch(&mut self, response_sender: ResponseSender) {
-        self.aborted.store(false, Ordering::Relaxed);
+    pub fn launch(mut self, response_sender: ResponseSender, aborted: Arc<AtomicBool>) -> Self {
+        aborted.store(false, Ordering::Relaxed);
         let global_counter_in_1k = AtomicUsize::new(0);
 
         self.time_manager.append_mut(self.time_manager.increment);
@@ -189,7 +213,7 @@ impl GameAgent {
 
             let mut main_td = ThreadData::new(
                 MainThread::new(
-                    response_sender,
+                    response_sender.clone(),
                     started_time,
                     SearchLimit::Time { turn_time: running_time }
                 ),
@@ -197,7 +221,7 @@ impl GameAgent {
                 self.config,
                 self.tt.view(),
                 self.ht.clone(),
-                &self.aborted, &global_counter_in_1k,
+                &aborted, &global_counter_in_1k,
             );
 
             s.spawn(move || {
@@ -221,7 +245,7 @@ impl GameAgent {
                     self.config,
                     self.tt.view(),
                     self.ht.clone(),
-                    &self.aborted, &global_counter_in_1k
+                    &aborted, &global_counter_in_1k
                 );
 
                 let mut state = self.state;
@@ -236,10 +260,8 @@ impl GameAgent {
 
         self.tt.increase_age();
         self.time_manager.consume_mut(started_time.elapsed());
-    }
 
-    pub fn abort(&self) {
-        self.aborted.store(true, Ordering::Relaxed);
+        self
     }
 
 }

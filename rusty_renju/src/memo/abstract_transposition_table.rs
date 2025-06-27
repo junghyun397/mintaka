@@ -15,11 +15,11 @@ pub trait AbstractTranspositionTable {
     type EntryType: AbstractTTEntry;
 
     fn size(&self) -> ByteSize {
-        (self.internal_table().len() * size_of::<Self::EntryType>()).into()
+        ByteSize::from_bytes(self.internal_table().len() * size_of::<Self::EntryType>())
     }
 
     fn calculate_table_len(size: ByteSize) -> usize {
-        size.kib() / size_of::<Self::EntryType>()
+        size.bytes() / size_of::<Self::EntryType>()
     }
 
     fn internal_table(&self) -> &Vec<Self::EntryType>;
@@ -35,7 +35,7 @@ pub trait AbstractTranspositionTable {
     fn clear_mut(&self, threads: usize) {
         self.clear_age();
 
-        if self.size().kib() < 1024 * 32 {
+        if self.size().mib() < 32 {
             for entry in self.internal_table().iter() {
                 entry.clear_mut();
             }

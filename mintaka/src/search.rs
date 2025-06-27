@@ -167,7 +167,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         tt_endgame_flag = entry.tt_flag.endgame_flag();
         if tt_endgame_flag == EndgameFlag::Win || tt_endgame_flag == EndgameFlag::Lose
         { // endgame tt-hit
-            return entry.score;
+            // return entry.score;
         }
 
         static_eval = entry.eval;
@@ -179,7 +179,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             ScoreKind::UpperBound => entry.score <= alpha,
             ScoreKind::Exact => true,
         } {
-            return entry.score;
+            // return entry.score;
         }
 
         static_eval = entry.score;

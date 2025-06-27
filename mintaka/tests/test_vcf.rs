@@ -18,7 +18,7 @@ mod test_vcf {
             let mut board = $board;
             let config = Config::default();
 
-            let tt = TranspositionTable::new_with_size(ByteSize::from_kib(512));
+            let tt = TranspositionTable::new_with_size(ByteSize::from_kib(32));
             let ht = HistoryTable {};
 
             let global_counter_in_1k = AtomicUsize::new(0);

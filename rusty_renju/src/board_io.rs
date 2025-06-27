@@ -63,11 +63,9 @@ fn parse_board_elements(source: &str) -> Result<Box<[BoardElement]>, &'static st
         .filter_map(match_symbol)
         .collect();
 
-    if elements.len() != pos::BOARD_SIZE {
-        return Err("Invalid elements size.");
-    }
-
-    Ok(elements)
+    (elements.len() == pos::BOARD_SIZE)
+        .then_some(elements)
+        .ok_or("Invalid elements size.")
 }
 
 fn extract_stones_by_color(color: Color, source: &[BoardElement]) -> Box<[Pos]> {
@@ -273,8 +271,10 @@ impl Display for Slice {
     }
 }
 
-impl From<&Board> for History {
-    fn from(value: &Board) -> Self {
+impl TryFrom<&Board> for History {
+    type Error = &'static str;
+
+    fn try_from(value: &Board) -> Result<Self, Self::Error> {
         let mut black_history = vec![];
         let mut white_history = vec![];
 
@@ -303,6 +303,10 @@ impl From<&Board> for History {
             }
         }
 
+        if white_history.len() > black_history.len() {
+            return Err("white's history is longer than black's history.");
+        }
+
         let mut history = History::default();
 
         while let Some(black_pos) = black_history.pop() {
@@ -313,7 +317,7 @@ impl From<&Board> for History {
             }
         }
 
-        history
+        Ok(history)
     }
 }
 
@@ -510,13 +514,4 @@ pub fn add_move_marker(mut board_string: String, color: Color, pos: Pos, pre_mar
     () => {
         $crate::board::Board::default()
     };
-}
-
-#[macro_export] macro_rules! board_with_history {
-    ($history_str:expr) => {{
-        let history = $crate::board::History::from_str($history_str).unwrap();
-        let board = $crate::board::Board::from(&history).unwrap();
-
-        (board, history)
-    }}
 }

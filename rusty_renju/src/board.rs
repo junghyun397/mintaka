@@ -1,4 +1,3 @@
-use crate::assert_struct_sizes;
 use crate::bitfield::Bitfield;
 use crate::memo::hash_key::HashKey;
 use crate::notation::color::Color;
@@ -7,7 +6,8 @@ use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::RuleKind;
 use crate::pattern;
 use crate::pattern::Patterns;
-use crate::slice::Slices;
+use crate::slice::{Slice, Slices};
+use crate::{assert_struct_sizes, slice_pattern};
 use std::marker::ConstParamTy;
 
 #[derive(Copy, Clone, Default)]
@@ -447,6 +447,22 @@ impl Board {
         } as u32;
 
         (((stones << 2) >> slice_idx) & 0b11111) as u8 // 0[00V00]0
+    }
+
+    pub fn find_winner(&self) -> Option<Color> {
+        self.slices.horizontal_slices.iter()
+            .chain(self.slices.vertical_slices.iter())
+            .chain(self.slices.ascending_slices.iter())
+            .chain(self.slices.descending_slices.iter())
+            .find_map(|slice| {
+                if slice_pattern::contains_five_in_a_row(slice.stones.black) {
+                    Some(Color::Black)
+                } else if slice_pattern::contains_five_in_a_row(slice.stones.white) {
+                    Some(Color::White)
+                } else {
+                    None
+                }
+            })
     }
 
 }
