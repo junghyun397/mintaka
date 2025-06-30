@@ -21,6 +21,6 @@ pub mod search_frame;
 pub mod game_state;
 pub mod movegen;
 pub mod game_agent;
-pub mod parameters;
+pub mod value;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

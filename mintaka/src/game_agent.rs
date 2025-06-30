@@ -194,7 +194,7 @@ impl GameAgent {
             .try_for_each(|command| self.command(response_sender, command))
     }
 
-    pub fn launch(mut self, response_sender: ResponseSender, aborted: Arc<AtomicBool>) -> Self {
+    pub fn launch(&mut self, response_sender: ResponseSender, aborted: Arc<AtomicBool>) {
         aborted.store(false, Ordering::Relaxed);
         let global_counter_in_1k = AtomicUsize::new(0);
 
@@ -259,9 +259,6 @@ impl GameAgent {
         });
 
         self.tt.increase_age();
-        self.time_manager.consume_mut(started_time.elapsed());
-
-        self
     }
 
 }

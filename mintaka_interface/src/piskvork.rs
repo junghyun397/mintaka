@@ -86,7 +86,7 @@ fn main() -> Result<(), &'static str> {
             },
             Message::Launch => {
                 launched.store(true, Ordering::Relaxed);
-                game_agent = game_agent.launch(response_sender.clone(), aborted.clone());
+                game_agent.launch(response_sender.clone(), aborted.clone());
             },
             _ => unreachable!()
         }
@@ -257,7 +257,7 @@ fn match_command(
                             .map_err(|_| "rule parsing failed.")?
                             .count_ones()
                         {
-                            // 1 => Ok(RuleKind::Gomoku),
+                            // 1 => Ok(RuleKind::Gomoku), // freestyle
                             // 6 => Ok(RuleKind::Gomoku), // swap2
                             4 => Ok(RuleKind::Renju),
                             _ => return Err("unsupported rule."),

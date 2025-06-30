@@ -3,10 +3,10 @@ use crate::config::Config;
 use crate::endgame::vcf_search::VcfFrame;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
-use crate::parameters::MAX_PLY;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_frame::{SearchFrame, KILLER_MOVE_SLOTS};
 use crate::thread_type::ThreadType;
+use crate::value::MAX_PLY;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 

@@ -4,9 +4,9 @@ use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::game_state::GameState;
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind};
 use crate::movegen::move_picker::MovePicker;
-use crate::parameters::{ASPIRATION_INITIAL_DELTA, MAX_PLY};
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
+use crate::value::{ASPIRATION_INITIAL_DELTA, MAX_PLY};
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
@@ -82,7 +82,7 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
         }
 
         if score <= alpha { // fail-low
-            beta = (alpha + beta) / 2;
+            beta = alpha.saturating_add(beta) / 2;
             alpha = (alpha - delta).max(-Score::INF);
             depth = max_depth;
         } else if score >= beta { // fail-high

@@ -23,7 +23,7 @@ pub enum Response {
         best_moves: Vec<(Pos, Score)>,
         hash_usage: f32,
     },
-    Pv(Vec<(Pos, PrincipalVariation)>),
+    Pv(PrincipalVariation),
     BestMove {
         best_move: Pos,
         score: Score,
@@ -43,7 +43,7 @@ pub enum GameResult {
 impl Display for GameResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GameResult::Win(color) => write!(f, "{:?} win", color),
+            GameResult::Win(color) => write!(f, "{color:?} win"),
             GameResult::Draw => write!(f, "draw"),
             GameResult::Full => write!(f, "full"),
         }

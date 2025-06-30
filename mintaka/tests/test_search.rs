@@ -35,7 +35,7 @@ mod test_search {
             Command::TurnTime(Duration::from_secs(1)),
         ]).unwrap();
 
-        game_agent = game_agent.launch(response_sender.clone(), aborted.clone());
+        game_agent.launch(response_sender.clone(), aborted.clone());
 
         while let Ok(response) = message_receiver.try_recv() {
             match response {
@@ -43,12 +43,12 @@ mod test_search {
                     println!("begins: workers={workers}, tt-size={tt_size}");
                 },
                 Message::Response(Response::BestMove { best_move, score, total_nodes_in_1k, time_elapsed }) => {
-                    println!("solution: pos={best_move}, score={score}, nodes={total_nodes_in_1k}, elapsed={:?}", time_elapsed);
+                    println!("solution: pos={best_move}, score={score}, nodes={total_nodes_in_1k}, elapsed={time_elapsed:?}");
                     game_agent.command(&response_sender, Command::Play(best_move.into())).unwrap();
-                    game_agent = game_agent.launch(response_sender.clone(), aborted.clone());
+                    game_agent.launch(response_sender.clone(), aborted.clone());
                 },
                 Message::Response(Response::Finished(result)) => {
-                    println!("finished: result={:?}", result);
+                    println!("finished: result={result:?}");
                     return result;
                 }
                 _ => {}
@@ -58,6 +58,7 @@ mod test_search {
         unreachable!()
     }
 
+    #[test]
     fn empty_position() {
         let board = Board::default();
         let result = search(board);

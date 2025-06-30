@@ -11,6 +11,18 @@ use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
+/*
+STREAMS when TEXT PROTOCOL
+main(agent-owned) / command-listener / stdout-listener / searcher
+
+command-listener > main > stdout-listener
+searcher >
+
+STREAMS when SERVER
+coroutine-driver(agent-owned) / searcher
+driver > searcher
+searcher > driver
+ */
 
 fn main() -> Result<(), &'static str> {
     let launched = Arc::new(AtomicBool::new(false));
@@ -43,10 +55,10 @@ fn main() -> Result<(), &'static str> {
                     Response::Error(message) =>
                         println!("error: {}", message),
                     Response::Begins { workers, running_time, tt_size } =>
-                        println!("begins: workers={workers}, running_time={:?}, tt-size={tt_size}", running_time),
+                        println!("begins: workers={workers}, running_time={running_time:?}, tt-size={tt_size}"),
                     Response::Status { eval, total_nodes_in_1k, best_moves, hash_usage } =>
                         println!(
-                            "status: eval={eval}\
+                            "status: eval={eval}, \
                             total_nodes_in_1k={total_nodes_in_1k}, \
                             best_moves={best_moves:?}, \
                             hash_usage={hash_usage}"
@@ -56,7 +68,7 @@ fn main() -> Result<(), &'static str> {
                     Response::BestMove { best_move, score, total_nodes_in_1k, time_elapsed} => {
                         launched.store(false, Ordering::Relaxed);
 
-                        println!("solution: pos={best_move}, score={score}, nodes={total_nodes_in_1k}k, elapsed={:?}", time_elapsed);
+                        println!("solution: pos={best_move}, score={score}, nodes={total_nodes_in_1k}k, elapsed={time_elapsed:?}");
                     },
                     Response::Finished(result) => {
                         println!("finished: winner={result}")
@@ -73,7 +85,7 @@ fn main() -> Result<(), &'static str> {
             },
             Message::Launch => {
                 launched.store(true, Ordering::Relaxed);
-                game_agent = game_agent.launch(response_sender.clone(), aborted.clone());
+                game_agent.launch(response_sender.clone(), aborted.clone());
             },
         }
     }

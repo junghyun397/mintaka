@@ -1,4 +1,4 @@
-use crate::parameters::MAX_PLY;
+use crate::value::MAX_PLY;
 use rusty_renju::impl_display_from_debug;
 use rusty_renju::notation::pos::MaybePos;
 

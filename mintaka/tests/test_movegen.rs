@@ -25,7 +25,7 @@ mod test_movegen {
         }
 
         println!("{}", state.board);
-        println!("{:?}", acc);
+        println!("{acc:?}");
     }
 
 }

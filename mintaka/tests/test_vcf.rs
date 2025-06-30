@@ -34,8 +34,8 @@ mod test_vcf {
 
             println!("{}", board.to_string_with_move_marker(last_move));
             println!("length: {}", vcf_result.len());
-            println!("sequence: {:?}", vcf_result);
-            println!("time: {:?}", time);
+            println!("sequence: {vcf_result:?}");
+            println!("time: {time:?}");
             println!("hash usage: {}", tt.hash_usage());
             println!("nodes: {}", td.batch_counter.count_local_total());
 
