@@ -23,7 +23,7 @@ const SYMBOL_FORBID_DOUBLE_FOUR: char = '4';
 const SYMBOL_FORBID_OVERLINE: char = '6';
 
 const HISTORY_LITERAL_SEPARATOR: &str = ",";
-const HISTORY_LITERAL_PASS: &str = "PASS";
+const HISTORY_LITERAL_PASS: &str = "pass";
 
 enum BoardElement {
     Stone(Color),
@@ -324,8 +324,8 @@ impl TryFrom<&Board> for History {
 impl Display for History {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let history = self.iter()
-            .map(|&mv|
-                match mv {
+            .map(|&action|
+                match action {
                     MaybePos::NONE => HISTORY_LITERAL_PASS.to_string(),
                     pos => pos.unwrap().to_string()
                 }
@@ -336,6 +336,8 @@ impl Display for History {
         write!(f, "{history}")
     }
 }
+
+impl_debug_from_display!(History);
 
 impl FromStr for History {
     type Err = &'static str;

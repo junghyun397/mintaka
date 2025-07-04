@@ -42,16 +42,16 @@ struct OffPVNode; impl NodeType for OffPVNode {
 
 pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH>,
-    state: &mut GameState,
+    mut state: GameState,
 ) -> Score {
     let mut score: Score = 0;
 
-    'iterative_deepening: for depth in 1 ..= MAX_PLY {
+    'iterative_deepening: for depth in 1 ..= td.config.max_depth {
         td.depth = depth;
         score = if depth < 7 {
-            pvs::<R, RootNode, TH>(td, state, depth, -Score::INF, Score::INF)
+            pvs::<R, RootNode, TH>(td, &mut state, depth, -Score::INF, Score::INF)
         } else {
-            aspiration::<R, TH>(td, state, depth, score)
+            aspiration::<R, TH>(td, &mut state, depth, score)
         };
 
         if td.is_aborted() {
@@ -82,7 +82,7 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
         }
 
         if score <= alpha { // fail-low
-            beta = alpha.saturating_add(beta) / 2;
+            beta = ((alpha as i32 + beta as i32) / 2) as Score;
             alpha = (alpha - delta).max(-Score::INF);
             depth = max_depth;
         } else if score >= beta { // fail-high

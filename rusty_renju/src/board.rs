@@ -6,7 +6,7 @@ use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::RuleKind;
 use crate::pattern;
 use crate::pattern::Patterns;
-use crate::slice::{Slice, Slices};
+use crate::slice::Slices;
 use crate::{assert_struct_sizes, slice_pattern};
 use std::marker::ConstParamTy;
 
@@ -68,8 +68,6 @@ impl Board {
     }
 
     pub fn unset_mut(&mut self, pos: Pos) {
-        self.patterns.unchecked_five_in_a_row = None;
-
         self.switch_player_mut();
 
         self.stones -= 1;
@@ -140,13 +138,13 @@ impl Board {
                     (false, false) => {
                         self.patterns.clear_with_slice_mut::<{ $color }, { $direction }>($slice);
                     },
-                    _ => {
-                        self.patterns.counts.update_slice_score_mut::<{ $color }, { $direction }>(
-                            $slice_idx as usize,
-                            $slice.evaluate_score::<{ $color }>()
-                        );
-                    }
+                    _ => {}
                 }
+
+                self.patterns.counts.update_slice_score_mut::<{ $color }, { $direction }>(
+                    $slice_idx as usize,
+                    $slice.evaluate_score::<{ $color }>()
+                );
             };
         }
 

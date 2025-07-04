@@ -1,11 +1,15 @@
 use crate::protocol::command::Command;
-use crate::protocol::response::Response;
+use rusty_renju::impl_debug_from_display;
+use rusty_renju::notation::color::Color;
+use std::fmt::Display;
 use std::sync::mpsc;
+
+pub const CHANNEL_CLOSED_MESSAGE: &str = "sender channel closed.";
 
 pub enum Message {
     Command(Command),
-    Response(Response),
     Status(StatusCommand),
+    Finished(GameResult),
     Launch,
 }
 
@@ -15,24 +19,24 @@ pub enum StatusCommand {
     History,
 }
 
-#[derive(Clone)]
-pub struct ResponseSender {
-    sender: mpsc::Sender<Message>,
+#[derive(Eq, PartialEq)]
+pub enum GameResult {
+    Win(Color),
+    Draw,
+    Full
 }
 
-const CHANNEL_CLOSED_MESSAGE: &str = "sender channel closed.";
-
-impl ResponseSender {
-
-    pub fn new(sender: mpsc::Sender<Message>) -> Self {
-        Self { sender }
+impl Display for GameResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GameResult::Win(color) => write!(f, "{color:?} win", ),
+            GameResult::Draw => write!(f, "draw"),
+            GameResult::Full => write!(f, "full"),
+        }
     }
-
-    pub fn response(&self, response: Response) {
-        self.sender.send(Message::Response(response)).expect(CHANNEL_CLOSED_MESSAGE);
-    }
-
 }
+
+impl_debug_from_display!(GameResult);
 
 pub struct CommandSender {
     sender: mpsc::Sender<Message>,
@@ -54,6 +58,22 @@ impl CommandSender {
 
     pub fn launch(&self) {
         self.sender.send(Message::Launch).expect(CHANNEL_CLOSED_MESSAGE);
+    }
+
+}
+
+pub struct MessageSender {
+    sender: mpsc::Sender<Message>,
+}
+
+impl MessageSender {
+
+    pub fn new(sender: mpsc::Sender<Message>) -> Self {
+        Self { sender }
+    }
+
+    pub fn message(&self, message: Message) {
+        self.sender.send(message).expect(CHANNEL_CLOSED_MESSAGE);
     }
 
 }

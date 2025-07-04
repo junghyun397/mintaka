@@ -1,8 +1,8 @@
 use mintaka::config::Config;
 use mintaka::game_agent::GameAgent;
 use mintaka::protocol::command::Command;
-use mintaka::protocol::message::{CommandSender, Message, ResponseSender, StatusCommand};
-use mintaka::protocol::response::Response;
+use mintaka::protocol::message::{CommandSender, Message, MessageSender, StatusCommand};
+use mintaka::protocol::response::{MpscResponseSender, Response, ResponseSender};
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::notation::pos::{MaybePos, Pos};
@@ -11,18 +11,6 @@ use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
-/*
-STREAMS when TEXT PROTOCOL
-main(agent-owned) / command-listener / stdout-listener / searcher
-
-command-listener > main > stdout-listener
-searcher >
-
-STREAMS when SERVER
-coroutine-driver(agent-owned) / searcher
-driver > searcher
-searcher > driver
- */
 
 fn main() -> Result<(), &'static str> {
     let launched = Arc::new(AtomicBool::new(false));
@@ -30,9 +18,9 @@ fn main() -> Result<(), &'static str> {
 
     let mut game_agent = GameAgent::new(Config::default());
 
-    let (command_sender, response_sender, message_receiver) = {
+    let (command_sender, message_sender, message_receiver) = {
         let (message_sender, message_receiver) = mpsc::channel();
-        (CommandSender::new(message_sender.clone()), ResponseSender::new(message_sender), message_receiver)
+        (CommandSender::new(message_sender.clone()), MessageSender::new(message_sender), message_receiver)
     };
 
     spawn_command_listener(launched.clone(), aborted.clone(), command_sender);
@@ -40,39 +28,10 @@ fn main() -> Result<(), &'static str> {
     for message in message_receiver {
         match message {
             Message::Command(command) => {
-                let result = game_agent.command(&response_sender, command);
+                let result = game_agent.command(&message_sender, command);
 
                 if let Err(err) = result {
                     println!("error: {}", err);
-                }
-            },
-            Message::Response(response) => {
-                match response {
-                    Response::Info(message) =>
-                        println!("info: {}", message),
-                    Response::Warning(message) =>
-                        println!("warning: {}", message),
-                    Response::Error(message) =>
-                        println!("error: {}", message),
-                    Response::Begins { workers, running_time, tt_size } =>
-                        println!("begins: workers={workers}, running_time={running_time:?}, tt-size={tt_size}"),
-                    Response::Status { eval, total_nodes_in_1k, best_moves, hash_usage } =>
-                        println!(
-                            "status: eval={eval}, \
-                            total_nodes_in_1k={total_nodes_in_1k}, \
-                            best_moves={best_moves:?}, \
-                            hash_usage={hash_usage}"
-                        ),
-                    Response::Pv(pvs) =>
-                        println!("pvs={pvs:?}"),
-                    Response::BestMove { best_move, score, total_nodes_in_1k, time_elapsed} => {
-                        launched.store(false, Ordering::Relaxed);
-
-                        println!("solution: pos={best_move}, score={score}, nodes={total_nodes_in_1k}k, elapsed={time_elapsed:?}");
-                    },
-                    Response::Finished(result) => {
-                        println!("finished: winner={result}")
-                    },
                 }
             },
             Message::Status(command) => match command {
@@ -81,11 +40,49 @@ fn main() -> Result<(), &'static str> {
                 StatusCommand::Board =>
                     println!("{}", game_agent.state.board),
                 StatusCommand::History =>
-                    println!("history: {}", game_agent.history),
+                    println!("history: {}", game_agent.state.history),
             },
+            Message::Finished(result) => {
+                println!("finished: {result}")
+            }
             Message::Launch => {
+                let (response_sender, response_receiver) = {
+                    let (response_sender, response_receiver) = mpsc::channel();
+                    (MpscResponseSender::new(response_sender), response_receiver)
+                };
+
+                std::thread::spawn(move || {
+                    for response in response_receiver {
+                        match response {
+                            Response::Begins { workers, running_time, tt_size } =>
+                                println!("begins: workers={workers}, running-time={running_time:?}, tt-size={tt_size}"),
+                            Response::Status { eval, total_nodes_in_1k, best_moves, hash_usage } =>
+                                println!(
+                                    "status: eval={eval}, \
+                                    total_nodes_in_1k={total_nodes_in_1k}, \
+                                    best_moves={best_moves:?}, \
+                                    hash_usage={hash_usage}"
+                                ),
+                            Response::Pv(pvs) =>
+                                println!("pvs={pvs:?}"),
+                            Response::Finished => break
+                        }
+                    }
+                });
+
                 launched.store(true, Ordering::Relaxed);
-                game_agent.launch(response_sender.clone(), aborted.clone());
+
+                let best_move = game_agent.launch(response_sender.clone(), aborted.clone());
+
+                launched.store(false, Ordering::Relaxed);
+
+                println!(
+                    "solution: pos={}, score={}, nodes={}k, elapsed={:?}",
+                    best_move.pos, best_move.score, best_move.total_nodes_in_1k, best_move.time_elapsed
+                );
+
+                game_agent.command(&message_sender, Command::Play(best_move.pos))?;
+                game_agent.command(&message_sender, Command::ConsumeTime(best_move.time_elapsed))?;
             },
         }
     }

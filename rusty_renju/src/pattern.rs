@@ -5,7 +5,7 @@ use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::notation::rule::{ForbiddenKind, RuleKind};
 use crate::slice::Slice;
-use crate::slice_pattern::{contains_five_in_a_row, SlicePattern};
+use crate::slice_pattern::SlicePattern;
 use crate::slice_pattern_count::SlicePatternCounts;
 use crate::utils::lang_utils::{repeat_16x, repeat_4x};
 use crate::{assert_struct_sizes, step_idx};
@@ -232,7 +232,6 @@ pub struct SlicePatternCount {
 pub struct Patterns {
     pub field: AlignedColorContainer<[Pattern; pos::BOARD_SIZE]>,
     pub counts: SlicePatternCounts,
-    pub unchecked_five_in_a_row: Option<Color>,
     pub unchecked_five_pos: ColorContainer<Option<Pos>>,
     pub forbidden_field: Bitfield,
 }
@@ -245,7 +244,6 @@ impl Default for Patterns {
         Self {
             field: unsafe { std::mem::zeroed() },
             counts: SlicePatternCounts::EMPTY,
-            unchecked_five_in_a_row: None,
             unchecked_five_pos: ColorContainer {
                 black: None,
                 white: None
@@ -274,9 +272,7 @@ impl Patterns {
             (_, false) => {
                 self.update_with_slice_pattern_mut::<C, D>(slice, slice_pattern);
             },
-            _ => {
-                self.counts.update_slice_score_mut::<C, D>(slice.idx as usize, slice.evaluate_score::<C>());
-            }
+            _ => {}
         };
     }
 
@@ -291,8 +287,6 @@ impl Patterns {
             let idx = step_idx!(D, start_idx, slice_idx);
             self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(0);
         }
-
-        self.counts.clear_slice_mut::<C, D>(slice.idx as usize, slice.evaluate_score::<C>());
 
         *slice.pattern_bitmap.get_ref_mut::<C>() = 0;
     }
@@ -332,11 +326,6 @@ impl Patterns {
                 self.forbidden_field.set_mut(Pos::from_index(idx as u8));
             }
         }
-
-        self.unchecked_five_in_a_row = self.unchecked_five_in_a_row.or(
-            contains_five_in_a_row(slice.stones::<C>())
-                .then_some(C)
-        );
 
         *slice.pattern_bitmap.get_ref_mut::<C>() = pattern_bitmap;
     }

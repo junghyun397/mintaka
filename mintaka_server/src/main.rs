@@ -1,6 +1,8 @@
-mod args;
+mod preference;
+mod session;
+mod unbounded_response_sender;
 
-use crate::args::Preference;
+use crate::preference::Preference;
 use std::env;
 use std::str::FromStr;
 use time::OffsetDateTime;
@@ -9,21 +11,9 @@ fn log_prefix() -> String {
     OffsetDateTime::now_utc().to_string()
 }
 
-fn main() {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let pref = Preference::from_args(env::args().collect()).unwrap_or_default();
 
-    let server = tiny_http::Server::http(format!("0.0.0.0:{}", pref.port)).unwrap();
-
-    println!("rusty_renju web-ui backend now listening on port {}.", pref.port);
-
-    loop {
-        let request = match server.recv() {
-            Ok(request) => request,
-            _ => break
-        };
-
-        if pref.verbose_output {
-            println!("{} income request: {:?}", log_prefix(), request);
-        }
-    }
+    Ok(())
 }

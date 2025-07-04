@@ -1,8 +1,8 @@
 use mintaka::config::Config;
 use mintaka::game_agent::GameAgent;
 use mintaka::protocol::command::Command;
-use mintaka::protocol::message::{CommandSender, Message, ResponseSender};
-use mintaka::protocol::response::Response;
+use mintaka::protocol::message::{CommandSender, Message, MessageSender};
+use mintaka::protocol::response::{MpscResponseSender, Response, ResponseSender};
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
@@ -44,9 +44,9 @@ fn main() -> Result<(), &'static str> {
 
     let mut game_agent = GameAgent::new(Config::default());
 
-    let (command_sender, response_sender, message_receiver) = {
+    let (command_sender, message_sender, message_receiver) = {
         let (message_sender, message_receiver) = mpsc::channel();
-        (CommandSender::new(message_sender.clone()), ResponseSender::new(message_sender), message_receiver)
+        (CommandSender::new(message_sender.clone()), MessageSender::new(message_sender), message_receiver)
     };
 
     spawn_command_listener(launched.clone(), aborted.clone(), command_sender);
@@ -54,39 +54,43 @@ fn main() -> Result<(), &'static str> {
     for message in message_receiver {
         match message {
             Message::Command(command) => {
-                game_agent.command(&response_sender, command)?;
-            },
-            Message::Response(response) => {
-                let piskvork_response = match response {
-                    Response::Info(message) => PiskvorkResponse::Info(message),
-                    Response::Warning(message) => PiskvorkResponse::Info(message),
-                    Response::Error(message) => PiskvorkResponse::Error(message),
-                    Response::Status { eval, total_nodes_in_1k, hash_usage, best_moves } => {
-                        PiskvorkResponse::Info(format!(
-                            "status eval={eval} \
-                            total-nodes={total_nodes_in_1k}K, \
-                            hash-usage={hash_usage}, \
-                            best-moves={best_moves:?}"
-                        ))
-                    },
-                    Response::Pv(pvs) => {
-                        PiskvorkResponse::Info(format!("pvs={pvs:?}"))
-                    },
-                    Response::BestMove { best_move, .. } => {
-                        launched.store(false, Ordering::Relaxed);
-
-                        game_agent.command(&response_sender, Command::Play(best_move.into()))?;
-
-                        PiskvorkResponse::Pos(best_move)
-                    },
-                    _ => PiskvorkResponse::None
-                };
-
-                stdio_out(piskvork_response);
+                game_agent.command(&message_sender, command)?;
             },
             Message::Launch => {
+                let (response_sender, response_receiver) = {
+                    let (response_sender, response_receiver) = mpsc::channel();
+                    (MpscResponseSender::new(response_sender), response_receiver)
+                };
+
+                std::thread::spawn(move || {
+                    for response in response_receiver {
+                        let piskvork_response = match response {
+                            Response::Begins { workers, running_time, tt_size} =>
+                                PiskvorkResponse::Info(format!(
+                                    "begins: workers={workers}, running-time={running_time:?}, tt-size={tt_size}"
+                                )),
+                            Response::Status { eval, total_nodes_in_1k, hash_usage, best_moves } =>
+                                PiskvorkResponse::Info(format!(
+                                    "status eval={eval} \
+                                    total-nodes={total_nodes_in_1k}K, \
+                                    hash-usage={hash_usage}, \
+                                    best-moves={best_moves:?}"
+                                )),
+                            Response::Pv(pvs) =>
+                                PiskvorkResponse::Info(format!("pvs={pvs:?}")),
+                            Response::Finished => break,
+                        };
+
+                        stdio_out(piskvork_response);
+                    }
+                });
+
                 launched.store(true, Ordering::Relaxed);
-                game_agent.launch(response_sender.clone(), aborted.clone());
+
+                let best_move = game_agent.launch(response_sender, aborted.clone());
+                game_agent.command(&message_sender, Command::Play(best_move.pos))?;
+
+                PiskvorkResponse::Pos(best_move.pos.unwrap());
             },
             _ => unreachable!()
         }

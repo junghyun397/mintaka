@@ -1,6 +1,5 @@
-use crate::config::SearchLimit;
-use crate::protocol::message::ResponseSender;
-use crate::protocol::response::Response;
+use crate::protocol::response::{Response, ResponseSender};
+use std::time::Duration;
 
 pub trait ThreadType {
 
@@ -8,33 +7,33 @@ pub trait ThreadType {
 
     fn make_response<F>(&self, produce: F) where F: FnOnce() -> Response;
 
-    fn limit_exceeded(&self, total_nodes_in_1k: usize) -> bool;
+    fn time_exceeded(&self) -> bool;
 
 }
 
-pub struct MainThread {
-    response_sender: ResponseSender,
+pub struct MainThread<T: ResponseSender> {
+    response_sender: T,
     start_time: std::time::Instant,
-    search_limit: SearchLimit,
+    running_time: Duration,
 }
 
-impl MainThread {
+impl<T: ResponseSender> MainThread<T> {
 
     pub fn new(
-        response_sender: ResponseSender,
+        response_sender: T,
         start_time: std::time::Instant,
-        search_limit: SearchLimit,
+        running_time: Duration,
     ) -> Self {
         Self {
             response_sender,
             start_time,
-            search_limit,
+            running_time,
         }
     }
 
 }
 
-impl ThreadType for MainThread {
+impl<T: ResponseSender> ThreadType for MainThread<T> {
     const IS_MAIN: bool = true;
 
     fn make_response<F>(&self, produce: F) where F: FnOnce() -> Response {
@@ -42,14 +41,8 @@ impl ThreadType for MainThread {
         self.response_sender.response(response);
     }
 
-    fn limit_exceeded(&self, total_nodes_in_1k: usize) -> bool {
-        match self.search_limit {
-            SearchLimit::Time { turn_time } =>
-                self.start_time.elapsed() > turn_time,
-            SearchLimit::Nodes { in_1k: finish_in_1k } =>
-                total_nodes_in_1k > finish_in_1k,
-            _ => false,
-        }
+    fn time_exceeded(&self) -> bool {
+        self.start_time.elapsed() >= self.running_time
     }
 }
 
@@ -61,7 +54,7 @@ impl ThreadType for WorkerThread {
 
     fn make_response<F>(&self, _action: F) where F: FnOnce() -> Response { }
 
-    fn limit_exceeded(&self, _total_nodes_in_1k: usize) -> bool {
+    fn time_exceeded(&self) -> bool {
         false
     }
 }

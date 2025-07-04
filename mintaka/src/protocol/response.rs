@@ -1,17 +1,13 @@
 use crate::principal_variation::PrincipalVariation;
-use rusty_renju::impl_debug_from_display;
-use rusty_renju::notation::color::Color;
+use crate::protocol::message;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::value::Score;
 use rusty_renju::utils::byte_size::ByteSize;
 use std::fmt::Display;
+use std::sync::mpsc;
 use std::time::Duration;
 
 pub enum Response {
-    Info(String),
-    Warning(String),
-    Error(String),
-
     Begins {
         workers: usize,
         running_time: Duration,
@@ -24,30 +20,36 @@ pub enum Response {
         hash_usage: f32,
     },
     Pv(PrincipalVariation),
-    BestMove {
-        best_move: Pos,
-        score: Score,
-        total_nodes_in_1k: usize,
-        time_elapsed: Duration,
-    },
-    Finished(GameResult),
+    Finished,
 }
 
-#[derive(Eq, PartialEq)]
-pub enum GameResult {
-    Win(Color),
-    Draw,
-    Full
+pub trait ResponseSender: Send {
+
+    fn response(&self, response: Response);
+
 }
 
-impl Display for GameResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GameResult::Win(color) => write!(f, "{color:?} win"),
-            GameResult::Draw => write!(f, "draw"),
-            GameResult::Full => write!(f, "full"),
-        }
+#[derive(Clone)]
+pub struct MpscResponseSender {
+    sender: mpsc::Sender<Response>,
+}
+
+impl ResponseSender for MpscResponseSender {
+    fn response(&self, response: Response) {
+        self.sender.send(response).expect(message::CHANNEL_CLOSED_MESSAGE);
     }
 }
 
-impl_debug_from_display!(GameResult);
+impl MpscResponseSender {
+
+    pub fn new(sender: mpsc::Sender<Response>) -> Self {
+        Self { sender }
+    }
+
+}
+
+pub struct NullResponseSender;
+
+impl ResponseSender for NullResponseSender {
+    fn response(&self, _response: Response) {}
+}

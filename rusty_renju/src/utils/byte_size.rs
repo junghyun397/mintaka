@@ -1,5 +1,5 @@
 use crate::impl_debug_from_display;
-use std::fmt::{Debug, Display};
+use std::fmt::Display;
 
 pub struct ByteSize(usize);
 

@@ -67,7 +67,10 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
     }
 
     pub fn search_limit_exceeded(&self) -> bool {
-        self.thread_type.limit_exceeded(self.batch_counter.count_global_in_1k())
+        TH::IS_MAIN && (
+            self.thread_type.time_exceeded()
+                || self.batch_counter.count_global_in_1k() >= self.config.max_nodes_in_1k
+        )
     }
 
     pub fn set_aborted_mut(&self) {

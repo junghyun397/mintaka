@@ -50,7 +50,7 @@ impl TranspositionTable {
         new
     }
 
-    pub fn view(&self) -> TTView {
+    pub fn view(&self) -> TTView<'_> {
         TTView {
             table: &self.table,
             age: self.fetch_age(),
@@ -92,7 +92,7 @@ impl TTView<'_> {
         endgame_flag: EndgameFlag,
         depth: u8,
         eval: Score,
-        mut score: Score,
+        score: Score,
         is_pv: bool,
     ) {
         let idx = self.calculate_index(key);

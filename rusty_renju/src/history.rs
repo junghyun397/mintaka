@@ -2,9 +2,9 @@ use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
 use std::ops::{Index, IndexMut};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct History {
-    entries: [MaybePos; pos::BOARD_SIZE],
+    pub entries: [MaybePos; pos::BOARD_SIZE],
     top: usize
 }
 
