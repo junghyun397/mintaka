@@ -1,16 +1,16 @@
 use mintaka::protocol::response::{Response, ResponseSender};
 
-pub struct UnboundedResponseSender {
+pub struct StreamResponseSender {
     tx: tokio::sync::mpsc::UnboundedSender<Response>,
 }
 
-impl ResponseSender for UnboundedResponseSender {
+impl ResponseSender for StreamResponseSender {
     fn response(&self, response: Response) {
         self.tx.send(response).unwrap();
     }
 }
 
-impl UnboundedResponseSender {
+impl StreamResponseSender {
     pub fn new(tx: tokio::sync::mpsc::UnboundedSender<Response>) -> Self {
         Self { tx }
     }

@@ -10,6 +10,8 @@ use crate::search;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::utils::time_manager::TimeManager;
+use rusty_renju::board::Board;
+use rusty_renju::history::History;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
@@ -40,12 +42,34 @@ pub struct GameAgent {
 impl GameAgent {
 
     pub fn new(config: Config) -> Self {
+        let tt = TranspositionTable::new_with_size(config.tt_size);
+
         Self {
             state: GameState::default(),
             config,
             time_manager: TimeManager::default(),
             time_history: Vec::new(),
-            tt: TranspositionTable::new_with_size(ByteSize::from_mib(16)),
+            tt,
+            ht: HistoryTable {},
+        }
+    }
+
+    pub fn from_state(config: Config, board: Board, history: History) -> Self {
+        let state = GameState {
+            board,
+            history,
+            movegen_window: board.hot_field.into(),
+            move_scores: board.hot_field.into(),
+        };
+
+        let tt = TranspositionTable::new_with_size(config.tt_size);
+
+        Self {
+            state,
+            config,
+            time_manager: TimeManager::default(),
+            time_history: Vec::new(),
+            tt,
             ht: HistoryTable {},
         }
     }

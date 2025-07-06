@@ -1,5 +1,6 @@
 use rusty_renju::notation::pos;
 use rusty_renju::notation::rule::RuleKind;
+use rusty_renju::utils::byte_size::ByteSize;
 use std::num::NonZeroUsize;
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
@@ -33,8 +34,8 @@ pub struct Config {
     pub max_depth: usize,
     pub max_vcf_depth: usize,
 
+    pub tt_size: ByteSize,
     pub workers: NonZeroUsize,
-
 
     pub repost_contents: ReportContents,
 }
@@ -48,6 +49,7 @@ impl Default for Config {
             max_nodes_in_1k: usize::MAX,
             max_depth: usize::MAX,
             max_vcf_depth: pos::BOARD_SIZE - 5,
+            tt_size: ByteSize::from_mib(16),
             workers: NonZeroUsize::new(1).unwrap(),
             repost_contents: ReportContents::default(),
         }

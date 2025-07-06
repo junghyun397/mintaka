@@ -1,6 +1,7 @@
 use crate::impl_debug_from_display;
 use std::fmt::Display;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ByteSize(usize);
 
 impl ByteSize {

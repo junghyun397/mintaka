@@ -8,8 +8,11 @@ rusty_renju = { path = "../rusty_renju" }
 mintaka = { path = "../mintaka" }
 
 time = "0.3.41"
+uuid = { version = "1.17.0", features = ["v4"] }
+dashmap = "6.1.0"
 anyhow = "1.0.98"
 num_cpus = "1.17.0"
 
-axum = "0.8.4"
+axum = { version = "0.8.4", features = ["ws"] }
 tokio = { version = "1.45.1", features = ["full"] }
+tokio-stream = "0.1.17"

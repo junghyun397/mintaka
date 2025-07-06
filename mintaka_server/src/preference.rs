@@ -1,5 +1,7 @@
+use std::env::Args;
+
 pub struct Preference {
-    pub port: usize,
+    pub address: String,
     pub verbose_output: bool,
     pub cores: usize,
 }
@@ -8,7 +10,7 @@ impl Default for Preference {
 
     fn default() -> Self {
         Self {
-            port: 8000,
+            address: "localhost:8080".to_string(),
             verbose_output: false,
             cores: 1,
         }
@@ -18,8 +20,10 @@ impl Default for Preference {
 
 impl Preference {
 
-    pub fn from_args(source: Vec<String>) -> Result<Self, &'static str> {
-        todo!()
+    pub fn from_args(args: Args) -> Result<Self, &'static str> {
+        let preference = Self::default();
+
+        Ok(preference)
     }
 
 }
