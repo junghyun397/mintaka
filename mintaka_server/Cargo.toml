@@ -7,12 +7,17 @@ edition = "2024"
 rusty_renju = { path = "../rusty_renju" }
 mintaka = { path = "../mintaka" }
 
-time = "0.3.41"
-uuid = { version = "1.17.0", features = ["v4"] }
-dashmap = "6.1.0"
-anyhow = "1.0.98"
+uuid = { version = "1.17.0", features = ["v4", "v7"] }
 num_cpus = "1.17.0"
+dashmap = "6.1.0"
 
+futures = "0.3.31"
+futures-util = "0.3.31"
 axum = { version = "0.8.4", features = ["ws"] }
+tower-http = { version = "0.6.6", features = ["trace"] }
 tokio = { version = "1.45.1", features = ["full"] }
 tokio-stream = "0.1.17"
+
+anyhow = "1.0.98"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["fmt", "env-filter"] }

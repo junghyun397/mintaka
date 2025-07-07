@@ -7,6 +7,7 @@ use std::fmt::Display;
 use std::sync::mpsc;
 use std::time::Duration;
 
+#[derive(Clone)]
 pub enum Response {
     Begins {
         workers: usize,

@@ -1,24 +1,31 @@
+use crate::app_state::WorkerPermit;
 use crate::stream_response_sender::StreamResponseSender;
 use anyhow::{anyhow, bail};
 use dashmap::DashMap;
 use mintaka::config::Config;
 use mintaka::game_agent::{BestMove, GameAgent};
 use mintaka::protocol::command::Command;
-use mintaka::protocol::message::Message;
+use mintaka::protocol::message::{GameResult, Message, MessageSender};
 use mintaka::protocol::response::{Response, ResponseSender};
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::memo::hash_key::HashKey;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio::sync::SemaphorePermit;
 use uuid::Uuid;
 
+const SESSION_NOT_FOUND_MESSAGE: &str = "session not found";
 const AGENT_IN_GAME_MESSAGE: &str = "agent in searching";
 const AGENT_NOT_IN_GAME_MESSAGE: &str = "agent not in searching";
 
+pub enum AgentState {
+    Agent(GameAgent),
+    Permit(WorkerPermit)
+}
+
 pub struct Session {
-    game_agent: Option<GameAgent>,
+    state: AgentState,
     abort_handle: Arc<AtomicBool>,
 }
 
@@ -26,72 +33,107 @@ impl Session {
 
     pub fn new(config: Config, board: Board, history: History) -> Self {
         Self {
-            game_agent: Some(GameAgent::from_state(config, board, history)),
+            state: AgentState::Agent(GameAgent::from_state(config, board, history)),
             abort_handle: Arc::new(AtomicBool::new(false)),
         }
     }
 
-    pub fn command(&mut self, command: Command) -> anyhow::Result<std::sync::mpsc::Receiver<Message>> {
-        let game_agent = self.game_agent.as_mut()
-            .ok_or(anyhow!(AGENT_IN_GAME_MESSAGE))?;
+    pub fn command(&mut self, command: Command) -> anyhow::Result<Option<GameResult>> {
+        let game_agent = match &mut self.state {
+            AgentState::Agent(agent) => agent,
+            AgentState::Permit(_) => bail!(AGENT_IN_GAME_MESSAGE),
+        };
 
         let (tx, rx) = std::sync::mpsc::channel();
 
-        game_agent.command(&tx, command).map_err(anyhow::Error::msg)?;
+        game_agent.command(&MessageSender::new(tx), command)
+            .map_err(anyhow::Error::msg)?;
 
-        Ok(rx)
+        let game_result = rx.try_iter().find_map(|message|
+            match message {
+                Message::Finished(result) => Some(result),
+                _ => None
+            }
+        );
+
+        Ok(game_result)
     }
 
-    pub fn launch(&mut self, result_sender: tokio::sync::mpsc::Sender<(GameAgent, BestMove)>) -> UnboundedReceiverStream<Response> {
-        let (response_sender, response_stream) = {
-            let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-            (StreamResponseSender::new(tx), UnboundedReceiverStream::new(rx))
-        };
+    pub fn launch(
+        &mut self,
+        response_sender: StreamResponseSender<Response>,
+        result_sender: StreamResponseSender<(GameAgent, BestMove)>,
+        worker_permit: WorkerPermit,
+    ) -> anyhow::Result<()> {
+        let AgentState::Agent(mut game_agent)
+            = std::mem::replace(&mut self.state, AgentState::Permit(worker_permit))
+                else { bail!(AGENT_IN_GAME_MESSAGE) };
 
         self.abort_handle.store(false, Ordering::Relaxed);
-
         let abort_flag = self.abort_handle.clone();
-        let mut game_agent = std::mem::take(&mut self.game_agent).unwrap();
 
         tokio::task::spawn_blocking(move || {
             let best_move = game_agent.launch(response_sender, abort_flag);
 
-            result_sender.send((game_agent, best_move)).unwrap();
+            result_sender.send(game_agent, best_move);
         });
-
-        response_stream
-    }
-
-    pub fn abort(&self) -> anyhow::Result<()> {
-        if self.game_agent.is_some() {
-            bail!(AGENT_NOT_IN_GAME_MESSAGE);
-        }
-
-        self.abort_handle.store(true, Ordering::Relaxed);
 
         Ok(())
     }
 
-    pub fn recover(&mut self, game_agent: GameAgent) {
-        self.game_agent = Some(game_agent);
+    pub fn abort(&self) -> anyhow::Result<()> {
+        match &self.state {
+            AgentState::Agent(_) => bail!(AGENT_NOT_IN_GAME_MESSAGE),
+            AgentState::Permit(_) => {
+                self.abort_handle.store(true, Ordering::Relaxed);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn recover(&mut self, game_agent: GameAgent) -> anyhow::Result<()> {
+        let permit = match std::mem::replace(&mut self.state, AgentState::Agent(game_agent)) {
+            AgentState::Permit(permit) => permit,
+            AgentState::Agent(prev_agent) => {
+                self.state = AgentState::Agent(prev_agent);
+
+                bail!(AGENT_NOT_IN_GAME_MESSAGE);
+            }
+        };
+
+        permit.release();
+
+        Ok(())
     }
 
     pub fn board_hash_key(&self) -> anyhow::Result<HashKey> {
-        let hash_key = self.game_agent.as_ref()
-            .ok_or(anyhow!(AGENT_IN_GAME_MESSAGE))?
-            .state.board.hash_key;
+        let hash_key = match &self.state {
+            AgentState::Agent(agent) => agent.state.board.hash_key,
+            AgentState::Permit(_) => bail!(AGENT_IN_GAME_MESSAGE),
+        };
 
         Ok(hash_key)
     }
 
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SessionKey(Uuid);
+
+#[derive(Clone)]
+pub enum SessionResponse {
+    Response(Response),
+    BestMove(BestMove),
+}
+
+pub enum SessionMessage {
+    Status
+}
 
 #[derive(Default)]
 pub struct Sessions {
-    map: DashMap<Uuid, Session>,
+    map: DashMap<SessionKey, Session>,
 }
 
 impl Sessions {
@@ -101,14 +143,50 @@ impl Sessions {
 
         let session = Session::new(config, board, history);
 
-        self.map.insert(session_key.0, session);
+        self.map.insert(session_key, session);
 
         session_key
     }
 
+    pub fn command_session(
+        &mut self,
+        session_key: SessionKey,
+        command: Command,
+    ) -> anyhow::Result<Option<GameResult>> {
+        let mut session = self.map.get_mut(&session_key)
+            .ok_or(anyhow!(SESSION_NOT_FOUND_MESSAGE))?;
+
+        session.command(command)
+    }
+
+    pub fn launch_session(
+        &mut self,
+        session_key: SessionKey,
+        response_sender: tokio::sync::mpsc::UnboundedSender<(SessionKey, SessionResponse)>,
+        worker_permit: SemaphorePermit,
+    ) -> anyhow::Result<()> {
+        let mut session = self.map.get_mut(&session_key)
+            .ok_or(anyhow!(SESSION_NOT_FOUND_MESSAGE))?;
+
+        // recover session logic
+        // best-move into session-response
+        // response-stream into session-response
+
+        Ok(())
+    }
+
     pub fn abort_session(&mut self, session_key: SessionKey) -> anyhow::Result<()> {
-        let session = self.map.get(&session_key.0)
-            .ok_or(anyhow!("session not found"))?;
+        let session = self.map.get(&session_key)
+            .ok_or(anyhow!(SESSION_NOT_FOUND_MESSAGE))?;
+
+        session.abort()?;
+
+        Ok(())
+    }
+
+    pub fn destroy_session(&mut self, session_key: SessionKey) -> anyhow::Result<()> {
+        let (_, session) = self.map.remove(&session_key)
+            .ok_or(anyhow!(SESSION_NOT_FOUND_MESSAGE))?;
 
         session.abort()?;
 

@@ -18,8 +18,8 @@ impl Default for MoveScores {
     }
 }
 
-impl From<Bitfield> for MoveScores {
-    fn from(value: Bitfield) -> Self {
+impl From<&Bitfield> for MoveScores {
+    fn from(value: &Bitfield) -> Self {
         let mut acc = Self::default();
 
         for pos in value.iter_hot_pos() {

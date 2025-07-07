@@ -23,6 +23,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+#[derive(Copy, Clone)]
 pub struct BestMove {
     pub pos: MaybePos,
     pub score: Score,
@@ -58,8 +59,8 @@ impl GameAgent {
         let state = GameState {
             board,
             history,
-            movegen_window: board.hot_field.into(),
-            move_scores: board.hot_field.into(),
+            movegen_window: (&board.hot_field).into(),
+            move_scores: (&board.hot_field).into(),
         };
 
         let tt = TranspositionTable::new_with_size(config.tt_size);
@@ -157,7 +158,7 @@ impl GameAgent {
                 let (board, history) = *boxed;
 
                 let movegen_window = (&board.hot_field).into();
-                let move_scores = board.hot_field.into();
+                let move_scores = (&board.hot_field).into();
 
                 self.state = GameState {
                     board,
