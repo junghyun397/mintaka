@@ -14,7 +14,8 @@ and plans to integrate an AlphaZero-based value and policy network.
 - **Interfaces**
   - Protocol Support: [Piskvork(Gomocup)](https://plastovicka.github.io/protocl2en.htm), [Yixin-board](https://github.com/accreator/Yixin-Board) and [GTP](https://www.gnu.org/software/gnugo/gnugo_19.html)-like protocol.
   - FFI Bindings: Java (JNI), WebAssembly (JavaScript/TypeScript)
-  - Web Interface: Solid.js frontend with REST API backend
+  - RPC/REST api: 
+  - Web Interface: Solid.js frontend with WebSocket/REST API backend
 
 - **Planned**
   - [NNUE](https://en.wikipedia.org/wiki/Efficiently_updatable_neural_network)-based evaluation with separate networks for black/white pieces
@@ -32,7 +33,7 @@ Principal Variation Search (PVS) based engine core
 Protocol adapters for [Piskvork(Gomocup)](https://plastovicka.github.io/protocl2en.htm), [Yixin-board](https://github.com/accreator/Yixin-Board) and [GTP](https://www.gnu.org/software/gnugo/gnugo_19.html)-like CLI
 
 ### mintaka-server
-(TBD) REST API service for web integration
+WebSocket and REST API support
 
 ### mintaka-webui
 (TBD) Solid.js based web frontend

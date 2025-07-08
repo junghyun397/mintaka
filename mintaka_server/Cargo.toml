@@ -7,17 +7,20 @@ edition = "2024"
 rusty_renju = { path = "../rusty_renju" }
 mintaka = { path = "../mintaka" }
 
-uuid = { version = "1.17.0", features = ["v4", "v7"] }
-num_cpus = "1.17.0"
-dashmap = "6.1.0"
+uuid = { version = "1.17", features = ["v4", "v7"] }
+num_cpus = "1.17"
+dashmap = "6.1"
 
-futures = "0.3.31"
-futures-util = "0.3.31"
-axum = { version = "0.8.4", features = ["ws"] }
-tower-http = { version = "0.6.6", features = ["trace"] }
-tokio = { version = "1.45.1", features = ["full"] }
-tokio-stream = "0.1.17"
+futures = "0.3"
+futures-util = "0.3"
+axum = { version = "0.8", features = ["ws"] }
+axum-extra = "0.10"
+axum-server = { version = "0.7", features = ["tls-rustls"] }
+tower-http = { version = "0.6", features = ["trace"] }
+tokio = { version = "1.45", features = ["full"] }
+tokio-stream = "0.1"
 
-anyhow = "1.0.98"
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["fmt", "env-filter"] }
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+serde = { version = "1.0.210", features = ["derive"] }

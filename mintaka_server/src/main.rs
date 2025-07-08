@@ -2,6 +2,8 @@ mod preference;
 mod session;
 mod stream_response_sender;
 mod app_state;
+mod rest;
+mod websocket;
 
 use crate::app_state::AppState;
 use crate::preference::Preference;
@@ -12,10 +14,13 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Router;
 use axum::ServiceExt;
+use axum_server::service::MakeService;
+use axum_server::tls_rustls::RustlsConfig;
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashSet;
 use std::env;
 use std::net::SocketAddr;
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
@@ -32,17 +37,35 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let addr: SocketAddr = pref.address.parse()?;
-    let listener = tokio::net::TcpListener::bind(addr).await?;
 
-    let state = Arc::new(AppState::new(pref));
+    let state = Arc::new(AppState::new(pref.clone()));
 
     let app = Router::new()
         .route("/ws", get(websocket_handler))
+        .route("/health", get(rest::health))
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
-    info!("listening on {addr}");
-    axum::serve(listener, app).await?;
+    if let Some(tls_config) = pref.tls_config {
+        let ruslts_config = RustlsConfig::from_pem_file(
+            Path::new(&tls_config.cert_path),
+            Path::new(&tls_config.key_path),
+        ).await?;
+
+        info!("listening on https://{addr}, wss://{addr}/ws");
+
+        axum_server::bind_rustls(addr, ruslts_config)
+            .serve(app.into_make_service())
+            .await?;
+    } else {
+        let listener = tokio::net::TcpListener::bind(addr)
+            .await?;
+
+        info!("listening on http://{addr}, ws://{addr}/ws");
+
+        axum::serve(listener, app)
+            .await?;
+    }
 
     Ok(())
 }
@@ -51,33 +74,5 @@ async fn websocket_handler(
     ws: WebSocketUpgrade,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(|socket| handle_socket(socket, state))
-}
-
-async fn handle_socket(
-    mut socket: WebSocket,
-    state: Arc<AppState>,
-) {
-    let mut interests: HashSet<SessionKey> = HashSet::new();
-
-    let (mut sender, mut receiver) = socket.split();
-
-    loop {
-        tokio::select! {
-            Some(Ok(msg)) = receiver.next() => {
-                match msg {
-                    ws::Message::Text(text) => {
-                        sender.send(ws::Message::Text(text)).await.unwrap();
-                    },
-                    ws::Message::Binary(data) => {
-                    },
-                    ws::Message::Ping(_) => {},
-                    ws::Message::Pong(_) => {},
-                    ws::Message::Close(_) => {
-                        break;
-                    }
-                }
-            }
-        }
-    }
+    ws.on_upgrade(|socket| websocket::handle_socket(socket, state))
 }
