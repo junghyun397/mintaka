@@ -3,6 +3,7 @@ use crate::session::{SessionKey, SessionResponse};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use axum::extract::ws;
 use axum::extract::ws::WebSocket;
+use futures_util::future::err;
 use futures_util::{SinkExt, StreamExt};
 use mintaka::config::Config;
 use mintaka::protocol::response::Response;
@@ -14,10 +15,12 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_stream::StreamMap;
 use tracing::info;
+use uuid::Uuid;
 
 pub async fn handle_socket(
     mut socket: WebSocket,
     mut state: Arc<AppState>,
+    connection_id: Uuid,
 ) {
     info!("new connection");
 
@@ -25,59 +28,60 @@ pub async fn handle_socket(
 
     let (mut sender, mut receiver) = socket.split();
 
-    loop {
-        tokio::select! {
-            Some(Ok(msg)) = receiver.next() => {
-                match msg {
-                    ws::Message::Text(text) => {
-                        match text.as_str() {
-                            "acquire" => {
-                                let session_key = SessionKey::new_random();
+    loop { tokio::select! {
+        Some(msg_result) = receiver.next() => match msg_result {
+            Ok(msg) => match msg {
+                ws::Message::Text(text) => match text.as_str() {
+                    "acquire" => {
+                        let session_key = SessionKey::new_random();
 
-                                if let Some(session_response_stream) = state.acquire_session_stream(session_key).unwrap() {
-                                    stream_map.insert(session_key, session_response_stream);
-                                }
-                            }
-                            "new" => {
-                                let config = Config::default();
-                                let board = Board::default();
-                                let history = History::default();
-
-                                let (session_key, session_response_stream) = state.new_session(config, board, history);
-
-                                stream_map.insert(session_key, session_response_stream);
-                            },
-                            _ => {
-                                sender.send(ws::Message::Text("invalid command".into())).await.unwrap();
-                            }
+                        if let Some(session_response_stream) = state.acquire_session_stream(session_key).unwrap() {
+                            stream_map.insert(session_key, session_response_stream);
                         }
                     },
-                    ws::Message::Binary(data) => {
+                    "new" => {
+                        let config = Config::default();
+                        let board = Board::default();
+                        let history = History::default();
+
+                        let session_key = state.new_session(config, board, history);
+                        let session_response_stream = state.acquire_session_stream(session_key).unwrap().unwrap();
+
+                        stream_map.insert(session_key, session_response_stream);
                     },
-                    ws::Message::Close(_) => {
-                        break;
+                    _ => {
+                        sender.send(ws::Message::Text("invalid command".into())).await.unwrap();
                     }
-                    _ => {}
-                }
+                },
+                ws::Message::Binary(data) => {
+                },
+                ws::Message::Close(_) => {
+                    break;
+                },
+                _ => {} // ignore ping, pong
             },
-            Some((session_key, session_response)) = stream_map.next() => {
-                match session_response {
-                    SessionResponse::Response(response) => {
-                    },
-                    SessionResponse::BestMove(best_move) => {
-                    },
-                    SessionResponse::Terminate => {
-                        stream_map.remove(&session_key);
-                    }
+            Err(err) => {
+                info!("connection broken: {}", err);
+                break;
+            }
+        },
+        Some((session_key, session_response)) = stream_map.next() => {
+            match session_response {
+                SessionResponse::Response(response) => {
+                },
+                SessionResponse::BestMove(best_move) => {
+                },
+                SessionResponse::Terminate => {
+                    stream_map.remove(&session_key);
                 }
             }
         }
-    }
+    } }
 
     for session_key in stream_map.keys().copied().collect::<Vec<_>>() {
         let session_response_stream = stream_map.remove(&session_key).unwrap();
 
-        state.recover_session_stream(session_key, session_response_stream).unwrap();
+        state.restore_session_stream(session_key, session_response_stream).unwrap();
     }
 
     info!("connection closed");

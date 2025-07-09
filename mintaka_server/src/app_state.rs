@@ -57,7 +57,7 @@ impl AppState {
         Ok(WorkerPermit(self.sem.clone().acquire_many_owned(workers).await?))
     }
 
-    pub fn new_session(&self, config: Config, board: Board, history: History) -> (SessionKey, UnboundedReceiverStream<SessionResponse>) {
+    pub fn new_session(&self, config: Config, board: Board, history: History) -> SessionKey {
         let session_key = SessionKey::new_random();
 
         let session = Session::new(config, board, history);
@@ -69,9 +69,9 @@ impl AppState {
             (tx, UnboundedReceiverStream::new(rx))
         };
 
-        self.session_streams.insert(session_key, (session_stream_sender, None));
+        self.session_streams.insert(session_key, (session_stream_sender, Some(session_stream_rx)));
 
-        (session_key, session_stream_rx)
+        session_key
     }
 
     pub fn command_session(
@@ -111,7 +111,8 @@ impl AppState {
             match result_rx.await {
                 Ok(SessionResultResponse { game_agent, best_move }) => {
                     if let Some(mut session) = sessions.get_mut(&session_key) {
-                        session.recover(game_agent).unwrap();
+                        session.store_best_move(best_move);
+                        session.restore(game_agent).unwrap();
                     }
 
                     session_response_sender.send(SessionResponse::BestMove(best_move)).unwrap();
@@ -151,7 +152,7 @@ impl AppState {
         Ok(session_stream_receiver)
     }
 
-    pub fn recover_session_stream(&self, session_key: SessionKey, session_stream_receiver: UnboundedReceiverStream<SessionResponse>) -> anyhow::Result<()> {
+    pub fn restore_session_stream(&self, session_key: SessionKey, session_stream_receiver: UnboundedReceiverStream<SessionResponse>) -> anyhow::Result<()> {
         self.session_streams.get_mut(&session_key)
             .ok_or(anyhow!(STREAM_NOT_ACQUIRED_MESSAGE))?.1
             = Some(session_stream_receiver);

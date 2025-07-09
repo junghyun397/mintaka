@@ -13,6 +13,7 @@ use crate::utils::time_manager::TimeManager;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
+use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
@@ -25,6 +26,7 @@ use std::time::Duration;
 
 #[derive(Copy, Clone)]
 pub struct BestMove {
+    pub hash: HashKey,
     pub pos: MaybePos,
     pub score: Score,
     pub total_nodes_in_1k: usize,
@@ -294,6 +296,7 @@ impl GameAgent {
         self.time_history.push(time_elapsed);
 
         BestMove {
+            hash: self.state.board.hash_key,
             pos: main_td.best_move,
             score,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),

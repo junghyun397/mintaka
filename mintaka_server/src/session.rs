@@ -18,7 +18,20 @@ const AGENT_IN_GAME_MESSAGE: &str = "agent in searching";
 const AGENT_NOT_IN_GAME_MESSAGE: &str = "agent not in searching";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct SessionKey(Uuid);
+
+impl Into<Uuid> for SessionKey {
+    fn into(self) -> Uuid {
+        self.0
+    }
+}
+
+impl From<Uuid> for SessionKey {
+    fn from(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+}
 
 impl SessionKey {
     pub fn new_random() -> Self {
@@ -44,6 +57,7 @@ pub enum AgentState {
 
 pub struct Session {
     state: AgentState,
+    best_move: Option<BestMove>,
     abort_handle: Arc<AtomicBool>,
 }
 
@@ -52,6 +66,7 @@ impl Session {
     pub fn new(config: Config, board: Board, history: History) -> Self {
         Self {
             state: AgentState::Agent(GameAgent::from_state(config, board, history)),
+            best_move: None,
             abort_handle: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -112,7 +127,15 @@ impl Session {
         Ok(())
     }
 
-    pub fn recover(&mut self, game_agent: GameAgent) -> anyhow::Result<()> {
+    pub fn store_best_move(&mut self, best_move: BestMove) {
+        self.best_move = Some(best_move);
+    }
+
+    pub fn last_best_move(&self) -> Option<BestMove> {
+        self.best_move
+    }
+
+    pub fn restore(&mut self, game_agent: GameAgent) -> anyhow::Result<()> {
         let permit = match std::mem::replace(&mut self.state, AgentState::Agent(game_agent)) {
             AgentState::Permit(permit) => permit,
             AgentState::Agent(prev_agent) => {
