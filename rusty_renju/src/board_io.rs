@@ -1,12 +1,10 @@
-use crate::bitfield::Bitfield;
 use crate::board::Board;
 use crate::board_iter::BoardIterItem;
 use crate::history::History;
 use crate::impl_debug_from_display;
 use crate::notation::color::Color;
 use crate::notation::pos;
-use crate::notation::pos::{MaybePos, Pos};
-use crate::notation::rule::ForbiddenKind;
+use crate::notation::pos::Pos;
 use crate::pattern::Pattern;
 use crate::slice::Slice;
 use crate::utils::str_utils::join_str_horizontally;
@@ -15,15 +13,15 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::sync::OnceLock;
 
-const SYMBOL_BLACK: char = 'X';
-const SYMBOL_WHITE: char = 'O';
-const SYMBOL_EMPTY: char = '.';
-const SYMBOL_FORBID_DOUBLE_THREE: char = '3';
-const SYMBOL_FORBID_DOUBLE_FOUR: char = '4';
-const SYMBOL_FORBID_OVERLINE: char = '6';
+pub const SYMBOL_BLACK: char = 'X';
+pub const SYMBOL_WHITE: char = 'O';
+pub const SYMBOL_EMPTY: char = '.';
+pub const SYMBOL_FORBID_DOUBLE_THREE: char = '3';
+pub const SYMBOL_FORBID_DOUBLE_FOUR: char = '4';
+pub const SYMBOL_FORBID_OVERLINE: char = '6';
 
-const HISTORY_LITERAL_SEPARATOR: &str = ",";
-const HISTORY_LITERAL_PASS: &str = "pass";
+pub const HISTORY_LITERAL_SEPARATOR: &str = ",";
+pub const HISTORY_LITERAL_PASS: &str = "pass";
 
 enum BoardElement {
     Stone(Color),
@@ -206,27 +204,6 @@ impl FromStr for Board {
     }
 }
 
-pub const BIN_BOARD_SIZE: usize = size_of::<[Bitfield; 2]>();
-
-impl From<&Board> for [u8; BIN_BOARD_SIZE] {
-    fn from(value: &Board) -> Self {
-        let mut black_field = Bitfield::default();
-        let mut white_field = Bitfield::default();
-
-        for row in 0 .. pos::U_BOARD_WIDTH {
-            for col in 0 .. pos::BOARD_WIDTH {
-                match value.slices.horizontal_slices[row].stone_kind(col) {
-                    Some(Color::Black) => { black_field.set_mut(Pos::from_cartesian(row as u8, col)) }
-                    Some(Color::White) => { white_field.set_mut(Pos::from_cartesian(row as u8, col)) }
-                    None => {}
-                }
-            }
-        }
-
-        unsafe { std::mem::transmute::<[[u8; 32]; 2], [u8; 64]>([black_field.0, white_field.0]) }
-    }
-}
-
 impl FromStr for Slice {
     type Err = &'static str;
 
@@ -267,212 +244,10 @@ impl Display for Slice {
             .collect::<Vec<_>>()
             .join(" ");
 
-        write!(f, "{}", content)
+        write!(f, "{content}")
     }
 }
 
-impl TryFrom<&Board> for History {
-    type Error = &'static str;
-
-    fn try_from(value: &Board) -> Result<Self, Self::Error> {
-        let mut black_history = vec![];
-        let mut white_history = vec![];
-
-        for distance_from_center in 0 .. pos::CENTER_ROW_COL {
-            let begin_idx = pos::CENTER_ROW_COL - distance_from_center;
-            let end_idx = pos::CENTER_ROW_COL + distance_from_center;
-
-            for pos in
-                (0 .. distance_from_center * 2 + 1) // horizontal-up
-                    .map(|offset| Pos::from_cartesian(begin_idx, begin_idx + offset))
-                .chain((0 .. distance_from_center * 2 + 1)
-                    .map(|offset| Pos::from_cartesian(end_idx, begin_idx + offset))
-                ) // horizontal-down
-                .chain((0 .. (distance_from_center * 2 + 1).saturating_sub(2))
-                    .map(|offset| Pos::from_cartesian(begin_idx + 1 + offset, begin_idx))
-                ) // vertical-left
-                .chain((0 .. (distance_from_center * 2 + 1).saturating_sub(2))
-                    .map(|offset| Pos::from_cartesian(begin_idx + 1 + offset, end_idx))
-                ) // vertical-right
-            {
-                match value.stone_kind(pos) {
-                    Some(Color::Black) => black_history.push(pos),
-                    Some(Color::White) => white_history.push(pos),
-                    _ => {}
-                }
-            }
-        }
-
-        if white_history.len() > black_history.len() {
-            return Err("white's history is longer than black's history.");
-        }
-
-        let mut history = History::default();
-
-        while let Some(black_pos) = black_history.pop() {
-            history.set_mut(black_pos);
-
-            if let Some(white_pos) = white_history.pop() {
-                history.set_mut(white_pos);
-            }
-        }
-
-        Ok(history)
-    }
-}
-
-impl Display for History {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let history = self.iter()
-            .map(|&action|
-                match action {
-                    MaybePos::NONE => HISTORY_LITERAL_PASS.to_string(),
-                    pos => pos.unwrap().to_string()
-                }
-            )
-            .collect::<Vec<_>>()
-            .join(HISTORY_LITERAL_SEPARATOR);
-
-        write!(f, "{history}")
-    }
-}
-
-impl_debug_from_display!(History);
-
-impl FromStr for History {
-    type Err = &'static str;
-
-    fn from_str(source: &str) -> Result<Self, Self::Err> {
-        let mut history = History::default();
-        let source = source.to_lowercase();
-        let bytes = source.as_bytes();
-        let mut idx = 0;
-
-        fn detect_token(bytes: &[u8]) -> Option<(Pos, usize)> {
-            if bytes.len() < 2
-                || !(b'a' .. (b'a' + pos::BOARD_WIDTH)).contains(&bytes[0])
-            {
-                return None;
-            }
-
-            let len =
-                if bytes.len() > 2 && bytes[2].is_ascii_digit() {
-                    3
-                } else if bytes[1].is_ascii_digit() {
-                    2
-                } else {
-                    return None;
-                };
-
-            Pos::from_str(str::from_utf8(&bytes[.. len]).unwrap()).ok()
-                .map(|pos| (pos, len))
-        }
-
-        while idx < bytes.len() {
-            if let Some((pos, len)) = detect_token(&bytes[idx ..]) {
-                history.set_mut(pos);
-                idx += len;
-            } else {
-                idx += 1;
-            }
-        }
-
-        Ok(history)
-    }
-}
-
-impl FromStr for Color {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_ascii_lowercase().as_str() {
-            "black" | "b" => Ok(Color::Black),
-            "white" | "w" => Ok(Color::White),
-            &_ => Err("unknown color")
-        }
-    }
-}
-
-impl FromStr for Pos {
-    type Err = &'static str;
-
-    fn from_str(source: &str) -> Result<Self, Self::Err> {
-        source[1..].parse::<u8>()
-            .map_err(|_| "invalid row charter")
-            .and_then(|row| {
-                let col = source.chars().next().unwrap() as u8 - b'a';
-
-                (col < pos::BOARD_WIDTH && row < pos::BOARD_WIDTH)
-                    .then(|| Pos::from_cartesian(row - 1 , col))
-                    .ok_or("column or row out of range")
-            })
-    }
-}
-
-impl Display for Pos {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", (self.col() + b'a') as char, self.row() + 1)
-    }
-}
-
-impl_debug_from_display!(Pos);
-
-impl Display for MaybePos {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            MaybePos::NONE => write!(f, "None"),
-            _ => write!(f, "Pos({})", self.unwrap())
-        }
-    }
-}
-
-impl_debug_from_display!(MaybePos);
-
-impl From<Color> for char {
-    fn from(value: Color) -> Self {
-        match value {
-            Color::Black => SYMBOL_BLACK,
-            Color::White => SYMBOL_WHITE
-        }
-    }
-}
-
-impl From<ForbiddenKind> for char {
-    fn from(value: ForbiddenKind) -> Self {
-        match value {
-            ForbiddenKind::DoubleThree => SYMBOL_FORBID_DOUBLE_THREE,
-            ForbiddenKind::DoubleFour => SYMBOL_FORBID_DOUBLE_FOUR,
-            ForbiddenKind::Overline => SYMBOL_FORBID_OVERLINE
-        }
-    }
-}
-
-impl_debug_from_display!(ForbiddenKind);
-
-impl Display for ForbiddenKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", char::from(*self))
-    }
-}
-
-impl_debug_from_display!(Bitfield);
-
-impl Display for Bitfield {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let content = self.iter()
-            .map(|is_hot|
-                if is_hot { "X" } else { "." }
-            )
-            .collect::<Vec<_>>()
-            .chunks(pos::U_BOARD_WIDTH)
-            .rev()
-            .map(|row| row.join(" "))
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        write!(f, "{}", content)
-    }
-}
 
 pub fn add_move_marker(mut board_string: String, color: Color, pos: Pos, pre_marker: char, post_marker: char) -> String {
     const COL_INDEX_OFFSET: usize = 3 + pos::U_BOARD_WIDTH * 2; // row(2) + margin(1) + col(w*2) + br(1)
@@ -487,33 +262,4 @@ pub fn add_move_marker(mut board_string: String, color: Color, pos: Pos, pre_mar
 
     board_string.replace_range(offset .. offset + 3, &format!("{pre_marker}{}{post_marker}", char::from(color)));
     board_string
-}
-
-#[macro_export] macro_rules! history {
-    ($($move_str:expr),+ $(,)?) => {{
-        use std::str::FromStr;
-
-        let mut history = $crate::history::History::default();
-
-        $(history.set_mut($crate::notation::pos::Pos::from_str($move_str).unwrap());)*
-
-        history
-    }};
-    () => {
-        $crate::history::History::default()
-    };
-}
-
-#[macro_export] macro_rules! board {
-    ($board_str:expr) => {{
-        use std::str::FromStr;
-
-        $crate::board::Board::from_str($board_str).unwrap()
-    }};
-    ($($move_str:expr),+ $(,)?) => {{
-        $crate::board::Board::from($crate::history!($($move_str),+))
-    }};
-    () => {
-        $crate::board::Board::default()
-    };
 }

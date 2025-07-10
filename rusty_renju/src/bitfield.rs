@@ -1,6 +1,8 @@
-use crate::assert_struct_sizes;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
+use crate::{assert_struct_sizes, impl_debug_from_display};
+use serde::{Deserialize, Serialize, Serializer};
+use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
 use std::simd::u8x32;
 
@@ -220,4 +222,35 @@ impl Iterator for BitfieldSetBitsIterator {
         Some(idx)
     }
 
+}
+
+impl Display for Bitfield {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let content = self.iter()
+            .map(|is_hot|
+                if is_hot { "X" } else { "." }
+            )
+            .collect::<Vec<_>>()
+            .chunks(pos::U_BOARD_WIDTH)
+            .rev()
+            .map(|row| row.join(" "))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        write!(f, "{content}")
+    }
+}
+
+impl_debug_from_display!(Bitfield);
+
+impl Serialize for Bitfield {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        serializer.serialize_bytes(&self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for Bitfield {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
+        Ok(Self(Deserialize::deserialize(deserializer)?))
+    }
 }

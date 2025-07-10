@@ -4,6 +4,7 @@ use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::slice::Slice;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Copy, Clone, Debug)]
 pub struct HashKey(pub u64);
@@ -45,5 +46,27 @@ impl From<&[Slice; pos::U_BOARD_WIDTH]> for HashKey {
 
                 key
             })
+    }
+}
+
+impl Serialize for HashKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        if serializer.is_human_readable() {
+            format!("{:016x}", self.0).serialize(serializer)
+        } else {
+            self.0.serialize(serializer)
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for HashKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        if deserializer.is_human_readable() {
+            u64::from_str_radix(String::deserialize(deserializer)?.as_str(), 16)
+                .map(Self)
+                .map_err(serde::de::Error::custom)
+        } else {
+            Ok(Self(u64::deserialize(deserializer)?))
+        }
     }
 }

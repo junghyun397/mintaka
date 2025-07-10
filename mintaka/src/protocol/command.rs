@@ -4,9 +4,11 @@ use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
+use serde::{Deserialize, Serialize};
 use std::num::NonZeroUsize;
 use std::time::Duration;
 
+#[derive(Serialize, Deserialize)]
 pub enum Command {
     Load(Box<(Board, History)>),
     Play(MaybePos),

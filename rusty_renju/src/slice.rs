@@ -1,3 +1,4 @@
+use crate::bitfield::Bitfield;
 use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
@@ -238,6 +239,25 @@ impl Slices {
         let idx = Self::calculate_descending_slice_idx(pos);
         (0 .. I_DIAGONAL_SLICE_AMOUNT).contains(&idx)
             .then_some(idx as usize)
+    }
+
+    pub fn bitfield(&self) -> ColorContainer<Bitfield> {
+        self.horizontal_slices.iter()
+            .enumerate()
+            .fold(
+                ColorContainer::new(Bitfield::default(), Bitfield::default()),
+                  |mut bitfield_container, (row_idx, slice)| {
+                      for col_idx in 0..pos::BOARD_WIDTH {
+                          if let Some(color) = slice.stone_kind(col_idx) {
+                              bitfield_container
+                                  .access_mut(color)
+                                  .set_mut(Pos::from_cartesian(row_idx as u8, col_idx));
+                          }
+                      }
+
+                      bitfield_container
+                }
+            )
     }
 
 }

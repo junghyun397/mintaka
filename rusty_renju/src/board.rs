@@ -1,6 +1,6 @@
 use crate::bitfield::Bitfield;
 use crate::memo::hash_key::HashKey;
-use crate::notation::color::Color;
+use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::RuleKind;
@@ -8,6 +8,8 @@ use crate::pattern;
 use crate::pattern::Patterns;
 use crate::slice::Slices;
 use crate::{assert_struct_sizes, slice_pattern};
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::marker::ConstParamTy;
 
 #[derive(Copy, Clone, Default)]
@@ -89,7 +91,7 @@ impl Board {
 
         let even_moves = moves.iter()
             .enumerate()
-            .filter_map(|(idx, &pos)| (idx % 2 == 0).then_some(pos))
+            .filter_map(|(idx, &pos)| idx.is_multiple_of(2).then_some(pos))
             .collect::<Vec<_>>();
 
         let (black_moves, white_moves) = match self.player_color {
@@ -577,4 +579,48 @@ impl SetOverrides {
         }
     }
 
+}
+
+#[macro_export] macro_rules! board {
+    ($board_str:expr) => {{
+        use std::str::FromStr;
+
+        $crate::board::Board::from_str($board_str).unwrap()
+    }};
+    ($($move_str:expr),+ $(,)?) => {{
+        $crate::board::Board::from($crate::history!($($move_str),+))
+    }};
+    () => {
+        $crate::board::Board::default()
+    };
+}
+
+impl Serialize for Board {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        let mut state = serializer.serialize_struct("Board", 3)?;
+        state.serialize_field("player_color", &self.player_color)?;
+        state.serialize_field("bitfield", &self.slices.bitfield())?;
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Board {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        #[derive(serde::Deserialize)]
+        struct BoardData {
+            player_color: Color,
+            bitfield: ColorContainer<Bitfield>,
+        }
+
+        let data = BoardData::deserialize(deserializer)?;
+
+        let black_moves = data.bitfield.black.iter_hot_pos().collect::<Box<_>>();
+        let white_moves = data.bitfield.white.iter_hot_pos().collect::<Box<_>>();
+
+        let mut board = Board::default();
+
+        board.batch_set_each_color_mut(black_moves, white_moves, data.player_color);
+
+        Ok(board)
+    }
 }

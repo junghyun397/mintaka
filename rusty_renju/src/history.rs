@@ -1,6 +1,13 @@
+use crate::board::Board;
+use crate::board_io::{HISTORY_LITERAL_PASS, HISTORY_LITERAL_SEPARATOR};
+use crate::impl_debug_from_display;
+use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
+use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
+use std::str::FromStr;
 
 #[derive(Copy, Clone)]
 pub struct History {
@@ -127,4 +134,149 @@ impl History {
         }
     }
 
+}
+
+#[macro_export] macro_rules! history {
+    ($($move_str:expr),+ $(,)?) => {{
+        use std::str::FromStr;
+
+        let mut history = $crate::history::History::default();
+
+        $(history.set_mut($crate::notation::pos::Pos::from_str($move_str).unwrap());)*
+
+        history
+    }};
+    () => {
+        $crate::history::History::default()
+    };
+}
+
+impl Display for History {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let history = self.iter()
+            .map(|&action|
+                match action {
+                    MaybePos::NONE => HISTORY_LITERAL_PASS.to_string(),
+                    pos => pos.unwrap().to_string()
+                }
+            )
+            .collect::<Vec<_>>()
+            .join(HISTORY_LITERAL_SEPARATOR);
+
+        write!(f, "{history}")
+    }
+}
+
+impl_debug_from_display!(History);
+
+impl FromStr for History {
+    type Err = &'static str;
+
+    fn from_str(source: &str) -> Result<Self, Self::Err> {
+        let mut history = History::default();
+        let source = source.to_lowercase();
+        let bytes = source.as_bytes();
+        let mut idx = 0;
+
+        fn detect_token(bytes: &[u8]) -> Option<(Pos, usize)> {
+            if bytes.len() < 2
+                || !(b'a' .. (b'a' + pos::BOARD_WIDTH)).contains(&bytes[0])
+            {
+                return None;
+            }
+
+            let len =
+                if bytes.len() > 2 && bytes[2].is_ascii_digit() {
+                    3
+                } else if bytes[1].is_ascii_digit() {
+                    2
+                } else {
+                    return None;
+                };
+
+            Pos::from_str(str::from_utf8(&bytes[.. len]).unwrap()).ok()
+                .map(|pos| (pos, len))
+        }
+
+        while idx < bytes.len() {
+            if let Some((pos, len)) = detect_token(&bytes[idx ..]) {
+                history.set_mut(pos);
+                idx += len;
+            } else {
+                idx += 1;
+            }
+        }
+
+        Ok(history)
+    }
+}
+
+impl TryFrom<&Board> for History {
+    type Error = &'static str;
+
+    fn try_from(value: &Board) -> Result<Self, Self::Error> {
+        let mut black_history = vec![];
+        let mut white_history = vec![];
+
+        for distance_from_center in 0 .. pos::CENTER_ROW_COL {
+            let begin_idx = pos::CENTER_ROW_COL - distance_from_center;
+            let end_idx = pos::CENTER_ROW_COL + distance_from_center;
+
+            for pos in
+                (0 .. distance_from_center * 2 + 1) // horizontal-up
+                    .map(|offset| Pos::from_cartesian(begin_idx, begin_idx + offset))
+                    .chain((0 .. distance_from_center * 2 + 1)
+                        .map(|offset| Pos::from_cartesian(end_idx, begin_idx + offset))
+                    ) // horizontal-down
+                    .chain((0 .. (distance_from_center * 2 + 1).saturating_sub(2))
+                        .map(|offset| Pos::from_cartesian(begin_idx + 1 + offset, begin_idx))
+                    ) // vertical-left
+                    .chain((0 .. (distance_from_center * 2 + 1).saturating_sub(2))
+                        .map(|offset| Pos::from_cartesian(begin_idx + 1 + offset, end_idx))
+                    ) // vertical-right
+            {
+                match value.stone_kind(pos) {
+                    Some(Color::Black) => black_history.push(pos),
+                    Some(Color::White) => white_history.push(pos),
+                    _ => {}
+                }
+            }
+        }
+
+        if white_history.len() > black_history.len() {
+            return Err("white's history is longer than black's history.");
+        }
+
+        let mut history = History::default();
+
+        while let Some(black_pos) = black_history.pop() {
+            history.set_mut(black_pos);
+
+            if let Some(white_pos) = white_history.pop() {
+                history.set_mut(white_pos);
+            }
+        }
+
+        Ok(history)
+    }
+}
+
+impl Serialize for History {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+        serializer.collect_seq(self.iter())
+    }
+}
+
+impl<'de> Deserialize<'de> for History {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
+        let vector = Vec::<MaybePos>::deserialize(deserializer)?;
+        let top = vector.len();
+
+        Ok(Self {
+            entries: vector
+                .try_into()
+                .map_err(|_| serde::de::Error::custom("history is too long"))?,
+            top
+        })
+    }
 }

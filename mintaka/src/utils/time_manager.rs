@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeManager {
     pub total_remaining: Duration,
     pub increment: Duration,

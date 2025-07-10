@@ -35,6 +35,7 @@ pub struct ThreadData<'a, TH: ThreadType> {
 
 impl<'a, TH: ThreadType> ThreadData<'a, TH> {
 
+    #[allow(clippy::uninit_assumed_init)]
     pub fn new(
         thread_type: TH, tid: usize,
         config: Config,
@@ -63,7 +64,7 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
     }
 
     pub fn should_check_limit(&self) -> bool {
-        self.batch_counter.count_local_total() % 1023 == 0
+        self.batch_counter.count_local_total().is_multiple_of(1024)
     }
 
     pub fn search_limit_exceeded(&self) -> bool {

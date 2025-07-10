@@ -1,6 +1,7 @@
 use crate::value::MAX_PLY;
 use rusty_renju::impl_display_from_debug;
 use rusty_renju::notation::pos::MaybePos;
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PrincipalVariation {
@@ -34,4 +35,16 @@ impl PrincipalVariation {
         self.line[1 .. self.top].copy_from_slice(&rest.line[0 .. rest.top]);
     }
 
+}
+
+impl Serialize for PrincipalVariation {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+        serializer.collect_seq(self.line[0 .. self.top].iter())
+    }
+}
+
+impl<'de> Deserialize<'de> for PrincipalVariation {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        todo!("deserialize")
+    }
 }

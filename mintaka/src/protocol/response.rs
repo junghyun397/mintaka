@@ -3,11 +3,11 @@ use crate::protocol::message;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::value::Score;
 use rusty_renju::utils::byte_size::ByteSize;
-use std::fmt::Display;
+use serde::{Deserialize, Serialize};
 use std::sync::mpsc;
 use std::time::Duration;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum Response {
     Begins {
         workers: usize,

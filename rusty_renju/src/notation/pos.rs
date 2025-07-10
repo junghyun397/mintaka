@@ -1,5 +1,11 @@
+use crate::impl_debug_from_display;
 use crate::notation::direction::Direction;
+use crate::notation::pos;
 use crate::utils::str_utils::u8_from_str;
+use serde::de::Error;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
 pub const BOARD_WIDTH: u8 = 15;
 pub const BOARD_SIZE: usize = U_BOARD_WIDTH * U_BOARD_WIDTH;
@@ -141,6 +147,50 @@ impl Pos {
 
 }
 
+impl FromStr for Pos {
+    type Err = &'static str;
+
+    fn from_str(source: &str) -> Result<Self, Self::Err> {
+        source[1..].parse::<u8>()
+            .map_err(|_| "invalid row charter")
+            .and_then(|row| {
+                let col = source.chars().next().unwrap() as u8 - b'a';
+
+                (col < pos::BOARD_WIDTH && row < pos::BOARD_WIDTH)
+                    .then(|| Pos::from_cartesian(row - 1 , col))
+                    .ok_or("column or row out of range")
+            })
+    }
+}
+
+impl Display for Pos {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", (self.col() + b'a') as char, self.row() + 1)
+    }
+}
+
+impl_debug_from_display!(Pos);
+
+impl Serialize for Pos {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        if serializer.is_human_readable() {
+            serializer.serialize_str(self.to_string().as_str())
+        } else {
+            serializer.serialize_u8(self.0)
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Pos {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        if deserializer.is_human_readable() {
+            Self::from_str(&String::deserialize(deserializer)?).map_err(Error::custom)
+        } else {
+            Ok(Self::from_index(u8::deserialize(deserializer)?))
+        }
+    }
+}
+
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 #[repr(transparent)]
 pub struct MaybePos(Pos);
@@ -194,3 +244,46 @@ impl From<Option<Pos>> for MaybePos {
         }
     }
 }
+impl FromStr for MaybePos {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "none" => Ok(MaybePos::NONE),
+            _ => s.parse()
+        }
+    }
+}
+
+impl Display for MaybePos {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            MaybePos::NONE => write!(f, "none"),
+            _ => write!(f, "{}", self.unwrap())
+        }
+    }
+}
+
+impl_debug_from_display!(MaybePos);
+
+impl Serialize for MaybePos {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        if serializer.is_human_readable() && self.is_none() {
+            serializer.serialize_str("none")
+        } else {
+            self.0.serialize(serializer)
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for MaybePos {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        if deserializer.is_human_readable() {
+            Self::from_str(&String::deserialize(deserializer)?)
+                .map_err(Error::custom)
+        } else {
+            Ok(Self(Pos::deserialize(deserializer)?))
+        }
+    }
+}
+

@@ -3,6 +3,8 @@ use crate::movegen::movegen_window::MovegenWindow;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::notation::pos::{MaybePos, Pos};
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Serialize, Serializer};
 
 #[derive(Default, Debug, Copy, Clone)]
 pub struct GameState {
@@ -49,5 +51,36 @@ impl From<History> for GameState {
         }
 
         game_state
+    }
+}
+
+impl Serialize for GameState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        let mut state = serializer.serialize_struct("GameState", 2)?;
+        state.serialize_field("board", &self.board)?;
+        state.serialize_field("history", &self.history)?;
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for GameState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
+        #[derive(Deserialize)]
+        struct GameStateData {
+            board: Board,
+            history: History,
+        }
+
+        let data = GameStateData::deserialize(deserializer)?;
+
+        let movegen_window = MovegenWindow::from(&data.board.hot_field);
+        let move_scores = MoveScores::from(&data.board.hot_field);
+
+        Ok(GameState {
+            board: data.board,
+            history: data.history,
+            movegen_window,
+            move_scores,
+        })
     }
 }

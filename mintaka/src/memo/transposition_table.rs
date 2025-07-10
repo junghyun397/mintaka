@@ -4,6 +4,8 @@ use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::value::Score;
 use rusty_renju::utils::byte_size::ByteSize;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU8, Ordering};
 
 pub struct TranspositionTable {
@@ -55,6 +57,64 @@ impl TranspositionTable {
             table: &self.table,
             age: self.fetch_age(),
         }
+    }
+
+    pub fn export(&self) -> Vec<u8> {
+        let age = self.fetch_age();
+        let byte_len = self.table.len() * size_of::<TTEntryBucket>();
+        let byte_cap = self.table.capacity() * size_of::<TTEntryBucket>();
+
+        let table_ptr = self.table.as_ptr() as *mut u8;
+
+        let mut bytes = Vec::with_capacity(byte_cap + 1);
+        bytes.push(age);
+        bytes.extend_from_slice(unsafe { std::slice::from_raw_parts(table_ptr, byte_len) });
+
+        let mut encoder = lz4::EncoderBuilder::new()
+            .level(4)
+            .build(Vec::new())
+            .unwrap();
+
+        encoder.write_all(&bytes)
+            .unwrap();
+
+        let (compressed, _) = encoder.finish();
+        compressed
+    }
+
+    pub fn import(source: Vec<u8>) -> Result<Self, &'static str> {
+        let mut decoder = lz4::Decoder::new(std::io::Cursor::new(source))
+            .map_err(|_| "failed to build decoder")?;
+        let mut decompressed = Vec::new();
+        decoder.read_to_end(&mut decompressed)
+            .map_err(|_| "failed to decompress")?;
+
+        let age = decompressed[0];
+        let payload = &decompressed[1 ..];
+
+        if !payload.len().is_multiple_of(size_of::<TTEntryBucket>()) {
+            return Err("illegal payload size");
+        }
+
+        let tt_len = payload.len() / size_of::<TTEntryBucket>();
+
+        let mut table = unsafe {
+            let mut table = Vec::with_capacity(tt_len);
+
+            table.set_len(tt_len);
+            std::ptr::copy_nonoverlapping(
+                payload.as_ptr(),
+                table.as_mut_ptr() as *mut u8,
+                payload.len(),
+            );
+
+            table
+        };
+
+        Ok(Self {
+            table,
+            age: AtomicU8::new(age),
+        })
     }
 
 }
@@ -147,4 +207,28 @@ impl TTView<'_> {
         }
     }
 
+}
+
+impl Serialize for TranspositionTable {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        let exported = self.clone().export();
+
+        if serializer.is_human_readable() {
+            todo!("base64 encode")
+        } else {
+            serializer.serialize_bytes(&exported)
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for TranspositionTable {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        let binary = if deserializer.is_human_readable() {
+            todo!("base64 decode")
+        } else {
+            Vec::<u8>::deserialize(deserializer)?
+        };
+
+        Ok(Self::import(binary).map_err(serde::de::Error::custom)?)
+    }
 }

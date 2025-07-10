@@ -20,11 +20,12 @@ use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::value::Score;
 use rusty_renju::utils::byte_size::ByteSize;
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct BestMove {
     pub hash: HashKey,
     pub pos: MaybePos,
@@ -256,7 +257,7 @@ impl GameAgent {
                 ),
                 0,
                 self.config,
-                tt_view.clone(),
+                tt_view,
                 HistoryTable {},
                 &aborted, &global_counter_in_1k,
             );
@@ -273,7 +274,7 @@ impl GameAgent {
                 let mut worker_td = ThreadData::new(
                     WorkerThread, tid,
                     self.config,
-                    tt_view.clone(),
+                    tt_view,
                     HistoryTable {},
                     &aborted, &global_counter_in_1k
                 );
