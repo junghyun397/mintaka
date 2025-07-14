@@ -1,11 +1,13 @@
 use crate::protocol::command::Command;
 use rusty_renju::impl_debug_from_display;
 use rusty_renju::notation::color::Color;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::sync::mpsc;
 
 pub const CHANNEL_CLOSED_MESSAGE: &str = "sender channel closed.";
 
+#[derive(Deserialize, Serialize)]
 pub enum Message {
     Command(Command),
     Status(StatusCommand),
@@ -13,13 +15,14 @@ pub enum Message {
     Launch,
 }
 
+#[derive(Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum StatusCommand {
     Version,
     Board,
     History,
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Serialize, Deserialize)]
 pub enum GameResult {
     Win(Color),
     Draw,

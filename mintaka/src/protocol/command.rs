@@ -5,7 +5,7 @@ use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize};
-use std::num::NonZeroUsize;
+use std::num::NonZeroU32;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize)]
@@ -30,7 +30,7 @@ pub enum Command {
     TotalTime(Duration),
     ConsumeTime(Duration),
     MaxNodes { in_1k: usize },
-    Workers(NonZeroUsize),
+    Workers(NonZeroU32),
     MaxMemory(ByteSize),
     Rule(RuleKind),
 }

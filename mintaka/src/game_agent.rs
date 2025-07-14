@@ -36,7 +36,7 @@ pub struct BestMove {
 
 pub struct GameAgent {
     pub state: GameState,
-    config: Config,
+    pub config: Config,
     time_manager: TimeManager,
     time_history: Vec<Duration>,
     tt: TranspositionTable,

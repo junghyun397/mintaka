@@ -1,34 +1,22 @@
+use crate::app_state::AppState;
+use crate::preference::{Preference, TlsConfig};
+use axum::routing::{delete, get, post};
+use axum::Router;
+use axum_server::tls_rustls::RustlsConfig;
+use std::net::SocketAddr;
+use std::path::Path;
+use std::sync::Arc;
+use tokio::signal::unix::SignalKind;
+use tower_http::trace::TraceLayer;
+use tracing::{error, info};
+
 mod preference;
 mod session;
 mod stream_response_sender;
 mod app_state;
 mod rest;
 mod websocket;
-
-use crate::app_state::AppState;
-use crate::preference::{Preference, TlsConfig};
-use crate::session::SessionKey;
-use axum::extract::ws::WebSocket;
-use axum::extract::{ws, State, WebSocketUpgrade};
-use axum::response::IntoResponse;
-use axum::routing::get;
-use axum::Router;
-use axum::ServiceExt;
-use axum_server::service::MakeService;
-use axum_server::tls_rustls::RustlsConfig;
-use futures_util::{SinkExt, StreamExt};
-use std::collections::HashSet;
-use std::env;
-use std::net::SocketAddr;
-use std::path::Path;
-use std::str::FromStr;
-use std::sync::Arc;
-use tokio::signal::unix::SignalKind;
-use tower_http::trace::TraceLayer;
-use tracing::log::Level::Trace;
-use tracing::{error, info, info_span, Instrument};
-use tracing_subscriber::EnvFilter;
-use uuid::{Timestamp, Uuid};
+mod app_error;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -42,8 +30,16 @@ async fn main() -> anyhow::Result<()> {
     let state = Arc::new(AppState::new(pref.clone()));
 
     let app = Router::new()
-        .route("/ws", get(websocket_handler))
-        .route("/health", get(rest::health))
+        .route("/ws", get(websocket::websocket_handler))
+        .route("/status", get(rest::status))
+        .route("/sessions", post(rest::new_session))
+        .route("/sessions/{sid}", delete(rest::destroy_session))
+        .route("/sessions/{sid}/commands", post(rest::command_session))
+        .route("/sessions/{sid}/launch", post(rest::launch_session))
+        .route("/sessions/{sid}/stream", get(rest::subscribe_session_response))
+        .route("/sessions/{sid}/abort", post(rest::abort_session))
+        .route("/sessions/{sid}/result", get(rest::get_session_result))
+        .route("/sessions/{sid}/hibernate", post(rest::hibernate_session))
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
@@ -73,18 +69,6 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
-}
-
-async fn websocket_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
-    ws.on_upgrade(|socket| {
-        let connection_id = Uuid::now_v7();
-
-        websocket::handle_socket(socket, state, connection_id)
-            .instrument(info_span!("ws", id = %connection_id))
-    })
 }
 
 fn spawn_tls_watcher(shared_rustls_config: RustlsConfig, tls_config: TlsConfig) {

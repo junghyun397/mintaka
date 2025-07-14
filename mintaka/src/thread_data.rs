@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 #[derive(Clone)]
 pub struct ThreadData<'a, TH: ThreadType> {
     pub thread_type: TH,
-    pub tid: usize,
+    pub tid: u32,
     pub config: Config,
 
     pub tt: TTView<'a>,
@@ -37,7 +37,7 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
 
     #[allow(clippy::uninit_assumed_init)]
     pub fn new(
-        thread_type: TH, tid: usize,
+        thread_type: TH, tid: u32,
         config: Config,
         tt: TTView<'a>,
         ht: HistoryTable,

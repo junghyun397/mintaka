@@ -1,15 +1,14 @@
 use crate::value::MAX_PLY;
-use rusty_renju::impl_display_from_debug;
+use rusty_renju::impl_debug_from_display;
 use rusty_renju::notation::pos::MaybePos;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::fmt::{Debug, Display, Formatter};
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub struct PrincipalVariation {
     pub line: [MaybePos; MAX_PLY],
     pub top: usize,
 }
-
-impl_display_from_debug!(PrincipalVariation);
 
 impl PrincipalVariation {
 
@@ -37,6 +36,14 @@ impl PrincipalVariation {
 
 }
 
+impl Display for PrincipalVariation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.line[.. self.top].to_vec())
+    }
+}
+
+impl_debug_from_display!(PrincipalVariation);
+
 impl Serialize for PrincipalVariation {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
         serializer.collect_seq(self.line[0 .. self.top].iter())
@@ -45,6 +52,13 @@ impl Serialize for PrincipalVariation {
 
 impl<'de> Deserialize<'de> for PrincipalVariation {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        todo!("deserialize")
+        let vec = Vec::<MaybePos>::deserialize(deserializer)?;
+
+        let mut line = [MaybePos::NONE; MAX_PLY];
+        let top = vec.len();
+
+        line[..top].copy_from_slice(&vec);
+
+        Ok(Self { line, top })
     }
 }

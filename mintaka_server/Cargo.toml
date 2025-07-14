@@ -7,7 +7,7 @@ edition = "2024"
 rusty_renju = { path = "../rusty_renju" }
 mintaka = { path = "../mintaka" }
 
-uuid = { version = "1.17", features = ["v4", "v7"] }
+uuid = { version = "1.17", features = ["v4", "v7", "serde"] }
 num_cpus = "1.17"
 dashmap = "6.1"
 

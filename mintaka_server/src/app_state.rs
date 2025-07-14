@@ -1,22 +1,20 @@
+pub(crate) use crate::app_error::AppError;
 use crate::preference::Preference;
 use crate::session::{Session, SessionKey, SessionResponse, SessionResultResponse};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use anyhow::anyhow;
 use dashmap::DashMap;
 use mintaka::config::Config;
+use mintaka::game_agent::BestMove;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::message::GameResult;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
+use std::num::NonZeroU32;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_stream::wrappers::UnboundedReceiverStream;
-
-const SESSION_NOT_FOUND_MESSAGE: &str = "session not found";
-const STREAM_NOT_FOUND_MESSAGE: &str = "stream not found";
-const STREAM_NOT_ACQUIRED_MESSAGE: &str = "stream not acquired";
-const STREAM_IN_SUBSCRIBING_MESSAGE: &str = "stream in subscribing";
 
 pub struct WorkerPermit(OwnedSemaphorePermit);
 
@@ -28,7 +26,6 @@ impl WorkerPermit {
 
 }
 
-// full interior mutability
 pub struct AppState {
     sessions: Arc<DashMap<SessionKey, Session>>,
     session_streams: Arc<DashMap<SessionKey, (UnboundedSender<SessionResponse>, Option<UnboundedReceiverStream<SessionResponse>>)>>,
@@ -53,8 +50,8 @@ impl AppState {
         self.sem.available_permits()
     }
 
-    pub async fn acquire_worker(&self, workers: u32) -> anyhow::Result<WorkerPermit> {
-        Ok(WorkerPermit(self.sem.clone().acquire_many_owned(workers).await?))
+    pub async fn acquire_workers(&self, workers: NonZeroU32) -> WorkerPermit {
+        WorkerPermit(self.sem.clone().acquire_many_owned(workers.get()).await.unwrap())
     }
 
     pub fn new_session(&self, config: Config, board: Board, history: History) -> SessionKey {
@@ -75,27 +72,29 @@ impl AppState {
     }
 
     pub fn command_session(
-        &mut self,
+        &self,
         session_key: SessionKey,
         command: Command,
-    ) -> anyhow::Result<Option<GameResult>> {
+    ) -> anyhow::Result<Option<GameResult>, AppError> {
         let mut session = self.sessions.get_mut(&session_key)
-            .ok_or(anyhow!(SESSION_NOT_FOUND_MESSAGE))?;
+            .ok_or(AppError::SessionNotFound)?;
 
         session.command(command)
     }
 
-    pub fn launch_session(
+    pub async fn launch_session(
         &self,
         session_key: SessionKey,
-        worker_permit: WorkerPermit,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<(), AppError> {
         let mut session = self.sessions.get_mut(&session_key)
-            .ok_or(anyhow!(SESSION_NOT_FOUND_MESSAGE))?;
+            .ok_or(AppError::SessionNotFound)?;
+
+        let session_stream_pair = self.session_streams.get(&session_key)
+            .ok_or(AppError::SessionInComputing)?;
+
+        let worker_permit = self.acquire_workers(session.required_workers()?).await;
 
         let (result_tx, result_rx) = tokio::sync::oneshot::channel();
-
-        let session_stream_pair = self.session_streams.get(&session_key).unwrap();
         let (session_response_sender, _) = session_stream_pair.value();
 
         session.launch(
@@ -124,18 +123,29 @@ impl AppState {
         Ok(())
     }
 
-    pub fn abort_session(&self, session_key: SessionKey) -> anyhow::Result<()> {
+    pub fn abort_session(&self, session_key: SessionKey) -> anyhow::Result<(), AppError> {
         let session = self.sessions.get(&session_key)
-            .ok_or(anyhow!(SESSION_NOT_FOUND_MESSAGE))?;
+            .ok_or(AppError::SessionNotFound)?;
+
+        if !session.is_computing() {
+            return Err(AppError::SessionIdle);
+        }
 
         session.abort()?;
 
         Ok(())
     }
 
-    pub fn destroy_session(&self, session_key: SessionKey) -> anyhow::Result<()> {
+    pub fn get_session_result(&self, session_key: SessionKey) -> anyhow::Result<BestMove, AppError> {
+        self.sessions.get(&session_key)
+            .ok_or(AppError::SessionNotFound)?
+            .last_best_move()
+            .ok_or(AppError::SessionNeverLaunched)
+    }
+
+    pub fn destroy_session(&self, session_key: SessionKey) -> anyhow::Result<(), AppError> {
         let (_, session) = self.sessions.remove(&session_key)
-            .ok_or(anyhow!(SESSION_NOT_FOUND_MESSAGE))?;
+            .ok_or(AppError::SessionNotFound)?;
 
         self.session_streams.remove(&session_key);
 
@@ -144,20 +154,29 @@ impl AppState {
         Ok(())
     }
 
-    pub fn acquire_session_stream(&self, session_key: SessionKey) -> anyhow::Result<Option<UnboundedReceiverStream<SessionResponse>>> {
+    pub fn acquire_session_stream(&self, session_key: SessionKey) -> anyhow::Result<UnboundedReceiverStream<SessionResponse>, AppError> {
         let session_stream_receiver = self.session_streams.get_mut(&session_key)
-            .ok_or(anyhow!(STREAM_NOT_FOUND_MESSAGE))?
-            .1.take();
+            .ok_or(AppError::SessionNotFound)?
+            .1.take()
+            .ok_or(AppError::StreamAcquired)?;
 
         Ok(session_stream_receiver)
     }
 
     pub fn restore_session_stream(&self, session_key: SessionKey, session_stream_receiver: UnboundedReceiverStream<SessionResponse>) -> anyhow::Result<()> {
         self.session_streams.get_mut(&session_key)
-            .ok_or(anyhow!(STREAM_NOT_ACQUIRED_MESSAGE))?.1
+            .ok_or(anyhow!(AppError::StreamNotAcquired))?.1
             = Some(session_stream_receiver);
 
         Ok(())
+    }
+
+    pub async fn hibernate_session(&self, _session_key: SessionKey) -> anyhow::Result<(), AppError> {
+        todo!()
+    }
+
+    pub async fn wakeup_session(&self, _session_key: SessionKey) -> anyhow::Result<(), AppError> {
+        todo!()
     }
 
 }

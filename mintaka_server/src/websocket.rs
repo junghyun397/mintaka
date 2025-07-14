@@ -1,8 +1,10 @@
 use crate::app_state::AppState;
 use crate::session::{SessionKey, SessionResponse};
 use crate::stream_response_sender::StreamSessionResponseSender;
-use axum::extract::ws;
+use crate::websocket;
 use axum::extract::ws::WebSocket;
+use axum::extract::{ws, State, WebSocketUpgrade};
+use axum::response::IntoResponse;
 use futures_util::future::err;
 use futures_util::{SinkExt, StreamExt};
 use mintaka::config::Config;
@@ -14,10 +16,22 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_stream::StreamMap;
-use tracing::info;
+use tracing::{info, info_span, Instrument};
 use uuid::Uuid;
 
-pub async fn handle_socket(
+pub async fn websocket_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    ws.on_upgrade(|socket| {
+        let connection_id = Uuid::now_v7();
+
+        handle_socket(socket, state, connection_id)
+            .instrument(info_span!("ws", id = %connection_id))
+    })
+}
+
+async fn handle_socket(
     mut socket: WebSocket,
     mut state: Arc<AppState>,
     connection_id: Uuid,
@@ -35,7 +49,7 @@ pub async fn handle_socket(
                     "acquire" => {
                         let session_key = SessionKey::new_random();
 
-                        if let Some(session_response_stream) = state.acquire_session_stream(session_key).unwrap() {
+                        if let Ok(session_response_stream) = state.acquire_session_stream(session_key) {
                             stream_map.insert(session_key, session_response_stream);
                         }
                     },
@@ -45,7 +59,7 @@ pub async fn handle_socket(
                         let history = History::default();
 
                         let session_key = state.new_session(config, board, history);
-                        let session_response_stream = state.acquire_session_stream(session_key).unwrap().unwrap();
+                        let session_response_stream = state.acquire_session_stream(session_key).unwrap();
 
                         stream_map.insert(session_key, session_response_stream);
                     },

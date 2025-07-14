@@ -7,7 +7,7 @@ use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::utils::byte_size::ByteSize;
-use std::num::NonZeroUsize;
+use std::num::NonZeroU32;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
@@ -134,22 +134,22 @@ fn handle_command(
                             .ok_or("workers not provided.")?
                         {
                             "auto" => {
-                                let cores = num_cpus::get_physical();
+                                let cores = num_cpus::get_physical() as u32;
 
                                 println!("info: workers={cores}");
 
                                 command_sender.command(
-                                    Command::Workers(NonZeroUsize::new(cores).unwrap())
+                                    Command::Workers(NonZeroU32::new(cores).unwrap())
                                 );
                             },
                             &_ => {
                                 let workers = args.get(2)
                                     .ok_or("workers not provided.")?
-                                    .parse::<usize>()
+                                    .parse::<u32>()
                                     .map_err(|_| "invalid workers number.")?;
 
                                 command_sender.command(
-                                    Command::Workers(NonZeroUsize::new(workers).unwrap())
+                                    Command::Workers(NonZeroU32::new(workers).unwrap())
                                 );
                             }
                         }

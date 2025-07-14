@@ -4,7 +4,6 @@ use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::value::Score;
 use rusty_renju::utils::byte_size::ByteSize;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU8, Ordering};
 
@@ -59,7 +58,7 @@ impl TranspositionTable {
         }
     }
 
-    pub fn export(&self) -> Vec<u8> {
+pub fn export(&self, compression_level: u32) -> Vec<u8> {
         let age = self.fetch_age();
         let byte_len = self.table.len() * size_of::<TTEntryBucket>();
         let byte_cap = self.table.capacity() * size_of::<TTEntryBucket>();
@@ -71,7 +70,7 @@ impl TranspositionTable {
         bytes.extend_from_slice(unsafe { std::slice::from_raw_parts(table_ptr, byte_len) });
 
         let mut encoder = lz4::EncoderBuilder::new()
-            .level(4)
+            .level(compression_level)
             .build(Vec::new())
             .unwrap();
 
@@ -207,28 +206,4 @@ impl TTView<'_> {
         }
     }
 
-}
-
-impl Serialize for TranspositionTable {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        let exported = self.clone().export();
-
-        if serializer.is_human_readable() {
-            todo!("base64 encode")
-        } else {
-            serializer.serialize_bytes(&exported)
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for TranspositionTable {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        let binary = if deserializer.is_human_readable() {
-            todo!("base64 decode")
-        } else {
-            Vec::<u8>::deserialize(deserializer)?
-        };
-
-        Ok(Self::import(binary).map_err(serde::de::Error::custom)?)
-    }
 }

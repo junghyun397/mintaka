@@ -10,7 +10,7 @@ use std::time::Duration;
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Response {
     Begins {
-        workers: usize,
+        workers: u32,
         running_time: Duration,
         tt_size: ByteSize,
     },
