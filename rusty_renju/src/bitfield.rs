@@ -1,6 +1,8 @@
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::{assert_struct_sizes, impl_debug_from_display};
+use base64::prelude::BASE64_URL_SAFE;
+use base64::Engine;
 use serde::{Deserialize, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
@@ -139,6 +141,14 @@ impl BitXorAssign for Bitfield {
     }
 }
 
+impl TryFrom<Vec<u8>> for Bitfield {
+    type Error = &'static str;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        Ok(Self(value.try_into().map_err(|_| "bitfield binary must exactly 32 bytes")?))
+    }
+}
+
 impl From<u8x32> for Bitfield {
 
     fn from(x: u8x32) -> Self {
@@ -245,12 +255,24 @@ impl_debug_from_display!(Bitfield);
 
 impl Serialize for Bitfield {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        serializer.serialize_bytes(&self.0)
+        if serializer.is_human_readable() {
+            BASE64_URL_SAFE.encode(self.0).serialize(serializer)
+        } else {
+            serializer.serialize_bytes(&self.0)
+        }
     }
 }
 
 impl<'de> Deserialize<'de> for Bitfield {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
-        Ok(Self(Deserialize::deserialize(deserializer)?))
+        if deserializer.is_human_readable() {
+            let binary = BASE64_URL_SAFE.decode(String::deserialize(deserializer)?)
+                .map_err(serde::de::Error::custom)?;
+
+            binary.try_into()
+                .map_err(serde::de::Error::custom)
+        } else {
+            Ok(Self(Deserialize::deserialize(deserializer)?))
+        }
     }
 }

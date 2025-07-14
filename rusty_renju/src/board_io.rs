@@ -1,14 +1,17 @@
+use crate::bitfield::Bitfield;
 use crate::board::Board;
 use crate::board_iter::BoardIterItem;
 use crate::history::History;
 use crate::impl_debug_from_display;
-use crate::notation::color::Color;
+use crate::notation::color::{Color, ColorContainer};
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::pattern::Pattern;
 use crate::slice::Slice;
 use crate::utils::str_utils::join_str_horizontally;
 use regex_lite::Regex;
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::sync::OnceLock;
@@ -77,6 +80,21 @@ fn extract_stones_by_color(color: Color, source: &[BoardElement]) -> Box<[Pos]> 
             }
         )
         .collect()
+}
+
+fn add_move_marker(mut board_string: String, color: Color, pos: Pos, pre_marker: char, post_marker: char) -> String {
+    const COL_INDEX_OFFSET: usize = 3 + pos::U_BOARD_WIDTH * 2; // row(2) + margin(1) + col(w*2) + br(1)
+    const LINE_OFFSET: usize = 3 + pos::U_BOARD_WIDTH * 2 + 3; // row(2) + margin(1) + col(w*2) + row(2) + br(1)
+    const LINE_BEGIN_OFFSET: usize = 2; // row(2)
+
+    let reversed_row = pos::U_BOARD_WIDTH - 1 - pos.row_usize();
+    let offset: usize = COL_INDEX_OFFSET
+        + LINE_OFFSET * reversed_row
+        - reversed_row.saturating_add_signed(-(pos::I_BOARD_WIDTH - 9))
+        + LINE_BEGIN_OFFSET + pos.col_usize() * 2;
+
+    board_string.replace_range(offset .. offset + 3, &format!("{pre_marker}{}{post_marker}", char::from(color)));
+    board_string
 }
 
 impl Board {
@@ -248,18 +266,46 @@ impl Display for Slice {
     }
 }
 
+#[macro_export] macro_rules! board {
+    ($board_str:expr) => {{
+        use std::str::FromStr;
 
-pub fn add_move_marker(mut board_string: String, color: Color, pos: Pos, pre_marker: char, post_marker: char) -> String {
-    const COL_INDEX_OFFSET: usize = 3 + pos::U_BOARD_WIDTH * 2; // row(2) + margin(1) + col(w*2) + br(1)
-    const LINE_OFFSET: usize = 3 + pos::U_BOARD_WIDTH * 2 + 3; // row(2) + margin(1) + col(w*2) + row(2) + br(1)
-    const LINE_BEGIN_OFFSET: usize = 2; // row(2)
+        $crate::board::Board::from_str($board_str).unwrap()
+    }};
+    ($($move_str:expr),+ $(,)?) => {{
+        $crate::board::Board::from($crate::history!($($move_str),+))
+    }};
+    () => {
+        $crate::board::Board::default()
+    };
+}
 
-    let reversed_row = pos::U_BOARD_WIDTH - 1 - pos.row_usize();
-    let offset: usize = COL_INDEX_OFFSET
-        + LINE_OFFSET * reversed_row
-        - reversed_row.saturating_add_signed(-(pos::I_BOARD_WIDTH - 9))
-        + LINE_BEGIN_OFFSET + pos.col_usize() * 2;
+impl Serialize for Board {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        let mut state = serializer.serialize_struct("Board", 3)?;
+        state.serialize_field("player_color", &self.player_color)?;
+        state.serialize_field("bitfield", &self.slices.bitfield())?;
+        state.end()
+    }
+}
 
-    board_string.replace_range(offset .. offset + 3, &format!("{pre_marker}{}{post_marker}", char::from(color)));
-    board_string
+impl<'de> Deserialize<'de> for Board {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        #[derive(serde::Deserialize)]
+        struct BoardData {
+            player_color: Color,
+            bitfield: ColorContainer<Bitfield>,
+        }
+
+        let data = BoardData::deserialize(deserializer)?;
+
+        let black_moves = data.bitfield.black.iter_hot_pos().collect::<Box<_>>();
+        let white_moves = data.bitfield.white.iter_hot_pos().collect::<Box<_>>();
+
+        let mut board = Board::default();
+
+        board.batch_set_each_color_mut(black_moves, white_moves, data.player_color);
+
+        Ok(board)
+    }
 }

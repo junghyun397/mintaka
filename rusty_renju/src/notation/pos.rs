@@ -1,10 +1,8 @@
 use crate::impl_debug_from_display;
 use crate::notation::direction::Direction;
-use crate::notation::pos;
 use crate::utils::str_utils::u8_from_str;
-use serde::de::Error;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt::{Display, Formatter};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 
 pub const BOARD_WIDTH: u8 = 15;
@@ -156,7 +154,7 @@ impl FromStr for Pos {
             .and_then(|row| {
                 let col = source.chars().next().unwrap() as u8 - b'a';
 
-                (col < pos::BOARD_WIDTH && row < pos::BOARD_WIDTH)
+                (col < BOARD_WIDTH && row < BOARD_WIDTH)
                     .then(|| Pos::from_cartesian(row - 1 , col))
                     .ok_or("column or row out of range")
             })
@@ -184,7 +182,7 @@ impl Serialize for Pos {
 impl<'de> Deserialize<'de> for Pos {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         if deserializer.is_human_readable() {
-            Self::from_str(&String::deserialize(deserializer)?).map_err(Error::custom)
+            Self::from_str(&String::deserialize(deserializer)?).map_err(de::Error::custom)
         } else {
             Ok(Self::from_index(u8::deserialize(deserializer)?))
         }
@@ -280,7 +278,7 @@ impl<'de> Deserialize<'de> for MaybePos {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         if deserializer.is_human_readable() {
             Self::from_str(&String::deserialize(deserializer)?)
-                .map_err(Error::custom)
+                .map_err(de::Error::custom)
         } else {
             Ok(Self(Pos::deserialize(deserializer)?))
         }

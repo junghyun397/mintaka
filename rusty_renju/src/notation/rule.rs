@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 use std::marker::ConstParamTy;
 
 //noinspection RsUnresolvedPath
-#[derive(ConstParamTy, Eq, PartialEq, Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(ConstParamTy, Default, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum RuleKind {
     Gomoku = 0,
     SimplifiedRenju = 1,
@@ -31,7 +31,7 @@ impl RuleKind {
 
 }
 
-#[derive(PartialEq, Eq, Copy, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum ForbiddenKind {
     DoubleThree = 1,
     DoubleFour = 2,
@@ -47,11 +47,3 @@ impl From<ForbiddenKind> for char {
         }
     }
 }
-
-impl Display for ForbiddenKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", char::from(*self))
-    }
-}
-
-impl_debug_from_display!(ForbiddenKind);

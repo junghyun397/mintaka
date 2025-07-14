@@ -43,7 +43,7 @@ impl Display for ByteSize {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let bytes = self.0;
         match bytes {
-            b if b < 1024 => write!(f, "{b}"),
+            b if b < 1024 => write!(f, "{b} B"),
             b if b < 1024 * 1024 => write!(f, "{:.2} KiB", b as f64 / 1024.0),
             b => write!(f, "{:.2} MiB", b as f64 / (1024.0 * 1024.0)),
         }

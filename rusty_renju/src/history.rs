@@ -5,7 +5,7 @@ use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 

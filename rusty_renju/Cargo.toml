@@ -15,6 +15,7 @@ crate-type = ["rlib", "cdylib"]
 regex-lite = "0.1"
 rand = "0.9"
 serde = { version = "1.0", features = ["derive"] }
+base64 = "0.22"
 
 [dev-dependencies]
 indoc = "2.0"

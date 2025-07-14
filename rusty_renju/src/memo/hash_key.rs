@@ -1,12 +1,13 @@
-use crate::cartesian_to_index;
 use crate::memo::hash_table;
 use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::slice::Slice;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use crate::{cartesian_to_index, impl_debug_from_display};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt::{Display, Formatter};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct HashKey(pub u64);
 
 impl HashKey {
@@ -49,10 +50,18 @@ impl From<&[Slice; pos::U_BOARD_WIDTH]> for HashKey {
     }
 }
 
+impl Display for HashKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "0x{:16x}", self.0)
+    }
+}
+
+impl_debug_from_display!(HashKey);
+
 impl Serialize for HashKey {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         if serializer.is_human_readable() {
-            format!("{:016x}", self.0).serialize(serializer)
+            self.to_string().serialize(serializer)
         } else {
             self.0.serialize(serializer)
         }
@@ -62,9 +71,10 @@ impl Serialize for HashKey {
 impl<'de> Deserialize<'de> for HashKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         if deserializer.is_human_readable() {
-            u64::from_str_radix(String::deserialize(deserializer)?.as_str(), 16)
+            let source = String::deserialize(deserializer)?;
+            u64::from_str_radix(&source[2 ..], 16)
                 .map(Self)
-                .map_err(serde::de::Error::custom)
+                .map_err(de::Error::custom)
         } else {
             Ok(Self(u64::deserialize(deserializer)?))
         }

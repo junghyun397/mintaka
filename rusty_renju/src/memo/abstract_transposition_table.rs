@@ -32,7 +32,7 @@ pub trait AbstractTranspositionTable {
 
     fn clear_age(&self);
 
-    fn clear_mut(&self, threads: usize) {
+    fn clear_mut(&self, threads: u32) {
         self.clear_age();
 
         if self.size().mib() < 32 {
@@ -41,7 +41,7 @@ pub trait AbstractTranspositionTable {
             }
         } else {
             std::thread::scope(|s| {
-                for chunk in self.internal_table().chunks(threads) {
+                for chunk in self.internal_table().chunks(threads as usize) {
                     s.spawn(|| {
                         for entry in chunk.iter() {
                             entry.clear_mut();
