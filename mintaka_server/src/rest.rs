@@ -6,14 +6,13 @@ use axum::response::{sse, Sse};
 use axum::Json;
 use futures_util::TryFutureExt;
 use mintaka::config::Config;
-use mintaka::game_agent::BestMove;
+use mintaka::game_agent::{BestMove, GameError};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::message::GameResult;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use serde::Serialize;
 use std::convert::Infallible;
-use std::num::NonZeroU32;
 use std::sync::Arc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
@@ -32,6 +31,13 @@ impl Into<(StatusCode, String)> for AppError {
             AppError::StreamAcquired => (StatusCode::CONFLICT, "response stream acquired".to_string()),
             AppError::StreamNotAcquired => (StatusCode::CONFLICT, "response stream not acquired".to_string()),
             AppError::SessionNeverLaunched => (StatusCode::NO_CONTENT, "session never launched".to_string()),
+            AppError::GameError(game_error) => match game_error {
+                GameError::StoneAlreadyExist => (StatusCode::CONFLICT, "stone already exist".to_string()),
+                GameError::StoneDoesNotExist => (StatusCode::CONFLICT, "stone does not exist".to_string()),
+                GameError::StoneColorMismatch => (StatusCode::CONFLICT, "stone color mismatch".to_string()),
+                GameError::ForbiddenMove => (StatusCode::CONFLICT, "forbidden move".to_string()),
+                GameError::NoHistoryToUndo => (StatusCode::CONFLICT, "no history to undo".to_string()),
+            },
             AppError::InternalError(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
         }
     }
@@ -59,13 +65,12 @@ pub async fn new_session(
 
 pub async fn command_session(
     Path(sid): Path<String>,
-    State(state): State<Arc<AppState>>
+    State(state): State<Arc<AppState>>,
+    Json(command): Json<Command>
 ) -> anyhow::Result<(StatusCode, Json<Option<GameResult>>), (StatusCode, String)> {
     let session_key = sid.parse::<SessionKey>().map_err(Into::into)?;
 
-    let command = Command::Workers(NonZeroU32::new(1).unwrap());
-
-    state.command_session(session_key, command)
+    state.command_session(session_key, command.into())
         .map_err(Into::into)
         .map(|result| (StatusCode::ACCEPTED, Json(result)))
 }
@@ -77,8 +82,8 @@ pub async fn launch_session(
     let session_key = sid.parse::<SessionKey>().map_err(Into::into)?;
 
     state.launch_session(session_key).await
-        .map(|_| StatusCode::OK)
         .map_err(Into::into)
+        .map(|_| StatusCode::OK)
 }
 
 pub async fn subscribe_session_response(
@@ -86,7 +91,6 @@ pub async fn subscribe_session_response(
     State(state): State<Arc<AppState>>
 ) -> anyhow::Result<Sse<UnboundedReceiverStream<Result<sse::Event, Infallible>>>, (StatusCode, String)> {
     let session_key = sid.parse::<SessionKey>().map_err(Into::into)?;
-
     todo!()
 }
 
@@ -107,7 +111,7 @@ pub async fn abort_session(
 ) -> anyhow::Result<StatusCode, (StatusCode, String)> {
     let session_key = sid.parse::<SessionKey>().map_err(Into::into)?;
 
-    state.get_session_result(session_key)
+    state.abort_session(session_key)
         .map_err(Into::into)
         .map(|_| StatusCode::NO_CONTENT)
 }

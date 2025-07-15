@@ -1,3 +1,4 @@
+use mintaka::game_agent::GameError;
 use std::fmt::{Debug, Display};
 
 #[derive(Debug)]
@@ -9,7 +10,8 @@ pub enum AppError {
     SessionNeverLaunched,
     StreamAcquired,
     StreamNotAcquired,
-    InternalError(String)
+    GameError(GameError),
+    InternalError(String),
 }
 
 impl Display for AppError {

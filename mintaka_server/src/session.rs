@@ -10,19 +10,21 @@ use rusty_renju::history::History;
 use rusty_renju::memo::hash_key::HashKey;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
 use std::num::NonZeroU32;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct SessionKey(Uuid);
 
-impl Into<Uuid> for SessionKey {
-    fn into(self) -> Uuid {
-        self.0
+impl Hash for SessionKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(self.0.as_bytes())
     }
 }
 
@@ -67,15 +69,19 @@ pub struct Session {
     state: AgentState,
     best_move: Option<BestMove>,
     abort_handle: Arc<AtomicBool>,
+    time_to_live: Option<Duration>,
+    last_active: Instant,
 }
 
 impl Session {
 
-    pub fn new(config: Config, board: Board, history: History) -> Self {
+    pub fn new(config: Config, board: Board, history: History, time_to_live: Option<Duration>) -> Self {
         Self {
             state: AgentState::Agent(GameAgent::from_state(config, board, history)),
             best_move: None,
             abort_handle: Arc::new(AtomicBool::new(false)),
+            time_to_live,
+            last_active: Instant::now(),
         }
     }
 
@@ -88,17 +94,16 @@ impl Session {
         let (tx, rx) = std::sync::mpsc::channel();
 
         game_agent.command(&MessageSender::new(tx), command)
-            .map_err(str::to_string)
-            .map_err(AppError::InternalError)?;
+            .map_err(AppError::GameError)?;
 
-        let game_result = rx.try_iter().find_map(|message|
+        for message in rx.try_iter() {
             match message {
-                Message::Finished(result) => Some(result),
-                _ => None
+                Message::Finished(result) => return Ok(Some(result)),
+                _ => continue,
             }
-        );
+        }
 
-        Ok(game_result)
+       Ok(None)
     }
 
     pub fn required_workers(&self) -> anyhow::Result<NonZeroU32, AppError> {
@@ -181,6 +186,25 @@ impl Session {
         Ok(hash_key)
     }
 
+    fn touch_last_active(&mut self) {
+        self.last_active = Instant::now();
+    }
+
+    pub fn is_expired(&self, now: Instant) -> bool {
+        match self.time_to_live {
+            Some(time_to_live) => now.duration_since(self.last_active) > time_to_live,
+            None => false,
+        }
+    }
+
+}
+
+impl Drop for Session {
+    fn drop(&mut self) {
+        if let AgentState::Permit(_) = &self.state {
+            self.abort_handle.store(true, Ordering::Relaxed);
+        }
+    }
 }
 
 impl Debug for SessionResultResponse {

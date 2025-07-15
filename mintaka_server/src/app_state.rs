@@ -12,6 +12,7 @@ use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use std::num::NonZeroU32;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -31,6 +32,7 @@ pub struct AppState {
     session_streams: Arc<DashMap<SessionKey, (UnboundedSender<SessionResponse>, Option<UnboundedReceiverStream<SessionResponse>>)>>,
     sem: Arc<Semaphore>,
     preference: Preference,
+    session_cleanup_task: Option<tokio::task::AbortHandle>,
 }
 
 impl AppState {
@@ -43,6 +45,7 @@ impl AppState {
             session_streams: Arc::new(DashMap::new()),
             sem,
             preference,
+            session_cleanup_task: None,
         }
     }
 
@@ -57,7 +60,7 @@ impl AppState {
     pub fn new_session(&self, config: Config, board: Board, history: History) -> SessionKey {
         let session_key = SessionKey::new_random();
 
-        let session = Session::new(config, board, history);
+        let session = Session::new(config, board, history, None);
 
         self.sessions.insert(session_key, session);
 
@@ -179,4 +182,31 @@ impl AppState {
         todo!()
     }
 
+    pub fn spawn_session_cleanup(&mut self) {
+        assert!(self.session_cleanup_task.is_none());
+
+        let sessions = self.sessions.clone();
+
+        let join_handle = tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(60));
+
+            loop {
+                interval.tick().await;
+                let now = Instant::now();
+
+                sessions.retain(|_, session| session.is_expired(now));
+            }
+        });
+
+        self.session_cleanup_task = Some(join_handle.abort_handle());
+    }
+
+}
+
+impl Drop for AppState {
+    fn drop(&mut self) {
+        if let Some(abort_handle) = self.session_cleanup_task.take() {
+            abort_handle.abort();
+        }
+    }
 }

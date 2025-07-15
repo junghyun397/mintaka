@@ -27,7 +27,9 @@ async fn main() -> anyhow::Result<()> {
 
     let addr: SocketAddr = pref.address.parse()?;
 
-    let state = Arc::new(AppState::new(pref.clone()));
+    let mut state = AppState::new(pref.clone());
+
+    state.spawn_session_cleanup();
 
     let app = Router::new()
         .route("/ws", get(websocket::websocket_handler))
@@ -41,7 +43,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/sessions/{sid}/result", get(rest::get_session_result))
         .route("/sessions/{sid}/hibernate", post(rest::hibernate_session))
         .layer(TraceLayer::new_for_http())
-        .with_state(state);
+        .with_state(Arc::new(state));
 
     if let Some(tls_config) = pref.tls_config {
         let ruslts_config = RustlsConfig::from_pem_file(
