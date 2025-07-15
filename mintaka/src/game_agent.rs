@@ -10,6 +10,7 @@ use crate::search;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::utils::time_manager::TimeManager;
+use rusty_renju::bitfield::Bitfield;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
@@ -34,9 +35,19 @@ pub struct BestMove {
     pub time_elapsed: Duration,
 }
 
+#[derive(Debug)]
+pub enum GameError {
+    StoneAlreadyExist,
+    StoneDoesNotExist,
+    StoneColorMismatch,
+    ForbiddenMove,
+    NoHistoryToUndo,
+}
+
 pub struct GameAgent {
     pub state: GameState,
     pub config: Config,
+    executed_moves: Bitfield,
     time_manager: TimeManager,
     time_history: Vec<Duration>,
     tt: TranspositionTable,
@@ -51,6 +62,7 @@ impl GameAgent {
         Self {
             state: GameState::default(),
             config,
+            executed_moves: Bitfield::default(),
             time_manager: TimeManager::default(),
             time_history: Vec::new(),
             tt,
@@ -71,6 +83,7 @@ impl GameAgent {
         Self {
             state,
             config,
+            executed_moves: Bitfield::default(),
             time_manager: TimeManager::default(),
             time_history: Vec::new(),
             tt,
@@ -78,18 +91,18 @@ impl GameAgent {
         }
     }
 
-    pub fn command(&mut self, message_sender: &MessageSender, command: Command) -> Result<(), &'static str> {
+    pub fn command(&mut self, message_sender: &MessageSender, command: Command) -> Result<(), GameError> {
         match command {
             Command::Play(action) => {
                 match action {
                     MaybePos::NONE => self.state.pass_mut(),
                     pos => {
                         if !self.state.board.is_pos_empty(pos.unwrap()) {
-                            return Err("stone already exists");
+                            return Err(GameError::StoneAlreadyExist);
                         }
 
                         if !self.state.board.is_legal_move(pos.unwrap()) {
-                            return Err("forbidden move");
+                            return Err(GameError::ForbiddenMove);
                         }
 
                         self.state.set_mut(pos.unwrap())
@@ -112,7 +125,7 @@ impl GameAgent {
             },
             Command::Set { pos, color } => {
                 if !self.state.board.is_pos_empty(pos) {
-                    return Err("stone already exists");
+                    return Err(GameError::StoneAlreadyExist);
                 }
 
                 self.state.movegen_window.imprint_window_mut(pos);
@@ -136,13 +149,13 @@ impl GameAgent {
                             self.state.board.switch_player_mut();
                         }
                     },
-                    Some(_) => return Err("stone color mismatch"),
-                    None => return Err("stone does not exist"),
+                    Some(_) => return Err(GameError::StoneColorMismatch),
+                    None => return Err(GameError::StoneDoesNotExist),
                 }
             },
             Command::Undo => {
                 match self.state.history.pop_mut() {
-                    None => return Err("no history to undo"),
+                    None => return Err(GameError::NoHistoryToUndo),
                     Some(action) => {
                         match action {
                             MaybePos::NONE => {
@@ -153,7 +166,11 @@ impl GameAgent {
                             }
                         }
 
-                        self.time_manager.append_mut(self.time_history.pop().unwrap())
+                        if self.executed_moves.is_hot_idx(self.state.history.len()) {
+                            self.executed_moves.unset_idx_mut(self.state.history.len());
+
+                            self.time_manager.append_mut(self.time_history.pop().unwrap());
+                        }
                     }
                 }
             },
@@ -225,7 +242,7 @@ impl GameAgent {
         Ok(())
     }
 
-    pub fn commands(&mut self, message_sender: &MessageSender, commands: Vec<Command>) -> Result<(), &'static str> {
+    pub fn commands(&mut self, message_sender: &MessageSender, commands: Vec<Command>) -> Result<(), GameError> {
         commands.into_iter()
             .try_for_each(|command| self.command(message_sender, command))
     }
@@ -291,6 +308,8 @@ impl GameAgent {
 
         self.tt.increase_age();
         self.ht = *main_td.ht;
+
+        self.executed_moves.set_idx_mut(self.state.history.len());
 
         let time_elapsed = started_time.elapsed();
         self.time_manager.consume_mut(time_elapsed);

@@ -26,20 +26,36 @@ impl Bitfield {
 
     pub const ZERO_FILLED: Bitfield = Bitfield([0; 32]);
 
-    pub const fn is_cold(&self, pos: Pos) -> bool {
-        self.0[pos.idx_usize() / 8] & (0b1 << (pos.idx_usize() % 8)) == 0
+    pub const fn is_hot_idx(&self, idx: usize) -> bool {
+        self.0[idx / 8] & (0b1 << (idx % 8)) != 0
     }
 
     pub const fn is_hot(&self, pos: Pos) -> bool {
-        self.0[pos.idx_usize() / 8] & (0b1 << (pos.idx_usize() % 8)) != 0
+        self.is_hot_idx(pos.idx_usize())
+    }
+
+    pub const fn is_cold_idx(&self, idx: usize) -> bool {
+        !self.is_hot_idx(idx)
+    }
+
+    pub const fn is_cold(&self, pos: Pos) -> bool {
+        !self.is_cold_idx(pos.idx_usize())
+    }
+
+    pub const fn set_idx_mut(&mut self, idx: usize) {
+        self.0[idx / 8] |= 0b1 << (idx % 8);
     }
 
     pub const fn set_mut(&mut self, pos: Pos) {
-        self.0[pos.idx_usize() / 8] |= 0b1 << (pos.idx() % 8);
+        self.set_idx_mut(pos.idx_usize());
+    }
+
+    pub const fn unset_idx_mut(&mut self, idx: usize) {
+        self.0[idx / 8] &= !(0b1 << (idx % 8));
     }
 
     pub const fn unset_mut(&mut self, pos: Pos) {
-        self.0[pos.idx_usize() / 8] &= !(0b1 << (pos.idx() % 8));
+        self.unset_idx_mut(pos.idx_usize());
     }
 
     pub fn count_ones(&self) -> u32 {

@@ -242,14 +242,15 @@ impl From<Option<Pos>> for MaybePos {
         }
     }
 }
+
 impl FromStr for MaybePos {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_ascii_lowercase().as_str() {
-            "none" => Ok(MaybePos::NONE),
-            _ => s.parse()
-        }
+        Ok(match s.to_ascii_lowercase().as_str() {
+            "none" => MaybePos::NONE,
+            _ => s.parse::<Pos>()?.into()
+        })
     }
 }
 
