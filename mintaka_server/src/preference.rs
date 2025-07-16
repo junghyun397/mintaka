@@ -9,28 +9,35 @@ pub struct TlsConfig {
     pub observe_sighup: bool,
 }
 
-fn version_str() -> String {
-    format!("rusty-renju={}, mintaka={}, mintaka_server={}",
+fn version_str() -> &'static str {
+    let version_str = format!("rusty-renju={}, mintaka={}, mintaka_server={}",
         rusty_renju::VERSION,
         mintaka::VERSION,
         env!("CARGO_PKG_VERSION")
-    )
+    );
+
+    Box::leak(version_str.into_boxed_str())
 }
 
 #[derive(Clone, Parser)]
-#[command(author = "JeongHyeon Choi", about = "mintaka_server: mintaka web api provider.", long_about = None)]
+#[
+    command(version = version_str(), disable_version_flag = true,
+    author = "JeongHyeon Choi",
+    about = "mintaka_server: mintaka web api provider.",
+    long_about = None)
+]
 pub struct Preference {
     #[arg(short, long, default_value = "default")]
     pub address: String,
     #[arg(short, long, default_value_t = num_cpus::get_physical())]
     pub cores: usize,
-    #[arg(short, long)]
+    #[arg(short, long, help = "Total memory limit in MiB")]
     memory_limit_mib: Option<usize>,
-    #[arg(long, requires = "tls_key")]
+    #[arg(long, requires = "tls_key", help = "TLS certificate file path")]
     tls_cert: Option<String>,
-    #[arg(long, requires = "tls_cert")]
+    #[arg(long, requires = "tls_cert", help = "TLS key file path")]
     tls_key: Option<String>,
-    #[arg(long)]
+    #[arg(long, help = "Reload TLS certificate on SIGHUP")]
     tls_renew: bool,
     #[clap(skip)]
     pub memory_limit: Option<ByteSize>,

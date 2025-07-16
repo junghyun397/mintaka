@@ -14,7 +14,7 @@ pub trait ThreadType {
 pub struct MainThread<T: ResponseSender> {
     response_sender: T,
     start_time: std::time::Instant,
-    running_time: Duration,
+    running_time: Option<Duration>,
 }
 
 impl<T: ResponseSender> MainThread<T> {
@@ -22,7 +22,7 @@ impl<T: ResponseSender> MainThread<T> {
     pub fn new(
         response_sender: T,
         start_time: std::time::Instant,
-        running_time: Duration,
+        running_time: Option<Duration>,
     ) -> Self {
         Self {
             response_sender,
@@ -42,7 +42,7 @@ impl<T: ResponseSender> ThreadType for MainThread<T> {
     }
 
     fn time_exceeded(&self) -> bool {
-        self.start_time.elapsed() >= self.running_time
+        self.running_time.is_some_and(|running_time| self.start_time.elapsed() >= running_time)
     }
 }
 

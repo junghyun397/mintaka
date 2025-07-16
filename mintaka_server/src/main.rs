@@ -1,5 +1,6 @@
 use crate::app_state::AppState;
 use crate::preference::{Preference, TlsConfig};
+use crate::session::SessionKey;
 use axum::routing::{delete, get, post};
 use axum::Router;
 use axum_server::tls_rustls::RustlsConfig;
@@ -58,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
         info!("listening on https://{addr}, wss://{addr}/ws");
 
         axum_server::bind_rustls(addr, ruslts_config)
-            .serve(app.into_make_service())
+            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
             .await?;
     } else {
         let listener = tokio::net::TcpListener::bind(addr)
@@ -66,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
 
         info!("listening on http://{addr}, ws://{addr}/ws");
 
-        axum::serve(listener, app)
+        axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
             .await?;
     }
 

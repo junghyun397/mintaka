@@ -157,11 +157,22 @@ impl BitXorAssign for Bitfield {
     }
 }
 
+#[derive(Debug)]
+pub struct BitfieldSizeError;
+
+impl Display for BitfieldSizeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "bitfield binary must exactly 32 bytes")
+    }
+}
+
+impl std::error::Error for BitfieldSizeError {}
+
 impl TryFrom<Vec<u8>> for Bitfield {
-    type Error = &'static str;
+    type Error = BitfieldSizeError;
 
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| "bitfield binary must exactly 32 bytes")?))
+        Ok(Self(value.try_into().map_err(|_| BitfieldSizeError)?))
     }
 }
 

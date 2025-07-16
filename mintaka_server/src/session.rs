@@ -9,7 +9,7 @@ use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::memo::hash_key::HashKey;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::num::NonZeroU32;
 use std::str::FromStr;
@@ -19,8 +19,13 @@ use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[repr(transparent)]
 pub struct SessionKey(Uuid);
+
+impl Display for SessionKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl Hash for SessionKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -48,7 +53,7 @@ impl SessionKey {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum SessionResponse {
     Response(Response),
     BestMove(BestMove),
@@ -58,6 +63,12 @@ pub enum SessionResponse {
 pub struct SessionResultResponse {
     pub game_agent: GameAgent,
     pub best_move: BestMove,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SessionCommandResponse {
+    board_hash: HashKey,
+    game_result: Option<GameResult>,
 }
 
 pub enum AgentState {
@@ -85,7 +96,7 @@ impl Session {
         }
     }
 
-    pub fn command(&mut self, command: Command) -> anyhow::Result<Option<GameResult>, AppError> {
+    pub fn command(&mut self, command: Command) -> anyhow::Result<SessionCommandResponse, AppError> {
         let game_agent = match &mut self.state {
             AgentState::Agent(agent) => agent,
             AgentState::Permit(_) => return Err(AppError::SessionInComputing),
@@ -96,14 +107,15 @@ impl Session {
         game_agent.command(&MessageSender::new(tx), command)
             .map_err(AppError::GameError)?;
 
-        for message in rx.try_iter() {
-            match message {
-                Message::Finished(result) => return Ok(Some(result)),
-                _ => continue,
-            }
-        }
-
-       Ok(None)
+        Ok(SessionCommandResponse {
+            board_hash: game_agent.state.board.hash_key,
+            game_result: rx.try_iter().find_map(|message|
+                match message {
+                    Message::Finished(result) => Some(result),
+                    _ => None,
+                }
+            ),
+        })
     }
 
     pub fn required_workers(&self) -> anyhow::Result<NonZeroU32, AppError> {

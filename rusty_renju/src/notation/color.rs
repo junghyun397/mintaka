@@ -1,6 +1,7 @@
 use crate::board_io::{SYMBOL_BLACK, SYMBOL_WHITE};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::marker::ConstParamTy;
 use std::ops::Not;
 use std::str::FromStr;
@@ -61,14 +62,25 @@ impl From<Color> for char {
     }
 }
 
+#[derive(Debug)]
+pub struct UnknownColorError;
+
+impl Display for UnknownColorError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unknown color")
+    }
+}
+
+impl std::error::Error for UnknownColorError {}
+
 impl FromStr for Color {
-    type Err = &'static str;
+    type Err = UnknownColorError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_ascii_lowercase().as_str() {
             "black" | "b" => Ok(Color::Black),
             "white" | "w" => Ok(Color::White),
-            &_ => Err("unknown color")
+            &_ => Err(UnknownColorError)
         }
     }
 }

@@ -7,11 +7,11 @@ use serde::{Deserialize, Serialize};
 use std::sync::mpsc;
 use std::time::Duration;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Response {
     Begins {
         workers: u32,
-        running_time: Duration,
+        running_time: Option<Duration>,
         tt_size: ByteSize,
     },
     Status {

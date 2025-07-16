@@ -1,18 +1,19 @@
 use mintaka::config::Config;
-use mintaka::game_agent::GameAgent;
+use mintaka::game_agent::{GameAgent, GameError};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::message::{CommandSender, Message, MessageSender, StatusCommand};
-use mintaka::protocol::response::{MpscResponseSender, Response, ResponseSender};
+use mintaka::protocol::response::{MpscResponseSender, Response};
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
-use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::notation::color::UnknownColorError;
+use rusty_renju::notation::pos::{MaybePos, Pos, PosError};
 use rusty_renju::utils::byte_size::ByteSize;
 use std::num::NonZeroU32;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
-fn main() -> Result<(), &'static str> {
+fn main() -> Result<(), GameError> {
     let launched = Arc::new(AtomicBool::new(false));
     let aborted = Arc::new(AtomicBool::new(false));
 
@@ -31,7 +32,7 @@ fn main() -> Result<(), &'static str> {
                 let result = game_agent.command(&message_sender, command);
 
                 if let Err(err) = result {
-                    println!("error: {}", err);
+                    println!("error: {err}");
                 }
             },
             Message::Status(command) => match command {
@@ -114,24 +115,24 @@ fn spawn_command_listener(launched: Arc<AtomicBool>, abort: Arc<AtomicBool>, com
 
 fn handle_command(
     launched: &Arc<AtomicBool>, abort: &Arc<AtomicBool>, command_sender: &CommandSender, buf: &str, args: Vec<&str>
-) -> Result<(), &'static str> {
+) -> Result<(), String> {
     if launched.load(Ordering::Relaxed) {
         match args[0] {
             "abort" => {
                 abort.store(true, Ordering::Relaxed);
             },
             "quite" => std::process::exit(0),
-            &_ => return Err("unknown command.")
+            &_ => return Err("unknown command.".to_string())
         }
     } else {
         match args[0] {
             "config" => {
                 match *args.get(1)
-                    .ok_or("data type not provided.")?
+                    .ok_or("data type not provided.".to_string())?
                 {
                     "workers" => {
                         match *args.get(2)
-                            .ok_or("workers not provided.")?
+                            .ok_or("workers not provided.".to_string())?
                         {
                             "auto" => {
                                 let cores = num_cpus::get_physical() as u32;
@@ -162,7 +163,7 @@ fn handle_command(
 
                         command_sender.command(Command::MaxMemory(ByteSize::from_kib(memory_size_in_kib)));
                     },
-                    &_ => return Err("data type not provided.")
+                    &_ => return Err("data type not provided.".to_string())
                 }
             },
             "limit" => {
@@ -197,7 +198,7 @@ fn handle_command(
                                     Command::IncrementTime(parse_time_in_milliseconds(&args)?)
                                 );
                             }
-                            &_ => return Err("unknown time type.")
+                            &_ => return Err("unknown time type.".to_string())
                         }
                     },
                     "nodes" => {
@@ -208,7 +209,7 @@ fn handle_command(
 
                         command_sender.command(Command::MaxNodes { in_1k: nodes });
                     },
-                    &_ => return Err("unknown limit type."),
+                    &_ => return Err("unknown limit type.".to_string()),
                 }
             }
             "parse" => {
@@ -238,7 +239,7 @@ fn handle_command(
                             Box::new((board, history))
                         ))
                     },
-                    &_ => return Err("unknown data type."),
+                    &_ => return Err("unknown data type.".to_string()),
                 }
             },
             "clear" => {
@@ -256,19 +257,24 @@ fn handle_command(
                 command_sender.status(StatusCommand::Version);
             },
             "set" => {
-                let pos = args.get(1).ok_or("position not provided.")?.parse()?;
-                let color = args.get(2).ok_or("color not provided.")?.parse()?;
+                let pos = args.get(1).ok_or("position not provided.")?.parse()
+                    .map_err(|e: PosError| e.to_string())?;
+                let color = args.get(2).ok_or("color not provided.")?.parse()
+                    .map_err(|e: UnknownColorError| e.to_string())?;
 
                 command_sender.command(Command::Set { pos, color });
             },
             "unset" => {
-                let pos = args.get(1).ok_or("position not provided.")?.parse()?;
-                let color = args.get(2).ok_or("color not provided.")?.parse()?;
+                let pos = args.get(1).ok_or("position not provided.")?.parse()
+                    .map_err(|e: PosError| e.to_string())?;
+                let color = args.get(2).ok_or("color not provided.")?.parse()
+                    .map_err(|e: UnknownColorError| e.to_string())?;
 
                 command_sender.command(Command::Unset { pos, color });
             },
             "p" | "play" => {
-                let pos: Pos = args.get(1).ok_or("position not provided.")?.parse()?;
+                let pos: Pos = args.get(1).ok_or("position not provided.")?.parse()
+                    .map_err(|e: PosError| e.to_string())?;
 
                 command_sender.command(Command::Play(pos.into()));
             },
@@ -278,7 +284,7 @@ fn handle_command(
             "g" | "gen" => {
                 command_sender.launch();
             },
-            &_ => return Err("unknown command."),
+            &_ => return Err("unknown command.".to_string()),
         }
     }
 

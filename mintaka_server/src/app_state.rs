@@ -1,13 +1,12 @@
 pub(crate) use crate::app_error::AppError;
 use crate::preference::Preference;
-use crate::session::{Session, SessionKey, SessionResponse, SessionResultResponse};
+use crate::session::{Session, SessionCommandResponse, SessionKey, SessionResponse, SessionResultResponse};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use anyhow::anyhow;
 use dashmap::DashMap;
 use mintaka::config::Config;
 use mintaka::game_agent::BestMove;
 use mintaka::protocol::command::Command;
-use mintaka::protocol::message::GameResult;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use std::num::NonZeroU32;
@@ -25,6 +24,11 @@ impl WorkerPermit {
         drop(self.0)
     }
 
+}
+
+pub struct SessionResource {
+    workers: NonZeroU32,
+    running_time: Duration,
 }
 
 pub struct AppState {
@@ -78,7 +82,7 @@ impl AppState {
         &self,
         session_key: SessionKey,
         command: Command,
-    ) -> anyhow::Result<Option<GameResult>, AppError> {
+    ) -> anyhow::Result<SessionCommandResponse, AppError> {
         let mut session = self.sessions.get_mut(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
@@ -194,7 +198,7 @@ impl AppState {
                 interval.tick().await;
                 let now = Instant::now();
 
-                sessions.retain(|_, session| session.is_expired(now));
+                sessions.retain(|_, session| !session.is_expired(now));
             }
         });
 

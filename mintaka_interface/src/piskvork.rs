@@ -1,13 +1,14 @@
 use mintaka::config::Config;
-use mintaka::game_agent::GameAgent;
+use mintaka::game_agent::{GameAgent, GameError};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::message::{CommandSender, Message, MessageSender};
-use mintaka::protocol::response::{MpscResponseSender, Response, ResponseSender};
+use mintaka::protocol::response::{MpscResponseSender, Response};
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
+use std::error::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
@@ -38,7 +39,7 @@ fn stdio_out(piskvork_response: PiskvorkResponse) {
     };
 }
 
-fn main() -> Result<(), &'static str> {
+fn main() -> Result<(), impl Error> {
     let launched = Arc::new(AtomicBool::new(false));
     let aborted = Arc::new(AtomicBool::new(false));
 
@@ -96,7 +97,7 @@ fn main() -> Result<(), &'static str> {
         }
     }
 
-    Ok(())
+    Ok::<(), GameError>(())
 }
 
 fn spawn_command_listener(launched: Arc<AtomicBool>, aborted: Arc<AtomicBool>, command_sender: CommandSender) {
@@ -309,8 +310,8 @@ fn match_command(
 
 fn parse_pos(row: &str, col: &str) -> Result<Pos, &'static str> {
     Ok(Pos::from_cartesian(
-        row.parse::<u8>().map_err(|e| "invalid row range.")?,
-        col.parse::<u8>().map_err(|e| "invalid col range.")?,
+        row.parse::<u8>().map_err(|_| "invalid row range.")?,
+        col.parse::<u8>().map_err(|_| "invalid col range.")?,
     ))
 }
 

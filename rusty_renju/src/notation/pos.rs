@@ -145,18 +145,35 @@ impl Pos {
 
 }
 
+#[derive(Debug)]
+pub enum PosError {
+    InvalidRowCharter,
+    ColumnOrRowOutOfRange,
+}
+
+impl Display for PosError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidRowCharter => write!(f, "Invalid row charter"),
+            Self::ColumnOrRowOutOfRange => write!(f, "Column or row out of range"),
+        }
+    }
+}
+
+impl std::error::Error for PosError {}
+
 impl FromStr for Pos {
-    type Err = &'static str;
+    type Err = PosError;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
         source[1..].parse::<u8>()
-            .map_err(|_| "invalid row charter")
+            .map_err(|_| PosError::InvalidRowCharter)
             .and_then(|row| {
                 let col = source.chars().next().unwrap() as u8 - b'a';
 
                 (col < BOARD_WIDTH && row < BOARD_WIDTH)
                     .then(|| Pos::from_cartesian(row - 1 , col))
-                    .ok_or("column or row out of range")
+                    .ok_or(PosError::ColumnOrRowOutOfRange)
             })
     }
 }
@@ -244,7 +261,7 @@ impl From<Option<Pos>> for MaybePos {
 }
 
 impl FromStr for MaybePos {
-    type Err = &'static str;
+    type Err = PosError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s.to_ascii_lowercase().as_str() {

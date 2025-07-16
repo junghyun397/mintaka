@@ -22,11 +22,12 @@ use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::value::Score;
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-#[derive(Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct BestMove {
     pub hash: HashKey,
     pub pos: MaybePos,
@@ -44,12 +45,31 @@ pub enum GameError {
     NoHistoryToUndo,
 }
 
+impl Display for GameError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GameError::StoneAlreadyExist => write!(f, "stone already exist"),
+            GameError::StoneDoesNotExist => write!(f, "stone does not exist"),
+            GameError::StoneColorMismatch => write!(f, "stone color mismatch"),
+            GameError::ForbiddenMove => write!(f, "forbidden move"),
+            GameError::NoHistoryToUndo => write!(f, "no history to undo"),
+        }
+    }
+}
+
+impl std::error::Error for GameError {}
+
+#[derive(Default)]
+pub struct TimeManagement {
+    time_manager: TimeManager,
+    time_history: Vec<Duration>,
+}
+
 pub struct GameAgent {
     pub state: GameState,
     pub config: Config,
+    pub time_management: Option<TimeManagement>,
     executed_moves: Bitfield,
-    time_manager: TimeManager,
-    time_history: Vec<Duration>,
     tt: TranspositionTable,
     ht: HistoryTable,
 }
@@ -63,8 +83,7 @@ impl GameAgent {
             state: GameState::default(),
             config,
             executed_moves: Bitfield::default(),
-            time_manager: TimeManager::default(),
-            time_history: Vec::new(),
+            time_management: config.time_management.then(TimeManagement::default),
             tt,
             ht: HistoryTable {},
         }
@@ -84,8 +103,7 @@ impl GameAgent {
             state,
             config,
             executed_moves: Bitfield::default(),
-            time_manager: TimeManager::default(),
-            time_history: Vec::new(),
+            time_management: config.time_management.then(TimeManagement::default),
             tt,
             ht: HistoryTable {},
         }
@@ -169,7 +187,9 @@ impl GameAgent {
                         if self.executed_moves.is_hot_idx(self.state.history.len()) {
                             self.executed_moves.unset_idx_mut(self.state.history.len());
 
-                            self.time_manager.append_mut(self.time_history.pop().unwrap());
+                            if let Some(time_management) = &mut self.time_management {
+                                time_management.time_manager.append_mut(time_management.time_history.pop().unwrap());
+                            }
                         }
                     }
                 }
@@ -212,16 +232,24 @@ impl GameAgent {
                 );
             }
             Command::TurnTime(time) => {
-                self.time_manager.turn = time;
+                if let Some(time_management) = &mut self.time_management {
+                    time_management.time_manager.turn = time;
+                }
             },
             Command::IncrementTime(time) => {
-                self.time_manager.increment = time;
+                if let Some(time_management) = &mut self.time_management {
+                    time_management.time_manager.increment = time;
+                }
             },
             Command::TotalTime(time) => {
-                self.time_manager.total_remaining = time;
+                if let Some(time_management) = &mut self.time_management {
+                    time_management.time_manager.total_remaining = time;
+                }
             },
             Command::ConsumeTime(time) => {
-                self.time_manager.consume_mut(time);
+                if let Some(time_management) = &mut self.time_management {
+                    time_management.time_manager.consume_mut(time);
+                }
             }
             Command::MaxNodes { in_1k } => {
                 self.config.max_nodes_in_1k = in_1k;
@@ -248,8 +276,16 @@ impl GameAgent {
     }
 
     pub fn launch(&mut self, response_sender: impl ResponseSender, aborted: Arc<AtomicBool>) -> BestMove {
-        self.time_manager.append_mut(self.time_manager.increment);
-        let running_time = self.time_manager.next_running_time();
+        let running_time;
+
+        if let Some(time_management) = &mut self.time_management {
+            time_management.time_manager.append_mut(time_management.time_manager.increment);
+
+            running_time = Some(time_management.time_manager.next_running_time());
+        } else {
+            running_time = None;
+        }
+
         let started_time = std::time::Instant::now();
 
         aborted.store(false, Ordering::Relaxed);
@@ -312,8 +348,11 @@ impl GameAgent {
         self.executed_moves.set_idx_mut(self.state.history.len());
 
         let time_elapsed = started_time.elapsed();
-        self.time_manager.consume_mut(time_elapsed);
-        self.time_history.push(time_elapsed);
+
+        if let Some(time_management) = &mut self.time_management {
+            time_management.time_manager.consume_mut(time_elapsed);
+            time_management.time_history.push(time_elapsed);
+        }
 
         BestMove {
             hash: self.state.board.hash_key,

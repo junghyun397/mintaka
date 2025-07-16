@@ -211,8 +211,25 @@ impl FromStr for History {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum HistoryError {
+    HistoryTooLong,
+    WhiteIsLongerThanBlack,
+}
+
+impl Display for HistoryError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HistoryError::HistoryTooLong => write!(f, "history is too long"),
+            HistoryError::WhiteIsLongerThanBlack => write!(f, "white's history is longer than black's history"),
+        }
+    }
+}
+
+impl std::error::Error for HistoryError {}
+
 impl TryFrom<&Board> for History {
-    type Error = &'static str;
+    type Error = HistoryError;
 
     fn try_from(value: &Board) -> Result<Self, Self::Error> {
         let mut black_history = vec![];
@@ -243,18 +260,23 @@ impl TryFrom<&Board> for History {
             }
         }
 
+        if white_history.len() + black_history.len() > pos::BOARD_SIZE {
+            return Err(HistoryError::HistoryTooLong)
+        }
+
         if white_history.len() > black_history.len() {
-            return Err("white's history is longer than black's history.");
+            return Err(HistoryError::WhiteIsLongerThanBlack);
         }
 
         let mut history = History::default();
 
-        while let Some(black_pos) = black_history.pop() {
+        while let Some(black_pos) = black_history.pop() && let Some(white_pos) = white_history.pop() {
             history.set_mut(black_pos);
+            history.set_mut(white_pos);
+        }
 
-            if let Some(white_pos) = white_history.pop() {
-                history.set_mut(white_pos);
-            }
+        if let Some(black_pos) = black_history.pop() {
+            history.set_mut(black_pos);
         }
 
         Ok(history)

@@ -37,6 +37,7 @@ pub struct Config {
     pub tt_size: ByteSize,
     pub workers: NonZeroU32,
 
+    pub time_management: bool,
     pub repost_contents: ReportContents,
 }
 
@@ -51,6 +52,7 @@ impl Default for Config {
             max_vcf_depth: pos::BOARD_SIZE - 5,
             tt_size: ByteSize::from_mib(16),
             workers: NonZeroU32::new(1).unwrap(),
+            time_management: false,
             repost_contents: ReportContents::default(),
         }
     }
