@@ -59,12 +59,13 @@ impl Display for GameError {
 
 impl std::error::Error for GameError {}
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct TimeManagement {
     time_manager: TimeManager,
     time_history: Vec<Duration>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct GameAgent {
     pub state: GameState,
     pub config: Config,

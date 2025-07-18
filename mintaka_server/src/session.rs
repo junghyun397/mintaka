@@ -8,7 +8,8 @@ use mintaka::protocol::response::{Response, ResponseSender};
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::memo::hash_key::HashKey;
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeStruct;
+use serde::{ser, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::num::NonZeroU32;
@@ -65,6 +66,12 @@ pub struct SessionResultResponse {
     pub best_move: BestMove,
 }
 
+impl Debug for SessionResultResponse {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}, {}", self.game_agent.state.history, self.best_move.pos)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SessionCommandResponse {
     board_hash: HashKey,
@@ -96,7 +103,7 @@ impl Session {
         }
     }
 
-    pub fn command(&mut self, command: Command) -> anyhow::Result<SessionCommandResponse, AppError> {
+    pub fn command(&mut self, command: Command) -> Result<SessionCommandResponse, AppError> {
         let game_agent = match &mut self.state {
             AgentState::Agent(agent) => agent,
             AgentState::Permit(_) => return Err(AppError::SessionInComputing),
@@ -118,7 +125,7 @@ impl Session {
         })
     }
 
-    pub fn required_workers(&self) -> anyhow::Result<NonZeroU32, AppError> {
+    pub fn required_workers(&self) -> Result<NonZeroU32, AppError> {
         match &self.state {
             AgentState::Agent(agent) => Ok(agent.config.workers),
             AgentState::Permit(_) => Err(AppError::SessionInComputing),
@@ -130,7 +137,7 @@ impl Session {
         response_sender: StreamSessionResponseSender,
         result_sender: tokio::sync::oneshot::Sender<SessionResultResponse>,
         worker_permit: WorkerPermit,
-    ) -> anyhow::Result<(), AppError> {
+    ) -> Result<(), AppError> {
         let AgentState::Agent(mut game_agent)
             = std::mem::replace(&mut self.state, AgentState::Permit(worker_permit))
                 else { return Err(AppError::SessionInComputing) };
@@ -156,7 +163,7 @@ impl Session {
         }
     }
 
-    pub fn abort(&self) -> anyhow::Result<(), AppError> {
+    pub fn abort(&self) -> Result<(), AppError> {
         match &self.state {
             AgentState::Agent(_) => Err(AppError::SessionIdle),
             AgentState::Permit(_) => {
@@ -174,7 +181,7 @@ impl Session {
         self.best_move
     }
 
-    pub fn restore(&mut self, game_agent: GameAgent) -> anyhow::Result<(), AppError> {
+    pub fn restore(&mut self, game_agent: GameAgent) -> Result<(), AppError> {
         let permit = match std::mem::replace(&mut self.state, AgentState::Agent(game_agent)) {
             AgentState::Permit(permit) => permit,
             AgentState::Agent(prev_agent) => {
@@ -189,7 +196,7 @@ impl Session {
         Ok(())
     }
 
-    pub fn board_hash_key(&self) -> anyhow::Result<HashKey, AppError> {
+    pub fn board_hash_key(&self) -> Result<HashKey, AppError> {
         let hash_key = match &self.state {
             AgentState::Agent(agent) => agent.state.board.hash_key,
             AgentState::Permit(_) => return Err(AppError::SessionInComputing),
@@ -219,8 +226,38 @@ impl Drop for Session {
     }
 }
 
-impl Debug for SessionResultResponse {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}, {}", self.game_agent.state.history, self.best_move.pos)
+impl Serialize for Session {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        let AgentState::Agent(agent) = &self.state else {
+            return Err(ser::Error::custom("session is not idle"));
+        };
+
+        let mut state = serializer.serialize_struct("Session", 1)?;
+        state.serialize_field("agent", &agent)?;
+        state.serialize_field("best_move", &self.best_move)?;
+        state.serialize_field("time_to_live", &self.time_to_live)?;
+
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Session {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        #[derive(Deserialize)]
+        struct SessionData {
+            agent: GameAgent,
+            best_move: Option<BestMove>,
+            time_to_live: Option<Duration>,
+        }
+
+        let data = SessionData::deserialize(deserializer)?;
+
+        Ok(Session {
+            state: AgentState::Agent(data.agent),
+            best_move: data.best_move,
+            abort_handle: Arc::new(AtomicBool::new(false)),
+            time_to_live: data.time_to_live,
+            last_active: Instant::now(),
+        })
     }
 }

@@ -1,16 +1,17 @@
 use rusty_renju::notation::pos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
+use serde::{Deserialize, Serialize};
 use std::num::NonZeroU32;
 
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SearchObjective {
     #[default] Best,
     Zeroing,
     Pondering
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ReportContents {
     pub main_pv: bool,
 }
@@ -23,7 +24,7 @@ impl Default for ReportContents {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Config {
     pub rule_kind: RuleKind,
     pub draw_condition: Option<usize>,

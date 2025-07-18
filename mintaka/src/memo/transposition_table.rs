@@ -4,6 +4,7 @@ use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::value::Score;
 use rusty_renju::utils::byte_size::ByteSize;
+use serde::{Deserialize, Serialize, Serializer};
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU8, Ordering};
 
@@ -58,7 +59,8 @@ impl TranspositionTable {
         }
     }
 
-pub fn export(&self, compression_level: u32) -> Vec<u8> {
+    // compression level: 0-9
+    pub fn export(&self, compression_level: u32) -> Vec<u8> {
         let age = self.fetch_age();
         let byte_len = self.table.len() * size_of::<TTEntryBucket>();
         let byte_cap = self.table.capacity() * size_of::<TTEntryBucket>();
@@ -206,4 +208,19 @@ impl TTView<'_> {
         }
     }
 
+}
+
+impl Serialize for TranspositionTable {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        serializer.serialize_bytes(&self.export(9))
+    }
+}
+
+impl<'de> Deserialize<'de> for TranspositionTable {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
+        let bytes = Vec::<u8>::deserialize(deserializer)?;
+
+        Self::import(bytes)
+            .map_err(serde::de::Error::custom)
+    }
 }

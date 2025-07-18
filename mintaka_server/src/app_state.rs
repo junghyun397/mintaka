@@ -2,7 +2,6 @@ pub(crate) use crate::app_error::AppError;
 use crate::preference::Preference;
 use crate::session::{Session, SessionCommandResponse, SessionKey, SessionResponse, SessionResultResponse};
 use crate::stream_response_sender::StreamSessionResponseSender;
-use anyhow::anyhow;
 use dashmap::DashMap;
 use mintaka::config::Config;
 use mintaka::game_agent::BestMove;
@@ -10,11 +9,14 @@ use mintaka::protocol::command::Command;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use std::num::NonZeroU32;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_stream::wrappers::UnboundedReceiverStream;
+use tracing::info;
 
 pub struct WorkerPermit(OwnedSemaphorePermit);
 
@@ -35,7 +37,7 @@ pub struct AppState {
     sessions: Arc<DashMap<SessionKey, Session>>,
     session_streams: Arc<DashMap<SessionKey, (UnboundedSender<SessionResponse>, Option<UnboundedReceiverStream<SessionResponse>>)>>,
     sem: Arc<Semaphore>,
-    preference: Preference,
+    pub preference: Preference,
     session_cleanup_task: Option<tokio::task::AbortHandle>,
 }
 
@@ -68,21 +70,70 @@ impl AppState {
 
         self.sessions.insert(session_key, session);
 
-        let (session_stream_sender, session_stream_rx) = {
+        let (session_stream_sender, session_stream) = {
             let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
             (tx, UnboundedReceiverStream::new(rx))
         };
 
-        self.session_streams.insert(session_key, (session_stream_sender, Some(session_stream_rx)));
+        self.session_streams.insert(session_key, (session_stream_sender, Some(session_stream)));
+
+        info!("new session created: sid={session_key}");
 
         session_key
+    }
+
+    pub async fn hibernate_session(&self, session_key: SessionKey, sessions_directory: &str) -> Result<(), AppError> {
+        let (_, session) = self.sessions.remove(&session_key)
+            .ok_or(AppError::SessionNotFound)?;
+
+        let encoded = tokio::task::spawn_blocking(move ||
+            bincode::serde::encode_to_vec(&session, bincode::config::standard()).unwrap()
+        )
+            .await
+            .map_err(|error| AppError::InternalError(error.to_string()))?;
+
+        let mut file = tokio::fs::File::create(format!("{sessions_directory}/{session_key}"))
+            .await
+            .map_err(|_| AppError::SessionFileAlreadyExists)?;
+
+        file.write_all(&encoded).await?;
+        file.flush().await?;
+
+        info!("session hibernated: sid={session_key}");
+
+        Ok(())
+    }
+
+    pub async fn wakeup_session(&self, session_key: SessionKey, session_directory: &str) -> Result<(), AppError> {
+        let buf = tokio::fs::read(format!("{session_directory}/{session_key}"))
+            .await
+            .map_err(|_| AppError::SessionFileNotFound)?;
+
+        let (session, _) = tokio::task::spawn_blocking(move ||
+            bincode::serde::decode_from_slice::<Session, _>(&buf, bincode::config::standard()).unwrap()
+        )
+            .await
+            .map_err(|error| AppError::InternalError(error.to_string()))?;
+
+        self.sessions.insert(session_key, session);
+
+        let (session_stream_sender, session_stream) = {
+            let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+            (tx, UnboundedReceiverStream::new(rx))
+        };
+
+        self.session_streams.insert(session_key, (session_stream_sender, Some(session_stream)));
+
+        info!("session woken up: sid={session_key}");
+
+        Ok(())
     }
 
     pub fn command_session(
         &self,
         session_key: SessionKey,
         command: Command,
-    ) -> anyhow::Result<SessionCommandResponse, AppError> {
+    ) -> Result<SessionCommandResponse, AppError> {
         let mut session = self.sessions.get_mut(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
@@ -92,7 +143,7 @@ impl AppState {
     pub async fn launch_session(
         &self,
         session_key: SessionKey,
-    ) -> anyhow::Result<(), AppError> {
+    ) -> Result<(), AppError> {
         let mut session = self.sessions.get_mut(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
@@ -100,6 +151,8 @@ impl AppState {
             .ok_or(AppError::SessionInComputing)?;
 
         let worker_permit = self.acquire_workers(session.required_workers()?).await;
+
+        info!("session launched: sid={session_key}");
 
         let (result_tx, result_rx) = tokio::sync::oneshot::channel();
         let (session_response_sender, _) = session_stream_pair.value();
@@ -130,7 +183,7 @@ impl AppState {
         Ok(())
     }
 
-    pub fn abort_session(&self, session_key: SessionKey) -> anyhow::Result<(), AppError> {
+    pub fn abort_session(&self, session_key: SessionKey) -> Result<(), AppError> {
         let session = self.sessions.get(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
@@ -143,14 +196,14 @@ impl AppState {
         Ok(())
     }
 
-    pub fn get_session_result(&self, session_key: SessionKey) -> anyhow::Result<BestMove, AppError> {
+    pub fn get_session_result(&self, session_key: SessionKey) -> Result<BestMove, AppError> {
         self.sessions.get(&session_key)
             .ok_or(AppError::SessionNotFound)?
             .last_best_move()
             .ok_or(AppError::SessionNeverLaunched)
     }
 
-    pub fn destroy_session(&self, session_key: SessionKey) -> anyhow::Result<(), AppError> {
+    pub fn destroy_session(&self, session_key: SessionKey) -> Result<(), AppError> {
         let (_, session) = self.sessions.remove(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
@@ -158,10 +211,12 @@ impl AppState {
 
         session.abort()?;
 
+        info!("session destroyed: sid={session_key}");
+
         Ok(())
     }
 
-    pub fn acquire_session_stream(&self, session_key: SessionKey) -> anyhow::Result<UnboundedReceiverStream<SessionResponse>, AppError> {
+    pub fn acquire_session_stream(&self, session_key: SessionKey) -> Result<UnboundedReceiverStream<SessionResponse>, AppError> {
         let session_stream_receiver = self.session_streams.get_mut(&session_key)
             .ok_or(AppError::SessionNotFound)?
             .1.take()
@@ -170,20 +225,47 @@ impl AppState {
         Ok(session_stream_receiver)
     }
 
-    pub fn restore_session_stream(&self, session_key: SessionKey, session_stream_receiver: UnboundedReceiverStream<SessionResponse>) -> anyhow::Result<()> {
+    pub fn restore_session_stream(&self, session_key: SessionKey, session_stream_receiver: UnboundedReceiverStream<SessionResponse>) -> Result<(), AppError> {
         self.session_streams.get_mut(&session_key)
-            .ok_or(anyhow!(AppError::StreamNotAcquired))?.1
+            .ok_or(AppError::StreamNotAcquired)?.1
             = Some(session_stream_receiver);
 
         Ok(())
     }
 
-    pub async fn hibernate_session(&self, _session_key: SessionKey) -> anyhow::Result<(), AppError> {
-        todo!()
+    pub async fn hibernate_all_sessions(&self) -> Result<(), AppError> {
+        let sessions_directory = &self.preference.sessions_directory;
+
+        let session_keys: Vec<_> = self.sessions.iter()
+            .map(|session| *session.key())
+            .collect();
+
+        let tasks = session_keys.into_iter()
+            .map(|session_key| self.hibernate_session(session_key, sessions_directory));
+
+        futures_util::future::try_join_all(tasks).await?;
+
+        Ok(())
     }
 
-    pub async fn wakeup_session(&self, _session_key: SessionKey) -> anyhow::Result<(), AppError> {
-        todo!()
+    pub async fn wakeup_all_sessions(&self) -> Result<(), AppError> {
+        let sessions_directory = &self.preference.sessions_directory;
+
+        let mut read_dir = tokio::fs::read_dir(sessions_directory).await?;
+        let mut session_keys = vec![];
+
+        while let Some(entry) = read_dir.next_entry().await? {
+            if let Ok(session_key) = SessionKey::from_str(&entry.file_name().to_string_lossy()) {
+                session_keys.push(session_key);
+            }
+        }
+
+        let tasks = session_keys.into_iter()
+            .map(|session_key| self.wakeup_session(session_key, sessions_directory));
+
+        futures_util::future::try_join_all(tasks).await?;
+
+        Ok(())
     }
 
     pub fn spawn_session_cleanup(&mut self) {

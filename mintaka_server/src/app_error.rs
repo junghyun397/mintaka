@@ -11,6 +11,8 @@ pub enum AppError {
     SessionNeverLaunched,
     StreamAcquired,
     StreamNotAcquired,
+    SessionFileAlreadyExists,
+    SessionFileNotFound,
     GameError(GameError),
     InternalError(String),
 }

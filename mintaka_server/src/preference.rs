@@ -1,5 +1,4 @@
 use clap::Parser;
-use clap_derive::Parser;
 use rusty_renju::utils::byte_size::ByteSize;
 
 #[derive(Default, Clone)]
@@ -10,13 +9,13 @@ pub struct TlsConfig {
 }
 
 fn version_str() -> &'static str {
-    let version_str = format!("rusty-renju={}, mintaka={}, mintaka_server={}",
-        rusty_renju::VERSION,
-        mintaka::VERSION,
-        env!("CARGO_PKG_VERSION")
-    );
-
-    Box::leak(version_str.into_boxed_str())
+    Box::leak(
+        format!("rusty-renju={}, mintaka={}, mintaka_server={}",
+            rusty_renju::VERSION,
+            mintaka::VERSION,
+            env!("CARGO_PKG_VERSION")
+        ).into_boxed_str()
+    )
 }
 
 #[derive(Clone, Parser)]
@@ -39,40 +38,27 @@ pub struct Preference {
     tls_key: Option<String>,
     #[arg(long, help = "Reload TLS certificate on SIGHUP")]
     tls_renew: bool,
+    #[arg(short, default_value = "sessions", help = "Session storage directory")]
+    pub sessions_directory: String,
+    #[arg(long, env = "MINTAKA_API_PASSWORD", default_value = None)]
+    pub api_password: Option<String>,
     #[clap(skip)]
     pub memory_limit: Option<ByteSize>,
     #[clap(skip)]
     pub tls_config: Option<TlsConfig>,
 }
 
-impl Default for Preference {
-
-    fn default() -> Self {
-        Self {
-            address: "127.0.0.1:8080".to_string(),
-            cores: num_cpus::get_physical(),
-            memory_limit_mib: None,
-            tls_cert: None,
-            tls_key: None,
-            tls_renew: false,
-            memory_limit: None,
-            tls_config: None,
-        }
-    }
-
-}
-
 impl Preference {
 
-    /// Parse command line arguments and create a Preference
-    pub fn parse() -> anyhow::Result<Self> {
+    pub fn parse() -> Self {
         let mut pref = Self::parse_from(std::env::args());
-        pref.post_parse()?;
-        Ok(pref)
+
+        pref.post_parse();
+
+        pref
     }
 
-    /// Process parsed arguments and set up derived fields
-    fn post_parse(&mut self) -> anyhow::Result<()> {
+    fn post_parse(&mut self) {
         if let Some(limit_mib) = self.memory_limit_mib {
             self.memory_limit = Some(ByteSize::from_mib(limit_mib));
         }
@@ -92,8 +78,6 @@ impl Preference {
                 observe_sighup: self.tls_renew,
             });
         }
-
-        Ok(())
     }
 
 }
