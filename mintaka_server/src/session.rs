@@ -1,7 +1,7 @@
 use crate::app_state::{AppError, WorkerPermit};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use mintaka::config::Config;
-use mintaka::game_agent::{BestMove, GameAgent};
+use mintaka::game_agent::{BestMove, ComputingResource, GameAgent};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::message::{GameResult, Message, MessageSender};
 use mintaka::protocol::response::{Response, ResponseSender};
@@ -137,7 +137,7 @@ impl Session {
         response_sender: StreamSessionResponseSender,
         result_sender: tokio::sync::oneshot::Sender<SessionResultResponse>,
         worker_permit: WorkerPermit,
-    ) -> Result<(), AppError> {
+    ) -> Result<ComputingResource, AppError> {
         let AgentState::Agent(mut game_agent)
             = std::mem::replace(&mut self.state, AgentState::Permit(worker_permit))
                 else { return Err(AppError::SessionInComputing) };
@@ -145,15 +145,17 @@ impl Session {
         self.abort_handle.store(false, Ordering::Relaxed);
         let abort_flag = self.abort_handle.clone();
 
+        let computing_resource = game_agent.next_computing_resource();
+
         tokio::task::spawn_blocking(async move || {
-            let best_move = game_agent.launch(response_sender, abort_flag);
+            let best_move = game_agent.launch(computing_resource, response_sender, abort_flag);
 
             result_sender
                 .send(SessionResultResponse { game_agent, best_move })
                 .unwrap();
         });
 
-        Ok(())
+        Ok(computing_resource)
     }
 
     pub fn is_computing(&self) -> bool {
@@ -232,11 +234,10 @@ impl Serialize for Session {
             return Err(ser::Error::custom("session is not idle"));
         };
 
-        let mut state = serializer.serialize_struct("Session", 1)?;
+        let mut state = serializer.serialize_struct("Session", 3)?;
         state.serialize_field("agent", &agent)?;
         state.serialize_field("best_move", &self.best_move)?;
         state.serialize_field("time_to_live", &self.time_to_live)?;
-
         state.end()
     }
 }

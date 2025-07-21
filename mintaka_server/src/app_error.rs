@@ -1,6 +1,5 @@
 use mintaka::game_agent::GameError;
 use std::fmt::{Debug, Display};
-use std::io::Error;
 
 #[derive(Debug)]
 pub enum AppError {
@@ -23,8 +22,8 @@ impl Display for AppError {
     }
 }
 
-impl From<Error> for AppError {
-    fn from(e: Error) -> Self {
+impl<T: std::error::Error> From<T> for AppError {
+    fn from(e: T) -> Self {
         Self::InternalError(e.to_string())
     }
 }

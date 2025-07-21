@@ -298,8 +298,13 @@ impl<'de> Deserialize<'de> for MaybePos {
             Self::from_str(&String::deserialize(deserializer)?)
                 .map_err(de::Error::custom)
         } else {
-            Ok(Self(Pos::deserialize(deserializer)?))
+            let raw_pos = Pos::deserialize(deserializer)?;
+
+            Ok(if raw_pos == Self::INVALID_POS {
+                Self::NONE
+            } else {
+                Self(raw_pos)
+            })
         }
     }
 }
-

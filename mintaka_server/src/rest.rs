@@ -1,5 +1,6 @@
 use crate::app_state::{AppError, AppState};
 use crate::session::{SessionKey, SessionResponse};
+use async_stream::stream;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{sse, IntoResponse, Sse};
@@ -78,7 +79,7 @@ pub async fn launch_session(
     State(state): State<Arc<AppState>>
 ) -> impl IntoResponse {
     state.launch_session(sid).await
-        .map(|_| StatusCode::OK)
+        .map(|computing_resource| (StatusCode::OK, Json(computing_resource)))
 }
 
 pub async fn subscribe_session_response(
@@ -86,26 +87,36 @@ pub async fn subscribe_session_response(
     State(state): State<Arc<AppState>>
 ) -> Result<Sse<impl Stream<Item = Result<sse::Event, Infallible>>>, AppError> {
     let session_stream = state.acquire_session_stream(sid)?;
+    let state = state.clone();
 
-    let sse_stream = session_stream
-        .map(|session_response| {
-            Ok(match session_response {
+    let sse_stream = stream! {
+        let mut receiver = session_stream;
+
+        while let Some(session_response) = receiver.next().await {
+            match session_response {
                 SessionResponse::Response(response) => {
-                    sse::Event::default()
-                        .event("update")
-                        .json_data(response).unwrap()
+                    yield Ok(sse::Event::default()
+                        .event("response")
+                        .json_data(response)
+                        .unwrap());
                 },
                 SessionResponse::BestMove(best_move) => {
-                    sse::Event::default()
-                        .event("best_move")
-                        .json_data(best_move).unwrap()
+                    yield Ok(sse::Event::default()
+                        .event("best-move")
+                        .json_data(best_move)
+                        .unwrap());
                 },
                 SessionResponse::Terminate => {
-                    sse::Event::default()
-                        .event("terminate")
+                    yield Ok(sse::Event::default()
+                        .event("terminate"));
+
+                    break;
                 }
-            })
-        });
+            }
+        }
+
+        state.restore_session_stream(sid, receiver).unwrap();
+    };
 
     Ok(Sse::new(sse_stream))
 }
@@ -139,7 +150,7 @@ pub async fn hibernate_session(
     State(state): State<Arc<AppState>>
 ) -> impl IntoResponse {
     state.hibernate_session(sid, &state.preference.sessions_directory).await
-        .map(|_| StatusCode::OK)
+        .map(|_| StatusCode::NO_CONTENT)
 }
 
 pub async fn wakeup_session(
@@ -147,5 +158,5 @@ pub async fn wakeup_session(
     State(state): State<Arc<AppState>>
 ) -> impl IntoResponse {
     state.wakeup_session(sid, &state.preference.sessions_directory).await
-        .map(|_| StatusCode::OK)
+        .map(|_| StatusCode::NO_CONTENT)
 }

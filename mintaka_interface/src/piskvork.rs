@@ -1,5 +1,5 @@
 use mintaka::config::Config;
-use mintaka::game_agent::{GameAgent, GameError};
+use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::message::{CommandSender, Message, MessageSender};
 use mintaka::protocol::response::{MpscResponseSender, Response};
@@ -66,9 +66,9 @@ fn main() -> Result<(), impl Error> {
                 std::thread::spawn(move || {
                     for response in response_receiver {
                         let piskvork_response = match response {
-                            Response::Begins { workers, running_time, tt_size} =>
+                            Response::Begins(ComputingResource { workers, time, nodes_in_1k, tt_size }) =>
                                 PiskvorkResponse::Info(format!(
-                                    "begins: workers={workers}, running-time={running_time:?}, tt-size={tt_size}"
+                                    "begins: workers={workers}, running-time={time:?}, nodes={nodes_in_1k}k, tt-size={tt_size}"
                                 )),
                             Response::Status { eval, total_nodes_in_1k, hash_usage, best_moves } =>
                                 PiskvorkResponse::Info(format!(
@@ -88,7 +88,10 @@ fn main() -> Result<(), impl Error> {
 
                 launched.store(true, Ordering::Relaxed);
 
-                let best_move = game_agent.launch(response_sender, aborted.clone());
+                let resource = game_agent.next_computing_resource();
+
+                let best_move = game_agent.launch(resource, response_sender, aborted.clone());
+
                 game_agent.command(&message_sender, Command::Play(best_move.pos))?;
 
                 PiskvorkResponse::Pos(best_move.pos.unwrap());

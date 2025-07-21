@@ -126,11 +126,15 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             return Score::lose_in(td.ply + 2)
         }
 
+        let movegen_window = state.movegen_window;
         td.push_ply_mut();
-        td.batch_counter.increment_single_mut();
         state.set_mut(pos);
 
-        return -pvs::<R, NT::NextType, TH>(td, state, depth_left, -beta, -alpha);
+        let score = -pvs::<R, NT::NextType, TH>(td, state, depth_left, -beta, -alpha);
+
+        state.unset_mut(movegen_window);
+
+        return score;
     }
 
     if !NT::IS_ROOT {
@@ -216,7 +220,6 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
         let movegen_window = state.movegen_window;
-        td.batch_counter.increment_single_mut();
         state.set_mut(pos);
 
         moves_searched += 1;

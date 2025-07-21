@@ -56,7 +56,7 @@ impl From<History> for GameState {
 
 impl Serialize for GameState {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        let mut state = serializer.serialize_struct("GameState", 2)?;
+        let mut state = serializer.serialize_struct("GameStateD", 2)?;
         state.serialize_field("board", &self.board)?;
         state.serialize_field("history", &self.history)?;
         state.end()

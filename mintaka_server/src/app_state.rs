@@ -4,10 +4,11 @@ use crate::session::{Session, SessionCommandResponse, SessionKey, SessionRespons
 use crate::stream_response_sender::StreamSessionResponseSender;
 use dashmap::DashMap;
 use mintaka::config::Config;
-use mintaka::game_agent::BestMove;
+use mintaka::game_agent::{BestMove, ComputingResource};
 use mintaka::protocol::command::Command;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
+use serde_json::json;
 use std::num::NonZeroU32;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -86,11 +87,10 @@ impl AppState {
         let (_, session) = self.sessions.remove(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
-        let encoded = tokio::task::spawn_blocking(move ||
-            bincode::serde::encode_to_vec(&session, bincode::config::standard()).unwrap()
-        )
+        let encoded = tokio::task::spawn_blocking(move || rmp_serde::to_vec(&session))
             .await
-            .map_err(|error| AppError::InternalError(error.to_string()))?;
+            .map_err(AppError::from)?
+            .map_err(AppError::from)?;
 
         let mut file = tokio::fs::File::create(format!("{sessions_directory}/{session_key}"))
             .await
@@ -109,11 +109,10 @@ impl AppState {
             .await
             .map_err(|_| AppError::SessionFileNotFound)?;
 
-        let (session, _) = tokio::task::spawn_blocking(move ||
-            bincode::serde::decode_from_slice::<Session, _>(&buf, bincode::config::standard()).unwrap()
-        )
+        let session = tokio::task::spawn_blocking(move || rmp_serde::from_slice(&buf))
             .await
-            .map_err(|error| AppError::InternalError(error.to_string()))?;
+            .map_err(AppError::from)?
+            .map_err(AppError::from)?;
 
         self.sessions.insert(session_key, session);
 
@@ -143,7 +142,7 @@ impl AppState {
     pub async fn launch_session(
         &self,
         session_key: SessionKey,
-    ) -> Result<(), AppError> {
+    ) -> Result<ComputingResource, AppError> {
         let mut session = self.sessions.get_mut(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
@@ -152,12 +151,10 @@ impl AppState {
 
         let worker_permit = self.acquire_workers(session.required_workers()?).await;
 
-        info!("session launched: sid={session_key}");
-
         let (result_tx, result_rx) = tokio::sync::oneshot::channel();
         let (session_response_sender, _) = session_stream_pair.value();
 
-        session.launch(
+        let computing_resource = session.launch(
             StreamSessionResponseSender::new(session_response_sender.clone()),
             result_tx,
             worker_permit
@@ -180,7 +177,9 @@ impl AppState {
             }
         });
 
-        Ok(())
+        info!("session launched: sid={session_key}, resource={}", json!(computing_resource));
+
+        Ok(computing_resource)
     }
 
     pub fn abort_session(&self, session_key: SessionKey) -> Result<(), AppError> {

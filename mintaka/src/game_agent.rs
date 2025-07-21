@@ -65,6 +65,14 @@ pub struct TimeManagement {
     time_history: Vec<Duration>,
 }
 
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub struct ComputingResource {
+    pub workers: u32,
+    pub tt_size: ByteSize,
+    pub time: Option<Duration>,
+    pub nodes_in_1k: usize,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct GameAgent {
     pub state: GameState,
@@ -276,15 +284,20 @@ impl GameAgent {
             .try_for_each(|command| self.command(message_sender, command))
     }
 
-    pub fn launch(&mut self, response_sender: impl ResponseSender, aborted: Arc<AtomicBool>) -> BestMove {
-        let running_time;
+    pub fn next_computing_resource(&self) -> ComputingResource {
+        ComputingResource {
+            workers: self.config.workers.get(),
+            tt_size: self.config.tt_size,
+            time: self.time_management.as_ref().map(|time_management|
+                time_management.time_manager.next_running_time()
+            ),
+            nodes_in_1k: self.config.max_nodes_in_1k,
+        }
+    }
 
+    pub fn launch(&mut self, computing_resource: ComputingResource, response_sender: impl ResponseSender, aborted: Arc<AtomicBool>) -> BestMove {
         if let Some(time_management) = &mut self.time_management {
             time_management.time_manager.append_mut(time_management.time_manager.increment);
-
-            running_time = Some(time_management.time_manager.next_running_time());
-        } else {
-            running_time = None;
         }
 
         let started_time = std::time::Instant::now();
@@ -292,11 +305,7 @@ impl GameAgent {
         aborted.store(false, Ordering::Relaxed);
         let global_counter_in_1k = Arc::new(AtomicUsize::new(0));
 
-        response_sender.response(Response::Begins {
-            workers: self.config.workers.get(),
-            running_time,
-            tt_size: self.tt.size(),
-        });
+        response_sender.response(Response::Begins(computing_resource));
 
         let tt_view = self.tt.view();
 
@@ -307,7 +316,7 @@ impl GameAgent {
                 MainThread::new(
                     response_sender,
                     started_time,
-                    running_time,
+                    computing_resource.time,
                 ),
                 0,
                 self.config,

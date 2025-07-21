@@ -294,10 +294,15 @@ impl<'de> Deserialize<'de> for History {
         let vector = Vec::<MaybePos>::deserialize(deserializer)?;
         let top = vector.len();
 
+        if top > pos::BOARD_SIZE {
+            return Err(serde::de::Error::custom("history is too long"));
+        }
+
+        let mut entries = [MaybePos::NONE; pos::BOARD_SIZE];
+        entries[.. top].copy_from_slice(&vector);
+
         Ok(Self {
-            entries: vector
-                .try_into()
-                .map_err(|_| serde::de::Error::custom("history is too long"))?,
+            entries,
             top
         })
     }

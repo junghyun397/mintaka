@@ -1,12 +1,12 @@
-use crate::app_state::AppState;
-use crate::preference::{Preference, TlsConfig};
-use crate::session::SessionKey;
 use axum::extract::{ConnectInfo, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{delete, get, on_service, post};
 use axum::{middleware, Router};
 use axum_server::tls_rustls::RustlsConfig;
+use mintaka_server::app_state::AppState;
+use mintaka_server::preference::{Preference, TlsConfig};
+use mintaka_server::rest;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::path::Path;
@@ -16,14 +16,6 @@ use tokio::signal::unix::SignalKind;
 use tower_http::trace::TraceLayer;
 use tracing::log::warn;
 use tracing::{error, info};
-
-mod preference;
-mod session;
-mod stream_response_sender;
-mod app_state;
-mod rest;
-mod websocket;
-mod app_error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

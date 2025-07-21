@@ -1,19 +1,14 @@
+use crate::game_agent::ComputingResource;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::message;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::value::Score;
-use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize};
 use std::sync::mpsc;
-use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Response {
-    Begins {
-        workers: u32,
-        running_time: Option<Duration>,
-        tt_size: ByteSize,
-    },
+    Begins(ComputingResource),
     Status {
         eval: f32,
         total_nodes_in_1k: usize,

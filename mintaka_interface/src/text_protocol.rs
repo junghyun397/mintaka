@@ -1,5 +1,5 @@
 use mintaka::config::Config;
-use mintaka::game_agent::{GameAgent, GameError};
+use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::message::{CommandSender, Message, MessageSender, StatusCommand};
 use mintaka::protocol::response::{MpscResponseSender, Response};
@@ -55,8 +55,8 @@ fn main() -> Result<(), GameError> {
                 std::thread::spawn(move || {
                     for response in response_receiver {
                         match response {
-                            Response::Begins { workers, running_time, tt_size } =>
-                                println!("begins: workers={workers}, running-time={running_time:?}, tt-size={tt_size}"),
+                            Response::Begins(ComputingResource { workers, time, nodes_in_1k, tt_size }) =>
+                                println!("begins: workers={workers}, running-time={time:?}, nodes={nodes_in_1k}, tt-size={tt_size}"),
                             Response::Status { eval, total_nodes_in_1k, best_moves, hash_usage } =>
                                 println!(
                                     "status: eval={eval}, \
@@ -73,7 +73,9 @@ fn main() -> Result<(), GameError> {
 
                 launched.store(true, Ordering::Relaxed);
 
-                let best_move = game_agent.launch(response_sender.clone(), aborted.clone());
+                let resource = game_agent.next_computing_resource();
+
+                let best_move = game_agent.launch(resource, response_sender.clone(), aborted.clone());
 
                 launched.store(false, Ordering::Relaxed);
 

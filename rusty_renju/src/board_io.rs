@@ -282,7 +282,7 @@ impl Display for Slice {
 
 impl Serialize for Board {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        let mut state = serializer.serialize_struct("Board", 3)?;
+        let mut state = serializer.serialize_struct("Board", 2)?;
         state.serialize_field("player_color", &self.player_color)?;
         state.serialize_field("bitfield", &self.slices.bitfield())?;
         state.end()
