@@ -54,23 +54,23 @@ impl From<History> for GameState {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct GameStateData {
+    board: Board,
+    history: History,
+}
+
 impl Serialize for GameState {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        let mut state = serializer.serialize_struct("GameStateD", 2)?;
-        state.serialize_field("board", &self.board)?;
-        state.serialize_field("history", &self.history)?;
-        state.end()
+        GameStateData {
+            board: self.board,
+            history: self.history,
+        }.serialize(serializer)
     }
 }
 
 impl<'de> Deserialize<'de> for GameState {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
-        #[derive(Deserialize)]
-        struct GameStateData {
-            board: Board,
-            history: History,
-        }
-
         let data = GameStateData::deserialize(deserializer)?;
 
         let movegen_window = MovegenWindow::from(&data.board.hot_field);

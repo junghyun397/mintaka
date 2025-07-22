@@ -284,7 +284,7 @@ impl GameAgent {
             .try_for_each(|command| self.command(message_sender, command))
     }
 
-    pub fn next_computing_resource(&self) -> ComputingResource {
+    fn next_computing_resource(&self) -> ComputingResource {
         ComputingResource {
             workers: self.config.workers.get(),
             tt_size: self.config.tt_size,
@@ -295,7 +295,9 @@ impl GameAgent {
         }
     }
 
-    pub fn launch(&mut self, computing_resource: ComputingResource, response_sender: impl ResponseSender, aborted: Arc<AtomicBool>) -> BestMove {
+    pub fn launch(&mut self, response_sender: impl ResponseSender, aborted: Arc<AtomicBool>) -> BestMove {
+        let computing_resource = self.next_computing_resource();
+
         if let Some(time_management) = &mut self.time_management {
             time_management.time_manager.append_mut(time_management.time_manager.increment);
         }

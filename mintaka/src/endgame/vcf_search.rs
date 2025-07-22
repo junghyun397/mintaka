@@ -331,7 +331,7 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
                 eval: 0,
             });
 
-        td.tt.store_entry_mut(board.hash_key, tt_entry);
+        td.tt.store_entry(board.hash_key, tt_entry);
 
         if let Some(frame) = td.pop_vcf_frame_mut() {
             board.unset_mut(frame.defend_pos);
@@ -358,7 +358,7 @@ fn tt_store_vcf_win(
     score: Score,
     is_pv: bool,
 ) {
-    td.tt.store_mut(
+    td.tt.store(
         hash_key,
         four_pos.into(),
         ScoreKind::LowerBound,
@@ -378,7 +378,7 @@ fn tt_store_vcf_lose(
     score: Score,
     is_pv: bool,
 ) {
-    td.tt.store_mut(
+    td.tt.store(
         hash_key,
         MaybePos::NONE,
         ScoreKind::UpperBound,

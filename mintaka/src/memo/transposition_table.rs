@@ -139,13 +139,13 @@ impl TTView<'_> {
     }
 
     #[inline]
-    pub fn store_entry_mut(&self, key: HashKey, entry: TTEntry) {
+    pub fn store_entry(&self, key: HashKey, entry: TTEntry) {
         let idx = self.calculate_index(key);
-        self.table[idx].store_mut(key.into(), entry);
+        self.table[idx].store(key.into(), entry);
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn store_mut(
+    pub fn store(
         &self,
         key: HashKey,
         maybe_best_move: MaybePos,
@@ -173,22 +173,20 @@ impl TTView<'_> {
                 entry.eval = eval;
                 entry.score = score;
 
-                self.table[idx].store_mut(key.into(), entry);
+                self.table[idx].store(key.into(), entry);
             }
+        } else {
+            let entry = TTEntry {
+                best_move: maybe_best_move,
+                tt_flag: TTFlag::new(score_kind, endgame_flag, false),
+                age: self.age,
+                depth,
+                eval,
+                score,
+            };
 
-            return;
+            self.table[idx].store(key.into(), entry);
         }
-
-        let entry = TTEntry {
-            best_move: maybe_best_move,
-            tt_flag: TTFlag::new(score_kind, endgame_flag, false),
-            age: self.age,
-            depth,
-            eval,
-            score,
-        };
-
-        self.table[idx].store_mut(key.into(), entry);
     }
 
     pub fn prefetch(&self, key: HashKey) {

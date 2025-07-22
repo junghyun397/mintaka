@@ -170,14 +170,15 @@ impl TTEntryBucket {
     }
 
     #[inline]
-    fn store_key_mut(&self, bucket_idx: usize, entry_key: TTEntryKey) {
+    fn store_key(&self, bucket_idx: usize, entry_key: TTEntryKey) {
         let bit_offset = KEY_SIZE * (bucket_idx % 3);
         let key_position = bucket_idx / 3;
         let mask = KEY_MASK << bit_offset;
 
-        let keys = self.keys[key_position].load(Ordering::Acquire);
-        let content = (keys & !mask) | (entry_key.lower_21_bits << bit_offset);
-        self.keys[key_position].store(content, Ordering::Release);
+        let original_keys = self.keys[key_position].load(Ordering::Acquire);
+        let keys = (original_keys & !mask) | (entry_key.lower_21_bits << bit_offset);
+
+        self.keys[key_position].store(keys, Ordering::Release);
     }
 
     #[inline]
@@ -190,9 +191,10 @@ impl TTEntryBucket {
     }
 
     #[inline]
-    pub fn store_mut(&self, entry_key: TTEntryKey, entry: TTEntry) {
+    pub fn store(&self, entry_key: TTEntryKey, entry: TTEntry) {
         let bucket_idx = Self::calculate_entry_index(entry_key);
-        self.store_key_mut(bucket_idx, entry_key);
+
+        self.store_key(bucket_idx, entry_key);
         self.entries[bucket_idx].store(entry.into(), Ordering::Relaxed);
     }
 

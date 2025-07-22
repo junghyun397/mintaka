@@ -280,23 +280,23 @@ impl Display for Slice {
     };
 }
 
+#[derive(Serialize, Deserialize)]
+struct BoardData {
+    player_color: Color,
+    bitfield: ColorContainer<Bitfield>,
+}
+
 impl Serialize for Board {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        let mut state = serializer.serialize_struct("Board", 2)?;
-        state.serialize_field("player_color", &self.player_color)?;
-        state.serialize_field("bitfield", &self.slices.bitfield())?;
-        state.end()
+        BoardData {
+            player_color: self.player_color,
+            bitfield: self.slices.bitfield()
+        }.serialize(serializer)
     }
 }
 
 impl<'de> Deserialize<'de> for Board {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        #[derive(serde::Deserialize)]
-        struct BoardData {
-            player_color: Color,
-            bitfield: ColorContainer<Bitfield>,
-        }
-
         let data = BoardData::deserialize(deserializer)?;
 
         let black_moves = data.bitfield.black.iter_hot_pos().collect::<Box<_>>();

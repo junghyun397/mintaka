@@ -154,9 +154,9 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         && td.search_limit_exceeded()
     {
         td.set_aborted_mut();
-        return 0;
+        return Score::DRAW;
     } else if td.is_aborted() {
-        return 0;
+        return Score::DRAW;
     }
 
     // clear pv-line
@@ -171,7 +171,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         tt_endgame_flag = entry.tt_flag.endgame_flag();
         if tt_endgame_flag == EndgameFlag::Win || tt_endgame_flag == EndgameFlag::Lose
         { // endgame tt-hit
-            // return entry.score;
+            return entry.score;
         }
 
         static_eval = entry.eval;
@@ -183,7 +183,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             ScoreKind::UpperBound => entry.score <= alpha,
             ScoreKind::Exact => true,
         } {
-            // return entry.score;
+            // return entry.score; // todo: debug
         }
 
         static_eval = entry.score;
@@ -204,14 +204,14 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     let mut best_score = -Score::INF;
     let mut best_move = MaybePos::NONE;
 
-    td.killers[td.ply] = [MaybePos::NONE; 2]; // todo: DEBUG
+    // td.killers[td.ply] = [MaybePos::NONE; 2]; // todo: debug
     let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
 
     td.push_ply_mut();
     td.ss[td.ply].static_eval = static_eval;
     td.ss[td.ply].on_pv = NT::IS_PV || tt_pv;
 
-    let mut moves_searched = 0;
+    let mut move_seq = 0;
     'position_search: while let Some((pos, _)) = move_picker.next(state) {
         if !state.board.is_legal_move(pos) {
             continue;
@@ -222,9 +222,9 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         let movegen_window = state.movegen_window;
         state.set_mut(pos);
 
-        moves_searched += 1;
+        move_seq += 1;
 
-        let score = if moves_searched == 1 { // full-window search
+        let score = if move_seq == 1 { // full-window search
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
         } else { // zero-window search
             let mut score = -pvs::<R, OffPVNode, TH>(td, state, depth_left - 1, -alpha - 1, -alpha);
@@ -277,7 +277,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         ScoreKind::UpperBound
     };
 
-    td.tt.store_mut(
+    td.tt.store(
         state.board.hash_key,
         best_move,
         score_kind,

@@ -88,9 +88,7 @@ fn main() -> Result<(), impl Error> {
 
                 launched.store(true, Ordering::Relaxed);
 
-                let resource = game_agent.next_computing_resource();
-
-                let best_move = game_agent.launch(resource, response_sender, aborted.clone());
+                let best_move = game_agent.launch(response_sender, aborted.clone());
 
                 game_agent.command(&message_sender, Command::Play(best_move.pos))?;
 

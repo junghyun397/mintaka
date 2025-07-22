@@ -37,7 +37,7 @@ impl Evaluator for HeuristicEvaluator {
 impl HeuristicEvaluator {
 
     fn eval_slice_pattern_counts<const C: Color>(board: &Board) -> Score {
-        let mut counts: GlobalPatternCount =board.patterns.counts.global.get::<C>();
+        let mut counts: GlobalPatternCount = board.patterns.counts.global.get::<C>();
 
         if C == Color::Black {
             for idx in board.patterns.forbidden_field.iter_hot_idx() {

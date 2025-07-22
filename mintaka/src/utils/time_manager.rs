@@ -46,8 +46,4 @@ impl TimeManager {
         self.total_remaining += additional_time;
     }
 
-    pub fn subtract_mut(&mut self, revoked_time: Duration) {
-        self.total_remaining -= revoked_time;
-    }
-
 }

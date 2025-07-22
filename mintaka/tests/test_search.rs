@@ -30,9 +30,8 @@ mod test_search {
         game_agent.commands(&message_sender, vec![
             Command::Load(Box::new((board, history))),
             Command::MaxMemory(ByteSize::from_mib(128)),
-            Command::TotalTime(Duration::from_secs(u64::MAX)),
             Command::IncrementTime(Duration::ZERO),
-            Command::TurnTime(Duration::from_micros(100)),
+            Command::TurnTime(Duration::from_secs(1)),
         ]).unwrap();
 
         for message in message_receiver {

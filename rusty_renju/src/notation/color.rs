@@ -86,139 +86,126 @@ impl FromStr for Color {
 }
 
 macro_rules! impl_color_container {
-    ($name:ident,$bound:ident) => {
-        impl<T: $bound> $name<T> {
+    (
+        $(#[$struct_attr:meta])*
+        $name:ident
+    ) => {
+        $(#[$struct_attr])*
+        pub struct $name<T> {
+            pub black: T,
+            pub white: T,
+        }
 
+        impl<T> $name<T> {
             pub const fn new(black: T, white: T) -> Self {
-                Self {
-                    black,
-                    white
-                }
+                Self { black, white }
             }
 
-            pub const fn access(&self, color: Color) -> &T {
+            #[inline]
+            pub fn access(&self, color: Color) -> &T {
                 match color {
                     Color::Black => &self.black,
-                    Color::White => &self.white
+                    Color::White => &self.white,
                 }
             }
 
-            pub const fn access_mut(&mut self, color: Color) -> &mut T {
+            #[inline]
+            pub fn access_mut(&mut self, color: Color) -> &mut T {
                 match color {
                     Color::Black => &mut self.black,
-                    Color::White => &mut self.white
+                    Color::White => &mut self.white,
                 }
             }
 
+            #[inline]
             pub const fn get_ref<const C: Color>(&self) -> &T {
                 match C {
                     Color::Black => &self.black,
-                    Color::White => &self.white
+                    Color::White => &self.white,
                 }
             }
 
+            #[inline]
             pub const fn get_reversed_ref<const C: Color>(&self) -> &T {
                 match C {
                     Color::Black => &self.white,
-                    Color::White => &self.black
+                    Color::White => &self.black,
                 }
             }
 
+            #[inline]
             pub const fn get_ref_mut<const C: Color>(&mut self) -> &mut T {
                 match C {
                     Color::Black => &mut self.black,
-                    Color::White => &mut self.white
+                    Color::White => &mut self.white,
                 }
             }
 
+            #[inline]
             pub const fn get_reversed_ref_mut<const C: Color>(&mut self) -> &mut T {
                 match C {
                     Color::Black => &mut self.white,
-                    Color::White => &mut self.black
+                    Color::White => &mut self.black,
                 }
             }
-
         }
-    };
-}
 
-macro_rules! impl_color_container_copy {
-    ($name:ident) => {
-        impl<T: std::marker::Copy> $name<T> {
+        impl<T> std::ops::Index<Color> for $name<T> {
+            type Output = T;
+            #[inline]
+            fn index(&self, index: Color) -> &Self::Output {
+                self.access(index)
+            }
+        }
 
+        impl<T> std::ops::IndexMut<Color> for $name<T> {
+            #[inline]
+            fn index_mut(&mut self, index: Color) -> &mut Self::Output {
+                self.access_mut(index)
+            }
+        }
+
+        impl<T: Copy> $name<T> {
+            #[inline]
             pub const fn get<const C: Color>(&self) -> T {
                 match C {
                     Color::Black => self.black,
-                    Color::White => self.white
+                    Color::White => self.white,
                 }
             }
 
+            #[inline]
             pub const fn get_reversed<const C: Color>(&self) -> T {
                 match C {
                     Color::Black => self.white,
-                    Color::White => self.black
+                    Color::White => self.black,
                 }
-            }
-
-        }
-    }
-}
-
-macro_rules! impl_serialize {
-    ($name:ident,$bound:ident) => {
-        impl<T: $bound + serde::Serialize> serde::Serialize for $name<T> {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
-                let mut state = serializer.serialize_struct("ColorContainer", 2)?;
-                state.serialize_field("black", &self.black)?;
-                state.serialize_field("white", &self.white)?;
-                state.end()
-            }
-        }
-
-        impl<'de, T: $bound + serde::Deserialize<'de>> serde::Deserialize<'de> for $name<T> {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
-                #[derive(Deserialize)]
-                struct ColorContainerData<T> {
-                    black: T,
-                    white: T,
-                }
-
-                let data = ColorContainerData::deserialize(deserializer)?;
-
-                Ok(Self::new(data.black, data.white))
             }
         }
     };
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(C)]
-pub struct ColorContainer<T: Copy> {
-    pub black: T,
-    pub white: T,
+impl_color_container!(
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    ColorContainer
+);
+
+impl_color_container!(
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+    #[repr(align(64))]
+    AlignedColorContainer
+);
+
+impl_color_container!(
+    #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+    DynamicColorContainer
+);
+
+impl<T: Clone> Clone for DynamicColorContainer<T> {
+    fn clone(&self) -> Self {
+        Self {
+            black: self.black.clone(),
+            white: self.white.clone(),
+        }
+    }
 }
-
-impl_color_container!(ColorContainer, Copy);
-impl_color_container_copy!(ColorContainer);
-impl_serialize!(ColorContainer, Copy);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[repr(C)]
-pub struct HeapColorContainer<T> {
-    pub black: T,
-    pub white: T,
-}
-
-impl_color_container!(HeapColorContainer, Clone);
-impl_serialize!(HeapColorContainer, Clone);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(align(64))]
-pub struct AlignedColorContainer<T: Copy> {
-    pub black: T,
-    pub white: T,
-}
-
-impl_color_container!(AlignedColorContainer, Copy);
-impl_color_container_copy!(AlignedColorContainer);
-impl_serialize!(AlignedColorContainer, Copy);

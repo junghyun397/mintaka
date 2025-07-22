@@ -53,7 +53,7 @@ impl Default for Config {
             max_vcf_depth: pos::BOARD_SIZE - 5,
             tt_size: ByteSize::from_mib(16),
             workers: NonZeroU32::new(1).unwrap(),
-            time_management: false,
+            time_management: true,
             repost_contents: ReportContents::default(),
         }
     }

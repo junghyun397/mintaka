@@ -1,7 +1,7 @@
 use rusty_renju::board::Board;
 use rusty_renju::board_iter::BoardIterItem;
 use rusty_renju::history::History;
-use rusty_renju::notation::color::{Color, HeapColorContainer};
+use rusty_renju::notation::color::{Color, DynamicColorContainer};
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, PixmapPaint, Stroke, Transform};
@@ -43,10 +43,10 @@ impl Default for ColorPalette {
 
 struct PixmapLut {
     background: Pixmap,
-    stone: HeapColorContainer<Pixmap>,
-    history: HeapColorContainer<[Pixmap; pos::BOARD_SIZE]>,
+    stone: DynamicColorContainer<Pixmap>,
+    history: DynamicColorContainer<[Pixmap; pos::BOARD_SIZE]>,
     forbidden_dot: Pixmap,
-    recent_move_marker: HeapColorContainer<[Pixmap; 2]>,
+    recent_move_marker: DynamicColorContainer<[Pixmap; 2]>,
 }
 
 pub enum ImageFormat {
@@ -157,11 +157,11 @@ impl ImageBoardRenderer {
         pixmap
     }
 
-    fn initialize_stone_lut(color_palette: &ColorPalette) -> HeapColorContainer<Pixmap> {
+    fn initialize_stone_lut(color_palette: &ColorPalette) -> DynamicColorContainer<Pixmap> {
         todo!()
     }
 
-    fn initialize_history_lut(color_palette: &ColorPalette) -> HeapColorContainer<[Pixmap; pos::BOARD_SIZE]> {
+    fn initialize_history_lut(color_palette: &ColorPalette) -> DynamicColorContainer<[Pixmap; pos::BOARD_SIZE]> {
         const HISTORY_FONT_SIZE: f32 = POINT_SIZE as f32 / 2.5;
 
         let acc = {
@@ -182,7 +182,7 @@ impl ImageBoardRenderer {
         todo!()
     }
 
-    fn initialize_recent_move_marker(color_palette: &ColorPalette) -> HeapColorContainer<[Pixmap; 2]> {
+    fn initialize_recent_move_marker(color_palette: &ColorPalette) -> DynamicColorContainer<[Pixmap; 2]> {
         const LATEST_MOVE_DOT_SIZE: f32 = POINT_SIZE as f32 / 5.0;
         const LATEST_MOVE_DOT_OFFSET: f32 = (POINT_SIZE as f32 - LATEST_MOVE_DOT_SIZE) / 2.0;
 

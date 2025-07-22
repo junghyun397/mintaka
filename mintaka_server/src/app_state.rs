@@ -142,7 +142,7 @@ impl AppState {
     pub async fn launch_session(
         &self,
         session_key: SessionKey,
-    ) -> Result<ComputingResource, AppError> {
+    ) -> Result<(), AppError> {
         let mut session = self.sessions.get_mut(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
@@ -154,7 +154,7 @@ impl AppState {
         let (result_tx, result_rx) = tokio::sync::oneshot::channel();
         let (session_response_sender, _) = session_stream_pair.value();
 
-        let computing_resource = session.launch(
+        session.launch(
             StreamSessionResponseSender::new(session_response_sender.clone()),
             result_tx,
             worker_permit
@@ -177,9 +177,9 @@ impl AppState {
             }
         });
 
-        info!("session launched: sid={session_key}, resource={}", json!(computing_resource));
+        info!("session launched: sid={session_key}");
 
-        Ok(computing_resource)
+        Ok(())
     }
 
     pub fn abort_session(&self, session_key: SessionKey) -> Result<(), AppError> {

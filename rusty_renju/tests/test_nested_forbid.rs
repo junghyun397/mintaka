@@ -47,7 +47,6 @@ mod test_nested_forbid {
         assert_eq!(case.to_string(), expected);
     }
 
-    #[cfg(feature = "strict_renju")]
     #[test]
     fn double_nested_double_three() {
         let case = board!(indoc! {"
@@ -131,7 +130,6 @@ mod test_nested_forbid {
         assert_eq!(case.to_string(), expected);
     }
 
-    #[cfg(feature = "strict_renju")]
     #[test]
     fn pseudo_double_nested_double_three() {
         let case = board!(indoc! {"
@@ -175,7 +173,6 @@ mod test_nested_forbid {
         assert_eq!(case.to_string(), expected);
     }
 
-    #[cfg(feature = "strict_renju")]
     #[test]
     fn multiple_nested_double_three() {
         let case = board!(indoc! {"

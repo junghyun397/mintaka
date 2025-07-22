@@ -255,7 +255,6 @@ impl Board {
         }
     }
 
-    #[cfg(not(feature = "strict_renju"))]
     fn is_invalid_three_component<C: ValidateThreeContext>(&self, context: C, direction: Direction, offset: isize) -> bool {
         const ANY_FOUR_OR_OVERLINE_MASK: u32 = pattern::UNIT_ANY_FOUR_MASK | pattern::UNIT_OVERLINE_MASK;
 
@@ -265,21 +264,7 @@ impl Board {
 
         !pattern.has_three() // non-three
             || pattern.apply_mask(ANY_FOUR_OR_OVERLINE_MASK) != 0 // double-four or overline
-            || pattern.count_open_threes() > 2 // maybe nested double-three
-    }
-
-    #[cfg(feature = "strict_renju")]
-    fn is_invalid_three_component<C: ValidateThreeContext>(&self, context: C, direction: Direction, offset: isize) -> bool {
-        const ANY_FOUR_OR_OVERLINE_MASK: u32 = pattern::UNIT_ANY_FOUR_MASK | pattern::UNIT_OVERLINE_MASK;
-
-        let pos = context.parent_pos().directional_offset_unchecked(direction, offset);
-
-        let pattern = self.patterns.field.black[pos.idx_usize()];
-
-        !pattern.has_three() // non-three
-            || pattern.apply_mask(ANY_FOUR_OR_OVERLINE_MASK) != 0 // double-four or overline
-            || context.four_contains(pos) // double-four
-            || context.set_contains(pos) // recursive
+            || context.override_contains(pos) // double-four and recursive
             || (pattern.count_open_threes() > 2 && { // nested double-three
                 let mut new_overrides = context.branch_overrides();
 
@@ -357,10 +342,8 @@ impl Board {
     }
 
     fn update_root_four_overrides(&self, overrides: &mut SetOverrides) {
-        let pos = overrides.set[0];
-
-        for direction in self.patterns.field.black[pos.idx_usize()].iter_three_directions() {
-            self.update_four_overrides_each_direction(overrides, direction, pos);
+        for direction in self.patterns.field.black[overrides.root.idx_usize()].iter_three_directions() {
+            self.update_four_overrides_each_direction(overrides, direction, overrides.root);
         }
     }
 
@@ -368,8 +351,7 @@ impl Board {
         for next_four_idx in (0 .. direction_from as usize * 3).chain((direction_from as usize + 1) * 3 .. 12) {
             let four_pos = overrides.next_four[next_four_idx];
             if four_pos != MaybePos::INVALID_POS {
-                overrides.four[overrides.four_top as usize] = four_pos;
-                overrides.four_top += 1;
+                overrides.bitfield.set_mut(four_pos);
             }
         }
 
@@ -383,8 +365,7 @@ impl Board {
             self.update_four_overrides_each_direction(overrides, direction, pos);
         }
 
-        overrides.set[overrides.set_top as usize] = pos;
-        overrides.set_top += 1;
+        overrides.bitfield.set_mut(pos);
     }
 
     fn update_four_overrides_each_direction(&self, overrides: &mut SetOverrides, direction: Direction, pos: Pos) {
@@ -483,9 +464,7 @@ trait ValidateThreeContext : Copy {
 
     fn branch_overrides(&self) -> SetOverrides;
 
-    fn set_contains(&self, pos: Pos) -> bool;
-
-    fn four_contains(&self, pos: Pos) -> bool;
+    fn override_contains(&self, pos: Pos) -> bool;
 
 }
 
@@ -509,11 +488,7 @@ impl ValidateThreeContext for ValidateThreeRoot {
         SetOverrides::new(self.root_pos)
     }
 
-    fn set_contains(&self, _pos: Pos) -> bool {
-        false
-    }
-
-    fn four_contains(&self, _pos: Pos) -> bool {
+    fn override_contains(&self, _pos: Pos) -> bool {
         false
     }
 }
@@ -541,41 +516,29 @@ impl ValidateThreeContext for ValidateThreeNode {
         self.overrides
     }
 
-    fn set_contains(&self, pos: Pos) -> bool {
-        self.overrides.set[..self.overrides.set_top as usize].contains(&pos)
-    }
-
-    fn four_contains(&self, pos: Pos) -> bool {
-        self.overrides.four[..self.overrides.four_top as usize].contains(&pos)
+    fn override_contains(&self, pos: Pos) -> bool {
+        self.overrides.bitfield.is_hot(pos)
     }
 }
 
 #[derive(Copy, Clone)]
-#[repr(align(8))]
 pub struct SetOverrides {
-    set: [Pos; 6],
-    set_top: u8,
-    four: [Pos; 20],
-    four_top: u8,
+    bitfield: Bitfield,
     next_four: [Pos; 12],
+    root: Pos,
 }
-
-assert_struct_sizes!(SetOverrides, size=40, align=8);
 
 impl SetOverrides {
 
     fn new(root: Pos) -> Self {
+        let mut bitfield = Bitfield::default();
+
+        bitfield.set_mut(root);
+
         Self {
-            set: {
-                const SET: [Pos; 6] = [MaybePos::INVALID_POS; 6];
-                let mut set = SET;
-                set[0] = root;
-                set
-            },
-            set_top: 1,
-            four: [MaybePos::INVALID_POS; 20],
-            four_top: 0,
+            bitfield,
             next_four: [MaybePos::INVALID_POS; 12],
+            root,
         }
     }
 

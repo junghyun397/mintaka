@@ -73,9 +73,7 @@ fn main() -> Result<(), GameError> {
 
                 launched.store(true, Ordering::Relaxed);
 
-                let resource = game_agent.next_computing_resource();
-
-                let best_move = game_agent.launch(resource, response_sender.clone(), aborted.clone());
+                let best_move = game_agent.launch(response_sender.clone(), aborted.clone());
 
                 launched.store(false, Ordering::Relaxed);
 
@@ -85,7 +83,6 @@ fn main() -> Result<(), GameError> {
                 );
 
                 game_agent.command(&message_sender, Command::Play(best_move.pos))?;
-                game_agent.command(&message_sender, Command::ConsumeTime(best_move.time_elapsed))?;
             },
         }
     }
