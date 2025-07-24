@@ -136,21 +136,6 @@ impl History {
 
 }
 
-#[macro_export] macro_rules! history {
-    ($($move_str:expr),+ $(,)?) => {{
-        use std::str::FromStr;
-
-        let mut history = $crate::history::History::default();
-
-        $(history.set_mut($crate::notation::pos::Pos::from_str($move_str).unwrap());)*
-
-        history
-    }};
-    () => {
-        $crate::history::History::default()
-    };
-}
-
 impl Display for History {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let history = self.iter()

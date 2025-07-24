@@ -40,10 +40,10 @@ impl GameState {
 }
 
 impl From<History> for GameState {
-    fn from(value: History) -> Self {
+    fn from(history: History) -> Self {
         let mut game_state = GameState::default();
 
-        for &maybe_pos in value.iter() {
+        for &maybe_pos in history.iter() {
             match maybe_pos {
                 MaybePos::NONE => game_state.pass_mut(),
                 pos => game_state.set_mut(pos.unwrap()),
@@ -51,6 +51,19 @@ impl From<History> for GameState {
         }
 
         game_state
+    }
+}
+
+impl From<Board> for GameState {
+    fn from(board: Board) -> Self {
+        let history = History::try_from(&board).unwrap();
+
+        GameState {
+            movegen_window: MovegenWindow::from(&board.hot_field),
+            move_scores: MoveScores::from(&board.hot_field),
+            board,
+            history,
+        }
     }
 }
 

@@ -7,7 +7,6 @@ use axum::response::{sse, IntoResponse, Sse};
 use axum::Json;
 use futures_util::Stream;
 use mintaka::config::Config;
-use mintaka::game_agent::GameError;
 use mintaka::protocol::command::Command;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
@@ -33,13 +32,7 @@ impl IntoResponse for AppError {
             AppError::SessionNeverLaunched => (StatusCode::NO_CONTENT, "session never launched".to_string()),
             AppError::SessionFileAlreadyExists => (StatusCode::CONFLICT, "internal session data already exists".to_string()),
             AppError::SessionFileNotFound => (StatusCode::NOT_FOUND, "internal session data does not exist".to_string()),
-            AppError::GameError(game_error) => match game_error {
-                GameError::StoneAlreadyExist => (StatusCode::CONFLICT, "stone already exist".to_string()),
-                GameError::StoneDoesNotExist => (StatusCode::CONFLICT, "stone does not exist".to_string()),
-                GameError::StoneColorMismatch => (StatusCode::CONFLICT, "stone color mismatch".to_string()),
-                GameError::ForbiddenMove => (StatusCode::CONFLICT, "forbidden move".to_string()),
-                GameError::NoHistoryToUndo => (StatusCode::CONFLICT, "no history to undo".to_string()),
-            },
+            AppError::GameError(game_error) => (StatusCode::CONFLICT, game_error.to_string()),
             AppError::InternalError(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
         }.into_response()
     }

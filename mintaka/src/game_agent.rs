@@ -43,6 +43,7 @@ pub enum GameError {
     StoneColorMismatch,
     ForbiddenMove,
     NoHistoryToUndo,
+    NoTimeManagement,
 }
 
 impl Display for GameError {
@@ -53,6 +54,7 @@ impl Display for GameError {
             GameError::StoneColorMismatch => write!(f, "stone color mismatch"),
             GameError::ForbiddenMove => write!(f, "forbidden move"),
             GameError::NoHistoryToUndo => write!(f, "no history to undo"),
+            GameError::NoTimeManagement => write!(f, "no time management"),
         }
     }
 }
@@ -62,7 +64,7 @@ impl std::error::Error for GameError {}
 #[derive(Default, Serialize, Deserialize)]
 pub struct TimeManagement {
     time_manager: TimeManager,
-    time_history: Vec<Duration>,
+    time_history: Vec<(MaybePos, Duration)>,
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
@@ -175,6 +177,18 @@ impl GameAgent {
                             self.state.board.unset_mut(pos);
                             self.state.board.switch_player_mut();
                         }
+
+                        if let Some(time_management) = &mut self.time_management
+                            && let Some((index, time)) = time_management.time_history.iter()
+                                .enumerate()
+                                .find_map(|(index, (action, time))|
+                                    (action == &pos.into()).then_some((index, *time))
+                                )
+                        {
+                            time_management.time_history.remove(index);
+                            time_management.time_manager.append_mut(time);
+                        }
+
                     },
                     Some(_) => return Err(GameError::StoneColorMismatch),
                     None => return Err(GameError::StoneDoesNotExist),
@@ -196,8 +210,11 @@ impl GameAgent {
                         if self.executed_moves.is_hot_idx(self.state.history.len()) {
                             self.executed_moves.unset_idx_mut(self.state.history.len());
 
-                            if let Some(time_management) = &mut self.time_management {
-                                time_management.time_manager.append_mut(time_management.time_history.pop().unwrap());
+                            if let Some(time_management) = &mut self.time_management
+                                && let Some((pos, time)) = time_management.time_history.pop()
+                                && pos == action
+                            {
+                                time_management.time_manager.append_mut(time);
                             }
                         }
                     }
@@ -241,24 +258,32 @@ impl GameAgent {
                 );
             }
             Command::TurnTime(time) => {
-                if let Some(time_management) = &mut self.time_management {
-                    time_management.time_manager.turn = time;
-                }
+                let Some(time_management) = &mut self.time_management else {
+                    return Err(GameError::NoTimeManagement);
+                };
+
+                time_management.time_manager.turn = time;
             },
             Command::IncrementTime(time) => {
-                if let Some(time_management) = &mut self.time_management {
-                    time_management.time_manager.increment = time;
-                }
+                let Some(time_management) = &mut self.time_management else {
+                    return Err(GameError::NoTimeManagement);
+                };
+
+                time_management.time_manager.increment = time;
             },
             Command::TotalTime(time) => {
-                if let Some(time_management) = &mut self.time_management {
-                    time_management.time_manager.total_remaining = time;
-                }
+                let Some(time_management) = &mut self.time_management else {
+                    return Err(GameError::NoTimeManagement);
+                };
+
+                time_management.time_manager.total_remaining = time;
             },
             Command::ConsumeTime(time) => {
-                if let Some(time_management) = &mut self.time_management {
-                    time_management.time_manager.consume_mut(time);
-                }
+                let Some(time_management) = &mut self.time_management else {
+                    return Err(GameError::NoTimeManagement);
+                };
+
+                time_management.time_manager.consume_mut(time);
             }
             Command::MaxNodes { in_1k } => {
                 self.config.max_nodes_in_1k = in_1k;
@@ -363,7 +388,7 @@ impl GameAgent {
 
         if let Some(time_management) = &mut self.time_management {
             time_management.time_manager.consume_mut(time_elapsed);
-            time_management.time_history.push(time_elapsed);
+            time_management.time_history.push((main_td.best_move, time_elapsed));
         }
 
         BestMove {

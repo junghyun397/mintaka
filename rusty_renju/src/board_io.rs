@@ -10,7 +10,6 @@ use crate::pattern::Pattern;
 use crate::slice::Slice;
 use crate::utils::str_utils::join_str_horizontally;
 use regex_lite::Regex;
-use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -271,9 +270,6 @@ impl Display for Slice {
         use std::str::FromStr;
 
         $crate::board::Board::from_str($board_str).unwrap()
-    }};
-    ($($move_str:expr),+ $(,)?) => {{
-        $crate::board::Board::from($crate::history!($($move_str),+))
     }};
     () => {
         $crate::board::Board::default()

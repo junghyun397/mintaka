@@ -1,15 +1,13 @@
 use crate::bitfield::Bitfield;
 use crate::memo::hash_key::HashKey;
-use crate::notation::color::{Color, ColorContainer};
+use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::RuleKind;
 use crate::pattern;
 use crate::pattern::Patterns;
 use crate::slice::Slices;
-use crate::{assert_struct_sizes, slice_pattern};
-use serde::ser::SerializeStruct;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use crate::slice_pattern;
 use std::marker::ConstParamTy;
 
 #[derive(Copy, Clone, Default)]
@@ -264,7 +262,7 @@ impl Board {
 
         !pattern.has_three() // non-three
             || pattern.apply_mask(ANY_FOUR_OR_OVERLINE_MASK) != 0 // double-four or overline
-            || context.override_contains(pos) // double-four and recursive
+            || context.override_contains(pos) // double-four or recursive
             || (pattern.count_open_threes() > 2 && { // nested double-three
                 let mut new_overrides = context.branch_overrides();
 

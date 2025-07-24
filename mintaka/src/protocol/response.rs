@@ -1,7 +1,6 @@
 use crate::game_agent::ComputingResource;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::message;
-use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::value::Score;
 use serde::{Deserialize, Serialize};
 use std::sync::mpsc;
@@ -10,12 +9,12 @@ use std::sync::mpsc;
 pub enum Response {
     Begins(ComputingResource),
     Status {
-        eval: f32,
+        pv: PrincipalVariation,
+        score: Score,
         total_nodes_in_1k: usize,
-        best_moves: Vec<(Pos, Score)>,
+        depth: usize,
         hash_usage: f32,
     },
-    Pv(PrincipalVariation),
     Finished,
 }
 

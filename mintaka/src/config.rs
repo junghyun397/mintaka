@@ -3,6 +3,7 @@ use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroU32;
+use std::time::Duration;
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SearchObjective {
@@ -13,12 +14,14 @@ pub enum SearchObjective {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ReportContents {
+    pub duration: Duration,
     pub main_pv: bool,
 }
 
 impl Default for ReportContents {
     fn default() -> Self {
         ReportContents {
+            duration: Duration::from_secs(1),
             main_pv: true,
         }
     }
@@ -39,7 +42,8 @@ pub struct Config {
     pub workers: NonZeroU32,
 
     pub time_management: bool,
-    pub repost_contents: ReportContents,
+
+    pub repost_contents: Option<ReportContents>,
 }
 
 impl Default for Config {
@@ -54,7 +58,7 @@ impl Default for Config {
             tt_size: ByteSize::from_mib(16),
             workers: NonZeroU32::new(1).unwrap(),
             time_management: true,
-            repost_contents: ReportContents::default(),
+            repost_contents: Some(ReportContents::default()),
         }
     }
 }

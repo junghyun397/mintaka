@@ -149,15 +149,17 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         }
     }
 
-    if TH::IS_MAIN
-        && td.should_check_limit()
-        && td.search_limit_exceeded()
-    {
-        td.set_aborted_mut();
-        return Score::DRAW;
+    if TH::IS_MAIN {
+        if td.should_check_limit()
+            && td.search_limit_exceeded()
+        {
+            td.set_aborted_mut();
+            return Score::DRAW;
+        }
     } else if td.is_aborted() {
         return Score::DRAW;
     }
+
 
     // clear pv-line
     td.pvs[td.ply].clear();

@@ -323,7 +323,7 @@ impl Patterns {
             self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(slice_patterns[slice_idx]);
 
             if C == Color::Black && self.field.black[idx].is_forbidden_ignoring_marker() {
-                self.forbidden_field.set_mut(Pos::from_index(idx as u8));
+                self.forbidden_field.set_idx_mut(idx);
             }
         }
 
