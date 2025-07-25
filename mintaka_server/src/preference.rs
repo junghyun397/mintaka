@@ -53,12 +53,12 @@ impl Preference {
     pub fn parse() -> Self {
         let mut pref = Self::parse_from(std::env::args());
 
-        pref.post_parse();
+        pref.init();
 
         pref
     }
 
-    fn post_parse(&mut self) {
+    fn init(&mut self) {
         if let Some(limit_mib) = self.memory_limit_mib {
             self.memory_limit = Some(ByteSize::from_mib(limit_mib));
         }

@@ -11,8 +11,6 @@ use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::utils::time_manager::TimeManager;
 use rusty_renju::bitfield::Bitfield;
-use rusty_renju::board::Board;
-use rusty_renju::history::History;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
@@ -61,10 +59,19 @@ impl Display for GameError {
 
 impl std::error::Error for GameError {}
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct TimeManagement {
     time_manager: TimeManager,
     time_history: Vec<(MaybePos, Duration)>,
+}
+
+impl From<TimeManager> for TimeManagement {
+    fn from(time_manager: TimeManager) -> Self {
+        Self {
+            time_manager,
+            time_history: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
@@ -72,7 +79,7 @@ pub struct ComputingResource {
     pub workers: u32,
     pub tt_size: ByteSize,
     pub time: Option<Duration>,
-    pub nodes_in_1k: usize,
+    pub nodes_in_1k: Option<usize>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -88,33 +95,17 @@ pub struct GameAgent {
 impl GameAgent {
 
     pub fn new(config: Config) -> Self {
-        let tt = TranspositionTable::new_with_size(config.tt_size);
-
-        Self {
-            state: GameState::default(),
-            config,
-            executed_moves: Bitfield::default(),
-            time_management: config.time_management.then(TimeManagement::default),
-            tt,
-            ht: HistoryTable {},
-        }
+        Self::from_state(config, GameState::default())
     }
 
-    pub fn from_state(config: Config, board: Board, history: History) -> Self {
-        let state = GameState {
-            board,
-            history,
-            movegen_window: (&board.hot_field).into(),
-            move_scores: (&board.hot_field).into(),
-        };
-
+    pub fn from_state(config: Config, state: GameState) -> Self {
         let tt = TranspositionTable::new_with_size(config.tt_size);
 
         Self {
             state,
             config,
             executed_moves: Bitfield::default(),
-            time_management: config.time_management.then(TimeManagement::default),
+            time_management: config.initial_time_manager.map(TimeManagement::from),
             tt,
             ht: HistoryTable {},
         }
@@ -144,9 +135,7 @@ impl GameAgent {
                     None => {
                         if self.state.board.stones == pos::U8_BOARD_SIZE {
                             message_sender.message(Message::Finished(message::GameResult::Full));
-                        } else if self.config.draw_condition.is_some_and(|draw_in|
-                            draw_in >= self.state.history.len()
-                        ) {
+                        } else if self.state.history.len() >= self.config.draw_condition {
                             message_sender.message(Message::Finished(message::GameResult::Draw));
                         }
                     }
@@ -234,6 +223,7 @@ impl GameAgent {
                 };
 
                 self.tt.clear_mut(self.config.workers.into());
+                self.executed_moves = Bitfield::default();
             },
             Command::BatchSet { player_moves, opponent_moves } => {
                 let (black_stones, white_stones) =
@@ -286,7 +276,7 @@ impl GameAgent {
                 time_management.time_manager.consume_mut(time);
             }
             Command::MaxNodes { in_1k } => {
-                self.config.max_nodes_in_1k = in_1k;
+                self.config.max_nodes_in_1k = Some(in_1k);
             },
             Command::Workers(workers) => {
                 self.config.workers = workers;

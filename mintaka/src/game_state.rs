@@ -86,14 +86,11 @@ impl<'de> Deserialize<'de> for GameState {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
         let data = GameStateData::deserialize(deserializer)?;
 
-        let movegen_window = MovegenWindow::from(&data.board.hot_field);
-        let move_scores = MoveScores::from(&data.board.hot_field);
-
         Ok(GameState {
+            movegen_window: MovegenWindow::from(&data.board.hot_field),
+            move_scores: MoveScores::from(&data.board.hot_field),
             board: data.board,
             history: data.history,
-            movegen_window,
-            move_scores,
         })
     }
 }

@@ -70,7 +70,9 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
     pub fn search_limit_exceeded(&self) -> bool {
         TH::IS_MAIN && (
             self.thread_type.time_exceeded()
-                || self.batch_counter.count_global_in_1k() >= self.config.max_nodes_in_1k
+                || self.config.max_nodes_in_1k.is_some_and(|in_1k|
+                    self.batch_counter.count_global_in_1k() >= in_1k
+                )
         )
     }
 

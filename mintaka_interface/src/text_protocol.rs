@@ -1,8 +1,10 @@
 use mintaka::config::Config;
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
+use mintaka::game_state::GameState;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::message::{CommandSender, Message, MessageSender, StatusCommand};
-use mintaka::protocol::response::{MpscResponseSender, Response};
+use mintaka::protocol::response::{CallBackResponseSender, Response};
+use mintaka_interface::preference::{Mode, Preference};
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::notation::color::UnknownColorError;
@@ -14,14 +16,23 @@ use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
 fn main() -> Result<(), GameError> {
+    let pref = Preference::parse();
+
+    match pref.mode {
+        Mode::TextProtocol => text_protocol(),
+        Mode::SelfPlay => self_play(pref.default_config, pref.game_state.unwrap()),
+    }
+}
+
+fn text_protocol() -> Result<(), GameError> {
     let launched = Arc::new(AtomicBool::new(false));
     let aborted = Arc::new(AtomicBool::new(false));
 
     let mut game_agent = GameAgent::new(Config::default());
 
     let (command_sender, message_sender, message_receiver) = {
-        let (message_sender, message_receiver) = mpsc::channel();
-        (CommandSender::new(message_sender.clone()), MessageSender::new(message_sender), message_receiver)
+        let (tx, rx) = mpsc::channel();
+        (CommandSender::new(tx.clone()), MessageSender::new(tx), rx)
     };
 
     spawn_command_listener(launched.clone(), aborted.clone(), command_sender);
@@ -47,33 +58,9 @@ fn main() -> Result<(), GameError> {
                 println!("finished: {result}")
             }
             Message::Launch => {
-                let (response_sender, response_receiver) = {
-                    let (response_sender, response_receiver) = mpsc::channel();
-                    (MpscResponseSender::new(response_sender), response_receiver)
-                };
-
-                std::thread::spawn(move || {
-                    for response in response_receiver {
-                        match response {
-                            Response::Begins(ComputingResource { workers, time, nodes_in_1k, tt_size }) =>
-                                println!("begins: workers={workers}, running-time={time:?}, nodes={nodes_in_1k}, tt-size={tt_size}"),
-                            Response::Status { eval, total_nodes_in_1k, best_moves, hash_usage } =>
-                                println!(
-                                    "status: eval={eval}, \
-                                    total_nodes_in_1k={total_nodes_in_1k}, \
-                                    best_moves={best_moves:?}, \
-                                    hash_usage={hash_usage}"
-                                ),
-                            Response::Pv(pvs) =>
-                                println!("pvs={pvs:?}"),
-                            Response::Finished => break
-                        }
-                    }
-                });
-
                 launched.store(true, Ordering::Relaxed);
 
-                let best_move = game_agent.launch(response_sender.clone(), aborted.clone());
+                let best_move = game_agent.launch(CallBackResponseSender::new(response_printer), aborted.clone());
 
                 launched.store(false, Ordering::Relaxed);
 
@@ -88,6 +75,23 @@ fn main() -> Result<(), GameError> {
     }
 
     Ok(())
+}
+
+fn response_printer(response: Response) {
+    match response {
+        Response::Begins(ComputingResource { workers, time, nodes_in_1k, tt_size }) =>
+            println!("begins: workers={workers}, running-time={time:?}, nodes={nodes_in_1k:?}, tt-size={tt_size}"),
+        Response::Status { score, pv, total_nodes_in_1k, depth, hash_usage, .. } =>
+            println!(
+                "status: score={score}, \
+                pv={pv:?}, \
+                total_nodes_in_1k={total_nodes_in_1k}, \
+                depth={depth}, \
+                hash_usage={hash_usage}"
+            ),
+        _ => {}
+    }
+
 }
 
 fn spawn_command_listener(launched: Arc<AtomicBool>, abort: Arc<AtomicBool>, command_sender: CommandSender) {
@@ -286,6 +290,46 @@ fn handle_command(
             &_ => return Err("unknown command.".to_string()),
         }
     }
+
+    Ok(())
+}
+
+fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
+    let aborted = Arc::new(AtomicBool::new(false));
+
+    let (command_sender, message_sender, message_receiver) = {
+        let (tx, rx) = mpsc::channel();
+        (CommandSender::new(tx.clone()), MessageSender::new(tx), rx)
+    };
+
+    let mut game_agent = GameAgent::from_state(config, game_state);
+
+    command_sender.launch();
+
+    let mut game_result = None;
+    for message in message_receiver {
+        match message {
+            Message::Launch => {
+                let best_move = game_agent.launch(CallBackResponseSender::new(response_printer), aborted.clone());
+
+                println!(
+                    "solution: pos={}, score={}, nodes={}k, elapsed={:?}",
+                    best_move.pos, best_move.score, best_move.total_nodes_in_1k, best_move.time_elapsed
+                );
+
+                game_agent.command(&message_sender, Command::Play(best_move.pos))?;
+
+                command_sender.launch();
+            },
+            Message::Finished(result) => {
+                game_result = Some(result);
+                break;
+            },
+            _ => {}
+        }
+    }
+
+    println!("{}", game_result.unwrap());
 
     Ok(())
 }

@@ -2,6 +2,9 @@ use crate::app_state::{AppError, WorkerPermit};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use mintaka::config::Config;
 use mintaka::game_agent::{BestMove, GameAgent};
+use mintaka::game_state::GameState;
+use mintaka::movegen::move_scores::MoveScores;
+use mintaka::movegen::movegen_window::MovegenWindow;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::message::{GameResult, Message, MessageSender};
 use mintaka::protocol::response::{Response, ResponseSender};
@@ -94,8 +97,15 @@ pub struct Session {
 impl Session {
 
     pub fn new(config: Config, board: Board, history: History, time_to_live: Option<Duration>) -> Self {
+        let game_state = GameState {
+            movegen_window: MovegenWindow::from(&board.hot_field),
+            move_scores: MoveScores::from(&board.hot_field),
+            board,
+            history,
+        };
+
         Self {
-            state: AgentState::Agent(GameAgent::from_state(config, board, history)),
+            state: AgentState::Agent(GameAgent::from_state(config, game_state)),
             best_move: None,
             abort_handle: Arc::new(AtomicBool::new(false)),
             time_to_live,

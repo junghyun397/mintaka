@@ -8,7 +8,6 @@ use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use crate::value::{ASPIRATION_INITIAL_DELTA, MAX_PLY};
 use rusty_renju::notation::color::Color;
-use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::value::{Score, Scores};
@@ -103,11 +102,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     mut alpha: Score,
     mut beta: Score,
 ) -> Score {
-    if td.config.draw_condition.is_some_and(|depth|
-        state.history.len() + 1 >= depth
-    )
-        || state.board.stones == pos::U8_BOARD_SIZE
-    {
+    if state.board.stones as usize >= td.config.draw_condition {
         return Score::DRAW;
     }
 

@@ -2,7 +2,7 @@ use crate::value::MAX_PLY;
 use rusty_renju::impl_debug_from_display;
 use rusty_renju::notation::pos::MaybePos;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Display, Formatter};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct PrincipalVariation {

@@ -2,7 +2,7 @@ use mintaka::config::Config;
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::message::{CommandSender, Message, MessageSender};
-use mintaka::protocol::response::{MpscResponseSender, Response};
+use mintaka::protocol::response::{CallBackResponseSender, Response};
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
@@ -46,8 +46,8 @@ fn main() -> Result<(), impl Error> {
     let mut game_agent = GameAgent::new(Config::default());
 
     let (command_sender, message_sender, message_receiver) = {
-        let (message_sender, message_receiver) = mpsc::channel();
-        (CommandSender::new(message_sender.clone()), MessageSender::new(message_sender), message_receiver)
+        let (tx, rx) = mpsc::channel();
+        (CommandSender::new(tx.clone()), MessageSender::new(tx), rx)
     };
 
     spawn_command_listener(launched.clone(), aborted.clone(), command_sender);
@@ -58,37 +58,9 @@ fn main() -> Result<(), impl Error> {
                 game_agent.command(&message_sender, command)?;
             },
             Message::Launch => {
-                let (response_sender, response_receiver) = {
-                    let (response_sender, response_receiver) = mpsc::channel();
-                    (MpscResponseSender::new(response_sender), response_receiver)
-                };
-
-                std::thread::spawn(move || {
-                    for response in response_receiver {
-                        let piskvork_response = match response {
-                            Response::Begins(ComputingResource { workers, time, nodes_in_1k, tt_size }) =>
-                                PiskvorkResponse::Info(format!(
-                                    "begins: workers={workers}, running-time={time:?}, nodes={nodes_in_1k}k, tt-size={tt_size}"
-                                )),
-                            Response::Status { eval, total_nodes_in_1k, hash_usage, best_moves } =>
-                                PiskvorkResponse::Info(format!(
-                                    "status eval={eval} \
-                                    total-nodes={total_nodes_in_1k}K, \
-                                    hash-usage={hash_usage}, \
-                                    best-moves={best_moves:?}"
-                                )),
-                            Response::Pv(pvs) =>
-                                PiskvorkResponse::Info(format!("pvs={pvs:?}")),
-                            Response::Finished => break,
-                        };
-
-                        stdio_out(piskvork_response);
-                    }
-                });
-
                 launched.store(true, Ordering::Relaxed);
 
-                let best_move = game_agent.launch(response_sender, aborted.clone());
+                let best_move = game_agent.launch(CallBackResponseSender::new(response_receiver), aborted.clone());
 
                 game_agent.command(&message_sender, Command::Play(best_move.pos))?;
 
@@ -120,6 +92,26 @@ fn spawn_command_listener(launched: Arc<AtomicBool>, aborted: Arc<AtomicBool>, c
             stdio_out(piskvork_response);
         }
     });
+}
+
+fn response_receiver(response: Response) {
+    let piskvork_response = match response {
+        Response::Begins(ComputingResource { workers, time, nodes_in_1k, tt_size }) =>
+            PiskvorkResponse::Info(format!(
+                "begins: workers={workers}, running-time={time:?}, nodes={nodes_in_1k}k, tt-size={tt_size}"
+            )),
+        Response::Status { score, pv, total_nodes_in_1k, depth, hash_usage } =>
+            PiskvorkResponse::Info(format!(
+                "status score={score}, \
+                pv={pv:?}, \
+                total_nodes_in_1k={total_nodes_in_1k}, \
+                depth={depth}, \
+                hash_usage={hash_usage}"
+            )),
+        Response::Finished => return
+    };
+
+    stdio_out(piskvork_response);
 }
 
 // https://plastovicka.github.io/protocl2en.htm

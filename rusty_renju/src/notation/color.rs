@@ -1,5 +1,4 @@
 use crate::board_io::{SYMBOL_BLACK, SYMBOL_WHITE};
-use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::marker::ConstParamTy;
