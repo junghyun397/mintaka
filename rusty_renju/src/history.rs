@@ -6,6 +6,7 @@ use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
+use std::iter;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 
@@ -64,6 +65,8 @@ impl History {
     }
 
     pub fn action_mut(&mut self, action: MaybePos) {
+        assert!(self.top < pos::BOARD_SIZE);
+
         self.entries[self.top] = action;
         self.top += 1;
     }
@@ -83,51 +86,41 @@ impl History {
     pub fn recent_move_pair(&self) -> [Option<MaybePos>; 2] {
         match self.len() {
             0 => [None, None],
-            1 => [Some(self.entries[1]), None],
+            1 => [None, Some(self.entries[0])],
             _ => [Some(self.entries[self.len() - 2]), Some(self.entries[self.len() - 1])]
         }
     }
 
-    pub fn recent_move_unchecked(&self) -> Pos {
+    pub fn recent_move(&self) -> MaybePos {
         debug_assert_ne!(self.top, 0);
-        self.entries[self.top].unwrap()
+        self.entries[self.top]
     }
 
-    pub fn recent_opponent_move_unchecked(&self) -> Pos {
-        debug_assert!(self.top > 0);
-        self.entries[self.top - 1].unwrap()
-    }
-
-    pub fn recent_player_move_unchecked(&self) -> Pos {
+    pub fn recent_player_move(&self) -> MaybePos {
         debug_assert!(self.top > 1);
-        self.entries[self.top - 2].unwrap()
-    }
-
-    pub fn recent_move_pair_unchecked(&self) -> [Pos; 2] {
-        debug_assert!(self.top > 0);
-        [self.recent_player_move_unchecked(), self.recent_opponent_move_unchecked()]
+        self.entries[self.top - 2]
     }
 
     pub fn avg_distance_to_recent_moves(&self, pos: Pos) -> u8 {
         if self.top > 3 {
-            let distance1 = self.entries[self.top - 4].unwrap().distance(pos);
-            let distance2 = self.entries[self.top - 3].unwrap().distance(pos);
-            let distance3 = self.entries[self.top - 2].unwrap().distance(pos);
-            let distance4 = self.entries[self.top - 1].unwrap().distance(pos);
+            let distance1 = self.entries[self.top - 4].distance_or(pos, 0);
+            let distance2 = self.entries[self.top - 3].distance_or(pos, 0);
+            let distance3 = self.entries[self.top - 2].distance_or(pos, 0);
+            let distance4 = self.entries[self.top - 1].distance_or(pos, 0);
             return (distance1 + distance2 + distance3 + distance4) / 4
         }
 
         match self.top {
-            1 => self.entries[0].unwrap().distance(pos),
+            1 => self.entries[0].distance_or(pos, 0),
             2 => {
-                let distance1 = self.entries[self.top - 2].unwrap().distance(pos);
-                let distance2 = self.entries[self.top - 1].unwrap().distance(pos);
+                let distance1 = self.entries[self.top - 2].distance_or(pos, 0);
+                let distance2 = self.entries[self.top - 1].distance_or(pos, 0);
                 (distance1 + distance2) / 2
             },
             3 => {
-                let distance1 = self.entries[self.top - 3].unwrap().distance(pos);
-                let distance2 = self.entries[self.top - 2].unwrap().distance(pos);
-                let distance3 = self.entries[self.top - 1].unwrap().distance(pos);
+                let distance1 = self.entries[self.top - 3].distance_or(pos, 0);
+                let distance2 = self.entries[self.top - 2].distance_or(pos, 0);
+                let distance3 = self.entries[self.top - 1].distance_or(pos, 0);
                 (distance1 + distance2 + distance3) / 3
             },
             _ => 0
@@ -220,28 +213,29 @@ impl TryFrom<&Board> for History {
         let mut black_history = vec![];
         let mut white_history = vec![];
 
-        for distance_from_center in 0 .. pos::CENTER_ROW_COL {
-            let begin_idx = pos::CENTER_ROW_COL - distance_from_center;
-            let end_idx = pos::CENTER_ROW_COL + distance_from_center;
+        for pos in (1 .. pos::CENTER_ROW_COL).rev()
+            .flat_map(|distance_from_center| {
+                let begin_idx = pos::CENTER_ROW_COL - distance_from_center;
+                let end_idx = pos::CENTER_ROW_COL + distance_from_center;
 
-            for pos in
-                (0 .. distance_from_center * 2 + 1) // horizontal-up
-                    .map(|offset| Pos::from_cartesian(begin_idx, begin_idx + offset))
+                (0 .. distance_from_center * 2 + 1) // horizontal-down
+                    .map(move |offset| Pos::from_cartesian(begin_idx, begin_idx + offset))
                     .chain((0 .. distance_from_center * 2 + 1)
-                        .map(|offset| Pos::from_cartesian(end_idx, begin_idx + offset))
-                    ) // horizontal-down
+                        .map(move |offset| Pos::from_cartesian(end_idx, begin_idx + offset))
+                    ) // horizontal-up
                     .chain((0 .. (distance_from_center * 2 + 1).saturating_sub(2))
-                        .map(|offset| Pos::from_cartesian(begin_idx + 1 + offset, begin_idx))
+                        .map(move |offset| Pos::from_cartesian(begin_idx + 1 + offset, begin_idx))
                     ) // vertical-left
                     .chain((0 .. (distance_from_center * 2 + 1).saturating_sub(2))
-                        .map(|offset| Pos::from_cartesian(begin_idx + 1 + offset, end_idx))
+                        .map(move |offset| Pos::from_cartesian(begin_idx + 1 + offset, end_idx))
                     ) // vertical-right
-            {
-                match value.stone_kind(pos) {
-                    Some(Color::Black) => black_history.push(pos),
-                    Some(Color::White) => white_history.push(pos),
-                    _ => {}
-                }
+            })
+            .chain(iter::once(pos::CENTER))
+        {
+            match value.stone_kind(pos) {
+                Some(Color::Black) => black_history.push(pos),
+                Some(Color::White) => white_history.push(pos),
+                _ => {},
             }
         }
 

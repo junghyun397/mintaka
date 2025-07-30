@@ -64,7 +64,7 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
     }
 
     pub fn should_check_limit(&self) -> bool {
-        self.batch_counter.count_local_total().is_multiple_of(1024)
+        self.batch_counter.buffer_zero()
     }
 
     pub fn search_limit_exceeded(&self) -> bool {

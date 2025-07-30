@@ -23,6 +23,10 @@ impl PrincipalVariation {
         self.line[0]
     }
 
+    pub fn last(&self) -> MaybePos {
+        self.line[self.top - 1]
+    }
+
     pub fn clear(&mut self) {
         self.top = 0;
     }

@@ -80,6 +80,8 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
             return score;
         }
 
+        td.best_move = td.pvs[0].head();
+
         if score <= alpha { // fail-low
             beta = ((alpha as i32 + beta as i32) / 2) as Score;
             alpha = (alpha - delta).max(-Score::INF);
@@ -109,6 +111,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
         .access(state.board.player_color)
     { // immediate win
+        if NT::IS_ROOT {
+            td.best_move = pos.into();
+        }
+
         return Score::win_in(td.ply + 1)
     }
 
@@ -128,15 +134,12 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         let score = -pvs::<R, NT::NextType, TH>(td, state, depth_left, -beta, -alpha);
 
         state.unset_mut(movegen_window);
+        td.pop_ply_mut();
 
         return score;
     }
 
     if !NT::IS_ROOT {
-        if td.ply >= MAX_PLY {
-            return HeuristicEvaluator.eval_value(&state.board);
-        }
-
         alpha = alpha.max(Score::lose_in(td.ply));
         beta = beta.min(Score::win_in(td.ply));
         if alpha >= beta { // mate distance pruning
@@ -151,10 +154,11 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             td.set_aborted_mut();
             return Score::DRAW;
         }
-    } else if td.is_aborted() {
-        return Score::DRAW;
     }
 
+    if td.is_aborted() {
+        return Score::DRAW;
+    }
 
     // clear pv-line
     td.pvs[td.ply].clear();
@@ -164,7 +168,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     let mut tt_pv: bool;
     let mut tt_endgame_flag: EndgameFlag;
 
-    if let Some(entry) = td.tt.probe(state.board.hash_key) {
+    if let Some(entry) = td.tt.probe(state.board.hash_key) && false { // todo: debug
         tt_endgame_flag = entry.tt_flag.endgame_flag();
         if tt_endgame_flag == EndgameFlag::Win || tt_endgame_flag == EndgameFlag::Lose
         { // endgame tt-hit
@@ -180,7 +184,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             ScoreKind::UpperBound => entry.score <= alpha,
             ScoreKind::Exact => true,
         } {
-            // return entry.score; // todo: debug
+            return entry.score;
         }
 
         static_eval = entry.score;
@@ -191,7 +195,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         tt_pv = false;
     }
 
-    if depth_left == 0 {
+    if td.ply + 1 >= MAX_PLY || depth_left == 0 {
         return vcf_search(td, td.config.max_vcf_depth, state, alpha, beta)
             .unwrap_or(static_eval);
     }
@@ -201,7 +205,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     let mut best_score = -Score::INF;
     let mut best_move = MaybePos::NONE;
 
-    // td.killers[td.ply] = [MaybePos::NONE; 2]; // todo: debug
+    td.killers[td.ply] = [MaybePos::NONE; 2]; // todo: debug
     let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
 
     td.push_ply_mut();
@@ -258,12 +262,6 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         }
     }
 
-    td.ss[td.ply].best_move = best_move;
-
-    if NT::IS_ROOT {
-        td.best_move = best_move;
-    }
-
     td.pop_ply_mut();
 
     let score_kind = if best_score >= beta {
@@ -284,6 +282,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         best_score,
         NT::IS_PV
     );
+
+    if NT::IS_ROOT {
+        td.best_move = best_move;
+    }
 
     best_score
 }

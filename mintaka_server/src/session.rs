@@ -6,7 +6,7 @@ use mintaka::game_state::GameState;
 use mintaka::movegen::move_scores::MoveScores;
 use mintaka::movegen::movegen_window::MovegenWindow;
 use mintaka::protocol::command::Command;
-use mintaka::protocol::message::{GameResult, Message, MessageSender};
+use mintaka::protocol::message::GameResult;
 use mintaka::protocol::response::{Response, ResponseSender};
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
@@ -15,7 +15,6 @@ use serde::ser::SerializeStruct;
 use serde::{ser, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
-use std::num::NonZeroU32;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -119,23 +118,16 @@ impl Session {
             AgentState::Permit(_) => return Err(AppError::SessionInComputing),
         };
 
-        let (tx, rx) = std::sync::mpsc::channel();
-
-        game_agent.command(&MessageSender::new(tx), command)
+        let game_result = game_agent.command(command)
             .map_err(AppError::GameError)?;
 
         Ok(SessionCommandResponse {
             board_hash: game_agent.state.board.hash_key,
-            game_result: rx.try_iter().find_map(|message|
-                match message {
-                    Message::Finished(result) => Some(result),
-                    _ => None,
-                }
-            ),
+            game_result,
         })
     }
 
-    pub fn required_workers(&self) -> Result<NonZeroU32, AppError> {
+    pub fn required_workers(&self) -> Result<u32, AppError> {
         match &self.state {
             AgentState::Agent(agent) => Ok(agent.config.workers),
             AgentState::Permit(_) => Err(AppError::SessionInComputing),

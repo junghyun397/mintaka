@@ -1,19 +1,19 @@
-use crate::{color_to_jint, jint_to_color, retrieve_ref, value_to_ptr};
+use crate::{color_to_jint, retrieve_ref, value_to_ptr};
 use jni::objects::{JByteArray, JClass, JString, ReleaseMode};
 use jni::sys::{jboolean, jbyte, jint, jlong};
 use jni::JNIEnv;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
-use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use std::str::FromStr;
 
 fn board_to_ptr(board: Board) -> jlong {
     Box::into_raw(Box::new(board)) as jlong
 }
 
-fn jbytearray_to_moves(env: &mut JNIEnv, source: JByteArray) -> Vec<Pos> { unsafe {
+fn jbytearray_to_moves(env: &mut JNIEnv, source: JByteArray) -> Vec<MaybePos> { unsafe {
     env.get_array_elements(&source, ReleaseMode::NoCopyBack).unwrap().iter()
-        .map(|&x| Pos::from_index(x as u8))
+        .map(|&x| Pos::from_index(x as u8).into())
         .collect()
 } }
 
@@ -49,22 +49,6 @@ pub unsafe extern "system" fn Java_com_do1phin_rustyrenju_Board_fromMoves(
 ) -> jlong {
     let mut board = Board::default();
     board.batch_set_mut(jbytearray_to_moves(&mut env, moves).as_slice());
-
-    board_to_ptr(board)
-}
-
-#[unsafe(no_mangle)]
-pub extern "system" fn Java_com_do1phin_rustyrenju_Board_fromEachColorMoves(
-    mut env: JNIEnv,
-    _class: JClass,
-    black_moves: JByteArray,
-    white_moves: JByteArray,
-    player: jint,
-) -> jlong {
-    let mut board = Board::default();
-    let black_moves = jbytearray_to_moves(&mut env, black_moves).into_boxed_slice();
-    let white_moves = jbytearray_to_moves(&mut env, white_moves).into_boxed_slice();
-    board.batch_set_each_color_mut(black_moves, white_moves, jint_to_color(player).unwrap());
 
     board_to_ptr(board)
 }

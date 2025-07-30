@@ -177,11 +177,7 @@ impl From<History> for Board {
     fn from(value: History) -> Self {
         let mut board = Board::default();
 
-        board.batch_set_mut(
-            &value.iter()
-                .map(|maybe_pos| maybe_pos.unwrap())
-                .collect::<Vec<Pos>>()
-        );
+        board.batch_set_mut(value.slice());
 
         board
     }

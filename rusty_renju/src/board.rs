@@ -81,15 +81,23 @@ impl Board {
         self.switch_player_mut();
     }
 
-    pub fn batch_set_mut(&mut self, moves: &[Pos]) {
+    pub fn unpass_mut(&mut self) {
+        self.switch_player_mut();
+    }
+
+    pub fn batch_set_mut(&mut self, moves: &[MaybePos]) {
         let odd_moves = moves.iter()
             .enumerate()
-            .filter_map(|(idx, &pos)| (idx % 2 == 1).then_some(pos))
+            .filter_map(|(idx, &pos)|
+                (!idx.is_multiple_of(2)).then_some(pos).and_then(MaybePos::into)
+            )
             .collect::<Vec<_>>();
 
         let even_moves = moves.iter()
             .enumerate()
-            .filter_map(|(idx, &pos)| idx.is_multiple_of(2).then_some(pos))
+            .filter_map(|(idx, &pos)|
+                idx.is_multiple_of(2).then_some(pos).and_then(MaybePos::into)
+            )
             .collect::<Vec<_>>();
 
         let (black_moves, white_moves) = match self.player_color {

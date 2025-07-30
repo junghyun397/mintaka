@@ -60,8 +60,8 @@ impl AppState {
         self.sem.available_permits()
     }
 
-    pub async fn acquire_workers(&self, workers: NonZeroU32) -> WorkerPermit {
-        WorkerPermit(self.sem.clone().acquire_many_owned(workers.get()).await.unwrap())
+    pub async fn acquire_workers(&self, workers: u32) -> WorkerPermit {
+        WorkerPermit(self.sem.clone().acquire_many_owned(workers).await.unwrap())
     }
 
     pub fn new_session(&self, config: Config, board: Board, history: History) -> SessionKey {

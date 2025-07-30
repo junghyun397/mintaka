@@ -68,14 +68,14 @@ pub fn vcf_search(
     let mut vcf_moves = generate_vcf_moves(
         &state.board,
         Score::DISTANCE_WINDOW,
-        state.history.recent_player_move_unchecked()
+        state.history.recent_player_move().unwrap_or(pos::CENTER)
     );
 
     if vcf_moves.is_empty() {
         return None;
     }
 
-    vcf_moves.sort_moves(state.history.recent_player_move_unchecked());
+    vcf_moves.sort_moves(state.history.recent_player_move().unwrap_or(pos::CENTER));
 
     Some(vcf::<Score>(td, VcfWin, max_vcf_ply, state.board, vcf_moves, alpha, beta))
 }
@@ -89,7 +89,7 @@ pub fn vcf_defend(
     let vcf_moves = generate_vcf_moves(
         &state.board,
         8,
-        state.history.recent_opponent_move_unchecked()
+        state.history.recent_move().unwrap_or(target_pos)
     );
 
     vcf::<Score>(td, VcfDefend { target_pos }, max_vcf_ply, state.board, vcf_moves, Score::MIN, Score::MAX)
@@ -98,7 +98,7 @@ pub fn vcf_defend(
 pub fn vcf_sequence(
     td: &mut ThreadData<impl ThreadType>,
     board: &Board
-) -> Option<Vec<Pos>> {
+) -> Option<Vec<MaybePos>> {
     let vcf_moves = generate_vcf_moves(board, 8, pos::CENTER);
 
     vcf::<SequenceEndgameAccumulator>(td, VcfWin, usize::MAX, *board, vcf_moves, Score::MIN, Score::MAX)

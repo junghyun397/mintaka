@@ -3,8 +3,7 @@ use crate::game_state::GameState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::protocol::command::Command;
-use crate::protocol::message;
-use crate::protocol::message::{Message, MessageSender};
+use crate::protocol::message::GameResult;
 use crate::protocol::response::{Response, ResponseSender};
 use crate::search;
 use crate::thread_data::ThreadData;
@@ -30,6 +29,7 @@ pub struct BestMove {
     pub hash: HashKey,
     pub pos: MaybePos,
     pub score: Score,
+    pub depth_searched: usize,
     pub total_nodes_in_1k: usize,
     pub time_elapsed: Duration,
 }
@@ -111,32 +111,34 @@ impl GameAgent {
         }
     }
 
-    pub fn command(&mut self, message_sender: &MessageSender, command: Command) -> Result<(), GameError> {
+    pub fn command(&mut self, command: Command) -> Result<Option<GameResult>, GameError> {
         match command {
             Command::Play(action) => {
                 match action {
                     MaybePos::NONE => self.state.pass_mut(),
                     pos => {
-                        if !self.state.board.is_pos_empty(pos.unwrap()) {
+                        let pos = pos.unwrap();
+
+                        if !self.state.board.is_pos_empty(pos) {
                             return Err(GameError::StoneAlreadyExist);
                         }
 
-                        if !self.state.board.is_legal_move(pos.unwrap()) {
+                        if !self.state.board.is_legal_move(pos) {
                             return Err(GameError::ForbiddenMove);
                         }
 
-                        self.state.set_mut(pos.unwrap())
+                        self.state.set_mut(pos)
                     }
                 }
 
                 match self.state.board.find_winner() {
                     Some(winner) =>
-                        message_sender.message(Message::Finished(message::GameResult::Win(winner))),
+                        return Ok(Some(GameResult::Win(winner))),
                     None => {
                         if self.state.board.stones == pos::U8_BOARD_SIZE {
-                            message_sender.message(Message::Finished(message::GameResult::Full));
-                        } else if self.state.history.len() >= self.config.draw_condition {
-                            message_sender.message(Message::Finished(message::GameResult::Draw));
+                            return Ok(Some(GameResult::Full));
+                        } else if self.state.height() >= self.config.draw_condition {
+                            return Ok(Some(GameResult::Draw));
                         }
                     }
                 }
@@ -196,8 +198,8 @@ impl GameAgent {
                             }
                         }
 
-                        if self.executed_moves.is_hot_idx(self.state.history.len()) {
-                            self.executed_moves.unset_idx_mut(self.state.history.len());
+                        if self.executed_moves.is_hot_idx(self.state.height()) {
+                            self.executed_moves.unset_idx_mut(self.state.height());
 
                             if let Some(time_management) = &mut self.time_management
                                 && let Some((pos, time)) = time_management.time_history.pop()
@@ -291,17 +293,24 @@ impl GameAgent {
             },
         };
 
-        Ok(())
+        Ok(None)
     }
 
-    pub fn commands(&mut self, message_sender: &MessageSender, commands: Vec<Command>) -> Result<(), GameError> {
-        commands.into_iter()
-            .try_for_each(|command| self.command(message_sender, command))
+    pub fn commands(&mut self, commands: Vec<Command>) -> Result<Option<GameResult>, GameError> {
+        let mut result = None;
+
+        for command in commands.into_iter() {
+            let local_result = self.command(command)?;
+
+            result = result.or(local_result);
+        }
+
+        Ok(result)
     }
 
     fn next_computing_resource(&self) -> ComputingResource {
         ComputingResource {
-            workers: self.config.workers.get(),
+            workers: self.config.workers,
             tt_size: self.config.tt_size,
             time: self.time_management.as_ref().map(|time_management|
                 time_management.time_manager.next_running_time()
@@ -350,7 +359,7 @@ impl GameAgent {
                 (main_td, score)
             });
 
-            for tid in 1 ..self.config.workers.get() {
+            for tid in 1 ..self.config.workers {
                 let mut worker_td = ThreadData::new(
                     WorkerThread, tid,
                     self.config,
@@ -372,7 +381,7 @@ impl GameAgent {
         self.tt.increase_age();
         self.ht = *main_td.ht;
 
-        self.executed_moves.set_idx_mut(self.state.history.len());
+        self.executed_moves.set_idx_mut(self.state.height());
 
         let time_elapsed = started_time.elapsed();
 
@@ -385,6 +394,7 @@ impl GameAgent {
             hash: self.state.board.hash_key,
             pos: main_td.best_move,
             score,
+            depth_searched: main_td.depth,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed,
         }

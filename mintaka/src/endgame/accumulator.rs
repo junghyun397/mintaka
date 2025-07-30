@@ -1,4 +1,4 @@
-use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::value::Score;
 
 pub trait EndgameAccumulator {
@@ -13,7 +13,7 @@ pub trait EndgameAccumulator {
 
 }
 
-pub type SequenceEndgameAccumulator = Option<Vec<Pos>>;
+pub type SequenceEndgameAccumulator = Option<Vec<MaybePos>>;
 
 impl EndgameAccumulator for SequenceEndgameAccumulator {
 
@@ -23,14 +23,14 @@ impl EndgameAccumulator for SequenceEndgameAccumulator {
 
     #[inline]
     fn unit(pos: Pos, _score: Score) -> Self {
-        Some(vec![pos])
+        Some(vec![pos.into()])
     }
 
     #[inline]
     fn append_pos(self, defend: Pos, four: Pos) -> Self {
         self.map(|mut sequence| {
-            sequence.push(defend);
-            sequence.push(four);
+            sequence.push(defend.into());
+            sequence.push(four.into());
             sequence
         })
     }

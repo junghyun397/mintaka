@@ -43,4 +43,8 @@ impl<'a> BatchCounter<'a> {
         self.local_counter_in_1k * 1000 + self.buffer
     }
 
+    pub fn buffer_zero(&self) -> bool {
+        self.buffer == 0
+    }
+
 }

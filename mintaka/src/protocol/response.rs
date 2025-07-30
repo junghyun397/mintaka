@@ -29,7 +29,7 @@ pub struct CallBackResponseSender<F> where F: Fn(Response) + Send {
 
 impl<F> ResponseSender for CallBackResponseSender<F> where F: Fn(Response) + Send {
     fn response(&self, response: Response) {
-        (&self.consumer)(response);
+        (self.consumer)(response);
     }
 }
 

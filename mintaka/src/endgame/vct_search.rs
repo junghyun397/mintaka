@@ -27,7 +27,7 @@ pub fn vct_search(
 pub fn vct_sequence(
     td: &mut ThreadData<impl ThreadType>,
     board: &Board, max_depth: usize
-) -> Option<Vec<Pos>> {
+) -> Option<Vec<MaybePos>> {
     vct::<SequenceEndgameAccumulator>(td, board, max_depth)
         .map(|mut sequence| {
             sequence.reverse();

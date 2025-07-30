@@ -13,7 +13,7 @@ mod test_movegen {
             let mut move_picker = MovePicker::new(MaybePos::NONE, [MaybePos::NONE; 2]);
 
             while let Some(tuple) = move_picker.next(&state) {
-                print!("{tuple:?}");
+                print!("{tuple:?}, ");
             }
         }};
     }

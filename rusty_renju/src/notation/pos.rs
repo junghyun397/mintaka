@@ -233,6 +233,21 @@ impl MaybePos {
         self.0
     }
 
+    pub const fn unwrap_or(self, default: Pos) -> Pos {
+        if self.is_none() {
+            default
+        } else {
+            self.0
+        }
+    }
+
+    pub fn distance_or(&self, other: Pos, default: u8) -> u8 {
+        match self {
+            &Self::NONE => default,
+            Self(pos) => pos.distance(other)
+        }
+    }
+
 }
 
 impl From<Pos> for MaybePos {

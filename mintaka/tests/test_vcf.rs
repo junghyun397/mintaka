@@ -32,20 +32,20 @@ mod test_vcf {
             board.batch_set_mut(&vcf_result.clone().into_boxed_slice());
             let last_move = vcf_result.last().copied().unwrap();
 
-            println!("{}", board.to_string_with_move_marker(last_move));
+            println!("{}", board.to_string_with_move_marker(last_move.unwrap()));
             println!("length: {}", vcf_result.len());
             println!("sequence: {vcf_result:?}");
             println!("time: {time:?}");
             println!("hash usage: {}", tt.hash_usage());
             println!("nodes: {}", td.batch_counter.count_local_total());
 
-            last_move
+            last_move.unwrap()
         }};
     }
 
     #[test]
     fn basic_vcf() {
-        let board = board!(indoc! {"}
+        let board = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14

@@ -1,7 +1,7 @@
 use mintaka::config::Config;
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::protocol::command::Command;
-use mintaka::protocol::message::{CommandSender, Message, MessageSender};
+use mintaka::protocol::message::{Message, MessageSender};
 use mintaka::protocol::response::{CallBackResponseSender, Response};
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
@@ -45,24 +45,26 @@ fn main() -> Result<(), impl Error> {
 
     let mut game_agent = GameAgent::new(Config::default());
 
-    let (command_sender, message_sender, message_receiver) = {
+    let (message_sender, message_receiver) = {
         let (tx, rx) = mpsc::channel();
-        (CommandSender::new(tx.clone()), MessageSender::new(tx), rx)
+        (MessageSender::new(tx), rx)
     };
 
-    spawn_command_listener(launched.clone(), aborted.clone(), command_sender);
+    spawn_command_listener(launched.clone(), aborted.clone(), message_sender.clone());
 
     for message in message_receiver {
         match message {
             Message::Command(command) => {
-                game_agent.command(&message_sender, command)?;
+                let result = game_agent.command(command)?;
+                message_sender.result(result);
             },
             Message::Launch => {
                 launched.store(true, Ordering::Relaxed);
 
                 let best_move = game_agent.launch(CallBackResponseSender::new(response_receiver), aborted.clone());
 
-                game_agent.command(&message_sender, Command::Play(best_move.pos))?;
+                let result = game_agent.command(Command::Play(best_move.pos))?;
+                message_sender.result(result);
 
                 PiskvorkResponse::Pos(best_move.pos.unwrap());
             },
@@ -73,7 +75,7 @@ fn main() -> Result<(), impl Error> {
     Ok::<(), GameError>(())
 }
 
-fn spawn_command_listener(launched: Arc<AtomicBool>, aborted: Arc<AtomicBool>, command_sender: CommandSender) {
+fn spawn_command_listener(launched: Arc<AtomicBool>, aborted: Arc<AtomicBool>, message_sender: MessageSender) {
     std::thread::spawn(move || {
         let mut buf = String::new();
 
@@ -86,7 +88,7 @@ fn spawn_command_listener(launched: Arc<AtomicBool>, aborted: Arc<AtomicBool>, c
                 continue;
             }
 
-            let piskvork_response = match_command(&launched, &aborted, &command_sender, args)
+            let piskvork_response = match_command(&launched, &aborted, &message_sender, args)
                 .unwrap_or_else(|message| PiskvorkResponse::Error(message.to_string()));
 
             stdio_out(piskvork_response);
@@ -98,7 +100,7 @@ fn response_receiver(response: Response) {
     let piskvork_response = match response {
         Response::Begins(ComputingResource { workers, time, nodes_in_1k, tt_size }) =>
             PiskvorkResponse::Info(format!(
-                "begins: workers={workers}, running-time={time:?}, nodes={nodes_in_1k}k, tt-size={tt_size}"
+                "begins: workers={workers}, running-time={time:?}, nodes={nodes_in_1k:?}k, tt-size={tt_size}"
             )),
         Response::Status { score, pv, total_nodes_in_1k, depth, hash_usage } =>
             PiskvorkResponse::Info(format!(
@@ -117,7 +119,7 @@ fn response_receiver(response: Response) {
 // https://plastovicka.github.io/protocl2en.htm
 // https://github.com/accreator/Yixin-protocol/blob/master/protocol.pdf
 fn match_command(
-    launched: &Arc<AtomicBool>, aborted: &Arc<AtomicBool>, command_sender: &CommandSender, args: Vec<&str>
+    launched: &Arc<AtomicBool>, aborted: &Arc<AtomicBool>, message_sender: &MessageSender, args: Vec<&str>
 ) -> Result<PiskvorkResponse, &'static str> {
     let response = if launched.load(Ordering::Relaxed) {
         match args[0] {
@@ -149,13 +151,13 @@ fn match_command(
                     args.get(2).ok_or("missing column token.")?
                 )?;
 
-                command_sender.command(Command::Play(pos.into()));
-                command_sender.launch();
+                message_sender.command(Command::Play(pos.into()));
+                message_sender.launch();
 
                 PiskvorkResponse::None
             },
             "BEGIN" => {
-                command_sender.launch();
+                message_sender.launch();
 
                 PiskvorkResponse::None
             },
@@ -165,7 +167,7 @@ fn match_command(
                     args.get(2).ok_or("missing column token.")?
                 )?;
 
-                command_sender.command(Command::Unset { pos, color: Color::Black });
+                message_sender.command(Command::Unset { pos, color: Color::Black });
 
                 PiskvorkResponse::Ok
             },
@@ -203,10 +205,10 @@ fn match_command(
                     };
                 }
 
-                command_sender.command(Command::BatchSet { player_moves, opponent_moves });
+                message_sender.command(Command::BatchSet { player_moves, opponent_moves });
 
                 if args[0] == "BOARD" {
-                    command_sender.launch();
+                    message_sender.launch();
                 }
 
                 PiskvorkResponse::None
@@ -217,12 +219,12 @@ fn match_command(
             "INFO" => {
                 match *args.get(1).ok_or("missing info key.")? {
                     "timeout_match" | "time_left" => {
-                        command_sender.command(Command::TotalTime(parse_time(&args)?));
+                        message_sender.command(Command::TotalTime(parse_time(&args)?));
 
                         PiskvorkResponse::Ok
                     },
                     "timeout_turn" => {
-                        command_sender.command(Command::TurnTime(parse_time(&args)?));
+                        message_sender.command(Command::TurnTime(parse_time(&args)?));
 
                         PiskvorkResponse::Ok
                     },
@@ -232,7 +234,7 @@ fn match_command(
                             .parse()
                             .map_err(|_| "memory parsing failed.")?;
 
-                        command_sender.command(
+                        message_sender.command(
                             Command::MaxMemory(ByteSize::from_bytes(max_memory_in_bytes))
                         );
 
@@ -249,7 +251,7 @@ fn match_command(
                         }
                     },
                     "rule" => {
-                        let rule_kind: Result<RuleKind, &str> = match args.get(1)
+                        let rule_kind = match args.get(1)
                             .ok_or("missing info value.")?
                             .parse::<usize>()
                             .map_err(|_| "rule parsing failed.")?
@@ -257,11 +259,11 @@ fn match_command(
                         {
                             // 1 => Ok(RuleKind::Gomoku), // freestyle
                             // 6 => Ok(RuleKind::Gomoku), // swap2
-                            4 => Ok(RuleKind::Renju),
+                            4 => RuleKind::Renju,
                             _ => return Err("unsupported rule."),
                         };
 
-                        command_sender.command(Command::Rule(rule_kind?));
+                        message_sender.command(Command::Rule(rule_kind));
 
                         PiskvorkResponse::Ok
                     },
@@ -272,9 +274,7 @@ fn match_command(
                 }
             },
             "YXHASHCLEAR" => {
-                command_sender.command(
-                    Command::Load(Box::default())
-                );
+                message_sender.command(Command::Load(Box::default()));
 
                 PiskvorkResponse::None
             },

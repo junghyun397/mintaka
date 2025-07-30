@@ -41,11 +41,12 @@ impl Display for GameResult {
 
 impl_debug_from_display!(GameResult);
 
-pub struct CommandSender {
+#[derive(Clone)]
+pub struct MessageSender {
     sender: mpsc::Sender<Message>,
 }
 
-impl CommandSender {
+impl MessageSender {
 
     pub fn new(sender: mpsc::Sender<Message>) -> Self {
         Self { sender }
@@ -63,20 +64,10 @@ impl CommandSender {
         self.sender.send(Message::Launch).expect(CHANNEL_CLOSED_MESSAGE);
     }
 
-}
-
-pub struct MessageSender {
-    sender: mpsc::Sender<Message>,
-}
-
-impl MessageSender {
-
-    pub fn new(sender: mpsc::Sender<Message>) -> Self {
-        Self { sender }
-    }
-
-    pub fn message(&self, message: Message) {
-        self.sender.send(message).expect(CHANNEL_CLOSED_MESSAGE);
+    pub fn result(&self, result: Option<GameResult>) {
+        if let Some(result) = result {
+            self.sender.send(Message::Finished(result)).expect(CHANNEL_CLOSED_MESSAGE);
+        }
     }
 
 }

@@ -2,15 +2,14 @@ use mintaka::config::Config;
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::game_state::GameState;
 use mintaka::protocol::command::Command;
-use mintaka::protocol::message::{CommandSender, Message, MessageSender, StatusCommand};
+use mintaka::protocol::message::{Message, MessageSender, StatusCommand};
 use mintaka::protocol::response::{CallBackResponseSender, Response};
 use mintaka_interface::preference::{Mode, Preference};
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::notation::color::UnknownColorError;
-use rusty_renju::notation::pos::{MaybePos, Pos, PosError};
+use rusty_renju::notation::pos::{Pos, PosError};
 use rusty_renju::utils::byte_size::ByteSize;
-use std::num::NonZeroU32;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
@@ -30,21 +29,18 @@ fn text_protocol() -> Result<(), GameError> {
 
     let mut game_agent = GameAgent::new(Config::default());
 
-    let (command_sender, message_sender, message_receiver) = {
+    let (message_sender, message_receiver) = {
         let (tx, rx) = mpsc::channel();
-        (CommandSender::new(tx.clone()), MessageSender::new(tx), rx)
+        (MessageSender::new(tx), rx)
     };
 
-    spawn_command_listener(launched.clone(), aborted.clone(), command_sender);
+    spawn_command_listener(launched.clone(), aborted.clone(), message_sender.clone());
 
     for message in message_receiver {
         match message {
             Message::Command(command) => {
-                let result = game_agent.command(&message_sender, command);
-
-                if let Err(err) = result {
-                    println!("error: {err}");
-                }
+                let result = game_agent.command(command)?;
+                message_sender.result(result);
             },
             Message::Status(command) => match command {
                 StatusCommand::Version =>
@@ -65,11 +61,12 @@ fn text_protocol() -> Result<(), GameError> {
                 launched.store(false, Ordering::Relaxed);
 
                 println!(
-                    "solution: pos={}, score={}, nodes={}k, elapsed={:?}",
-                    best_move.pos, best_move.score, best_move.total_nodes_in_1k, best_move.time_elapsed
+                    "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}",
+                    best_move.pos, best_move.score, best_move.depth_searched, best_move.total_nodes_in_1k, best_move.time_elapsed
                 );
 
-                game_agent.command(&message_sender, Command::Play(best_move.pos))?;
+                let result = game_agent.command(Command::Play(best_move.pos))?;
+                message_sender.result(result);
             },
         }
     }
@@ -81,7 +78,7 @@ fn response_printer(response: Response) {
     match response {
         Response::Begins(ComputingResource { workers, time, nodes_in_1k, tt_size }) =>
             println!("begins: workers={workers}, running-time={time:?}, nodes={nodes_in_1k:?}, tt-size={tt_size}"),
-        Response::Status { score, pv, total_nodes_in_1k, depth, hash_usage, .. } =>
+        Response::Status { score, pv, total_nodes_in_1k, depth, hash_usage } =>
             println!(
                 "status: score={score}, \
                 pv={pv:?}, \
@@ -94,7 +91,7 @@ fn response_printer(response: Response) {
 
 }
 
-fn spawn_command_listener(launched: Arc<AtomicBool>, abort: Arc<AtomicBool>, command_sender: CommandSender) {
+fn spawn_command_listener(launched: Arc<AtomicBool>, abort: Arc<AtomicBool>, message_sender: MessageSender) {
     std::thread::spawn(move || {
         let mut buf = String::new();
 
@@ -107,7 +104,7 @@ fn spawn_command_listener(launched: Arc<AtomicBool>, abort: Arc<AtomicBool>, com
                 continue;
             }
 
-            let result = handle_command(&launched, &abort, &command_sender, &buf, args);
+            let result = handle_command(&launched, &abort, &message_sender, &buf, args);
 
             if let Err(err) = result {
                 println!("error: {err}");
@@ -117,7 +114,7 @@ fn spawn_command_listener(launched: Arc<AtomicBool>, abort: Arc<AtomicBool>, com
 }
 
 fn handle_command(
-    launched: &Arc<AtomicBool>, abort: &Arc<AtomicBool>, command_sender: &CommandSender, buf: &str, args: Vec<&str>
+    launched: &Arc<AtomicBool>, abort: &Arc<AtomicBool>, message_sender: &MessageSender, buf: &str, args: Vec<&str>
 ) -> Result<(), String> {
     if launched.load(Ordering::Relaxed) {
         match args[0] {
@@ -142,19 +139,17 @@ fn handle_command(
 
                                 println!("info: workers={cores}");
 
-                                command_sender.command(
-                                    Command::Workers(NonZeroU32::new(cores).unwrap())
-                                );
+                                message_sender.command(Command::Workers(cores));
                             },
                             &_ => {
                                 let workers = args.get(2)
                                     .ok_or("workers not provided.")?
                                     .parse::<u32>()
-                                    .map_err(|_| "invalid workers number.")?;
+                                    .ok()
+                                    .filter(|&workers| workers > 0)
+                                    .ok_or("invalid workers number.")?;
 
-                                command_sender.command(
-                                    Command::Workers(NonZeroU32::new(workers).unwrap())
-                                );
+                                message_sender.command(Command::Workers(workers));
                             }
                         }
                     },
@@ -164,7 +159,7 @@ fn handle_command(
                             .parse::<usize>()
                             .map_err(|_| "invalid memory size.")?;
 
-                        command_sender.command(Command::MaxMemory(ByteSize::from_kib(memory_size_in_kib)));
+                        message_sender.command(Command::MaxMemory(ByteSize::from_kib(memory_size_in_kib)));
                     },
                     &_ => return Err("data type not provided.".to_string())
                 }
@@ -187,17 +182,17 @@ fn handle_command(
                             .ok_or("data type not provided.")?
                         {
                             "match" => {
-                                command_sender.command(
+                                message_sender.command(
                                     Command::TotalTime(parse_time_in_milliseconds(&args)?)
                                 );
                             },
                             "turn" => {
-                                command_sender.command(
+                                message_sender.command(
                                     Command::TurnTime(parse_time_in_milliseconds(&args)?)
                                 );
                             },
                             "increment" => {
-                                command_sender.command(
+                                message_sender.command(
                                     Command::IncrementTime(parse_time_in_milliseconds(&args)?)
                                 );
                             }
@@ -210,7 +205,7 @@ fn handle_command(
                             .parse::<usize>()
                             .map_err(|_| "invalid nodes number.")?;
 
-                        command_sender.command(Command::MaxNodes { in_1k: nodes });
+                        message_sender.command(Command::MaxNodes { in_1k: nodes });
                     },
                     &_ => return Err("unknown limit type.".to_string()),
                 }
@@ -220,7 +215,7 @@ fn handle_command(
                     .ok_or("data type not provided.")?
                 {
                     "board" => {
-                        command_sender.command(Command::Load(
+                        message_sender.command(Command::Load(
                             Box::new((buf.parse()?, History::default()))
                         ));
                     },
@@ -231,14 +226,9 @@ fn handle_command(
 
                         let mut board = Board::default();
 
-                        board.batch_set_mut(
-                            &history.iter()
-                                .copied()
-                                .map(MaybePos::unwrap)
-                                .collect::<Vec<Pos>>()
-                        );
+                        board.batch_set_mut(history.slice());
 
-                        command_sender.command(Command::Load(
+                        message_sender.command(Command::Load(
                             Box::new((board, history))
                         ))
                     },
@@ -246,18 +236,18 @@ fn handle_command(
                 }
             },
             "clear" => {
-                command_sender.command(Command::Load(
+                message_sender.command(Command::Load(
                     Box::new((Board::default(), History::default()))
                 ));
             },
             "b" | "board" => {
-                command_sender.status(StatusCommand::Board);
+                message_sender.status(StatusCommand::Board);
             },
             "history" => {
-                command_sender.status(StatusCommand::History);
+                message_sender.status(StatusCommand::History);
             },
             "version" => {
-                command_sender.status(StatusCommand::Version);
+                message_sender.status(StatusCommand::Version);
             },
             "set" => {
                 let pos = args.get(1).ok_or("position not provided.")?.parse()
@@ -265,7 +255,7 @@ fn handle_command(
                 let color = args.get(2).ok_or("color not provided.")?.parse()
                     .map_err(|e: UnknownColorError| e.to_string())?;
 
-                command_sender.command(Command::Set { pos, color });
+                message_sender.command(Command::Set { pos, color });
             },
             "unset" => {
                 let pos = args.get(1).ok_or("position not provided.")?.parse()
@@ -273,19 +263,19 @@ fn handle_command(
                 let color = args.get(2).ok_or("color not provided.")?.parse()
                     .map_err(|e: UnknownColorError| e.to_string())?;
 
-                command_sender.command(Command::Unset { pos, color });
+                message_sender.command(Command::Unset { pos, color });
             },
             "p" | "play" => {
                 let pos: Pos = args.get(1).ok_or("position not provided.")?.parse()
                     .map_err(|e: PosError| e.to_string())?;
 
-                command_sender.command(Command::Play(pos.into()));
+                message_sender.command(Command::Play(pos.into()));
             },
             "u" | "undo" => {
-                command_sender.command(Command::Undo);
+                message_sender.command(Command::Undo);
             },
             "g" | "gen" => {
-                command_sender.launch();
+                message_sender.launch();
             },
             &_ => return Err("unknown command.".to_string()),
         }
@@ -297,14 +287,16 @@ fn handle_command(
 fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
     let aborted = Arc::new(AtomicBool::new(false));
 
-    let (command_sender, message_sender, message_receiver) = {
+    let (message_sender, message_receiver) = {
         let (tx, rx) = mpsc::channel();
-        (CommandSender::new(tx.clone()), MessageSender::new(tx), rx)
+        (MessageSender::new(tx), rx)
     };
 
     let mut game_agent = GameAgent::from_state(config, game_state);
 
-    command_sender.launch();
+    // game_agent.command(Command::Workers(num_cpus::get_physical() as u32))?;
+
+    message_sender.launch();
 
     let mut game_result = None;
     for message in message_receiver {
@@ -312,14 +304,16 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
             Message::Launch => {
                 let best_move = game_agent.launch(CallBackResponseSender::new(response_printer), aborted.clone());
 
+                let result = game_agent.command(Command::Play(best_move.pos))?;
+                message_sender.result(result);
+
+                println!("{}", game_agent.state.board);
                 println!(
-                    "solution: pos={}, score={}, nodes={}k, elapsed={:?}",
-                    best_move.pos, best_move.score, best_move.total_nodes_in_1k, best_move.time_elapsed
+                    "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}",
+                    best_move.pos, best_move.score, best_move.depth_searched, best_move.total_nodes_in_1k, best_move.time_elapsed
                 );
 
-                game_agent.command(&message_sender, Command::Play(best_move.pos))?;
-
-                command_sender.launch();
+                message_sender.launch();
             },
             Message::Finished(result) => {
                 game_result = Some(result);

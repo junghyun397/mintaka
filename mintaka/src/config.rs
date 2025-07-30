@@ -4,7 +4,6 @@ use rusty_renju::notation::pos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize};
-use std::num::NonZeroU32;
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SearchObjective {
@@ -25,7 +24,7 @@ pub struct Config {
     pub max_vcf_depth: usize,
 
     pub tt_size: ByteSize,
-    pub workers: NonZeroU32,
+    pub workers: u32,
 
     pub initial_time_manager: Option<TimeManager>,
 }
@@ -40,7 +39,7 @@ impl Default for Config {
             max_depth: value::MAX_PLY,
             max_vcf_depth: pos::BOARD_SIZE - 5,
             tt_size: ByteSize::from_mib(16),
-            workers: NonZeroU32::new(1).unwrap(),
+            workers: 1,
             initial_time_manager: None,
         }
     }

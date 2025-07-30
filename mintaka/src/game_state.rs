@@ -30,11 +30,22 @@ impl GameState {
     }
 
     pub fn unset_mut(&mut self, movegen_window: MovegenWindow) {
-        let pos = self.history.pop_mut().unwrap().unwrap();
-        self.board.unset_mut(pos);
+        match self.history.pop_mut().unwrap() {
+            MaybePos::NONE => {
+                self.board.unpass_mut();
+            },
+            pos => {
+                let pos = pos.unwrap();
 
-        self.move_scores.remove_neighbor_score(pos);
-        self.movegen_window = movegen_window;
+                self.board.unset_mut(pos);
+                self.move_scores.remove_neighbor_score(pos);
+                self.movegen_window = movegen_window;
+            }
+        }
+    }
+
+    pub fn height(&self) -> usize {
+        self.history.len()
     }
 
 }
