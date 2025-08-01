@@ -68,14 +68,14 @@ pub fn vcf_search(
     let mut vcf_moves = generate_vcf_moves(
         &state.board,
         Score::DISTANCE_WINDOW,
-        state.history.recent_player_move().unwrap_or(pos::CENTER)
+        state.history.recent_player_action().unwrap_or(pos::CENTER)
     );
 
     if vcf_moves.is_empty() {
         return None;
     }
 
-    vcf_moves.sort_moves(state.history.recent_player_move().unwrap_or(pos::CENTER));
+    vcf_moves.sort_moves(state.history.recent_player_action().unwrap_or(pos::CENTER));
 
     Some(vcf::<Score>(td, VcfWin, max_vcf_ply, state.board, vcf_moves, alpha, beta))
 }
@@ -89,7 +89,7 @@ pub fn vcf_defend(
     let vcf_moves = generate_vcf_moves(
         &state.board,
         8,
-        state.history.recent_move().unwrap_or(target_pos)
+        state.history.recent_action().unwrap_or(target_pos)
     );
 
     vcf::<Score>(td, VcfDefend { target_pos }, max_vcf_ply, state.board, vcf_moves, Score::MIN, Score::MAX)
@@ -117,14 +117,14 @@ fn vcf<ACC: EndgameAccumulator>(
     alpha: Score, beta: Score,
 ) -> ACC {
     match board.player_color {
-        Color::Black => try_vcf::<{ Color::Black }, ACC>(td, dest, vcf_max_ply, board, vcf_moves, alpha, beta),
-        Color::White => try_vcf::<{ Color::White }, ACC>(td, dest, vcf_max_ply, board, vcf_moves, alpha, beta),
+        Color::Black => try_vcf::<{ Color::Black }, _, ACC>(td, dest, vcf_max_ply, board, vcf_moves, alpha, beta),
+        Color::White => try_vcf::<{ Color::White }, _, ACC>(td, dest, vcf_max_ply, board, vcf_moves, alpha, beta),
     }
 }
 
 // depth-first search
-fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
-    td: &mut ThreadData<impl ThreadType>,
+fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
+    td: &mut ThreadData<TH>,
     dest: impl VcfDestination,
     vcf_max_ply: usize,
     mut board: Board,
@@ -171,6 +171,14 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
             .enumerate()
             .skip(move_counter)
         {
+            if TH::IS_MAIN
+                && td.should_check_limit()
+                && td.search_limit_exceeded()
+            {
+                td.set_aborted_mut();
+                return ACC::ZERO;
+            }
+
             if td.is_aborted() {
                 return ACC::ZERO;
             }
@@ -259,14 +267,14 @@ fn try_vcf<const C: Color, ACC: EndgameAccumulator>(
 
                 match entry.tt_flag.score_kind() {
                     ScoreKind::LowerBound =>
-                        alpha = alpha.max(entry.score),
+                        alpha = alpha.max(entry.score as Score),
                     ScoreKind::UpperBound =>
-                        beta = beta.min(entry.score),
+                        beta = beta.min(entry.score as Score),
                     _ => {}
                 }
 
                 if alpha >= beta { // beta cutoff
-                    best_score = entry.score;
+                    best_score = entry.score as Score;
                     score = best_score;
                     board.unset_mut(four_pos);
                     vcf_ply -= 1;

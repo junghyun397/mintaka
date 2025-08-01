@@ -118,10 +118,12 @@ fn increase_closed_four(mut copied: u128, clear_mask: u128, mask: u128) -> u128 
     copied                               // 0 0 0 | 1 0 0 | 1 1 0
 }
 
-fn calculate_five_in_a_rows(mut stones: u16) -> u16 {
-    stones &= stones >> 1;  // 1 1 1 1 1 0 & 0 1 1 1 1 1
-    stones &= stones >> 3;  // 0 1 1 1 1 0 & 0 0 0 0 1 1 ...
-    stones                  // 0 0 0 0 1 0 ...
+fn calculate_five_in_a_rows(stones: u16) -> u16 {
+    stones
+        & (stones >> 1)
+        & (stones >> 2)
+        & (stones >> 3)
+        & (stones >> 4)
 }
 
 pub fn contains_five_in_a_row(stones: u16) -> bool {

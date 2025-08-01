@@ -1,4 +1,4 @@
-use crate::board::Board;
+use crate::board::Board;use crate::board::Board;
 use crate::board_io::{HISTORY_LITERAL_PASS, HISTORY_LITERAL_SEPARATOR};
 use crate::impl_debug_from_display;
 use crate::notation::color::Color;
@@ -47,7 +47,7 @@ impl History {
         self.top
     }
 
-    pub fn slice(&self) -> &[MaybePos] {
+    pub fn actions(&self) -> &[MaybePos] {
         &self.entries[..self.top]
     }
 
@@ -83,25 +83,25 @@ impl History {
         self.entries[..self.top].iter()
     }
 
-    pub fn recent_move_pair(&self) -> [Option<MaybePos>; 2] {
+    pub fn recent_action_pair(&self) -> [MaybePos; 2] {
         match self.len() {
-            0 => [None, None],
-            1 => [None, Some(self.entries[0])],
-            _ => [Some(self.entries[self.len() - 2]), Some(self.entries[self.len() - 1])]
+            0 => [MaybePos::NONE, MaybePos::NONE],
+            1 => [MaybePos::NONE, self.entries[0]],
+            _ => [self.entries[self.len() - 2], self.entries[self.len() - 1]]
         }
     }
 
-    pub fn recent_move(&self) -> MaybePos {
+    pub fn recent_action(&self) -> MaybePos {
         debug_assert_ne!(self.top, 0);
         self.entries[self.top]
     }
 
-    pub fn recent_player_move(&self) -> MaybePos {
+    pub fn recent_player_action(&self) -> MaybePos {
         debug_assert!(self.top > 1);
         self.entries[self.top - 2]
     }
 
-    pub fn avg_distance_to_recent_moves(&self, pos: Pos) -> u8 {
+    pub fn avg_distance_to_recent_actions(&self, pos: Pos) -> u8 {
         if self.top > 3 {
             let distance1 = self.entries[self.top - 4].distance_or(pos, 0);
             let distance2 = self.entries[self.top - 3].distance_or(pos, 0);

@@ -83,6 +83,7 @@ impl TranspositionTable {
         compressed
     }
 
+    #[allow(clippy::uninit_vec)]
     pub fn import(source: Vec<u8>) -> Result<Self, &'static str> {
         let mut decoder = lz4::Decoder::new(std::io::Cursor::new(source))
             .map_err(|_| "failed to build decoder")?;
@@ -170,8 +171,8 @@ impl TTView<'_> {
                 entry.tt_flag = TTFlag::new(score_kind, endgame_flag, is_pv);
                 entry.age = self.age;
                 entry.depth = depth;
-                entry.eval = eval;
-                entry.score = score;
+                entry.eval = eval as i16;
+                entry.score = score as i16;
 
                 self.table[idx].store(key.into(), entry);
             }
@@ -181,8 +182,8 @@ impl TTView<'_> {
                 tt_flag: TTFlag::new(score_kind, endgame_flag, false),
                 age: self.age,
                 depth,
-                eval,
-                score,
+                eval: eval as i16,
+                score: score as i16,
             };
 
             self.table[idx].store(key.into(), entry);

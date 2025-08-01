@@ -1,9 +1,8 @@
-use crate::bitfield::Bitfield;
+use crate::bitfield::Bitfield;use crate::bitfield::Bitfield;
 use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::notation::value::Score;
 use crate::{assert_struct_sizes, const_for, max};
 
 pub const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
@@ -111,7 +110,7 @@ impl Slice {
 
     // TODO: add pre-check and optimization; 7%.
     #[inline(always)]
-    pub fn evaluate_score<const C: Color>(&self) -> Score {
+    pub fn evaluate_score<const C: Color>(&self) -> i16 {
         let blocks = {
             let raw = self.stones.get_reversed::<C>() as u32
                 | self.pattern_bitmap.get::<C>() as u32;
@@ -131,7 +130,7 @@ impl Slice {
             | (p3 << 1) | (p3 << 2) | (p3 << 3)
             | (p4 << 1) | (p4 << 2) | (p4 << 3) | (p4 << 4);
 
-        (!filled & stones).count_ones() as Score
+        (!filled & stones).count_ones() as i16
     }
 
 }

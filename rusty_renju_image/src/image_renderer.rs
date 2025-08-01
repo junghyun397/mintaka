@@ -353,19 +353,7 @@ impl ImageBoardRenderer {
             },
             HistoryRenderType::Recent => {
                 let [player_action, opponent_action]
-                    = maybe_history.unwrap().recent_move_pair();
-
-                if let Some(action) = player_action {
-                    if action != MaybePos::NONE {
-                        todo!() // draw "+" mark
-                    }
-                }
-
-                if let Some(action) = opponent_action {
-                    if action != MaybePos::NONE {
-                        todo!() // draw "." mark
-                    }
-                }
+                    = maybe_history.unwrap().recent_action_pair();
             },
             _ => {},
         }

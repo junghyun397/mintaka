@@ -1,11 +1,11 @@
-use crate::bitfield::Bitfield;
+use crate::bitfield::Bitfield;use crate::bitfield::Bitfield;
 use crate::board::Board;
 use crate::board_iter::BoardIterItem;
 use crate::history::History;
 use crate::impl_debug_from_display;
 use crate::notation::color::{Color, ColorContainer};
 use crate::notation::pos;
-use crate::notation::pos::Pos;
+use crate::notation::pos::{MaybePos, Pos};
 use crate::pattern::Pattern;
 use crate::slice::Slice;
 use crate::utils::str_utils::join_str_horizontally;
@@ -102,9 +102,22 @@ impl Board {
         add_move_marker(self.to_string(), !self.player_color, pos, '[', ']')
     }
 
-    pub fn to_string_with_move_marker_pair(&self, pre: Pos, post: Pos) -> String {
-        let board_string = add_move_marker(self.to_string(), self.player_color, pre, '|', '|');
-        add_move_marker(board_string, !self.player_color, post, '[', ']')
+    pub fn to_string_with_action_marker_pair(&self, pair: [MaybePos; 2]) -> String {
+        self.to_string_with_action_markers(pair[0], pair[1])
+    }
+
+    pub fn to_string_with_action_markers(&self, pre: MaybePos, post: MaybePos) -> String {
+        let mut board_string = self.to_string();
+
+        if pre.is_some() {
+            board_string = add_move_marker(board_string, self.player_color, pre.unwrap(), '|', '|');
+        }
+
+        if post.is_some() {
+            board_string = add_move_marker(board_string, !self.player_color, post.unwrap(), '[', ']')
+        }
+
+        board_string
     }
 
     pub fn build_attribute_string<F>(&self, transform: F) -> String
@@ -177,7 +190,7 @@ impl From<History> for Board {
     fn from(value: History) -> Self {
         let mut board = Board::default();
 
-        board.batch_set_mut(value.slice());
+        board.batch_set_mut(value.actions());
 
         board
     }

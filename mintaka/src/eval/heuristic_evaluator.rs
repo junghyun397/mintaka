@@ -52,7 +52,7 @@ impl HeuristicEvaluator {
         counts.closed_fours as Score * HeuristicThreatScores::CLOSED_FOUR
             + counts.threes as Score * HeuristicThreatScores::OPEN_THREE
             + counts.open_fours as Score * HeuristicThreatScores::OPEN_FOUR
-            + counts.score
+            + counts.score as Score
     }
 
 }

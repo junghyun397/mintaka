@@ -27,15 +27,14 @@ impl Board {
     }
 
     pub fn is_pos_empty(&self, pos: Pos) -> bool {
-        self.slices.horizontal_slices[pos.row_usize()].is_empty(pos.col())
+        self.hot_field.is_cold(pos)
     }
 
     pub fn is_legal_move(&self, pos: Pos) -> bool {
-        if !self.is_pos_empty(pos) {
-            return false;
-        }
-
-        self.player_color != Color::Black || !self.patterns.forbidden_field.is_hot(pos)
+        self.is_pos_empty(pos) && (
+            self.player_color != Color::Black
+                || !self.patterns.forbidden_field.is_hot(pos)
+        )
     }
 
     pub fn stone_kind(&self, pos: Pos) -> Option<Color> {

@@ -32,7 +32,7 @@ impl MoveList {
         }
 
         let mut best_idx = 0;
-        let mut best_score = i16::MIN;
+        let mut best_score = Score::MIN;
 
         for (idx, &(_, score)) in self.moves[0 .. self.top].iter().enumerate() {
             if score > best_score {

@@ -59,7 +59,7 @@ fn score_move(state: &GameState, pos: Pos) -> Score {
             state.board.patterns.field.get::<{ Color::White }>()[pos.idx_usize()]
         ) as f32;
 
-    let distance = (state.history.avg_distance_to_recent_moves(pos).max(8) + 4) as f32;
+    let distance = (state.history.avg_distance_to_recent_actions(pos).max(8) + 4) as f32;
 
     (((score + neighborhood_score) / distance) * 16.0) as Score
 }

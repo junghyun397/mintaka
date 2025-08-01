@@ -2,7 +2,6 @@ use rusty_renju::assert_struct_sizes;
 use rusty_renju::memo::abstract_transposition_table::AbstractTTEntry;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
-use rusty_renju::notation::value::Score;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const KEY_SIZE: usize = 21;
@@ -92,8 +91,8 @@ pub struct TTEntry {
     pub tt_flag: TTFlag, // 8
     pub age: u8, // 8
     pub depth: u8, // 8
-    pub eval: Score, // 16
-    pub score: Score, // 16
+    pub eval: i16, // 16
+    pub score: i16, // 16
 }
 
 assert_struct_sizes!(TTEntry, size=8, align=8);

@@ -1,8 +1,8 @@
-pub type Score = i16;
+pub type Score = i32;
 
 pub trait Scores {
-    const INF: Score = 32000;
-    const WIN: Score = Self::INF - 1;
+    const INF: Score = i16::MAX as i32;
+    const WIN: Score = i16::MAX as i32 - 1;
     const DRAW: Score = 0;
 
     fn win_in(ply: usize) -> Score {

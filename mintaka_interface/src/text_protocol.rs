@@ -226,7 +226,7 @@ fn handle_command(
 
                         let mut board = Board::default();
 
-                        board.batch_set_mut(history.slice());
+                        board.batch_set_mut(history.actions());
 
                         message_sender.command(Command::Load(
                             Box::new((board, history))
@@ -307,7 +307,10 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
                 let result = game_agent.command(Command::Play(best_move.pos))?;
                 message_sender.result(result);
 
-                println!("{}", game_agent.state.board);
+                println!("{}",
+                    game_agent.state.board.to_string_with_action_marker_pair(game_agent.state.history.recent_action_pair())
+                );
+
                 println!(
                     "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}",
                     best_move.pos, best_move.score, best_move.depth_searched, best_move.total_nodes_in_1k, best_move.time_elapsed

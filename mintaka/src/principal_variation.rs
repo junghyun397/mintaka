@@ -12,11 +12,8 @@ pub struct PrincipalVariation {
 
 impl PrincipalVariation {
 
-    pub const fn new_const() -> Self {
-        Self {
-            line: [MaybePos::NONE; MAX_PLY],
-            top: 0,
-        }
+    pub fn moves(&self) -> &[MaybePos] {
+        &self.line[0 .. self.top]
     }
 
     pub fn head(&self) -> MaybePos {
@@ -31,7 +28,7 @@ impl PrincipalVariation {
         self.top = 0;
     }
 
-    pub fn load(&mut self, head: MaybePos, rest: &Self) {
+    pub fn load(&mut self, head: MaybePos, rest: Self) {
         self.clear();
         self.line[0] = head;
         self.top = rest.top + 1;
@@ -42,7 +39,7 @@ impl PrincipalVariation {
 
 impl Display for PrincipalVariation {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.line[.. self.top].to_vec())
+        write!(f, "{:?}", self.moves())
     }
 }
 
@@ -50,7 +47,7 @@ impl_debug_from_display!(PrincipalVariation);
 
 impl Serialize for PrincipalVariation {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
-        serializer.collect_seq(self.line[0 .. self.top].iter())
+        serializer.collect_seq(self.moves())
     }
 }
 

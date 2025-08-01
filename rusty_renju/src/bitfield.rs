@@ -39,7 +39,7 @@ impl Bitfield {
     }
 
     pub const fn is_cold(&self, pos: Pos) -> bool {
-        !self.is_cold_idx(pos.idx_usize())
+        !self.is_hot_idx(pos.idx_usize())
     }
 
     pub const fn set_idx_mut(&mut self, idx: usize) {
