@@ -68,7 +68,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_toDetailedString<'a>(
     _class: JClass<'a>,
     board_ptr: jlong,
 ) -> JString<'a> {
-    env.new_string(retrieve_ref::<Board>(board_ptr).build_detailed_string()).unwrap()
+    env.new_string(retrieve_ref::<Board>(board_ptr).to_string_with_pattern_analysis()).unwrap()
 }
 
 

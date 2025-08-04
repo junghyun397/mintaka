@@ -8,7 +8,7 @@ mod test_movegen {
     macro_rules! test_move_ordering {
         ($history:literal) => {{
             let history: History = $history.parse().unwrap();
-            let state = GameState::from(history);
+            let state = GameState::from_board_and_history(history.into(), history);
 
             let mut move_picker = MovePicker::new(MaybePos::NONE, [MaybePos::NONE; 2]);
 

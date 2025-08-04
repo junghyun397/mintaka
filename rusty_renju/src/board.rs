@@ -221,29 +221,35 @@ impl Board {
     }
 
     fn validate_forbidden_moves_mut(&mut self) {
-        for root_pos in self.patterns.forbidden_field.clone().iter_hot_pos() {
+        for root_pos in self.patterns.candidate_forbidden_field.clone().iter_hot_pos() {
             let pattern = self.patterns.field.black[root_pos.idx_usize()];
 
-            let unmark_forbidden: bool;
+            let mark_forbidden: bool;
+            let delete_forbidden: bool;
             let pattern_marker_update: Option<bool>;
 
             if pattern.has_five() {
-                unmark_forbidden = true;
+                mark_forbidden = false;
+                delete_forbidden = false;
                 pattern_marker_update = None;
             } else if pattern.has_fours() || pattern.has_overline() {
-                unmark_forbidden = false;
+                mark_forbidden = true;
+                delete_forbidden = false;
                 pattern_marker_update = None;
             } else if pattern.has_threes() {
                 if self.is_valid_double_three(ValidateThreeRoot { root_pos }) {
-                    unmark_forbidden = false;
+                    mark_forbidden = true;
+                    delete_forbidden = false;
                     pattern_marker_update = Some(false);
                 } else {
-                    unmark_forbidden = true;
+                    mark_forbidden = false;
+                    delete_forbidden = false;
                     pattern_marker_update = Some(true);
                 }
             } else {
-                unmark_forbidden = true;
-                pattern_marker_update = None;
+                mark_forbidden = false;
+                delete_forbidden = true;
+                pattern_marker_update = Some(true);
             }
 
             if let Some(mark) = pattern_marker_update {
@@ -254,8 +260,14 @@ impl Board {
                 }
             }
 
-            if unmark_forbidden {
+            if mark_forbidden {
+                self.patterns.forbidden_field.set_mut(root_pos);
+            } else {
                 self.patterns.forbidden_field.unset_mut(root_pos);
+            }
+
+            if delete_forbidden {
+                self.patterns.candidate_forbidden_field.unset_mut(root_pos);
             }
         }
     }

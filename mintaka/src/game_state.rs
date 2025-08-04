@@ -16,6 +16,15 @@ pub struct GameState {
 
 impl GameState {
 
+    pub fn from_board_and_history(board: Board, history: History) -> Self {
+        GameState {
+            board,
+            history,
+            movegen_window: MovegenWindow::from(&board.hot_field),
+            move_scores: MoveScores::from(&board.hot_field),
+        }
+    }
+
     pub fn set_mut(&mut self, pos: Pos) {
         self.board.set_mut(pos);
         self.history.set_mut(pos);
@@ -48,34 +57,6 @@ impl GameState {
         self.history.len()
     }
 
-}
-
-impl From<History> for GameState {
-    fn from(history: History) -> Self {
-        let mut game_state = GameState::default();
-
-        for &maybe_pos in history.iter() {
-            match maybe_pos {
-                MaybePos::NONE => game_state.pass_mut(),
-                pos => game_state.set_mut(pos.unwrap()),
-            }
-        }
-
-        game_state
-    }
-}
-
-impl From<Board> for GameState {
-    fn from(board: Board) -> Self {
-        let history = History::try_from(&board).unwrap();
-
-        GameState {
-            movegen_window: MovegenWindow::from(&board.hot_field),
-            move_scores: MoveScores::from(&board.hot_field),
-            board,
-            history,
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize)]

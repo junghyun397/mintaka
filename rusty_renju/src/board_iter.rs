@@ -4,6 +4,7 @@ use crate::pattern::Pattern;
 use crate::{index_to_col, index_to_row};
 
 #[repr(u64)]
+#[derive(Copy, Clone)]
 pub enum BoardIterItem {
     Stone(Color),
     Pattern(ColorContainer<Pattern>),

@@ -8,7 +8,7 @@ mod test_eval {
 
     macro_rules! eval {
         ($board:expr) => {{
-            let state = GameState::from($board);
+            let state = GameState::from_board_and_history($board, (&$board).try_into().unwrap());
 
             HeuristicEvaluator.eval_value(&state.board)
         }};

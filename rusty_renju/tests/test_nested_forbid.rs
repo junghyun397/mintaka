@@ -2,7 +2,7 @@
 mod test_nested_forbid {
     use indoc::indoc;
     use rusty_renju::board;
-    use rusty_renju::board::Board;
+    use rusty_renju::notation::pos::pos_unchecked;
 
     #[test]
     fn single_nested_double_three() {
@@ -258,7 +258,7 @@ mod test_nested_forbid {
 
     #[test]
     fn recursive_double_three() {
-        let case = indoc! {"
+        let case = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -275,7 +275,7 @@ mod test_nested_forbid {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
+           A B C D E F G H I J K L M N O"});
 
         let expected = indoc! {"
            A B C D E F G H I J K L M N O
@@ -296,7 +296,35 @@ mod test_nested_forbid {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
+        assert_eq!(case.to_string(), expected);
+    }
+
+    #[test]
+    fn test_sequential_nested_double_three() {
+        let case = board!(indoc! {"
+           A B C D E F G H I J K L M N O
+        15 . . . . . . . . . . . . . . . 15
+        14 . . . . . . . . . . . . . . . 14
+        13 . . . . . . . . . . . . . . . 13
+        12 . . . . . . . . . . . . . . . 12
+        11 . . . . . . O . . . . . . . . 11
+        10 . . . . . . . . . . . . . . . 10
+         9 . . . . . . . . O . . . . . . 9
+         8 . . . . . . . X X . . . . . . 8
+         7 . . . . . . X X O . . . . . . 7
+         6 . . . . . O . . . . . . . . . 6
+         5 . . . . . O X . . . . . . . . 5
+         4 . . . . . . . . . . . . . . . 4
+         3 . . . . . . . . . . . . . . . 3
+         2 . . . . . . . . . . . . . . . 2
+         1 . . . . . . . . . . . . . . . 1
+           A B C D E F G H I J K L M N O"});
+
+        let mut case_mod = case;
+        case_mod.set_mut(pos_unchecked("j9"));
+        case_mod.unset_mut(pos_unchecked("j9"));
+
+        assert_eq!(case_mod.to_string(), case.to_string());
     }
 
 }

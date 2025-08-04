@@ -1,4 +1,4 @@
-use crate::board::Board;use crate::board::Board;
+use crate::board::Board;
 use crate::board_io::{HISTORY_LITERAL_PASS, HISTORY_LITERAL_SEPARATOR};
 use crate::impl_debug_from_display;
 use crate::notation::color::Color;
@@ -10,10 +10,12 @@ use std::iter;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 
+pub const MAX_HISTORY_SIZE: usize = 248;
+
 #[derive(Copy, Clone)]
 pub struct History {
-    pub entries: [MaybePos; pos::BOARD_SIZE],
-    top: usize
+    pub entries: [MaybePos; MAX_HISTORY_SIZE],
+    top: usize,
 }
 
 impl Default for History {
@@ -39,7 +41,7 @@ impl IndexMut<usize> for History {
 impl History {
 
     const EMPTY: Self = Self {
-        entries: [MaybePos::NONE; pos::BOARD_SIZE],
+        entries: [MaybePos::NONE; MAX_HISTORY_SIZE],
         top: 0,
     };
 
@@ -277,7 +279,7 @@ impl<'de> Deserialize<'de> for History {
             return Err(serde::de::Error::custom("history is too long"));
         }
 
-        let mut entries = [MaybePos::NONE; pos::BOARD_SIZE];
+        let mut entries = [MaybePos::NONE; MAX_HISTORY_SIZE];
         entries[.. top].copy_from_slice(&vector);
 
         Ok(Self {

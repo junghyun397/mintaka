@@ -32,7 +32,7 @@ mod test_vcf {
             board.batch_set_mut(&vcf_result.clone().into_boxed_slice());
             let last_move = vcf_result.last().copied().unwrap();
 
-            println!("{}", board.to_string_with_move_marker(last_move.unwrap()));
+            println!("{}", board.to_string_with_highlighted_move(last_move.unwrap()));
             println!("length: {}", vcf_result.len());
             println!("sequence: {vcf_result:?}");
             println!("time: {time:?}");

@@ -46,9 +46,9 @@ impl Preference {
     fn init(&mut self) {
         if self.mode == Mode::SelfPlay {
             self.game_state = Some(if let Some(history) = self.history {
-                GameState::from(history)
+                GameState::from_board_and_history(history.into(), history)
             } else if let Some(board) = self.board {
-                GameState::from(board)
+                GameState::from_board_and_history(board, (&board).try_into().unwrap())
             } else {
                 GameState::default()
             });

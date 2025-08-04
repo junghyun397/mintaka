@@ -1,4 +1,4 @@
-use crate::bitfield::Bitfield;use crate::bitfield::Bitfield;
+use crate::bitfield::Bitfield;
 use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;

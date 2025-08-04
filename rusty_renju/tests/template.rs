@@ -41,8 +41,6 @@ mod template {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        println!("{}", case.parse::<Board>().unwrap().build_detailed_string());
-
         assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
     }
 }

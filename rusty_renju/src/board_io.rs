@@ -1,4 +1,4 @@
-use crate::bitfield::Bitfield;use crate::bitfield::Bitfield;
+use crate::bitfield::Bitfield;
 use crate::board::Board;
 use crate::board_iter::BoardIterItem;
 use crate::history::History;
@@ -38,6 +38,16 @@ fn match_symbol(c: char) -> Option<BoardElement> {
             Some(BoardElement::Empty),
         _ => None
     }
+}
+
+fn board_iter_item_to_symbol(item: BoardIterItem) -> String {
+    match item {
+        BoardIterItem::Stone(color) => char::from(color),
+        BoardIterItem::Pattern(pattern) =>
+            pattern.black.forbidden_kind()
+                .map(char::from)
+                .unwrap_or(SYMBOL_EMPTY)
+    }.to_string()
 }
 
 fn parse_board_elements(source: &str) -> Result<Box<[BoardElement]>, &'static str> {
@@ -81,47 +91,75 @@ fn extract_stones_by_color(color: Color, source: &[BoardElement]) -> Box<[Pos]> 
         .collect()
 }
 
-fn add_move_marker(mut board_string: String, color: Color, pos: Pos, pre_marker: char, post_marker: char) -> String {
-    const COL_INDEX_OFFSET: usize = 3 + pos::U_BOARD_WIDTH * 2; // row(2) + margin(1) + col(w*2) + br(1)
-    const LINE_OFFSET: usize = 3 + pos::U_BOARD_WIDTH * 2 + 3; // row(2) + margin(1) + col(w*2) + row(2) + br(1)
-    const LINE_BEGIN_OFFSET: usize = 2; // row(2)
-
-    let reversed_row = pos::U_BOARD_WIDTH - 1 - pos.row_usize();
-    let offset: usize = COL_INDEX_OFFSET
-        + LINE_OFFSET * reversed_row
-        - reversed_row.saturating_add_signed(-(pos::I_BOARD_WIDTH - 9))
-        + LINE_BEGIN_OFFSET + pos.col_usize() * 2;
-
-    board_string.replace_range(offset .. offset + 3, &format!("{pre_marker}{}{post_marker}", char::from(color)));
-    board_string
-}
-
 impl Board {
 
-    pub fn to_string_with_move_marker(&self, pos: Pos) -> String {
-        add_move_marker(self.to_string(), !self.player_color, pos, '[', ']')
+    pub fn to_string_with_highlighted_move(&self, pos: Pos) -> String {
+        let marker = ["[".to_string(), "]".to_string()];
+
+        self.render_with_attributes(
+            |_, &item| board_iter_item_to_symbol(item),
+            |iter_pos, _| (iter_pos == pos).then(|| (false, marker.clone()))
+        )
     }
 
-    pub fn to_string_with_action_marker_pair(&self, pair: [MaybePos; 2]) -> String {
-        self.to_string_with_action_markers(pair[0], pair[1])
+    pub fn to_string_with_last_moves(&self, pair: [MaybePos; 2]) -> String {
+        let pre_marker = ["[".to_string(), "]".to_string()];
+        let post_marker = ["|".to_string(), "|".to_string()];
+
+        self.render_with_attributes(
+            |_, &item| board_iter_item_to_symbol(item),
+            |iter_pos, _| match MaybePos::from(iter_pos) {
+                pos if pos == pair[0] => Some((true, pre_marker.clone())),
+                pos if pos == pair[1] => Some((false, post_marker.clone())),
+                _ => None,
+            },
+        )
     }
 
-    pub fn to_string_with_action_markers(&self, pre: MaybePos, post: MaybePos) -> String {
-        let mut board_string = self.to_string();
+    pub fn to_string_with_heatmap(&self, heatmap: [Option<f64>; pos::BOARD_SIZE], log_scale: bool) -> String {
+        let min = heatmap.iter()
+            .filter_map(|&x| x)
+            .fold(f64::NAN, f64::min);
 
-        if pre.is_some() {
-            board_string = add_move_marker(board_string, self.player_color, pre.unwrap(), '|', '|');
+        let max = heatmap.iter()
+            .filter_map(|&x| x)
+            .fold(f64::NAN, f64::max);
+
+        if min.is_nan() {
+            return self.to_string();
         }
 
-        if post.is_some() {
-            board_string = add_move_marker(board_string, !self.player_color, post.unwrap(), '[', ']')
-        }
+        let range = max - min;
+        let log_range = (range + 1.0).ln();
 
-        board_string
+        self.render_with_attributes(
+            |pos, &item| {
+                let cell = board_iter_item_to_symbol(item);
+
+                if let Some(value) = heatmap[pos.idx_usize()] {
+                    let factor = if log_scale {
+                        (value - min + 1.0).ln() / log_range
+                    } else {
+                        (value - min) / range
+                    };
+
+                    let normalized = (factor.clamp(0.0, 1.0) * (u8::MAX as f64)) as u8;
+
+                    let r: u8 = normalized;
+                    let b: u8 = u8::MAX - normalized;
+
+                    format!("\x1b[48;2;{};0;{}m{}\x1b[0m", r, b, cell)
+                } else {
+                    cell
+                }
+            },
+            |_, _| None,
+        )
     }
 
-    pub fn build_attribute_string<F>(&self, transform: F) -> String
-    where F: Fn(&BoardIterItem) -> String
+    pub fn render_with_attributes<T1, T2>(&self, cell: T1, marker: T2) -> String where
+        T1: Fn(Pos, &BoardIterItem) -> String,
+        T2: Fn(Pos, &BoardIterItem) -> Option<(bool, [String; 2])>
     {
         let content = self.iter_items()
             .collect::<Vec<_>>()
@@ -129,11 +167,24 @@ impl Board {
             .enumerate()
             .map(|(row_idx, item_row)| {
                 let content: String = item_row.iter()
-                    .map(&transform)
-                    .collect::<Vec<_>>()
-                    .join(" ");
+                    .enumerate()
+                    .map(|(col_idx, item)| {
+                        let pos = Pos::from_cartesian(row_idx as u8, col_idx as u8);
+                        (pos, item, cell(pos, item))
+                    })
+                    .fold(" ".to_string(), |acc, (pos, item, cell)| {
+                        if let Some((overwrite, [left, right])) = marker(pos, item) {
+                            if overwrite || acc.chars().last().unwrap() == ' ' {
+                                format!("{}{left}{cell}{right}", &acc[..acc.len() - 1]).to_string()
+                            } else {
+                                format!("{}{cell}{right}", acc).to_string()
+                            }
+                        } else {
+                            format!("{acc}{cell} ").to_string()
+                        }
+                    });
 
-                format!("{:-2} {content} {}", row_idx + 1, row_idx + 1)
+                format!("{:-2}{content}{}", row_idx + 1, row_idx + 1)
             })
             .rev()
             .collect::<Vec<_>>()
@@ -149,10 +200,10 @@ impl Board {
         format!("{column_hint}\n{content}\n{column_hint}")
     }
 
-    pub fn build_detailed_string(&self) -> String {
+    pub fn to_string_with_pattern_analysis(&self) -> String {
         fn build_each_color_string(board: &Board, color: Color) -> String {
             fn render_pattern(board: &Board, color: Color, extract: fn(&Pattern) -> u32) -> String {
-                board.build_attribute_string(|item| {
+                board.render_with_attributes(|_, item| {
                     match item {
                         &BoardIterItem::Stone(color) => char::from(color).to_string(),
                         BoardIterItem::Pattern(pattern) => {
@@ -165,7 +216,7 @@ impl Board {
                             }
                         }
                     }
-                })
+                }, |_, _| None)
             }
 
             let open_three = format!("open_three\n{}", render_pattern(board, color, Pattern::count_open_threes));
@@ -198,14 +249,9 @@ impl From<History> for Board {
 
 impl Display for Board {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.build_attribute_string(|item|
-            match item {
-                &BoardIterItem::Stone(color) => char::from(color),
-                BoardIterItem::Pattern(pattern) =>
-                    pattern.black.forbidden_kind()
-                        .map(char::from)
-                        .unwrap_or(SYMBOL_EMPTY)
-            }.to_string()
+        write!(f, "{}", self.render_with_attributes(
+            |_, &item| board_iter_item_to_symbol(item),
+            |_, _| None
         ))
     }
 }

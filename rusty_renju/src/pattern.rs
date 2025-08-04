@@ -233,10 +233,11 @@ pub struct Patterns {
     pub field: AlignedColorContainer<[Pattern; pos::BOARD_SIZE]>,
     pub counts: SlicePatternCounts,
     pub unchecked_five_pos: ColorContainer<Option<Pos>>,
+    pub candidate_forbidden_field: Bitfield,
     pub forbidden_field: Bitfield,
 }
 
-assert_struct_sizes!(Patterns, size=2496, align=64);
+assert_struct_sizes!(Patterns, size=2560, align=64);
 
 impl Default for Patterns {
 
@@ -248,7 +249,8 @@ impl Default for Patterns {
                 black: None,
                 white: None
             },
-            forbidden_field: Bitfield::default(),
+            candidate_forbidden_field: Bitfield::ZERO_FILLED,
+            forbidden_field: Bitfield::ZERO_FILLED,
         }
     }
 
@@ -323,7 +325,7 @@ impl Patterns {
             self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(slice_patterns[slice_idx]);
 
             if C == Color::Black && self.field.black[idx].is_forbidden_ignoring_marker() {
-                self.forbidden_field.set_idx_mut(idx);
+                self.candidate_forbidden_field.set_idx_mut(idx);
             }
         }
 

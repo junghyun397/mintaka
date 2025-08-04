@@ -308,7 +308,7 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
                 message_sender.result(result);
 
                 println!("{}",
-                    game_agent.state.board.to_string_with_action_marker_pair(game_agent.state.history.recent_action_pair())
+                    game_agent.state.board.to_string_with_last_moves(game_agent.state.history.recent_action_pair())
                 );
 
                 println!(
