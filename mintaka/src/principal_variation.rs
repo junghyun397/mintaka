@@ -16,6 +16,11 @@ impl PrincipalVariation {
         &self.line[0 .. self.top]
     }
 
+    pub fn init(&mut self, pos: MaybePos) {
+        self.line[0] = pos;
+        self.top = 1;
+    }
+
     pub fn head(&self) -> MaybePos {
         self.line[0]
     }

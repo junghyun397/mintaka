@@ -1,15 +1,26 @@
-use rusty_renju::board::Board;
+use crate::game_state::GameState;
+use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
+use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::value::Score;
 
-pub type PolicyDistribution = [f32; pos::BOARD_SIZE];
+#[cfg(feature = "heuristic-eval")]
+pub type ActiveEvaluator = crate::eval::heuristic_evaluator::HeuristicEvaluator;
+#[cfg(feature = "nnue-eval")]
+pub type ActiveEvaluator = crate::eval::nnue_evaluator::NnueEvaluator;
+
+pub type PolicyDistribution = [Score; pos::BOARD_SIZE];
 
 pub trait Evaluator {
 
-    const POLICY_EVALUATION: bool;
+    fn from_state(state: &GameState) -> Self;
 
-    fn eval_value(&self, board: &Board) -> Score;
+    fn update(&mut self, state: &GameState);
 
-    fn eval_policy(&self, board: &Board) -> PolicyDistribution;
+    fn undo(&mut self, state: &GameState, color: Color, pos: Pos);
+
+    fn eval_policy(&self, state: &GameState) -> PolicyDistribution;
+
+    fn eval_value(&self, state: &GameState) -> Score;
 
 }

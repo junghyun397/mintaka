@@ -1,4 +1,5 @@
 use crate::endgame::accumulator::{EndgameAccumulator, SequenceEndgameAccumulator};
+use crate::eval::evaluator::Evaluator;
 use crate::memo::tt_entry::TTEntry;
 use crate::movegen::move_list::MoveList;
 use crate::thread_data::ThreadData;
@@ -18,14 +19,14 @@ pub(crate) struct VCTFrame {
 }
 
 pub fn vct_search(
-    td: &mut ThreadData<impl ThreadType>,
+    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     board: &Board, max_depth: usize
 ) -> Score {
     vct::<Score>(td, board, max_depth)
 }
 
 pub fn vct_sequence(
-    td: &mut ThreadData<impl ThreadType>,
+    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     board: &Board, max_depth: usize
 ) -> Option<Vec<MaybePos>> {
     vct::<SequenceEndgameAccumulator>(td, board, max_depth)
@@ -36,7 +37,7 @@ pub fn vct_sequence(
 }
 
 fn vct<ACC: EndgameAccumulator>(
-    td: &mut ThreadData<impl ThreadType>,
+    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     board: &Board, max_depth: usize
 ) -> ACC {
     let mut board = *board;
@@ -48,7 +49,7 @@ fn vct<ACC: EndgameAccumulator>(
 
 // depth-first proof-number search
 fn try_vct<const C: Color, ACC: EndgameAccumulator>(
-    td: &mut ThreadData<impl ThreadType>,
+    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     mut board: Board,
     max_depth: usize, mut depth: usize, mut opponent_has_open_four: bool, mut opponent_has_five: bool,
 ) -> ACC {

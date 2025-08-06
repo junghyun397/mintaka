@@ -1,6 +1,7 @@
 use crate::batch_counter::BatchCounter;
 use crate::config::Config;
 use crate::endgame::vcf_search::VcfFrame;
+use crate::eval::evaluator::Evaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::principal_variation::PrincipalVariation;
@@ -11,10 +12,12 @@ use rusty_renju::notation::pos::{MaybePos, Pos};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 #[derive(Clone)]
-pub struct ThreadData<'a, TH: ThreadType> {
+pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub thread_type: TH,
     pub tid: u32,
     pub config: Config,
+
+    pub evaluator: E,
 
     pub tt: TTView<'a>,
     pub ht: Box<HistoryTable>,
@@ -33,12 +36,13 @@ pub struct ThreadData<'a, TH: ThreadType> {
     pub ply: usize,
 }
 
-impl<'a, TH: ThreadType> ThreadData<'a, TH> {
+impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
 
     #[allow(clippy::uninit_assumed_init)]
     pub fn new(
         thread_type: TH, tid: u32,
         config: Config,
+        evaluator: E,
         tt: TTView<'a>,
         ht: HistoryTable,
         aborted: &'a AtomicBool,
@@ -49,6 +53,7 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
             tid,
             config,
             tt,
+            evaluator,
             ht: Box::new(ht),
             ss: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             pvs: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
@@ -82,8 +87,9 @@ impl<'a, TH: ThreadType> ThreadData<'a, TH> {
         self.aborted.load(Ordering::Relaxed)
     }
 
-    pub fn push_ply_mut(&mut self) {
+    pub fn push_ply_mut(&mut self, pos: Pos) {
         self.ply += 1;
+        self.ss[self.ply].pos = pos.into();
         self.batch_counter.increment_single_mut();
     }
 

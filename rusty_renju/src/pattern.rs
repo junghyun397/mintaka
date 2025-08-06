@@ -268,12 +268,10 @@ impl Patterns {
         let slice_pattern = slice.calculate_slice_pattern::<R, C>();
 
         match (slice.pattern_bitmap.get::<C>() == 0, slice_pattern.is_empty()) {
-            (false, true) => {
-                self.clear_with_slice_mut::<C, D>(slice);
-            },
-            (_, false) => {
-                self.update_with_slice_pattern_mut::<C, D>(slice, slice_pattern);
-            },
+            (false, true) =>
+                self.clear_with_slice_mut::<C, D>(slice),
+            (_, false) =>
+                self.update_with_slice_pattern_mut::<C, D>(slice, slice_pattern),
             _ => {}
         };
     }
@@ -289,6 +287,11 @@ impl Patterns {
             let idx = step_idx!(D, start_idx, slice_idx);
             self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(0);
         }
+
+        self.counts.clear_slice_mut::<C, D>(
+            slice.idx as usize,
+            slice.evaluate_score::<C>()
+        );
 
         *slice.pattern_bitmap.get_ref_mut::<C>() = 0;
     }

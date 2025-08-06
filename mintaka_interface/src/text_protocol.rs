@@ -18,16 +18,16 @@ fn main() -> Result<(), GameError> {
     let pref = Preference::parse();
 
     match pref.mode {
-        Mode::TextProtocol => text_protocol(),
+        Mode::TextProtocol => text_protocol(pref.default_config, pref.game_state.unwrap_or_default()),
         Mode::SelfPlay => self_play(pref.default_config, pref.game_state.unwrap()),
     }
 }
 
-fn text_protocol() -> Result<(), GameError> {
+fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
     let launched = Arc::new(AtomicBool::new(false));
     let aborted = Arc::new(AtomicBool::new(false));
 
-    let mut game_agent = GameAgent::new(Config::default());
+    let mut game_agent = GameAgent::from_state(config, state);
 
     let (message_sender, message_receiver) = {
         let (tx, rx) = mpsc::channel();

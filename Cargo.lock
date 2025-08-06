@@ -1035,7 +1035,6 @@ name = "mintaka"
 version = "0.1.0-pre-alpha"
 dependencies = [
  "indoc",
- "log",
  "lz4",
  "rusty_renju",
  "serde",

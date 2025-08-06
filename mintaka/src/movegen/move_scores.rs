@@ -1,6 +1,7 @@
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::value::Score;
 use rusty_renju::utils::platform;
 use rusty_renju::{cartesian_to_index, const_for, max, min};
 use std::simd::Simd;
@@ -88,6 +89,16 @@ impl MoveScores {
                 }
             }
         }
+    }
+
+    pub fn sum_scores(&self) -> Score {
+        self.scores.iter()
+            .map(|&score| {
+                let mut score = score as Score;
+                score = score.pow(2);
+                score
+            })
+            .sum::<Score>()
     }
 
 }

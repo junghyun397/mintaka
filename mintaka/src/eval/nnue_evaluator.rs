@@ -1,6 +1,9 @@
 use crate::eval::evaluator::{Evaluator, PolicyDistribution};
+use crate::game_state::GameState;
 use rusty_renju::board::Board;
+use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
+use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::value::Score;
 
 struct NNUEInput {
@@ -12,28 +15,31 @@ struct NNUEInput {
     opponent_stones: [i8; 256]
 }
 
+#[derive(Clone)]
 pub struct NnueEvaluator {
     black_network: (),
     white_network: ()
 }
 
-impl Default for NnueEvaluator {
-
-    fn default() -> Self {
-        todo!()
-    }
-
-}
-
 impl Evaluator for NnueEvaluator {
 
-    const POLICY_EVALUATION: bool = true;
-
-    fn eval_value(&self, board: &Board) -> Score {
+    fn from_state(state: &GameState) -> Self {
         todo!()
     }
 
-    fn eval_policy(&self, board: &Board) -> PolicyDistribution {
+    fn update(&mut self, state: &GameState) {
+        todo!()
+    }
+
+    fn undo(&mut self, state: &GameState, color: Color, pos: Pos) {
+        todo!()
+    }
+
+    fn eval_policy(&self, state: &GameState) -> PolicyDistribution {
+        todo!()
+    }
+
+    fn eval_value(&self, state: &GameState) -> Score {
         todo!()
     }
 

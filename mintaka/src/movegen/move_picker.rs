@@ -1,7 +1,10 @@
+use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
-use crate::movegen::move_generator::{generate_defend_open_four_moves, generate_neighbors_moves};
+use crate::movegen::move_generator::generate_defend_open_four_moves;
 use crate::movegen::move_list::MoveList;
 use crate::search_frame::KILLER_MOVE_SLOTS;
+use crate::thread_data::ThreadData;
+use crate::thread_type::ThreadType;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::value::{Score, Scores};
@@ -42,6 +45,7 @@ impl MovePicker {
 
     pub fn next(
         &mut self,
+        td: &ThreadData<impl ThreadType, impl Evaluator>,
         state: &GameState,
     ) -> Option<(Pos, Score)> {
         loop {
@@ -67,7 +71,18 @@ impl MovePicker {
                         generate_defend_open_four_moves(state, &mut self.moves_buffer);
                         self.stage = MoveStage::DefendFour;
                     } else {
-                        generate_neighbors_moves(state, &mut self.moves_buffer);
+                        let mut field = !state.board.hot_field & state.movegen_window.movegen_field;
+
+                        if state.board.player_color == Color::Black {
+                            field &= !state.board.patterns.forbidden_field;
+                        }
+
+                        let policy_buffer = td.evaluator.eval_policy(state);
+
+                        for idx in field.iter_hot_idx() {
+                            self.moves_buffer.push(Pos::from_index(idx as u8), policy_buffer[idx]);
+                        }
+
                         self.stage = MoveStage::Neighbor;
                     }
                 },

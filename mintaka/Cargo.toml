@@ -3,11 +3,15 @@ name = "mintaka"
 version = "0.1.0-pre-alpha"
 edition = "2024"
 
+[features]
+heuristic-eval = []
+nnue-eval = []
+default = ["heuristic-eval"]
+
 [dependencies]
 rusty_renju = {path = "../rusty_renju" }
 serde = { version = "1.0", features = ["derive"] }
 lz4 = "1.28"
-log = "0.4.27"
 
 [dev-dependencies]
 indoc = "2.0"

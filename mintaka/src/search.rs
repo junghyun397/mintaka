@@ -1,6 +1,5 @@
 use crate::endgame::vcf_search::vcf_search;
 use crate::eval::evaluator::Evaluator;
-use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::game_state::GameState;
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind};
 use crate::movegen::move_picker::MovePicker;
@@ -40,7 +39,7 @@ struct OffPVNode; impl NodeType for OffPVNode {
 }
 
 pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
-    td: &mut ThreadData<TH>,
+    td: &mut ThreadData<TH, impl Evaluator>,
     mut state: GameState,
 ) -> Score {
     let mut score: Score = 0;
@@ -63,7 +62,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
 }
 
 pub fn aspiration<const R: RuleKind, TH: ThreadType>(
-    td: &mut ThreadData<TH>,
+    td: &mut ThreadData<TH, impl Evaluator>,
     state: &mut GameState,
     max_depth: usize,
     prev_score: Score,
@@ -97,7 +96,7 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
 }
 
 pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
-    td: &mut ThreadData<TH>,
+    td: &mut ThreadData<TH, impl Evaluator>,
     state: &mut GameState,
     depth_left: usize,
     mut alpha: Score,
@@ -118,7 +117,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     }
 
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
-        .access(!state.board.player_color)
+        .access(state.board.opponent_color())
     { // defend immediate win
         if state.board.player_color == Color::Black
             && state.board.patterns.forbidden_field.is_hot(pos)
@@ -126,7 +125,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             return Score::lose_in(td.ply + 2)
         }
 
-        td.push_ply_mut();
+        td.push_ply_mut(pos);
         let movegen_window = state.movegen_window;
         state.set_mut(pos);
 
@@ -162,7 +161,6 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         return Score::DRAW;
     }
 
-    // clear pv-line
     td.pvs[td.ply].clear();
 
     let mut static_eval: Score;
@@ -192,7 +190,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         static_eval = entry.score as Score;
     } else {
         tt_endgame_flag = EndgameFlag::Unknown;
-        static_eval = HeuristicEvaluator.eval_value(&state.board);
+        static_eval = td.evaluator.eval_value(state);
         tt_move = MaybePos::NONE;
         tt_pv = false;
     }
@@ -212,27 +210,31 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     td.ss[td.ply].static_eval = static_eval;
     td.ss[td.ply].on_pv = NT::IS_PV || tt_pv;
 
-    let mut move_seq = 0;
-    'position_search: while let Some((pos, _)) = move_picker.next(state) {
+    let mut total_moves = 0; // todo: debug
+    let mut illegal_moves = 0; // todo: debug
+    let mut moves_made = 0;
+    'position_search: while let Some((pos, _)) = move_picker.next(td, state) {
+        total_moves += 1;
         if !state.board.is_legal_move(pos) {
+            illegal_moves += 1;
             continue;
         }
 
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
-        td.push_ply_mut();
+        td.push_ply_mut(pos);
         let movegen_window = state.movegen_window;
         state.set_mut(pos);
 
-        move_seq += 1;
+        moves_made += 1;
 
-        let score = if move_seq == 1 { // full-window search
+        let score = if moves_made == 1 && true { // full-window search todo: debug
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
         } else { // zero-window search
             let mut score = -pvs::<R, OffPVNode, TH>(td, state, depth_left - 1, -alpha - 1, -alpha);
 
             if score > alpha { // zero-window failed, full-window search
-                score = -pvs::<R, PVNode, TH>(td, state, depth_left - 1, -beta, -alpha);
+                score = -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha);
             }
 
             score
@@ -241,15 +243,19 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         state.unset_mut(movegen_window);
         td.pop_ply_mut();
 
-        best_score = best_score.max(score);
+        if score <= best_score {
+            continue;
+        }
+
+        best_score = score;
+        best_move = pos.into();
 
         if score > alpha { // improve alpha
-            best_move = pos.into();
             alpha = score;
 
-            if NT::IS_PV { // update parent node pv
+            if NT::IS_PV {
                 if NT::IS_ROOT {
-                    td.pvs[0].line[0] = pos.into();
+                    td.pvs[0].init(pos.into());
                 } else {
                     let sub_pv = td.pvs[td.ply];
                     td.pvs[td.ply - 1].load(pos.into(), sub_pv);
@@ -264,8 +270,13 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         }
     }
 
-    if td.is_aborted() {
-        return Score::DRAW;
+    if NT::IS_ROOT {
+        td.best_move = best_move;
+    }
+
+    if moves_made == 0 { // todo: debug
+        println!("{} {}", total_moves, illegal_moves);
+        println!("{}", state.board.to_string_with_pattern_analysis());
     }
 
     let score_kind = if best_score >= beta {
@@ -286,10 +297,6 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         best_score,
         NT::IS_PV
     );
-
-    if NT::IS_ROOT {
-        td.best_move = best_move;
-    }
 
     best_score
 }

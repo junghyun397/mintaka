@@ -103,26 +103,24 @@ impl Board {
     }
 
     pub fn to_string_with_last_moves(&self, pair: [MaybePos; 2]) -> String {
-        let pre_marker = ["[".to_string(), "]".to_string()];
-        let post_marker = ["|".to_string(), "|".to_string()];
+        let post_marker = ["[".to_string(), "]".to_string()];
+        let pre_marker = ["|".to_string(), "|".to_string()];
 
         self.render_with_attributes(
             |_, &item| board_iter_item_to_symbol(item),
             |iter_pos, _| match MaybePos::from(iter_pos) {
-                pos if pos == pair[0] => Some((true, pre_marker.clone())),
-                pos if pos == pair[1] => Some((false, post_marker.clone())),
+                pos if pos == pair[1] => Some((true, post_marker.clone())),
+                pos if pos == pair[0] => Some((false, pre_marker.clone())),
                 _ => None,
             },
         )
     }
 
-    pub fn to_string_with_heatmap(&self, heatmap: [Option<f64>; pos::BOARD_SIZE], log_scale: bool) -> String {
-        let min = heatmap.iter()
-            .filter_map(|&x| x)
+    pub fn to_string_with_heatmap(&self, heatmap: [f64; pos::BOARD_SIZE], log_scale: bool) -> String {
+        let min = heatmap.into_iter()
             .fold(f64::NAN, f64::min);
 
-        let max = heatmap.iter()
-            .filter_map(|&x| x)
+        let max = heatmap.into_iter()
             .fold(f64::NAN, f64::max);
 
         if min.is_nan() {
@@ -136,7 +134,9 @@ impl Board {
             |pos, &item| {
                 let cell = board_iter_item_to_symbol(item);
 
-                if let Some(value) = heatmap[pos.idx_usize()] {
+                if heatmap[pos.idx_usize()].is_finite() {
+                    let value = heatmap[pos.idx_usize()];
+
                     let factor = if log_scale {
                         (value - min + 1.0).ln() / log_range
                     } else {

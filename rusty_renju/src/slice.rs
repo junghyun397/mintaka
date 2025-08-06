@@ -3,7 +3,7 @@ use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::{assert_struct_sizes, const_for, max};
+use crate::{assert_struct_sizes, const_for, max, slice_pattern};
 
 pub const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
@@ -105,6 +105,16 @@ impl Slice {
         match C {
             Color::Black => is_pattern_available(self.stones.black, self.stones.white),
             Color::White => is_pattern_available(self.stones.white, self.stones.black),
+        }
+    }
+
+    pub fn winner(&self) -> Option<Color> {
+        if slice_pattern::contains_five_in_a_row(self.stones.black) {
+            Some(Color::Black)
+        } else if slice_pattern::contains_five_in_a_row(self.stones.white) {
+            Some(Color::White)
+        } else {
+            None
         }
     }
 

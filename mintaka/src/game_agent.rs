@@ -1,4 +1,6 @@
 use crate::config::Config;
+use crate::eval::evaluator::{ActiveEvaluator, Evaluator};
+use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::game_state::GameState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
@@ -18,6 +20,7 @@ use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::value::Score;
 use rusty_renju::utils::byte_size::ByteSize;
+use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -82,11 +85,11 @@ pub struct ComputingResource {
     pub nodes_in_1k: Option<usize>,
 }
 
-#[derive(Serialize, Deserialize)]
 pub struct GameAgent {
     pub state: GameState,
     pub config: Config,
     pub time_management: Option<TimeManagement>,
+    pub evaluator: ActiveEvaluator,
     executed_moves: Bitfield,
     tt: TranspositionTable,
     ht: HistoryTable,
@@ -106,6 +109,7 @@ impl GameAgent {
             config,
             executed_moves: Bitfield::default(),
             time_management: config.initial_time_manager.map(TimeManagement::from),
+            evaluator: ActiveEvaluator::from_state(&state),
             tt,
             ht: HistoryTable {},
         }
@@ -127,20 +131,19 @@ impl GameAgent {
                             return Err(GameError::ForbiddenMove);
                         }
 
-                        self.state.set_mut(pos)
+                        self.state.set_mut(pos);
+                        self.evaluator.update(&self.state);
+
+                        if let Some(winner) = self.state.board.find_winner(pos) {
+                            return Ok(Some(GameResult::Win(winner)));
+                        }
                     }
                 }
 
-                match self.state.board.find_winner() {
-                    Some(winner) =>
-                        return Ok(Some(GameResult::Win(winner))),
-                    None => {
-                        if self.state.board.stones == pos::U8_BOARD_SIZE {
-                            return Ok(Some(GameResult::Full));
-                        } else if self.state.height() >= self.config.draw_condition {
-                            return Ok(Some(GameResult::Draw));
-                        }
-                    }
+                if self.state.board.stones == pos::U8_BOARD_SIZE {
+                    return Ok(Some(GameResult::Full));
+                } else if self.state.height() >= self.config.draw_condition {
+                    return Ok(Some(GameResult::Draw));
                 }
             },
             Command::Set { pos, color } => {
@@ -172,8 +175,8 @@ impl GameAgent {
                         if let Some(time_management) = &mut self.time_management
                             && let Some((index, time)) = time_management.time_history.iter()
                                 .enumerate()
-                                .find_map(|(index, (action, time))|
-                                    (action == &pos.into()).then_some((index, *time))
+                                .find_map(|(index, &(action, time))|
+                                    (action == pos.into()).then_some((index, time))
                                 )
                         {
                             time_management.time_history.remove(index);
@@ -215,14 +218,14 @@ impl GameAgent {
                 let (board, history) = *boxed;
 
                 let movegen_window = (&board.hot_field).into();
-                let move_scores = (&board.hot_field).into();
 
                 self.state = GameState {
                     board,
                     history,
                     movegen_window,
-                    move_scores,
                 };
+
+                self.evaluator = HeuristicEvaluator::from_state(&self.state);
 
                 self.tt.clear_mut(self.config.workers.into());
                 self.executed_moves = Bitfield::default();
@@ -248,6 +251,8 @@ impl GameAgent {
                     white_stones.into_boxed_slice(),
                     player
                 );
+
+                self.evaluator = HeuristicEvaluator::from_state(&self.state);
             }
             Command::TurnTime(time) => {
                 let Some(time_management) = &mut self.time_management else {
@@ -346,6 +351,7 @@ impl GameAgent {
                 ),
                 0,
                 self.config,
+                self.evaluator.clone(),
                 tt_view,
                 HistoryTable {},
                 &aborted, &global_counter_in_1k,
@@ -363,6 +369,7 @@ impl GameAgent {
                 let mut worker_td = ThreadData::new(
                     WorkerThread, tid,
                     self.config,
+                    self.evaluator.clone(),
                     tt_view,
                     HistoryTable {},
                     &aborted, &global_counter_in_1k
@@ -400,4 +407,45 @@ impl GameAgent {
         }
     }
 
+}
+
+impl Serialize for GameAgent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+        let mut state = serializer.serialize_struct("GameAgent", 5)?;
+        state.serialize_field("state", &self.state)?;
+        state.serialize_field("config", &self.config)?;
+        state.serialize_field("time_management", &self.time_management)?;
+        state.serialize_field("executed_moves", &self.executed_moves)?;
+        state.serialize_field("tt", &self.tt)?;
+        state.serialize_field("ht", &self.ht)?;
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for GameAgent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
+        #[derive(Deserialize)]
+        struct GameAgentData {
+            state: GameState,
+            config: Config,
+            time_management: Option<TimeManagement>,
+            executed_moves: Bitfield,
+            tt: TranspositionTable,
+            ht: HistoryTable,
+        }
+
+        let data = GameAgentData::deserialize(deserializer)?;
+
+        let evaluator = ActiveEvaluator::from_state(&data.state);
+
+        Ok(Self {
+            state: data.state,
+            config: data.config,
+            time_management: data.time_management,
+            executed_moves: data.executed_moves,
+            evaluator,
+            tt: data.tt,
+            ht: data.ht,
+        })
+    }
 }

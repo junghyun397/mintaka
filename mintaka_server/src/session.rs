@@ -3,7 +3,6 @@ use crate::stream_response_sender::StreamSessionResponseSender;
 use mintaka::config::Config;
 use mintaka::game_agent::{BestMove, GameAgent};
 use mintaka::game_state::GameState;
-use mintaka::movegen::move_scores::MoveScores;
 use mintaka::movegen::movegen_window::MovegenWindow;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::message::GameResult;
@@ -98,7 +97,6 @@ impl Session {
     pub fn new(config: Config, board: Board, history: History, time_to_live: Option<Duration>) -> Self {
         let game_state = GameState {
             movegen_window: MovegenWindow::from(&board.hot_field),
-            move_scores: MoveScores::from(&board.hot_field),
             board,
             history,
         };
@@ -253,7 +251,7 @@ impl<'de> Deserialize<'de> for Session {
 
         let data = SessionData::deserialize(deserializer)?;
 
-        Ok(Session {
+        Ok(Self {
             state: AgentState::Agent(data.agent),
             best_move: data.best_move,
             abort_handle: Arc::new(AtomicBool::new(false)),

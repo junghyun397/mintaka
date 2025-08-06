@@ -38,7 +38,7 @@ impl Default for Config {
             max_nodes_in_1k: None,
             max_depth: value::MAX_PLY,
             max_vcf_depth: pos::BOARD_SIZE - 5,
-            tt_size: ByteSize::from_mib(16),
+            tt_size: ByteSize::from_mib(128),
             workers: 1,
             initial_time_manager: None,
         }

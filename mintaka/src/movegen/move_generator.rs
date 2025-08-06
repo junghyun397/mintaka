@@ -1,8 +1,6 @@
 use crate::game_state::GameState;
 use crate::movegen::move_list::MoveList;
-use crate::movegen::score_table::probe_score_table_lut;
 use rusty_renju::board::Board;
-use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::value::Score;
@@ -50,18 +48,9 @@ impl VcfMovesUnchecked {
 }
 
 fn score_move(state: &GameState, pos: Pos) -> Score {
-    let neighborhood_score = state.move_scores.scores[pos.idx_usize()] as f32;
-    let score =
-        probe_score_table_lut::<{ Color::Black }>(
-            state.board.patterns.field.get::<{ Color::Black }>()[pos.idx_usize()]
-        ) as f32
-            + probe_score_table_lut::<{ Color::White }>(
-            state.board.patterns.field.get::<{ Color::White }>()[pos.idx_usize()]
-        ) as f32;
-
     let distance = (state.history.avg_distance_to_recent_actions(pos).max(8) + 4) as f32;
 
-    (((score + neighborhood_score) / distance) * 16.0) as Score
+    16 - distance as Score
 }
 
 pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Pos) -> VcfMovesUnchecked {
@@ -127,18 +116,6 @@ pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Po
     }
 
     VcfMovesUnchecked { moves: vcf_moves, top: vcf_moves_top as u8 }
-}
-
-pub fn generate_neighbors_moves(state: &GameState, moves: &mut MoveList) {
-    let mut field = !state.board.hot_field & state.movegen_window.movegen_field;
-
-    if state.board.player_color == Color::Black {
-        field &= !state.board.patterns.forbidden_field;
-    }
-
-    for pos in field.iter_hot_pos() {
-        moves.push(pos, score_move(state, pos));
-    }
 }
 
 pub fn generate_defend_open_four_moves(state: &GameState, moves: &mut MoveList) {

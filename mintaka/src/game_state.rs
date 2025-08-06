@@ -1,4 +1,3 @@
-use crate::movegen::move_scores::MoveScores;
 use crate::movegen::movegen_window::MovegenWindow;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
@@ -11,7 +10,6 @@ pub struct GameState {
     pub board: Board,
     pub history: History,
     pub movegen_window: MovegenWindow,
-    pub move_scores: MoveScores,
 }
 
 impl GameState {
@@ -21,7 +19,6 @@ impl GameState {
             board,
             history,
             movegen_window: MovegenWindow::from(&board.hot_field),
-            move_scores: MoveScores::from(&board.hot_field),
         }
     }
 
@@ -29,7 +26,6 @@ impl GameState {
         self.board.set_mut(pos);
         self.history.set_mut(pos);
 
-        self.move_scores.add_neighbor_score(pos);
         self.movegen_window.imprint_window_mut(pos);
     }
 
@@ -39,6 +35,8 @@ impl GameState {
     }
 
     pub fn unset_mut(&mut self, movegen_window: MovegenWindow) {
+        self.movegen_window = movegen_window;
+
         match self.history.pop_mut().unwrap() {
             MaybePos::NONE => {
                 self.board.unpass_mut();
@@ -47,8 +45,6 @@ impl GameState {
                 let pos = pos.unwrap();
 
                 self.board.unset_mut(pos);
-                self.move_scores.remove_neighbor_score(pos);
-                self.movegen_window = movegen_window;
             }
         }
     }
@@ -80,7 +76,6 @@ impl<'de> Deserialize<'de> for GameState {
 
         Ok(GameState {
             movegen_window: MovegenWindow::from(&data.board.hot_field),
-            move_scores: MoveScores::from(&data.board.hot_field),
             board: data.board,
             history: data.history,
         })

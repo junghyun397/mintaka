@@ -6,9 +6,7 @@ use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::RuleKind;
 use crate::pattern;
 use crate::pattern::Patterns;
-use crate::slice::Slices;
-use crate::slice_pattern;
-use std::marker::ConstParamTy;
+use crate::slice::{Slice, Slices};
 
 #[derive(Copy, Clone, Default)]
 pub struct Board {
@@ -33,7 +31,7 @@ impl Board {
     pub fn is_legal_move(&self, pos: Pos) -> bool {
         self.is_pos_empty(pos) && (
             self.player_color != Color::Black
-                || !self.patterns.forbidden_field.is_hot(pos)
+                || self.patterns.forbidden_field.is_cold(pos)
         )
     }
 
@@ -365,14 +363,17 @@ impl Board {
     }
 
     fn update_four_overrides(&self, overrides: &mut SetOverrides, direction_from: Direction, pos: Pos) {
-        for next_four_idx in (0 .. direction_from as usize * 3).chain((direction_from as usize + 1) * 3 .. 12) {
+        for next_four_idx in
+            (0 .. direction_from as usize * 3)
+                .chain((direction_from as usize + 1) * 3 .. 12)
+        {
             let four_pos = overrides.next_four[next_four_idx];
-            if four_pos != MaybePos::INVALID_POS {
-                overrides.bitfield.set_mut(four_pos);
+            if four_pos.is_some() {
+                overrides.bitfield.set_mut(four_pos.unwrap());
             }
         }
 
-        overrides.next_four = [MaybePos::INVALID_POS; 12];
+        overrides.next_four = [MaybePos::NONE; 12];
 
         for direction in self.patterns.field.black[pos.idx_usize()].iter_three_directions() {
             if direction == direction_from {
@@ -390,46 +391,46 @@ impl Board {
 
         match self.calculate_near_four_window::<{ Color::Black }>(direction, pos) {
             /* .VOO.  */ 0b11000 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -1);
-                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 3);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -1).into();
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 3).into();
             },
             /* .OOV.  */ 0b00011 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -3);
-                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 1);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -3).into();
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 1).into();
             },
             /* .V.OO. */ 0b10000 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -1);
-                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 1);
-                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 3);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -1).into();
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 1).into();
+                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 3).into();
             }
             /* .OO.V. */ 0b00001 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -3);
-                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, -1);
-                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 1);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -3).into();
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, -1).into();
+                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 1).into();
             }
             /* .VO.O. */ 0b01000 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -1);
-                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 2);
-                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 4);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -1).into();
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 2).into();
+                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 4).into();
             },
             /* .OVO.  */ 0b01010 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -2);
-                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 2);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -2).into();
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 2).into();
             },
             /* .O.OV. */ 0b00010 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -4);
-                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, -2);
-                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 1);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -4).into();
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, -2).into();
+                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 1).into();
             },
             /* .OV.O. */ 0b10010 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -2);
-                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 1);
-                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 3);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -2).into();
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, 1).into();
+                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 3).into();
             },
             /* .O.VO. */ 0b01001 => {
-                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -3);
-                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, -1);
-                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 2);
+                overrides.next_four[direction_offset] = pos.directional_offset_unchecked(direction, -3).into();
+                overrides.next_four[direction_offset + 1] = pos.directional_offset_unchecked(direction, -1).into();
+                overrides.next_four[direction_offset + 2] = pos.directional_offset_unchecked(direction, 2).into();
             },
             _ => unreachable!()
         }
@@ -447,26 +448,30 @@ impl Board {
         (((stones << 2) >> slice_idx) & 0b11111) as u8 // 0[00V00]0
     }
 
-    pub fn find_winner(&self) -> Option<Color> {
+    pub fn find_winner(&self, pos: Pos) -> Option<Color> {
+        [
+            Some(&self.slices.horizontal_slices[pos.row_usize()]),
+            Some(&self.slices.vertical_slices[pos.col_usize()]),
+            Slices::ascending_slice_idx(pos).map(|idx| &self.slices.ascending_slices[idx]),
+            Slices::descending_slice_idx(pos).map(|idx| &self.slices.descending_slices[idx])
+        ].iter()
+            .find_map(|maybe_slice| maybe_slice
+                .and_then(Slice::winner)
+            )
+    }
+
+    pub fn find_global_winner(&self) -> Option<Color> {
         self.slices.horizontal_slices.iter()
             .chain(self.slices.vertical_slices.iter())
             .chain(self.slices.ascending_slices.iter())
             .chain(self.slices.descending_slices.iter())
-            .find_map(|slice| {
-                if slice_pattern::contains_five_in_a_row(slice.stones.black) {
-                    Some(Color::Black)
-                } else if slice_pattern::contains_five_in_a_row(slice.stones.white) {
-                    Some(Color::White)
-                } else {
-                    None
-                }
-            })
+            .find_map(Slice::winner)
     }
 
 }
 
 //noinspection RsUnresolvedPath
-#[derive(ConstParamTy, Eq, PartialEq,)]
+#[derive(std::marker::ConstParamTy, Eq, PartialEq,)]
 pub enum MoveType {
     Set, Unset
 }
@@ -541,7 +546,7 @@ impl ValidateThreeContext for ValidateThreeNode {
 #[derive(Copy, Clone)]
 pub struct SetOverrides {
     bitfield: Bitfield,
-    next_four: [Pos; 12],
+    next_four: [MaybePos; 12],
     root: Pos,
 }
 
@@ -554,7 +559,7 @@ impl SetOverrides {
 
         Self {
             bitfield,
-            next_four: [MaybePos::INVALID_POS; 12],
+            next_four: [MaybePos::NONE; 12],
             root,
         }
     }
