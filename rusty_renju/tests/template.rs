@@ -1,9 +1,9 @@
 mod template {
     use indoc::indoc;
-    use rusty_renju::board::Board;
+    use rusty_renju::board;
 
     fn template() {
-        let case = indoc! {"
+        let case = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15
         14 . . . . . . . . . . . . . . . 14
@@ -20,7 +20,7 @@ mod template {
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
+           A B C D E F G H I J K L M N O"});
 
         let expected = indoc! {"
            A B C D E F G H I J K L M N O
@@ -41,6 +41,6 @@ mod template {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        assert_eq!(case.parse::<Board>().unwrap().to_string(), expected);
+        assert_eq!(case.to_string(), expected);
     }
 }

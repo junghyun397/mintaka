@@ -1,20 +1,47 @@
 #[cfg(test)]
 mod test_movegen {
-    use mintaka::game_state::GameState;
+    use mintaka::config::Config;
+    use mintaka::eval::evaluator::{ActiveEvaluator, Evaluator};
+    use mintaka::memo::history_table::HistoryTable;
+    use mintaka::memo::transposition_table::TranspositionTable;
     use mintaka::movegen::move_picker::MovePicker;
+    use mintaka::thread_data::ThreadData;
+    use mintaka::thread_type::WorkerThread;
     use rusty_renju::history::History;
     use rusty_renju::notation::pos;
     use rusty_renju::notation::pos::MaybePos;
+    use std::sync::atomic::{AtomicBool, AtomicUsize};
 
     macro_rules! test_move_ordering {
         ($history:literal) => {{
+            let config = Config::default();
             let history: History = $history.parse().unwrap();
-            let state = GameState::from_board_and_history(history.into(), history);
+
+            let state = history.into();
+
+            let evaluator = ActiveEvaluator::from_state(&state);
+
+            let tt = TranspositionTable::new_with_size(config.tt_size);
+            let ht = HistoryTable {};
+
+            let global_counter_in_1k = AtomicUsize::new(0);
+            let aborted = AtomicBool::new(false);
+
+            let mut td = ThreadData::new(
+                WorkerThread,
+                0,
+                config,
+                evaluator,
+                tt.view(),
+                ht,
+                &aborted,
+                &global_counter_in_1k
+            );
 
             let mut move_picker = MovePicker::new(MaybePos::NONE, [MaybePos::NONE; 2]);
 
             let mut heatmap = [f64::NAN; pos::BOARD_SIZE];
-            while let Some((pos, score)) = move_picker.next(&state) {
+            while let Some((pos, score)) = move_picker.next(&td, &state) {
                 heatmap[pos.idx_usize()] = score as f64;
 
                 print!("{:?}, ", (pos, score));

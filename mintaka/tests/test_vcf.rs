@@ -3,6 +3,8 @@ mod test_vcf {
     use indoc::indoc;
     use mintaka::config::Config;
     use mintaka::endgame::vcf_search;
+    use mintaka::eval::evaluator::ActiveEvaluator;
+    use mintaka::eval::evaluator::Evaluator;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
     use mintaka::thread_data::ThreadData;
@@ -15,8 +17,11 @@ mod test_vcf {
 
     macro_rules! vcf {
         ($board:expr) => {{
-            let mut board = $board;
+            let mut state = $board.into();
+
             let config = Config::default();
+
+            let evaluator = ActiveEvaluator::from_state(&state);
 
             let tt = TranspositionTable::new_with_size(ByteSize::from_kib(32));
             let ht = HistoryTable {};
@@ -24,15 +29,15 @@ mod test_vcf {
             let global_counter_in_1k = AtomicUsize::new(0);
             let aborted = AtomicBool::new(false);
 
-            let mut td = ThreadData::new(WorkerThread, 0, config, tt.view(), ht, &aborted, &global_counter_in_1k);
+            let mut td = ThreadData::new(WorkerThread, 0, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
             let time = std::time::Instant::now();
-            let vcf_result = vcf_search::vcf_sequence(&mut td, &board).unwrap();
+            let vcf_result = vcf_search::vcf_sequence(&mut td, &state).unwrap();
             let time = time.elapsed();
 
-            board.batch_set_mut(&vcf_result.clone().into_boxed_slice());
+            state.board.batch_set_mut(&vcf_result.clone().into_boxed_slice());
             let last_move = vcf_result.last().copied().unwrap();
 
-            println!("{}", board.to_string_with_highlighted_move(last_move.unwrap()));
+            println!("{}", state.board.to_string_with_highlighted_move(last_move.unwrap()));
             println!("length: {}", vcf_result.len());
             println!("sequence: {vcf_result:?}");
             println!("time: {time:?}");

@@ -59,6 +59,63 @@ impl Slice {
         acc
     }
 
+    pub fn eval_slice<const C: Color>(&self) -> u8 {
+        let (mut stones, mut blocks) = {
+            let (stones, blocks) = self.stones_with_boundary_mask::<C>();
+            ((stones as u32) << 1, ((blocks as u32) << 1) | 0b1)
+        };
+
+        let open = !blocks;
+
+        let mut start5 = open;
+        start5 &= open >> 1;
+        start5 &= open >> 2;
+        start5 &= open >> 3;
+        start5 &= open >> 4;
+
+        let cover5 = start5 | (start5 << 1) | (start5 << 2) | (start5 << 3) | (start5 << 4);
+
+        stones = stones & cover5;
+        if stones == 0 { return 0; }
+
+        let empty = !(stones | blocks);
+        let mut score: u8 = 0;
+
+        let pair_left = stones & (stones >> 1);
+        let paired = (stones & (stones << 1)) | (stones & (stones >> 1));
+        let singles = stones & !paired;
+
+        // . . O . .
+        let open_both = singles & (empty << 1) & (empty << 2) & (empty >> 1) & (empty >> 2);
+        score += 3 * (open_both.count_ones() as u8);
+
+        // X . O . . . | . . . O . X
+        let blocked_loose_left = singles & (empty << 1) & (blocks << 2) & (empty >> 1);
+        let blocked_loose_right = singles & (empty >> 1) & (blocks >> 2) & (empty << 1);
+        let blocked_loose = (blocked_loose_left | blocked_loose_right) & !open_both;
+        score += 1 * (blocked_loose.count_ones() as u8);
+
+        // X O O . . . | . . . O O X
+        let blocked_none_gap = pair_left & ((blocks << 1) | (blocks >> 2));
+        score += 2 * (blocked_none_gap.count_ones() as u8);
+
+        // X O . O . . | . . O . O X
+        let single_gap = stones & (empty >> 1) & (stones >> 2);
+        let blocked_single_gap = single_gap & ((blocks << 1) | (blocks >> 3));
+        score += 2 * (blocked_single_gap.count_ones() as u8);
+
+        // X O . . O . | . O . . O X
+        let double_gap = stones & (empty >> 1) & (empty >> 2) & (stones >> 3);
+        let blocked_double_gap = double_gap & ((blocks << 1) | (blocks >> 4));
+        score += 2 * (blocked_double_gap.count_ones() as u8);
+
+        // . O . . . O .
+        let bridged = stones & (empty >> 1) & (empty >> 2) & (empty >> 3) & (stones >> 4) & (empty << 1) & (empty >> 5);
+        score += 3 * (bridged.count_ones() as u8);
+
+        score
+    }
+
 }
 
 #[inline(always)]

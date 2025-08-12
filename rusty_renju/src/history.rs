@@ -103,6 +103,19 @@ impl History {
         self.entries[self.top - 2]
     }
 
+    pub fn avg_distance_to_recent_action_pair(&self, pos: Pos) -> u8 {
+        if self.top > 1 {
+            let distance1 = self.entries[self.top - 2].distance_or(pos, 0);
+            let distance2 = self.entries[self.top - 1].distance_or(pos, 0);
+            return (distance1 + distance2) / 2
+        }
+
+        match self.top {
+            1 => self.entries[0].distance_or(pos, 0),
+            _ => 0
+        }
+    }
+
     pub fn avg_distance_to_recent_actions(&self, pos: Pos) -> u8 {
         if self.top > 3 {
             let distance1 = self.entries[self.top - 4].distance_or(pos, 0);

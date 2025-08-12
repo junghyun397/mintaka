@@ -7,7 +7,6 @@ use crate::movegen::move_generator::{generate_vcf_moves, VcfMovesUnchecked};
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
-use rusty_renju::history::History;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
@@ -98,13 +97,11 @@ pub fn vcf_defend(
 
 pub fn vcf_sequence(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
-    board: &Board
+    state: &GameState
 ) -> Option<Vec<MaybePos>> {
-    let vcf_moves = generate_vcf_moves(board, 8, pos::CENTER);
+    let vcf_moves = generate_vcf_moves(&state.board, 8, pos::CENTER);
 
-    let state = GameState::from_board_and_history(*board, History::default());
-
-    vcf::<SequenceEndgameAccumulator>(td, VcfWin, usize::MAX, state, vcf_moves, Score::MIN, Score::MAX)
+    vcf::<SequenceEndgameAccumulator>(td, VcfWin, usize::MAX, *state, vcf_moves, Score::MIN, Score::MAX)
         .map(|mut sequence| {
             sequence.reverse();
             sequence

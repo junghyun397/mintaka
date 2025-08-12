@@ -1,4 +1,4 @@
-use crate::utils::time_manager::TimeManager;
+use crate::time_manager::TimeManager;
 use crate::value;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::rule::RuleKind;

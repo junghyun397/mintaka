@@ -3,23 +3,23 @@
 #![feature(portable_simd)]
 #![cfg_attr(target_arch = "aarch64", feature(stdarch_aarch64_prefetch))]
 
+pub mod batch_counter;
 pub mod config;
-pub mod memo;
-pub mod eval;
 pub mod endgame;
-pub mod tablebase;
-pub mod utils;
+pub mod eval;
+pub mod game_agent;
+pub mod game_state;
+pub mod memo;
+pub mod movegen;
+pub mod nnue;
+pub mod principal_variation;
 pub mod protocol;
 pub mod search;
-pub mod principal_variation;
-pub mod nnue;
+pub mod search_frame;
+pub mod tablebase;
 pub mod thread_data;
 pub mod thread_type;
-pub mod batch_counter;
-pub mod search_frame;
-pub mod game_state;
-pub mod movegen;
-pub mod game_agent;
+pub mod time_manager;
 pub mod value;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

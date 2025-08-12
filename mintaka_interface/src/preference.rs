@@ -1,7 +1,7 @@
 use clap::{Parser, ValueEnum};
 use mintaka::config::Config;
 use mintaka::game_state::GameState;
-use mintaka::utils::time_manager::TimeManager;
+use mintaka::time_manager::TimeManager;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use std::time::Duration;
@@ -46,9 +46,9 @@ impl Preference {
     fn init(&mut self) {
         if self.mode == Mode::SelfPlay {
             self.game_state = Some(if let Some(history) = self.history {
-                GameState::from_board_and_history(history.into(), history)
+                history.into()
             } else if let Some(board) = self.board {
-                GameState::from_board_and_history(board, (&board).try_into().unwrap())
+                board.into()
             } else {
                 GameState::default()
             });

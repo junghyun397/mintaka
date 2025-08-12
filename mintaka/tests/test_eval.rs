@@ -1,16 +1,17 @@
 #[cfg(test)]
 mod test_eval {
     use indoc::indoc;
-    use mintaka::eval::evaluator::Evaluator;
-    use mintaka::eval::heuristic_evaluator::HeuristicEvaluator;
+    use mintaka::eval::evaluator::{ActiveEvaluator, Evaluator};
     use mintaka::game_state::GameState;
     use rusty_renju::board;
 
     macro_rules! eval {
         ($board:expr) => {{
-            let state = GameState::from_board_and_history($board, (&$board).try_into().unwrap());
+            let state: GameState = $board.into();
 
-            HeuristicEvaluator.eval_value(&state.board)
+            let mut evaluator = ActiveEvaluator::from_state(&state.clone());
+
+            evaluator.eval_value(&state)
         }};
     }
 
@@ -23,17 +24,19 @@ mod test_eval {
         13 . . . . . . . . . . . . . . . 13
         12 . . . . . . . . . . . . . . . 12
         11 . . . . . . . . . . . . . . . 11
-        10 . . . . . . . O . . . . . . . 10
-         9 . . . . . . . . O . . . . . . 9
-         8 . . . . . . X X . O . . . . . 8
-         7 . . . . . . X O X . X . . . . 7
-         6 . . . . . . . . . O . . . . . 6
-         5 . . . . . . . . . . . . . . . 5
+        10 . . . . . . . . . . . . . . . 10
+         9 . . . . . . X . O . . . . . . 9
+         8 . . . . . . . X . . . . . . . 8
+         7 . . . . . . X O O O . . . . . 7
+         6 . . . . . . . X X X O . . . . 6
+         5 . . . . . . . . O . . . . . . 5
          4 . . . . . . . . . . . . . . . 4
          3 . . . . . . . . . . . . . . . 3
          2 . . . . . . . . . . . . . . . 2
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"});
+
+        println!("{}", board.to_string_with_pattern_analysis());
 
         println!("{:?}", eval!(board));
     }

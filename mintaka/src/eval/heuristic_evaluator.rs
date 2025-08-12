@@ -33,22 +33,30 @@ impl Evaluator for HeuristicEvaluator {
         let mut policy = [0; pos::BOARD_SIZE];
 
         for (idx, &score) in self.move_scores.scores.iter().enumerate().take(pos::BOARD_SIZE) {
-            policy[idx] = score as Score;
+            let distance = state.history.avg_distance_to_recent_actions(Pos::from_index(idx as u8)) as Score;
+
+            policy[idx] = (16 - distance) + score as Score;
         }
 
         policy
     }
 
     fn eval_value(&self, state: &GameState) -> Score {
-        let score_black = Self::eval_slice_pattern_counts::<{ Color::Black }>(&state.board);
-        let score_white = Self::eval_slice_pattern_counts::<{ Color::White }>(&state.board);
+        let black_score = Self::eval_slice_pattern_counts::<{ Color::Black }>(&state.board);
+        let white_score = Self::eval_slice_pattern_counts::<{ Color::White }>(&state.board);
 
         match state.board.player_color {
-            Color::Black => score_black - score_white,
-            Color::White => score_white - score_black,
+            Color::Black => black_score - white_score,
+            Color::White => white_score - black_score,
         }
     }
 
+}
+
+struct HeuristicThreatScores; impl HeuristicThreatScores {
+    const CLOSED_FOUR: Score = 100;
+    const OPEN_THREE: Score = 100;
+    const OPEN_FOUR: Score = 1000;
 }
 
 impl HeuristicEvaluator {
@@ -72,20 +80,32 @@ impl HeuristicEvaluator {
             + counts.score as Score
     }
 
+    fn eval_pattern(state: &GameState) -> Score {
+        let mut black_score = 0;
+        let mut white_score = 0;
+
+        for idx in state.movegen_window.movegen_field.iter_hot_idx() {
+            black_score +=
+                probe_score_table_lut::<{ Color::Black }>(state.board.patterns.field.get::<{ Color::Black }>()[idx]) as Score;
+            white_score -=
+                probe_score_table_lut::<{ Color::White }>(state.board.patterns.field.get::<{ Color::White }>()[idx]) as Score;
+        }
+
+        match state.board.player_color {
+            Color::Black => black_score - white_score,
+            Color::White => white_score - black_score,
+        }
+    }
+
+    fn eval_slice(state: &GameState) -> Score {
+        let mut player_score = 0;
+
+        0
+    }
+
 }
 
-struct HeuristicThreatScores; impl HeuristicThreatScores {
-    const CLOSED_FOUR: Score = 100;
-    const OPEN_THREE: Score = 100;
-    const OPEN_FOUR: Score = 1000;
-}
-
-pub fn probe_score_table_lut<const C: Color>(pattern: Pattern) -> i8 {
-    let idx = encode_pattern_to_score_key(pattern);
-    PATTERN_SCORE_LUT.get_ref::<C>()[idx]
-}
-
-fn encode_pattern_to_score_key(pattern: Pattern) -> usize {
+fn probe_score_table_lut<const C: Color>(pattern: Pattern) -> i8 {
     let mut pattern_key = pattern.count_closed_fours() & 0b11;
 
     pattern_key |= (pattern.count_open_fours() & 0b11) << 2;
@@ -93,20 +113,20 @@ fn encode_pattern_to_score_key(pattern: Pattern) -> usize {
     pattern_key |= (pattern.has_close_three() as u32) << 6;
     pattern_key |= (pattern.has_overline() as u32) * 127;
 
-    pattern_key as usize
+    PATTERN_SCORE_LUT.get_ref::<C>()[pattern_key as usize]
 }
 
 struct HeuristicPositionScores; impl HeuristicPositionScores {
-    const OPEN_THREE: i8 = 15;
-    const CLOSE_THREE: i8 = 5;
-    const CLOSED_FOUR: i8 = 7;
-    const OPEN_FOUR: i8 = 80;
+    const OPEN_THREE: i8 = 5;
+    const CLOSE_THREE: i8 = 0;
+    const CLOSED_FOUR: i8 = 2;
+    const OPEN_FOUR: i8 = i8::MAX;
     const DOUBLE_THREE_FORK: i8 = 30;
-    const THREE_FOUR_FORK: i8 = 50;
-    const DOUBLE_FOUR_FORK: i8 = 80;
+    const THREE_FOUR_FORK: i8 = i8::MAX;
+    const DOUBLE_FOUR_FORK: i8 = i8::MAX;
     const DOUBLE_THREE_FORBID: i8 = 1;
-    const DOUBLE_FOUR_FORBID: i8 = -2;
-    const OVERLINE_FORBID: i8 = -2;
+    const DOUBLE_FOUR_FORBID: i8 = -3;
+    const OVERLINE_FORBID: i8 = -3;
 }
 
 const PATTERN_SCORE_LUT: ColorContainer<[i8; 0b1 << 7]> = build_pattern_score_lut();

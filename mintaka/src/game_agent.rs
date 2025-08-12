@@ -10,7 +10,7 @@ use crate::protocol::response::{Response, ResponseSender};
 use crate::search;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
-use crate::utils::time_manager::TimeManager;
+use crate::time_manager::TimeManager;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
@@ -86,13 +86,13 @@ pub struct ComputingResource {
 }
 
 pub struct GameAgent {
-    pub state: GameState,
     pub config: Config,
-    pub time_management: Option<TimeManagement>,
+    pub state: GameState,
     pub evaluator: ActiveEvaluator,
-    executed_moves: Bitfield,
     tt: TranspositionTable,
     ht: HistoryTable,
+    executed_moves: Bitfield,
+    pub time_management: Option<TimeManagement>,
 }
 
 impl GameAgent {
@@ -105,13 +105,13 @@ impl GameAgent {
         let tt = TranspositionTable::new_with_size(config.tt_size);
 
         Self {
-            state,
             config,
-            executed_moves: Bitfield::default(),
-            time_management: config.initial_time_manager.map(TimeManagement::from),
+            state,
             evaluator: ActiveEvaluator::from_state(&state),
             tt,
             ht: HistoryTable {},
+            executed_moves: Bitfield::default(),
+            time_management: config.initial_time_manager.map(TimeManagement::from),
         }
     }
 
@@ -217,14 +217,7 @@ impl GameAgent {
             Command::Load(boxed) => {
                 let (board, history) = *boxed;
 
-                let movegen_window = (&board.hot_field).into();
-
-                self.state = GameState {
-                    board,
-                    history,
-                    movegen_window,
-                };
-
+                self.state = GameState::from_board_and_history(board, history);
                 self.evaluator = HeuristicEvaluator::from_state(&self.state);
 
                 self.tt.clear_mut(self.config.workers.into());
@@ -255,11 +248,15 @@ impl GameAgent {
                 self.evaluator = HeuristicEvaluator::from_state(&self.state);
             }
             Command::TurnTime(time) => {
-                let Some(time_management) = &mut self.time_management else {
-                    return Err(GameError::NoTimeManagement);
-                };
-
-                time_management.time_manager.turn = time;
+                if let Some(time_management) = &mut self.time_management {
+                    time_management.time_manager.turn = time;
+                } else {
+                    self.time_management = Some(TimeManagement::from(TimeManager::new(
+                        Duration::MAX,
+                        Duration::ZERO,
+                        time
+                    )))
+                }
             },
             Command::IncrementTime(time) => {
                 let Some(time_management) = &mut self.time_management else {
@@ -269,11 +266,15 @@ impl GameAgent {
                 time_management.time_manager.increment = time;
             },
             Command::TotalTime(time) => {
-                let Some(time_management) = &mut self.time_management else {
-                    return Err(GameError::NoTimeManagement);
-                };
-
-                time_management.time_manager.total_remaining = time;
+                if let Some(time_management) = &mut self.time_management {
+                    time_management.time_manager.total_remaining = time;
+                } else {
+                    self.time_management = Some(TimeManagement::from(TimeManager::new(
+                        time,
+                        Duration::ZERO,
+                        Duration::MAX
+                    )))
+                }
             },
             Command::ConsumeTime(time) => {
                 let Some(time_management) = &mut self.time_management else {
@@ -411,13 +412,13 @@ impl GameAgent {
 
 impl Serialize for GameAgent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
-        let mut state = serializer.serialize_struct("GameAgent", 5)?;
-        state.serialize_field("state", &self.state)?;
+        let mut state = serializer.serialize_struct("GameAgent", 6)?;
         state.serialize_field("config", &self.config)?;
-        state.serialize_field("time_management", &self.time_management)?;
-        state.serialize_field("executed_moves", &self.executed_moves)?;
+        state.serialize_field("state", &self.state)?;
         state.serialize_field("tt", &self.tt)?;
         state.serialize_field("ht", &self.ht)?;
+        state.serialize_field("executed_moves", &self.executed_moves)?;
+        state.serialize_field("time_management", &self.time_management)?;
         state.end()
     }
 }
@@ -439,13 +440,13 @@ impl<'de> Deserialize<'de> for GameAgent {
         let evaluator = ActiveEvaluator::from_state(&data.state);
 
         Ok(Self {
-            state: data.state,
             config: data.config,
-            time_management: data.time_management,
-            executed_moves: data.executed_moves,
+            state: data.state,
             evaluator,
             tt: data.tt,
             ht: data.ht,
+            executed_moves: data.executed_moves,
+            time_management: data.time_management,
         })
     }
 }

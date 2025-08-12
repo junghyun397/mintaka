@@ -122,6 +122,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         if state.board.player_color == Color::Black
             && state.board.patterns.forbidden_field.is_hot(pos)
         { // trapped
+            if NT::IS_ROOT {
+                td.best_move = MaybePos::NONE;
+            }
+
             return Score::lose_in(td.ply + 2)
         }
 
@@ -129,7 +133,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         let movegen_window = state.movegen_window;
         state.set_mut(pos);
 
-        let score = -pvs::<R, NT, TH>(td, state, depth_left, -beta, -alpha);
+        let score = -pvs::<R, NT::NextType, TH>(td, state, depth_left, -beta, -alpha);
 
         state.unset_mut(movegen_window);
         td.pop_ply_mut();

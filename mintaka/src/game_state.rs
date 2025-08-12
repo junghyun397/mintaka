@@ -55,6 +55,29 @@ impl GameState {
 
 }
 
+impl Into<GameState> for Board {
+    fn into(self) -> GameState {
+        let history = (&self).try_into().unwrap_or(History::default());
+
+        GameState {
+            board: self,
+            history,
+            movegen_window: MovegenWindow::from(&self.hot_field),
+        }
+    }
+}
+
+impl Into<GameState> for History {
+    fn into(self) -> GameState {
+        let board = self.into();
+        GameState {
+            board,
+            history: self,
+            movegen_window: MovegenWindow::from(&board.hot_field),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct GameStateData {
     board: Board,

@@ -118,29 +118,8 @@ impl Slice {
         }
     }
 
-    // TODO: add pre-check and optimization; 7%.
-    #[inline(always)]
-    pub fn evaluate_score<const C: Color>(&self) -> i16 {
-        let blocks = {
-            let raw = self.stones.get_reversed::<C>() as u32
-                | self.pattern_bitmap.get::<C>() as u32;
-
-            (raw << 1) | 0b1
-        };
-
-        let stones = (self.stones.get::<C>() as u32) << 1;
-
-        let p1 = blocks & (blocks >> 2);
-        let p2 = blocks & (blocks >> 3);
-        let p3 = blocks & (blocks >> 4);
-        let p4 = blocks & (blocks >> 5);
-
-        let filled = (p1 << 1)
-            | (p2 << 1) | (p2 << 2)
-            | (p3 << 1) | (p3 << 2) | (p3 << 3)
-            | (p4 << 1) | (p4 << 2) | (p4 << 3) | (p4 << 4);
-
-        (!filled & stones).count_ones() as i16
+    pub fn stones_with_boundary_mask<const C: Color>(&self) -> (u16, u16) {
+        (self.stones.get::<C>(), (u16::MAX << self.length) | self.stones.get_reversed::<C>())
     }
 
 }
@@ -254,8 +233,9 @@ impl Slices {
         self.horizontal_slices.iter()
             .enumerate()
             .fold(
-                ColorContainer::new(Bitfield::default(), Bitfield::default()),
-                  |mut bitfield_container, (row_idx, slice)| {
+                ColorContainer::new(
+                    Bitfield::default(), Bitfield::default()),
+                |mut bitfield_container, (row_idx, slice)| {
                       for col_idx in 0..pos::BOARD_WIDTH {
                           if let Some(color) = slice.stone_kind(col_idx) {
                               bitfield_container

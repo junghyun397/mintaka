@@ -10,7 +10,7 @@ mod test_slice_pattern {
         ($case:expr, $expected:expr, $color:expr, $mask:expr, $result:expr) => {{
             assert_eq!($case.len(), $expected.len());
 
-            let slice = Slice::from_str($case).unwrap();
+            let slice: Slice = $case.parse().unwrap();
             let black_patterns = slice.calculate_slice_pattern::<{ RuleKind::Renju }, { Color::Black }>();
             let white_patterns = slice.calculate_slice_pattern::<{ RuleKind::Renju }, { Color::White }>();
 
@@ -119,37 +119,37 @@ mod test_slice_pattern {
     #[test]
     fn three() {
         test_pattern!(
-            color = both,
+            color               = both,
             case                = ". . . O O . . .",
             open_three          = ". V V O O V V .",
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = "X . O O . . .",
             open_three          = "X . O O V V .",
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = "X . . O O . . .",
             open_three          = "X . V O O V V .",
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = ". . O . O . .",
             open_three          = ". V O V O V .",
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = "X . O . O . .",
             open_three          = "X . O V O V .",
         );
         
         test_pattern!(
-            color = both,
+            color               = both,
             case                = ". O . . O .",
             open_three          = ". O V V O .",
         );
@@ -158,7 +158,7 @@ mod test_slice_pattern {
     #[test]
     fn complex_three() {
         test_pattern!(
-            color = Color::Black,
+            color               = Color::Black,
             case                = "X . . X X . . .",
             open_three          = "X . . X X V V .",
             closed_four_single  = "X V V X X . . .",
@@ -171,25 +171,25 @@ mod test_slice_pattern {
         );
 
         test_pattern!(
-            color = Color::Black,
+            color               = Color::Black,
             case                = "X . . . X X . . X",
             open_three          = "X . . . X X . . X",
         );
 
         test_pattern!(
-            color = Color::Black,
+            color               = Color::Black,
             case                = "X . . . X X . . . X",
             open_three          = "X . . V X X V . . X",
         );
 
         test_pattern!(
-            color = Color::Black,
+            color               = Color::Black,
             case                = "X . . X . X . .",
             open_three          = "X . . X V X V .",
         );
 
         test_pattern!(
-            color = Color::Black,
+            color               = Color::Black,
             case                = "X . . X . X . . X",
             open_three          = "X . . X . X . . X",
         );
@@ -198,19 +198,19 @@ mod test_slice_pattern {
     #[test]
     fn four() {
         test_pattern!(
-            color = both,
+            color               = both,
             case                = "O O O . .",
             closed_four_single  = "O O O V V",
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = ". O O O .",
             closed_four_single  = "V O O O V",
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = ". . O O O . .",
             closed_four_single  = "V . O O O . V",
             open_four           = ". V O O O V .",
@@ -218,7 +218,7 @@ mod test_slice_pattern {
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = "X . O O O . .",
             closed_four_single  = "X V O O O . V",
             open_four           = "X . O O O V .",
@@ -226,7 +226,7 @@ mod test_slice_pattern {
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = ". . O O O . .",
             closed_four_single  = "V . O O O . V",
             open_four           = ". V O O O V .",
@@ -234,13 +234,13 @@ mod test_slice_pattern {
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = ". O O . . O .",
             closed_four_single  = ". O O V V O .",
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = ". O O . O .",
             closed_four_single  = "V O O . O V",
             open_four           = ". O O V O .",
@@ -251,13 +251,13 @@ mod test_slice_pattern {
     #[test]
     fn complex_four_black() {
         test_pattern!(
-            color = Color::Black,
+            color               = Color::Black,
             case                = ". X X . . X X .",
             closed_four_single  = ". X X . . X X .",
         );
 
         test_pattern!(
-            color = Color::Black,
+            color               = Color::Black,
             case                = "X . . X X X . . .",
             closed_four_single  = "X . V X X X . V .",
             open_four           = "X . . X X X V . .",
@@ -265,7 +265,7 @@ mod test_slice_pattern {
         );
 
         test_pattern!(
-            color = Color::Black,
+            color               = Color::Black,
             case                = ". X . X X . X .",
             closed_four_single  = "V X V X X V X V",
             closed_four_double  = ". X . X X . X .",
@@ -274,7 +274,7 @@ mod test_slice_pattern {
         );
 
         test_pattern!(
-            color = Color::Black,
+            color               = Color::Black,
             case                = ". X . X . X X . .",
             closed_four_single  = ". X . X V X X V .",
             closed_four_double  = ". X . X . X X . .",
@@ -286,14 +286,14 @@ mod test_slice_pattern {
     #[test]
     fn complex_four_white() {
         test_pattern!(
-            color = Color::White,
+            color               = Color::White,
             case                = "O . . O O O",
             closed_four_single  = "O V V O O O",
             closed_four_double  = "O . . O O O",
         );
 
         test_pattern!(
-            color = Color::White,
+            color               = Color::White,
             case                = ". O O O . . O",
             closed_four_single  = "V O O O V V O",
             closed_four_double  = ". O O O . . O",
@@ -302,21 +302,21 @@ mod test_slice_pattern {
         );
 
         test_pattern!(
-            color = Color::White,
+            color               = Color::White,
             case                = "O O . O . O O",
             closed_four_single  = "O O V O V O O",
             closed_four_double  = "O O . O . O O",
         );
 
         test_pattern!(
-            color = Color::White,
+            color               = Color::White,
             case                = "O O O . . O O O",
             closed_four_single  = "O O O V V O O O",
             closed_four_double  = "O O O . . O O O",
         );
 
         test_pattern!(
-            color = Color::White,
+            color               = Color::White,
             case                = ". . O . O O . O",
             closed_four_single  = ". V O . O O V O",
             closed_four_double  = ". . O . O O . O",
@@ -324,7 +324,7 @@ mod test_slice_pattern {
         );
 
         test_pattern!(
-            color = Color::White,
+            color               = Color::White,
             case                = "O O . . O . O . .",
             open_three          = "O O . . O V O V .",
             closed_four_single  = "O O V V O . O . .",
@@ -334,21 +334,21 @@ mod test_slice_pattern {
     #[test]
     fn double_four() {
         test_pattern!(
-            color = both,
+            color               = both,
             case                = ". O . O . O . O .",
             closed_four_single  = ". O V O . O V O .",
             closed_four_double  = ". O . O V O . O .",
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = ". O . O . O . O . O . O .",
             closed_four_single  = ". O V O . O . O . O V O .",
             closed_four_double  = ". O . O V O V O V O . O .",
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = ". O . O O . . O .",
             closed_four_single  = "V O . O O . V O .",
             closed_four_double  = ". O . O O V . O .",
@@ -356,7 +356,7 @@ mod test_slice_pattern {
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = ". O O . O . . O O .",
             closed_four_single  = "V O O . O . V O O .",
             closed_four_double  = ". O O . O V . O O .",
@@ -364,14 +364,14 @@ mod test_slice_pattern {
         );
 
         test_pattern!(
-            color = Color::White,
+            color               = Color::White,
             case                = "O . O O . . O . O O",
             closed_four_single  = "O V O O . . O V O O",
             closed_four_double  = "O . O O V V O . O O",
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = ". . O O O . . . O O O . .",
             closed_four_single  = "V . O O O . . . O O O . V",
             closed_four_double  = ". . O O O . V . O O O . .",
@@ -379,7 +379,7 @@ mod test_slice_pattern {
         );
 
         test_pattern!(
-            color = Color::White,
+            color               = Color::White,
             case                = "O . O . O O . . O O . O . . .",
             closed_four_single  = "O V O . O O . . O O . O V . .",
             closed_four_double  = "O . O . O O V V O O . O . . .",
@@ -387,7 +387,7 @@ mod test_slice_pattern {
         );
 
         test_pattern!(
-            color = Color::Black,
+            color               = Color::Black,
             case                = "X . X . X X . . X X . X . . .",
             open_three          = "X . X . X X . . X X . X . . .",
             closed_four_single  = "X . X V X X V V X X . X V . .",
@@ -399,19 +399,19 @@ mod test_slice_pattern {
     #[test]
     fn five() {
         test_pattern!(
-            color = both,
+            color               = both,
             case                = ". O O O O .",
             five                = "V O O O O V",
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = "O O O . O",
             five                = "O O O V O",
         );
 
         test_pattern!(
-            color = both,
+            color               = both,
             case                = "O O . O O",
             five                = "O O V O O",
         );
@@ -420,21 +420,21 @@ mod test_slice_pattern {
     #[test]
     fn overline() {
         test_pattern!(
-            color = Color::Black,
+            color               = Color::Black,
             case                = "X . X X X X .",
             five                = "X . X X X X V",
             overline            = "X V X X X X .",
         );
 
         test_pattern!(
-            color = Color::Black,
+            color               = Color::Black,
             case                = "X X X . X X",
             five                = "X X X . X X",
             overline            = "X X X V X X",
         );
 
         test_pattern!(
-            color = Color::Black,
+            color               = Color::Black,
             case                = "X X X X . X",
             five                = "X X X X . X",
             overline            = "X X X X V X",

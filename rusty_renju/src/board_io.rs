@@ -229,7 +229,8 @@ impl Board {
         }
 
         format!(
-            "{}\nblack\n{}\nwhite\n{}", self,
+            "player={}\n{self}\nblack\n{}\nwhite\n{}",
+            self.player_color,
             build_each_color_string(self, Color::Black),
             build_each_color_string(self, Color::White)
         )
