@@ -59,9 +59,6 @@ pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Po
 
     let field_ptr = board.patterns.field.access(board.player_color).as_ptr() as *const u32;
 
-    let four_mask = Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
-    let zero_mask = Simd::splat(0);
-
     let recent_move_row = recent_move.row_usize();
     let recent_move_col = recent_move.col_usize();
 
@@ -70,49 +67,62 @@ pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Po
         let begin_col = recent_move_col.saturating_sub(distance_window as usize);
 
         let begin_idx = cartesian_to_index!(begin_row, begin_col);
-        begin_idx - begin_idx % platform::U32_LANE_N
+        begin_idx - begin_idx % (platform::U32_TOTAL_LANES)
     };
 
     let end_idx = {
-        let end_row = (recent_move_row + distance_window as usize).max(pos::U_BOARD_WIDTH);
-        let end_col = (recent_move_col + distance_window as usize).max(pos::U_BOARD_WIDTH);
+        let end_row = (recent_move_row + distance_window as usize).min(pos::U_BOARD_WIDTH);
+        let end_col = (recent_move_col + distance_window as usize).min(pos::U_BOARD_WIDTH);
 
         let end_idx = cartesian_to_index!(end_row, end_col);
-        (end_idx + platform::U32_LANE_N).min(pos::BOARD_BOUND) - end_idx % platform::U32_LANE_N
+        (end_idx + (platform::U32_TOTAL_LANES)).min(pattern::PATTERN_SIZE)
+            - end_idx % (platform::U32_TOTAL_LANES)
     };
 
-    for start_idx in (begin_idx .. end_idx).step_by(platform::U32_LANE_N) {
-        let mut vector = Simd::<u32, { platform::U32_LANE_N }>::from_slice(
-            unsafe { std::slice::from_raw_parts(field_ptr.add(start_idx), platform::U32_LANE_N) }
-        );
+    let four_mask = Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
+    let zero_mask = Simd::splat(0);
 
-        vector &= four_mask;
-        let mut bitmask = vector
-            .simd_ne(zero_mask)
-            .to_bitmask();
-
-        while bitmask != 0 {
-            let lane_position = bitmask.trailing_zeros() as usize;
-            bitmask &= bitmask - 1;
-
-            let pos_idx = start_idx + lane_position;
-            let distance = chebyshev_distance!(
-                recent_move_row as isize, recent_move_col as isize,
-                index_to_row!(pos_idx) as isize, index_to_col!(pos_idx) as isize
+    for start_idx in (begin_idx .. end_idx).step_by(platform::U32_TOTAL_LANES) {
+        let mut registers: [Simd<u32, { platform::U32_LANE_N }>; platform::U32_REGISTER_N] =
+            std::array::from_fn(|idx|
+                Simd::<u32, { platform::U32_LANE_N }>::from_slice(
+                    unsafe { std::slice::from_raw_parts(
+                        field_ptr.add(start_idx + idx * platform::U32_LANE_N),
+                        platform::U32_LANE_N
+                    ) }
+                )
             );
 
-            if distance > distance_window {
-                continue;
-            }
+        const BITMASK_BUCKET_SIZE: usize = pattern::PATTERN_SIZE / 64;
+        let mut bitmasks: [u64; BITMASK_BUCKET_SIZE] = [0; BITMASK_BUCKET_SIZE];
 
-            vcf_moves[vcf_moves_top] = Pos::from_index(pos_idx as u8);
-            vcf_moves_top += 1;
+        for idx in 0 .. platform::U32_REGISTER_N {
+            registers[idx] &= four_mask;
+            let bitmask = registers[idx]
+                .simd_ne(zero_mask)
+                .to_bitmask();
+            bitmasks[idx * platform::U32_LANE_N / 64] |= bitmask << ((idx * platform::U32_LANE_N) % 64);
         }
-    }
 
-    if board.patterns.field.access(board.player_color)[pos::BOARD_BOUND].has_any_four() {
-        vcf_moves[vcf_moves_top] = Pos::from_index(pos::U8_BOARD_BOUND);
-        vcf_moves_top += 1;
+        for bitmask_idx in 0 ..BITMASK_BUCKET_SIZE {
+            while bitmasks[bitmask_idx] != 0 {
+                let lane_position = bitmasks[bitmask_idx].trailing_zeros() as usize + bitmask_idx * 64;
+                bitmasks[bitmask_idx] &= bitmasks[bitmask_idx] - 1;
+
+                let pos_idx = start_idx + lane_position;
+                let distance = chebyshev_distance!(
+					recent_move_row as isize, recent_move_col as isize,
+					index_to_row!(pos_idx) as isize, index_to_col!(pos_idx) as isize
+				);
+
+                if distance > distance_window {
+                    continue;
+                }
+
+                vcf_moves[vcf_moves_top] = Pos::from_index(pos_idx as u8);
+                vcf_moves_top += 1;
+            }
+        }
     }
 
     VcfMovesUnchecked { moves: vcf_moves, top: vcf_moves_top as u8 }

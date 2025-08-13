@@ -6,6 +6,8 @@ mod bench_vcf {
     use indoc::indoc;
     use mintaka::config::Config;
     use mintaka::endgame::vcf_search;
+    use mintaka::eval::evaluator::ActiveEvaluator;
+    use mintaka::eval::evaluator::Evaluator;
     use mintaka::game_state::GameState;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
@@ -22,7 +24,9 @@ mod bench_vcf {
 
     macro_rules! bench_vcf {
         ($bencher:expr,$board:expr,$score:expr,$player_move:expr,$opponent_move:expr) => {{
-            let game_state = GameState {
+            let config = Config::default();
+
+            let state = GameState {
                 board: $board,
                 history: {
                     let mut history = History::default();
@@ -35,7 +39,7 @@ mod bench_vcf {
                 ..Default::default()
             };
 
-            let config = Config::default();
+            let evaluator = ActiveEvaluator::from_state(&state);
 
             let tt = TranspositionTable::new_with_size(ByteSize::from_kib(32));
             let ht = HistoryTable {};
@@ -43,10 +47,10 @@ mod bench_vcf {
             let global_counter_in_1k = AtomicUsize::new(0);
             let aborted = AtomicBool::new(false);
 
-            let td = ThreadData::new(WorkerThread, 0, config, tt.view(), ht, &aborted, &global_counter_in_1k);
+            let td = ThreadData::new(WorkerThread, 0, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
-                let result = vcf_search::vcf_search(&mut td.clone(), usize::MAX, &game_state, -Score::INF, Score::INF);
+                let result = vcf_search::vcf_search(&mut td.clone(), usize::MAX, &state, -Score::INF, Score::INF);
                 assert!(result.unwrap() > $score);
                 tt.clear_mut(1);
             })

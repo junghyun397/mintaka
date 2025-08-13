@@ -1,7 +1,6 @@
 use crate::eval::evaluator::{Evaluator, PolicyDistribution};
 use crate::game_state::GameState;
 use crate::movegen::move_scores::MoveScores;
-use rusty_renju::board::Board;
 use rusty_renju::const_for;
 use rusty_renju::notation::color::{Color, ColorContainer};
 use rusty_renju::notation::pos;
@@ -17,37 +16,49 @@ pub struct HeuristicEvaluator {
 
 impl Evaluator for HeuristicEvaluator {
 
+    type EvaluatorParameter = ();
+
     fn from_state(state: &GameState) -> Self {
         Self {
             move_scores: (&state.board.hot_field).into()
         }
     }
 
-    fn update(&mut self, state: &GameState) {
-    }
+    fn update(&mut self, _state: &GameState) {}
 
-    fn undo(&mut self, state: &GameState, color: Color, pos: Pos) {
-    }
+    fn undo(&mut self, _state: &GameState, _color: Color, _pos: Pos) {}
 
     fn eval_policy(&self, state: &GameState) -> PolicyDistribution {
         let mut policy = [0; pos::BOARD_SIZE];
 
-        for (idx, &score) in self.move_scores.scores.iter().enumerate().take(pos::BOARD_SIZE) {
-            let distance = state.history.avg_distance_to_recent_actions(Pos::from_index(idx as u8)) as Score;
+        let movegen_field = state.movegen_window.movegen_field & !state.board.hot_field;
 
-            policy[idx] = (16 - distance) + score as Score;
+        let pattern_field = state.board.patterns.field.access(state.board.player_color);
+        let policy_score_lut = POLICY_SCORE_LUT.access(state.board.player_color);
+
+        for idx in movegen_field.iter_hot_idx() {
+            let neighbor_score = self.move_scores.scores[idx] as Score;
+
+            let distance_score = {
+                let distance = state.history.avg_distance_to_recent_actions(Pos::from_index(idx as u8)) as Score;
+                (10 - distance) / 2
+            };
+
+            let pattern_score = probe_score_table_lut(policy_score_lut, pattern_field[idx]) as Score;
+
+            policy[idx] = neighbor_score + distance_score + pattern_score;
         }
 
         policy
     }
 
     fn eval_value(&self, state: &GameState) -> Score {
-        let black_score = Self::eval_slice_pattern_counts::<{ Color::Black }>(&state.board);
-        let white_score = Self::eval_slice_pattern_counts::<{ Color::White }>(&state.board);
+        let eval_black = Self::eval_slice_pattern_counts::<{ Color::Black }>(state);
+        let eval_white = Self::eval_slice_pattern_counts::<{ Color::White }>(state);
 
         match state.board.player_color {
-            Color::Black => black_score - white_score,
-            Color::White => white_score - black_score,
+            Color::Black => eval_black - eval_white,
+            Color::White => eval_white - eval_black,
         }
     }
 
@@ -61,12 +72,12 @@ struct HeuristicThreatScores; impl HeuristicThreatScores {
 
 impl HeuristicEvaluator {
 
-    fn eval_slice_pattern_counts<const C: Color>(board: &Board) -> Score {
-        let mut counts: GlobalPatternCount = board.patterns.counts.global.get::<C>();
+    fn eval_slice_pattern_counts<const C: Color>(state: &GameState) -> Score {
+        let mut counts: GlobalPatternCount = state.board.patterns.counts.global.get::<C>();
 
         if C == Color::Black {
-            for idx in board.patterns.forbidden_field.iter_hot_idx() {
-                let pattern = board.patterns.field.black[idx];
+            for idx in state.board.patterns.forbidden_field.iter_hot_idx() {
+                let pattern = state.board.patterns.field.black[idx];
 
                 counts.threes -= pattern.count_closed_fours() as i16;
                 counts.closed_fours -= pattern.count_closed_fours() as i16;
@@ -74,38 +85,23 @@ impl HeuristicEvaluator {
             }
         }
 
-        counts.closed_fours as Score * HeuristicThreatScores::CLOSED_FOUR
-            + counts.threes as Score * HeuristicThreatScores::OPEN_THREE
-            + counts.open_fours as Score * HeuristicThreatScores::OPEN_FOUR
-            + counts.score as Score
-    }
+        let mut score = 0;
 
-    fn eval_pattern(state: &GameState) -> Score {
-        let mut black_score = 0;
-        let mut white_score = 0;
-
-        for idx in state.movegen_window.movegen_field.iter_hot_idx() {
-            black_score +=
-                probe_score_table_lut::<{ Color::Black }>(state.board.patterns.field.get::<{ Color::Black }>()[idx]) as Score;
-            white_score -=
-                probe_score_table_lut::<{ Color::White }>(state.board.patterns.field.get::<{ Color::White }>()[idx]) as Score;
+        if counts.open_fours > 1 { // multiple open-fours
+            score += 10000;
         }
 
-        match state.board.player_color {
-            Color::Black => black_score - white_score,
-            Color::White => white_score - black_score,
-        }
-    }
+        score += counts.closed_fours as Score * HeuristicThreatScores::CLOSED_FOUR;
+        score += counts.threes as Score * HeuristicThreatScores::OPEN_THREE;
+        score += counts.open_fours as Score * HeuristicThreatScores::OPEN_FOUR;
+        score += counts.score as Score;
 
-    fn eval_slice(state: &GameState) -> Score {
-        let mut player_score = 0;
-
-        0
+        score
     }
 
 }
 
-fn probe_score_table_lut<const C: Color>(pattern: Pattern) -> i8 {
+fn probe_score_table_lut(lut: &PolicyScoreLut, pattern: Pattern) -> i8 {
     let mut pattern_key = pattern.count_closed_fours() & 0b11;
 
     pattern_key |= (pattern.count_open_fours() & 0b11) << 2;
@@ -113,25 +109,26 @@ fn probe_score_table_lut<const C: Color>(pattern: Pattern) -> i8 {
     pattern_key |= (pattern.has_close_three() as u32) << 6;
     pattern_key |= (pattern.has_overline() as u32) * 127;
 
-    PATTERN_SCORE_LUT.get_ref::<C>()[pattern_key as usize]
+    lut[pattern_key as usize]
 }
 
-struct HeuristicPositionScores; impl HeuristicPositionScores {
-    const OPEN_THREE: i8 = 5;
+struct HeuristicPolicyScores; impl HeuristicPolicyScores {
+    const OPEN_THREE: i8 = 15;
     const CLOSE_THREE: i8 = 0;
-    const CLOSED_FOUR: i8 = 2;
+    const CLOSED_FOUR: i8 = 10;
     const OPEN_FOUR: i8 = i8::MAX;
     const DOUBLE_THREE_FORK: i8 = 30;
     const THREE_FOUR_FORK: i8 = i8::MAX;
     const DOUBLE_FOUR_FORK: i8 = i8::MAX;
-    const DOUBLE_THREE_FORBID: i8 = 1;
+    const DOUBLE_THREE_FORBID: i8 = 4;
     const DOUBLE_FOUR_FORBID: i8 = -3;
-    const OVERLINE_FORBID: i8 = -3;
+    const OVERLINE_FORBID: i8 = -30;
 }
 
-const PATTERN_SCORE_LUT: ColorContainer<[i8; 0b1 << 7]> = build_pattern_score_lut();
+type PolicyScoreLut = [i8; 0b1 << 7];
+const POLICY_SCORE_LUT: ColorContainer<PolicyScoreLut> = build_pattern_score_lut();
 
-const fn build_pattern_score_lut() -> ColorContainer<[i8; 128]> {
+const fn build_pattern_score_lut() -> ColorContainer<PolicyScoreLut> {
     let mut acc = ColorContainer::new(
         [0; 0b1 << 7],
         [0; 0b1 << 7]
@@ -139,7 +136,7 @@ const fn build_pattern_score_lut() -> ColorContainer<[i8; 128]> {
 
     const fn flash_score_variants(
         color: Color,
-        lut: &mut [i8; 0b1 << 7],
+        lut: &mut PolicyScoreLut,
     ) {
         const_for!(pattern_key in 0, 0b1 << 7; {
             let closed_fours = pattern_key & 0b11;
@@ -150,38 +147,38 @@ const fn build_pattern_score_lut() -> ColorContainer<[i8; 128]> {
             lut[pattern_key] = match color {
                 Color::Black => {
                     if pattern_key == 127 {
-                        HeuristicPositionScores::OVERLINE_FORBID
+                        HeuristicPolicyScores::OVERLINE_FORBID
                     } else if closed_fours + open_fours > 1 {
-                        HeuristicPositionScores::DOUBLE_FOUR_FORBID
+                        HeuristicPolicyScores::DOUBLE_FOUR_FORBID
                     } else if open_threes > 1 {
-                        HeuristicPositionScores::DOUBLE_THREE_FORBID
+                        HeuristicPolicyScores::DOUBLE_THREE_FORBID
                     } else if open_fours == 1 {
-                        HeuristicPositionScores::OPEN_FOUR
+                        HeuristicPolicyScores::OPEN_FOUR
                     } else if closed_fours == 1 && open_threes == 1 {
-                        HeuristicPositionScores::THREE_FOUR_FORK
+                        HeuristicPolicyScores::THREE_FOUR_FORK
                     } else if open_threes == 1 {
-                        HeuristicPositionScores::OPEN_THREE
+                        HeuristicPolicyScores::OPEN_THREE
                     } else if close_threes != 0 {
-                        HeuristicPositionScores::CLOSE_THREE
+                        HeuristicPolicyScores::CLOSE_THREE
                     } else {
                         0
                     }
                 },
                 Color::White => {
                     if open_fours > 0 {
-                        HeuristicPositionScores::OPEN_FOUR
+                        HeuristicPolicyScores::OPEN_FOUR
                     } else if closed_fours > 1 {
-                        HeuristicPositionScores::DOUBLE_FOUR_FORK
+                        HeuristicPolicyScores::DOUBLE_FOUR_FORK
                     } else if closed_fours > 0 && open_threes > 0 {
-                        HeuristicPositionScores::THREE_FOUR_FORK
+                        HeuristicPolicyScores::THREE_FOUR_FORK
                     } else if open_threes > 1 {
-                        HeuristicPositionScores::DOUBLE_THREE_FORK
+                        HeuristicPolicyScores::DOUBLE_THREE_FORK
                     } else if open_threes == 1 {
-                        HeuristicPositionScores::OPEN_THREE
+                        HeuristicPolicyScores::OPEN_THREE
                     } else if closed_fours == 1 {
-                        HeuristicPositionScores::CLOSED_FOUR
+                        HeuristicPolicyScores::CLOSED_FOUR
                     } else if close_threes != 0 {
-                        HeuristicPositionScores::CLOSE_THREE
+                        HeuristicPolicyScores::CLOSE_THREE
                     } else {
                         0
                     }

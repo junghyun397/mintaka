@@ -1,7 +1,6 @@
 use crate::bitfield::Bitfield;
 use crate::notation::color::{AlignedColorContainer, Color, ColorContainer};
 use crate::notation::direction::Direction;
-use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::notation::rule::{ForbiddenKind, RuleKind};
 use crate::slice::Slice;
@@ -40,6 +39,8 @@ pub const SLICE_PATTERN_OPEN_FOUR_MASK: u128    = repeat_16x(OPEN_FOUR);
 pub const SLICE_PATTERN_FIVE_MASK: u128         = repeat_16x(FIVE);
 pub const SLICE_PATTERN_THREE_MASK: u128        = repeat_16x(OPEN_THREE);
 pub const SLICE_PATTERN_OVERLINE_MASK: u128     = repeat_16x(OVERLINE);
+
+pub const PATTERN_SIZE: usize = 256;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 #[repr(u8)]
@@ -223,21 +224,16 @@ impl Pattern {
 
 }
 
-pub struct SlicePatternCount {
-    pub threes: u8,
-    pub fours: u8,
-}
-
 #[derive(Debug, Copy, Clone)]
 pub struct Patterns {
-    pub field: AlignedColorContainer<[Pattern; pos::BOARD_SIZE]>,
+    pub field: AlignedColorContainer<[Pattern; PATTERN_SIZE]>,
     pub counts: SlicePatternCounts,
     pub unchecked_five_pos: ColorContainer<Option<Pos>>,
     pub candidate_forbidden_field: Bitfield,
     pub forbidden_field: Bitfield,
 }
 
-assert_struct_sizes!(Patterns, size=2560, align=64);
+assert_struct_sizes!(Patterns, size=2752, align=64);
 
 impl Default for Patterns {
 

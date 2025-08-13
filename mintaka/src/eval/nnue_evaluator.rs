@@ -1,4 +1,5 @@
 use crate::eval::evaluator::{Evaluator, PolicyDistribution};
+use crate::eval::nnue::network_params::NnueNetworkParams;
 use crate::game_state::GameState;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
@@ -22,6 +23,8 @@ pub struct NnueEvaluator {
 }
 
 impl Evaluator for NnueEvaluator {
+
+    type EvaluatorParameter = NnueNetworkParams;
 
     fn from_state(state: &GameState) -> Self {
         todo!()

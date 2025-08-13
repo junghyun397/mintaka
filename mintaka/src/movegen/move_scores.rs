@@ -49,44 +49,42 @@ impl MoveScores {
         let scores_ptr = self.scores.as_mut_slice().as_mut_ptr();
         let mask_ptr = NEIGHBORHOOD_SCORE_LUT[pos.idx_usize()].as_ptr();
 
-        unsafe {
-            for start_idx in (0..256).step_by(platform::U8_LANE_N * platform::U8_UNROLL_N) {
-                let mut registers: [Simd<u8, { platform::U8_LANE_N }>; platform::U8_UNROLL_N] =
-                    std::array::from_fn(|idx|
-                        Simd::from_slice(
-                            slice::from_raw_parts(
-                                scores_ptr.add(start_idx + platform::U8_LANE_N * idx),
-                                platform::U8_LANE_N
-                            )
-                        )
-                    );
-
-                for idx in 0 .. platform::U8_UNROLL_N {
-                    if INC {
-                        registers[idx] += Simd::from_slice(
-                            slice::from_raw_parts(
-                                mask_ptr.add(start_idx + platform::U8_LANE_N * idx),
-                                platform::U8_LANE_N
-                            )
-                        );
-                    } else {
-                        registers[idx] -= Simd::from_slice(
-                            slice::from_raw_parts(
-                                mask_ptr.add(start_idx + platform::U8_LANE_N * idx),
-                                platform::U8_LANE_N
-                            )
-                        )
-                    }
-                }
-
-                for idx in 0 .. platform::U8_UNROLL_N {
-                    registers[idx].copy_to_slice(
-                        slice::from_raw_parts_mut(
-                            scores_ptr.add(start_idx + platform::U8_LANE_N * idx),
+        for start_idx in (0..256).step_by(platform::U8_LANE_N * platform::U8_REGISTER_N) {
+            let mut registers: [Simd<u8, { platform::U8_LANE_N }>; platform::U8_REGISTER_N] =
+                std::array::from_fn(|idx|
+                    Simd::from_slice(
+                        unsafe { slice::from_raw_parts(
+                            scores_ptr.add(start_idx + idx * platform::U8_LANE_N),
                             platform::U8_LANE_N
-                        )
+                        ) }
+                    )
+                );
+
+            for idx in 0 .. platform::U8_REGISTER_N {
+                if INC {
+                    registers[idx] += Simd::from_slice(
+                        unsafe { slice::from_raw_parts(
+                            mask_ptr.add(start_idx + idx * platform::U8_LANE_N),
+                            platform::U8_LANE_N
+                        ) }
                     );
+                } else {
+                    registers[idx] -= Simd::from_slice(
+                        unsafe { slice::from_raw_parts(
+                            mask_ptr.add(start_idx + idx * platform::U8_LANE_N),
+                            platform::U8_LANE_N
+                        ) }
+                    )
                 }
+            }
+
+            for idx in 0 .. platform::U8_REGISTER_N {
+                registers[idx].copy_to_slice(
+                    unsafe { slice::from_raw_parts_mut(
+                        scores_ptr.add(start_idx + idx * platform::U8_LANE_N),
+                        platform::U8_LANE_N
+                    ) }
+                );
             }
         }
     }

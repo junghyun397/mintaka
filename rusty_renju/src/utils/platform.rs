@@ -1,9 +1,24 @@
-// use wider lane for instruction level parallelism
+pub const U32_LANE_N: usize = {
+    if cfg!(target_feature = "avx512f") {
+        16
+    } else if cfg!(target_feature = "avx2") {
+        8
+    } else {
+        4
+    }
+};
 
-#[cfg(any(target_feature = "avx2", target_feature = "avx512f"))]
-pub const U32_LANE_N: usize = 32; // 225 % 32 = 1
-#[cfg(not(all(target_feature = "avx2", target_feature = "avx512f")))]
-pub const U32_LANE_N: usize = 16;
+pub const U32_REGISTER_N: usize = {
+    if cfg!(target_feature = "avx512f") {
+        8
+    } else if cfg!(target_feature = "avx2") {
+        4
+    } else {
+        4
+    }
+};
+
+pub const U32_TOTAL_LANES: usize = U32_LANE_N * U32_REGISTER_N;
 
 pub const U8_LANE_N: usize = {
     if cfg!(target_feature = "avx512f") {
@@ -15,7 +30,7 @@ pub const U8_LANE_N: usize = {
     }
 };
 
-pub const U8_UNROLL_N: usize = {
+pub const U8_REGISTER_N: usize = {
     if cfg!(target_feature = "avx512f") {
         4
     } else if cfg!(target_feature = "avx2") {

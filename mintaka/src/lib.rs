@@ -11,7 +11,6 @@ pub mod game_agent;
 pub mod game_state;
 pub mod memo;
 pub mod movegen;
-pub mod nnue;
 pub mod principal_variation;
 pub mod protocol;
 pub mod search;

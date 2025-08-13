@@ -13,6 +13,8 @@ pub type PolicyDistribution = [Score; pos::BOARD_SIZE];
 
 pub trait Evaluator {
 
+    type EvaluatorParameter;
+
     fn from_state(state: &GameState) -> Self;
 
     fn update(&mut self, state: &GameState);
