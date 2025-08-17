@@ -1,14 +1,17 @@
 mod template {
     use mintaka::config::Config;
     use mintaka::eval::evaluator::{ActiveEvaluator, Evaluator};
+    use mintaka::game_agent::GameAgent;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
+    use mintaka::protocol::response::NullResponseSender;
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
     use rusty_renju::board::Board;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
+    use std::sync::Arc;
 
-    fn template() {
+    fn td() {
         let config = Config::default();
         let source = Board::default();
 
@@ -34,4 +37,20 @@ mod template {
         );
     }
 
+    fn agent() {
+        let mut agent = {
+            let mut config = Config::default();
+            config.max_nodes_in_1k = Some(1000);
+
+            let source = Board::default();
+
+            let state = source.into();
+
+            GameAgent::from_state(config, state)
+        };
+
+        let best_move = agent.launch(NullResponseSender, Arc::new(AtomicBool::new(false)));
+
+        println!("{:?}", best_move);
+    }
 }

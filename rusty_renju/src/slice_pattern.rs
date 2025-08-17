@@ -188,6 +188,7 @@ pub fn contains_five_in_a_row(stones: u16) -> bool {
 }
 
 // 128 KiB
+#[repr(align(32))]
 struct VectorMatchLut {
     black: [u8; u16::MAX as usize],
     white: [u8; u16::MAX as usize],
@@ -252,6 +253,7 @@ impl SlicePatchData {
 
 }
 
+#[repr(align(32))]
 struct PatchLut {
     black: [SlicePatchData; 76],
     white: [SlicePatchData; 71],

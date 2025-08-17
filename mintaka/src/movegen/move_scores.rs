@@ -8,7 +8,7 @@ use std::simd::Simd;
 use std::slice;
 
 #[derive(Debug, Copy, Clone)]
-#[repr(align(64))]
+#[repr(align(32))]
 pub struct MoveScores {
     pub scores: [u8; 256],
 }
@@ -47,7 +47,7 @@ impl MoveScores {
 
     fn adjust_neighbor_score<const INC: bool>(&mut self, pos: Pos) {
         let scores_ptr = self.scores.as_mut_slice().as_mut_ptr();
-        let mask_ptr = NEIGHBORHOOD_SCORE_LUT[pos.idx_usize()].as_ptr();
+        let mask_ptr = NEIGHBORHOOD_SCORE_LUT.0[pos.idx_usize()].as_ptr();
 
         for start_idx in (0..256).step_by(platform::U8_LANE_N * platform::U8_REGISTER_N) {
             let mut registers: [Simd<u8, { platform::U8_LANE_N }>; platform::U8_REGISTER_N] =
@@ -101,9 +101,12 @@ impl MoveScores {
 
 }
 
-const NEIGHBORHOOD_SCORE_LUT: [[u8; 256]; pos::BOARD_SIZE] = build_neighborhood_score_lut();
+#[repr(align(64))]
+struct NeighborhoodScoreLUT([[u8; 256]; pos::BOARD_SIZE]);
 
-const fn build_neighborhood_score_lut() -> [[u8; 256]; pos::BOARD_SIZE] {
+const NEIGHBORHOOD_SCORE_LUT: NeighborhoodScoreLUT = build_neighborhood_score_lut();
+
+const fn build_neighborhood_score_lut() -> NeighborhoodScoreLUT {
     let imprint_score_pattern: [[u8; 7]; 7] = [
         [1, 0, 0, 1, 0, 0, 1],
         [0, 2, 1, 2, 1, 2, 0],
@@ -138,5 +141,5 @@ const fn build_neighborhood_score_lut() -> [[u8; 256]; pos::BOARD_SIZE] {
         })
     });
 
-    acc
+    NeighborhoodScoreLUT(acc)
 }

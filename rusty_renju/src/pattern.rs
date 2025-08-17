@@ -276,6 +276,8 @@ impl Patterns {
 
     #[inline]
     pub fn clear_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
+        self.counts.clear_slice_mut::<C, D>(slice.idx as usize, slice.eval_slice::<C>());
+
         let start_idx = slice.start_pos.idx_usize();
         let mut clear_mask = slice.pattern_bitmap.get::<C>();
         while clear_mask != 0 {
@@ -285,8 +287,6 @@ impl Patterns {
             let idx = step_idx!(D, start_idx, slice_idx);
             self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(0);
         }
-
-        self.counts.clear_slice_mut::<C, D>(slice.idx as usize, slice.eval_slice::<C>());
 
         *slice.pattern_bitmap.get_ref_mut::<C>() = 0;
     }
@@ -300,14 +300,14 @@ impl Patterns {
     fn update_with_slice_pattern_mut<const C: Color, const D: Direction>(
         &mut self, slice: &mut Slice, slice_pattern: SlicePattern
     ) {
-        *self.unchecked_five_pos.get_ref_mut::<C>() = self.unchecked_five_pos.get_ref::<C>().or(
-            (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK != 0).then(|| {
+        *self.unchecked_five_pos.get_ref_mut::<C>() = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK != 0)
+            .then(|| {
                 let slice_idx = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8;
                 Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8))
             })
-        );
+            .or(self.unchecked_five_pos.get::<C>());
 
-        self.counts.set_slice_mut::<C, D>(
+        self.counts.update_slice_mut::<C, D>(
             slice.idx as usize,
             (slice_pattern.patterns & SLICE_PATTERN_THREE_MASK).count_ones() as u8,
             (slice_pattern.patterns & SLICE_PATTERN_CLOSED_FOUR_MASK).count_ones() as u8,

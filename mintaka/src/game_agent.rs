@@ -32,7 +32,7 @@ pub struct BestMove {
     pub hash: HashKey,
     pub pos: MaybePos,
     pub score: Score,
-    pub depth_searched: usize,
+    pub depth_reached: usize,
     pub total_nodes_in_1k: usize,
     pub time_elapsed: Duration,
 }
@@ -236,7 +236,7 @@ impl GameAgent {
                 let player = if batch_color == Color::Black {
                     self.state.board.player_color
                 } else {
-                    self.state.board.opponent_color()
+                    !self.state.board.player_color
                 };
 
                 self.state.board.batch_set_each_color_mut(
@@ -398,11 +398,15 @@ impl GameAgent {
             time_management.time_history.push((main_td.best_move, time_elapsed));
         }
 
+        println!("{} {:?}", main_td.root_moves, main_td.root_scores); // todo: debug
+
+        println!("{}", self.state.board.to_string_with_heatmap(main_td.root_scores.map(f32::from), true));
+
         BestMove {
             hash: self.state.board.hash_key,
             pos: main_td.best_move,
             score,
-            depth_searched: main_td.depth,
+            depth_reached: main_td.depth,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed,
         }
@@ -427,12 +431,12 @@ impl<'de> Deserialize<'de> for GameAgent {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
         #[derive(Deserialize)]
         struct GameAgentData {
-            state: GameState,
             config: Config,
-            time_management: Option<TimeManagement>,
-            executed_moves: Bitfield,
+            state: GameState,
             tt: TranspositionTable,
             ht: HistoryTable,
+            time_management: Option<TimeManagement>,
+            executed_moves: Bitfield,
         }
 
         let data = GameAgentData::deserialize(deserializer)?;

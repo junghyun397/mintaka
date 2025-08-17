@@ -1,3 +1,5 @@
+pub const U32_WIDE_LANE_N: usize = 64;
+
 pub const U32_LANE_N: usize = {
     if cfg!(target_feature = "avx512f") {
         16
@@ -10,11 +12,11 @@ pub const U32_LANE_N: usize = {
 
 pub const U32_REGISTER_N: usize = {
     if cfg!(target_feature = "avx512f") {
-        8
+        16
     } else if cfg!(target_feature = "avx2") {
         4
     } else {
-        4
+        16
     }
 };
 

@@ -1,6 +1,7 @@
 use crate::eval::evaluator::{Evaluator, PolicyDistribution};
 use crate::game_state::GameState;
 use crate::movegen::move_scores::MoveScores;
+use rusty_renju::board::Board;
 use rusty_renju::const_for;
 use rusty_renju::notation::color::{Color, ColorContainer};
 use rusty_renju::notation::pos;
@@ -44,7 +45,7 @@ impl Evaluator for HeuristicEvaluator {
                 (10 - distance) / 2
             };
 
-            let pattern_score = probe_score_table_lut(policy_score_lut, pattern_field[idx]) as Score;
+            let pattern_score = lookup_policy_score_lut(policy_score_lut, pattern_field[idx]) as Score;
 
             policy[idx] = neighbor_score + distance_score + pattern_score;
         }
@@ -53,55 +54,58 @@ impl Evaluator for HeuristicEvaluator {
     }
 
     fn eval_value(&self, state: &GameState) -> Score {
-        let eval_black = Self::eval_slice_pattern_counts::<{ Color::Black }>(state);
-        let eval_white = Self::eval_slice_pattern_counts::<{ Color::White }>(state);
-
         match state.board.player_color {
-            Color::Black => eval_black - eval_white,
-            Color::White => eval_white - eval_black,
+            Color::Black =>
+                Self::eval_slice_pattern_counts::<{ Color::Black }, true>(&state.board)
+                    - Self::eval_slice_pattern_counts::<{ Color::White }, false>(&state.board)
+            ,
+            Color::White =>
+                Self::eval_slice_pattern_counts::<{ Color::White }, true>(&state.board)
+                    - Self::eval_slice_pattern_counts::<{ Color::Black }, false>(&state.board)
         }
     }
 
 }
 
 struct HeuristicThreatScores; impl HeuristicThreatScores {
-    const CLOSED_FOUR: Score = 100;
-    const OPEN_THREE: Score = 100;
-    const OPEN_FOUR: Score = 1000;
+    const CLOSED_FOUR: Score = 150;
+    const OPEN_THREE: Score = 300;
+    const PLAYER_OPEN_FOUR: Score = 10000;
 }
 
 impl HeuristicEvaluator {
 
-    fn eval_slice_pattern_counts<const C: Color>(state: &GameState) -> Score {
-        let mut counts: GlobalPatternCount = state.board.patterns.counts.global.get::<C>();
+    fn eval_slice_pattern_counts<const C: Color, const P: bool>(board: &Board) -> Score {
+        let mut counts: GlobalPatternCount = board.patterns.counts.global.get::<C>();
 
         if C == Color::Black {
-            for idx in state.board.patterns.forbidden_field.iter_hot_idx() {
-                let pattern = state.board.patterns.field.black[idx];
+            for idx in board.patterns.forbidden_field.iter_hot_idx() {
+                let pattern = board.patterns.field.black[idx];
 
-                counts.threes -= pattern.count_closed_fours() as i16;
-                counts.closed_fours -= pattern.count_closed_fours() as i16;
-                counts.open_fours -= pattern.count_open_threes() as i16;
+                counts.threes -= pattern.count_open_threes() as u8;
+                counts.closed_fours -= pattern.count_closed_fours() as u8;
+                counts.open_fours -= pattern.count_open_fours() as u8;
             }
         }
 
         let mut score = 0;
 
-        if counts.open_fours > 1 { // multiple open-fours
-            score += 10000;
-        }
-
         score += counts.closed_fours as Score * HeuristicThreatScores::CLOSED_FOUR;
         score += counts.threes as Score * HeuristicThreatScores::OPEN_THREE;
-        score += counts.open_fours as Score * HeuristicThreatScores::OPEN_FOUR;
         score += counts.score as Score;
+
+        if P {
+            score += counts.open_fours as Score * HeuristicThreatScores::PLAYER_OPEN_FOUR;
+        } else if counts.open_fours > 2 {
+            score -= counts.open_fours as Score * HeuristicThreatScores::PLAYER_OPEN_FOUR;
+        }
 
         score
     }
 
 }
 
-fn probe_score_table_lut(lut: &PolicyScoreLut, pattern: Pattern) -> i8 {
+fn lookup_policy_score_lut(lut: &PolicyScoreLut, pattern: Pattern) -> i8 {
     let mut pattern_key = pattern.count_closed_fours() & 0b11;
 
     pattern_key |= (pattern.count_open_fours() & 0b11) << 2;

@@ -62,7 +62,7 @@ fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
 
                 println!(
                     "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}",
-                    best_move.pos, best_move.score, best_move.depth_searched, best_move.total_nodes_in_1k, best_move.time_elapsed
+                    best_move.pos, best_move.score, best_move.depth_reached, best_move.total_nodes_in_1k, best_move.time_elapsed
                 );
 
                 let result = game_agent.command(Command::Play(best_move.pos))?;
@@ -313,7 +313,7 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
 
                 println!(
                     "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}",
-                    best_move.pos, best_move.score, best_move.depth_searched, best_move.total_nodes_in_1k, best_move.time_elapsed
+                    best_move.pos, best_move.score, best_move.depth_reached, best_move.total_nodes_in_1k, best_move.time_elapsed
                 );
 
                 message_sender.launch();

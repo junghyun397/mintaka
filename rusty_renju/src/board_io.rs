@@ -116,12 +116,12 @@ impl Board {
         )
     }
 
-    pub fn to_string_with_heatmap(&self, heatmap: [f64; pos::BOARD_SIZE], log_scale: bool) -> String {
+    pub fn to_string_with_heatmap(&self, heatmap: [f32; pos::BOARD_SIZE], log_scale: bool) -> String {
         let min = heatmap.into_iter()
-            .fold(f64::NAN, f64::min);
+            .fold(f32::NAN, f32::min);
 
         let max = heatmap.into_iter()
-            .fold(f64::NAN, f64::max);
+            .fold(f32::NAN, f32::max);
 
         if min.is_nan() {
             return self.to_string();
@@ -130,7 +130,7 @@ impl Board {
         let range = max - min;
         let log_range = (range + 1.0).ln();
 
-        self.render_with_attributes(
+        let board_string = self.render_with_attributes(
             |pos, &item| {
                 let cell = board_iter_item_to_symbol(item);
 
@@ -143,7 +143,7 @@ impl Board {
                         (value - min) / range
                     };
 
-                    let normalized = (factor.clamp(0.0, 1.0) * (u8::MAX as f64)) as u8;
+                    let normalized = (factor.clamp(0.0, 1.0) * (u8::MAX as f32)) as u8;
 
                     let r: u8 = normalized;
                     let b: u8 = u8::MAX - normalized;
@@ -154,7 +154,9 @@ impl Board {
                 }
             },
             |_, _| None,
-        )
+        );
+
+        format!("min={min} max={max}\n{board_string}")
     }
 
     pub fn render_with_attributes<T1, T2>(&self, cell: T1, marker: T2) -> String where

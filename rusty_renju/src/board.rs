@@ -20,10 +20,6 @@ pub struct Board {
 
 impl Board {
 
-    pub const fn opponent_color(&self) -> Color {
-        self.player_color.reversed()
-    }
-
     pub fn is_pos_empty(&self, pos: Pos) -> bool {
         self.hot_field.is_cold(pos)
     }
@@ -127,7 +123,7 @@ impl Board {
     }
 
     pub fn switch_player_mut(&mut self) {
-        self.player_color = self.opponent_color();
+        self.player_color = !self.player_color;
     }
 
     fn incremental_update_mut<const M: MoveType>(&mut self, pos: Pos) {

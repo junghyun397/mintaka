@@ -149,7 +149,7 @@ fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
         let mut result = ACC::unit(four_pos, win_score);
         let mut hash_key = board.hash_key;
 
-        let opponent_color = board.opponent_color();
+        let opponent_color = !board.player_color;
 
         while let Some(frame) = td.pop_vcf_frame_mut() {
             hash_key = hash_key.set(opponent_color, frame.defend_pos);

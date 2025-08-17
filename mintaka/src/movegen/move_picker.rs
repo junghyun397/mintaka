@@ -19,7 +19,6 @@ enum MoveStage {
     Killer,
     DefendFour,
     Neighbor,
-    Done
 }
 
 pub struct MovePicker {
@@ -67,7 +66,7 @@ impl MovePicker {
                         return Some((killer_move, KILLER_MOVE_SCORE));
                     }
 
-                    if Self::has_open_four(state) {
+                    if Self::opponent_has_open_four(state) {
                         generate_defend_open_four_moves(state, &mut self.moves_buffer);
                         self.stage = MoveStage::DefendFour;
                     } else {
@@ -89,13 +88,12 @@ impl MovePicker {
                 MoveStage::DefendFour | MoveStage::Neighbor => {
                     return self.moves_buffer.consume_best();
                 },
-                MoveStage::Done => break None
             }
         }
     }
 
-    fn has_open_four(state: &GameState) -> bool {
-        let total_fours = match state.board.player_color {
+    fn opponent_has_open_four(state: &GameState) -> bool {
+        let total_fours = match !state.board.player_color {
             Color::Black => {
                 let mut total_fours = state.board.patterns.counts.global.black.open_fours as u32;
 

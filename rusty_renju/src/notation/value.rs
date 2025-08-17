@@ -10,7 +10,7 @@ pub trait Scores {
     }
 
     fn lose_in(ply: usize) -> Score {
-        -Self::WIN + ply as Score
+        ply as Score - Self::WIN
     }
 
 }

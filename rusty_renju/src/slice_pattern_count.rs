@@ -13,10 +13,10 @@ pub struct SlicePatternCount {
 
 #[derive(Debug, Copy, Clone)]
 pub struct GlobalPatternCount {
-    pub threes: i16,
-    pub closed_fours: i16,
-    pub open_fours: i16,
-    pub score: i16,
+    pub threes: u8,
+    pub closed_fours: u8,
+    pub open_fours: u8,
+    pub score: u16,
 }
 
 impl SlicePatternCount {
@@ -55,17 +55,23 @@ impl SlicePatternCounts {
         } + slice_idx]
     }
 
-    pub fn set_slice_mut<const C: Color, const D: Direction>(
+    pub fn update_slice_mut<const C: Color, const D: Direction>(
         &mut self, slice_idx: usize, threes: u8, closed_fours: u8, open_fours: u8, score: u8
     ) {
         let global_count = self.global.get_ref_mut::<C>();
         let slice_count = Self::access_local_mut::<C, D>(&mut self.locals, slice_idx);
 
-        global_count.threes += threes as i16 - slice_count.threes as i16;
-        global_count.closed_fours += closed_fours as i16 - slice_count.closed_fours as i16;
-        global_count.open_fours += open_fours as i16 - slice_count.open_fours as i16;
+        global_count.threes += threes;
+        global_count.threes -= slice_count.threes;
 
-        global_count.score += score as i16 - slice_count.score as i16;
+        global_count.closed_fours += closed_fours;
+        global_count.closed_fours -= slice_count.closed_fours;
+
+        global_count.open_fours += open_fours;
+        global_count.open_fours -= slice_count.open_fours;
+
+        global_count.score += score as u16;
+        global_count.score -= slice_count.score as u16;
 
         *slice_count = SlicePatternCount {
             threes,
@@ -79,18 +85,27 @@ impl SlicePatternCounts {
         let global_count = self.global.get_ref_mut::<C>();
         let slice_count = Self::access_local_mut::<C, D>(&mut self.locals, slice_idx);
 
-        global_count.threes -= slice_count.threes as i16;
-        global_count.closed_fours -= slice_count.closed_fours as i16;
-        global_count.open_fours -= slice_count.open_fours as i16;
+        global_count.threes -= slice_count.threes;
+        global_count.closed_fours -= slice_count.closed_fours;
+        global_count.open_fours -= slice_count.open_fours;
 
-        global_count.score += score as i16 - slice_count.score as i16;
+        global_count.score += score as u16;
+        global_count.score -= slice_count.score as u16;
 
-        *slice_count = SlicePatternCount::EMPTY;
+        *slice_count = SlicePatternCount {
+            threes: 0,
+            closed_fours: 0,
+            open_fours: 0,
+            score,
+        };
     }
 
     pub fn update_slice_score_mut<const C: Color, const D: Direction>(&mut self, slice_idx: usize, score: u8) {
         let slice_count = Self::access_local_mut::<C, D>(&mut self.locals, slice_idx);
-        self.global.get_ref_mut::<C>().score += score as i16 - slice_count.score as i16;
+
+        self.global.get_ref_mut::<C>().score += score as u16;
+        self.global.get_ref_mut::<C>().score -= slice_count.score as u16;
+
         slice_count.score = score;
     }
 
@@ -98,7 +113,7 @@ impl SlicePatternCounts {
 
 impl GlobalPatternCount {
 
-    pub fn total_fours(&self) -> i16 {
+    pub fn total_fours(&self) -> u8 {
         self.closed_fours + self.open_fours
     }
 

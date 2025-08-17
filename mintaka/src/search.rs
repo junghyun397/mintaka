@@ -117,7 +117,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     }
 
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
-        .access(state.board.opponent_color())
+        .access(!state.board.player_color)
     { // defend immediate win
         if state.board.player_color == Color::Black
             && state.board.patterns.forbidden_field.is_hot(pos)
@@ -214,13 +214,9 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     td.ss[td.ply].static_eval = static_eval;
     td.ss[td.ply].on_pv = NT::IS_PV || tt_pv;
 
-    let mut total_moves = 0; // todo: debug
-    let mut illegal_moves = 0; // todo: debug
     let mut moves_made = 0;
     'position_search: while let Some((pos, _)) = move_picker.next(td, state) {
-        total_moves += 1;
         if !state.board.is_legal_move(pos) {
-            illegal_moves += 1;
             continue;
         }
 
@@ -246,6 +242,11 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
         state.unset_mut(movegen_window);
         td.pop_ply_mut();
+
+        if NT::IS_ROOT { // todo: debug
+            td.root_moves += 1;
+            td.root_scores[pos.idx_usize()] = score as f32;
+        }
 
         if score <= best_score {
             continue;
@@ -278,11 +279,6 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         td.best_move = best_move;
     }
 
-    if moves_made == 0 { // todo: debug
-        println!("{} {}", total_moves, illegal_moves);
-        println!("{}", state.board.to_string_with_pattern_analysis());
-    }
-
     let score_kind = if best_score >= beta {
         ScoreKind::LowerBound
     } else if best_score > original_alpha {
@@ -302,5 +298,9 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         NT::IS_PV
     );
 
-    best_score
+    if moves_made == 0 {
+        static_eval
+    } else {
+        best_score
+    }
 }

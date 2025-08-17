@@ -8,6 +8,7 @@ use crate::principal_variation::PrincipalVariation;
 use crate::search_frame::{SearchFrame, KILLER_MOVE_SLOTS};
 use crate::thread_type::ThreadType;
 use crate::value::MAX_PLY;
+use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -34,6 +35,10 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub best_move: MaybePos,
     pub depth: usize,
     pub ply: usize,
+
+    // todo: debug
+    pub root_scores: [f32; pos::BOARD_SIZE],
+    pub root_moves: usize,
 }
 
 impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
@@ -65,6 +70,8 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
             best_move: MaybePos::NONE,
             depth: 0,
             ply: 0,
+            root_scores: [f32::NAN; pos::BOARD_SIZE],
+            root_moves: 0,
         }
     }
 
