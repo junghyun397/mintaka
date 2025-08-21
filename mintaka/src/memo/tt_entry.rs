@@ -39,6 +39,14 @@ pub enum EndgameFlag {
     Lose = 3,
 }
 
+impl EndgameFlag {
+
+    pub fn is_deterministic(&self) -> bool {
+        *self == Self::Win || *self == Self::Lose
+    }
+
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct TTFlag(u8);
 

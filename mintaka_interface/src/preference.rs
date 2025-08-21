@@ -63,6 +63,8 @@ impl Preference {
         }
 
         self.default_config.max_nodes_in_1k = self.nodes_in_1k;
+
+        self.default_config = self.default_config.validate().unwrap();
     }
 
 }

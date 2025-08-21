@@ -49,7 +49,7 @@ impl GameState {
         }
     }
 
-    pub fn height(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.history.len()
     }
 

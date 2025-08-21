@@ -4,6 +4,7 @@ mod test_movegen {
     use mintaka::eval::evaluator::{ActiveEvaluator, Evaluator};
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
+    use mintaka::movegen::move_list::MoveEntry;
     use mintaka::movegen::move_picker::MovePicker;
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
@@ -40,9 +41,9 @@ mod test_movegen {
 
             let mut move_picker = MovePicker::new(MaybePos::NONE, [MaybePos::NONE; 2]);
 
-            let mut heatmap = [f64::NAN; pos::BOARD_SIZE];
-            while let Some((pos, score)) = move_picker.next(&td, &state) {
-                heatmap[pos.idx_usize()] = score as f64;
+            let mut heatmap = [f32::NAN; pos::BOARD_SIZE];
+            while let Some(MoveEntry { pos, score }) = move_picker.next(&td, &state) {
+                heatmap[pos.idx_usize()] = score as f32;
 
                 print!("{:?}, ", (pos, score));
             }
@@ -53,7 +54,7 @@ mod test_movegen {
 
     #[test]
     fn move_ordering() {
-        test_move_ordering!("h8h7h6");
+        test_move_ordering!("h8h7h6k7j8");
     }
 
 }

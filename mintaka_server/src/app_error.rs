@@ -1,4 +1,5 @@
 use mintaka::game_agent::GameError;
+use std::error::Error;
 use std::fmt::{Debug, Display};
 
 #[derive(Debug)]
@@ -22,8 +23,10 @@ impl Display for AppError {
     }
 }
 
-impl<T: std::error::Error> From<T> for AppError {
+impl<T: Error> From<T> for AppError {
     fn from(e: T) -> Self {
         Self::InternalError(e.to_string())
     }
 }
+
+impl Error for AppError {}

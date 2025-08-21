@@ -4,6 +4,7 @@ mod codegen {
     use rand::{Rng, SeedableRng};
     use rusty_renju::notation::pos;
 
+    #[allow(dead_code)]
     fn generate_hash_table() {
         let seed = 42;
         let mut rng = StdRng::seed_from_u64(seed);

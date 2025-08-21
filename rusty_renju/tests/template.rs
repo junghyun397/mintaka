@@ -2,6 +2,7 @@ mod template {
     use indoc::indoc;
     use rusty_renju::board;
 
+    #[allow(dead_code)]
     fn template() {
         let case = board!(indoc! {"
            A B C D E F G H I J K L M N O

@@ -2,10 +2,12 @@ use crate::endgame::vcf_search::vcf_search;
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::memo::tt_entry::{EndgameFlag, ScoreKind};
+use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker::MovePicker;
+use crate::search_frame::SearchFrame;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
-use crate::value::{ASPIRATION_INITIAL_DELTA, MAX_PLY};
+use crate::value;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
@@ -67,7 +69,7 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     max_depth: usize,
     prev_score: Score,
 ) -> Score {
-    let mut delta = ASPIRATION_INITIAL_DELTA + prev_score / 1024;
+    let mut delta = value::ASPIRATION_INITIAL_DELTA + prev_score / 1024;
     let mut alpha = (prev_score - delta).max(-Score::INF);
     let mut beta = (prev_score + delta).min(Score::INF);
     let mut depth = max_depth;
@@ -129,14 +131,22 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             return Score::lose_in(td.ply + 2)
         }
 
+        td.ss[td.ply] = SearchFrame {
+            hash_key: state.board.hash_key,
+            static_eval: Score::lose_in(td.ply + 1),
+            on_pv: NT::IS_PV,
+            movegen_window: state.movegen_window,
+            last_pos: pos.into(),
+            cutoffs: 0,
+        };
+
         td.push_ply_mut(pos);
-        let movegen_window = state.movegen_window;
         state.set_mut(pos);
 
-        let score = -pvs::<R, NT::NextType, TH>(td, state, depth_left, -beta, -alpha);
+        let score = -pvs::<R, NT::NextType, TH>(td, state, depth_left.saturating_sub(1), -beta, -alpha);
 
-        state.unset_mut(movegen_window);
         td.pop_ply_mut();
+        state.unset_mut(td.ss[td.ply].movegen_window);
 
         if NT::IS_ROOT {
             td.best_move = pos.into();
@@ -169,39 +179,52 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
     let mut static_eval: Score;
     let mut tt_move: MaybePos;
+    let mut tt_score: Score;
     let mut tt_pv: bool;
     let mut tt_endgame_flag: EndgameFlag;
 
-    if let Some(entry) = td.tt.probe(state.board.hash_key) && false { // todo: debug
+    if let Some(entry) = td.tt.probe(state.board.hash_key) {
         tt_endgame_flag = entry.tt_flag.endgame_flag();
-        if tt_endgame_flag == EndgameFlag::Win || tt_endgame_flag == EndgameFlag::Lose
-        { // endgame tt-hit
+        if tt_endgame_flag.is_deterministic() { // endgame tt-hit
+            if NT::IS_ROOT {
+                td.best_move = entry.best_move;
+            }
+
             return entry.score as Score;
         }
 
         static_eval = entry.eval as Score;
         tt_move = entry.best_move;
+        tt_score = entry.score as Score;
         tt_pv = entry.tt_flag.is_pv();
 
-        if !NT::IS_PV && match entry.tt_flag.score_kind() { // tt-cutoff
-            ScoreKind::LowerBound => entry.score as Score >= beta,
-            ScoreKind::UpperBound => entry.score as Score <= alpha,
-            ScoreKind::Exact => true,
-        } {
+        if !NT::IS_PV // tt-cutoff
+            && td.ply <= entry.depth as usize
+            && match entry.tt_flag.score_kind() {
+                ScoreKind::LowerBound => tt_score >= beta,
+                ScoreKind::UpperBound => tt_score as Score <= alpha,
+                ScoreKind::Exact => true,
+            }
+        {
+            if NT::IS_ROOT {
+                td.best_move = tt_move;
+            }
+
             return entry.score as Score;
         }
 
         static_eval = entry.score as Score;
     } else {
-        tt_endgame_flag = EndgameFlag::Unknown;
         static_eval = td.evaluator.eval_value(state);
+
         tt_move = MaybePos::NONE;
+        tt_score = static_eval;
         tt_pv = false;
+        tt_endgame_flag = EndgameFlag::Unknown;
     }
 
-    if td.ply + 1 >= MAX_PLY || depth_left == 0 {
-        return vcf_search(td, td.config.max_vcf_depth, state, alpha, beta)
-            .unwrap_or(static_eval);
+    if td.ply >= value::MAX_PLY || depth_left == 0 {
+        return vcf_search(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
     }
 
     let original_alpha = alpha;
@@ -209,26 +232,33 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     let mut best_score = -Score::INF;
     let mut best_move = MaybePos::NONE;
 
+    td.ss[td.ply] = SearchFrame {
+        movegen_window: state.movegen_window,
+        hash_key: state.board.hash_key,
+        static_eval,
+        on_pv: NT::IS_PV || tt_pv,
+        last_pos: MaybePos::NONE,
+        cutoffs: 0,
+    };
+
     let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
-
-    td.ss[td.ply].static_eval = static_eval;
-    td.ss[td.ply].on_pv = NT::IS_PV || tt_pv;
-
     let mut moves_made = 0;
-    'position_search: while let Some((pos, _)) = move_picker.next(td, state) {
+
+    'position_search: while let Some(MoveEntry { pos, .. }) = move_picker.next(td, state) {
         if !state.board.is_legal_move(pos) {
             continue;
         }
 
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
+        td.ss[td.ply].last_pos = pos.into();
+
         td.push_ply_mut(pos);
-        let movegen_window = state.movegen_window;
         state.set_mut(pos);
 
         moves_made += 1;
 
-        let score = if moves_made == 1 && true { // full-window search todo: debug
+        let score = if moves_made == 1 || true { // full-window search
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
         } else { // zero-window search
             let mut score = -pvs::<R, OffPVNode, TH>(td, state, depth_left - 1, -alpha - 1, -alpha);
@@ -240,8 +270,8 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             score
         };
 
-        state.unset_mut(movegen_window);
         td.pop_ply_mut();
+        state.unset_mut(td.ss[td.ply].movegen_window);
 
         if NT::IS_ROOT { // todo: debug
             td.root_moves += 1;
@@ -292,7 +322,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         best_move,
         score_kind,
         tt_endgame_flag,
-        td.ply as u8,
+        td.ply,
         static_eval,
         best_score,
         NT::IS_PV

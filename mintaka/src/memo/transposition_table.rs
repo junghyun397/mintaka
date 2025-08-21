@@ -152,7 +152,7 @@ impl TTView<'_> {
         maybe_best_move: MaybePos,
         score_kind: ScoreKind,
         endgame_flag: EndgameFlag,
-        depth: u8,
+        depth: usize,
         eval: Score,
         score: Score,
         is_pv: bool,
@@ -170,7 +170,7 @@ impl TTView<'_> {
 
                 entry.tt_flag = TTFlag::new(score_kind, endgame_flag, is_pv);
                 entry.age = self.age;
-                entry.depth = depth;
+                entry.depth = depth as u8;
                 entry.eval = eval as i16;
                 entry.score = score as i16;
 
@@ -181,7 +181,7 @@ impl TTView<'_> {
                 best_move: maybe_best_move,
                 tt_flag: TTFlag::new(score_kind, endgame_flag, false),
                 age: self.age,
-                depth,
+                depth: depth as u8,
                 eval: eval as i16,
                 score: score as i16,
             };

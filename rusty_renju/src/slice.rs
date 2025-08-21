@@ -58,14 +58,6 @@ impl Slice {
         *self.stones.access_mut(color) &= !(0b1 << idx);
     }
 
-    pub fn stones<const C: Color>(&self) -> u16 {
-        self.stones.get::<C>()
-    }
-
-    pub fn stones_reversed_color<const C: Color>(&self) -> u16 {
-        self.stones.get_reversed::<C>()
-    }
-
     pub fn is_empty(&self, idx: u8) -> bool {
         let mask = 0b1 << idx;
         (self.stones.black | self.stones.white) & mask == 0

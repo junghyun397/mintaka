@@ -1,9 +1,12 @@
 use crate::time_manager::TimeManager;
 use crate::value;
+use rusty_renju::history;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize};
+use std::error::Error;
+use std::fmt::Display;
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SearchObjective {
@@ -36,11 +39,39 @@ impl Default for Config {
             draw_condition: pos::BOARD_SIZE,
             search_objective: SearchObjective::default(),
             max_nodes_in_1k: None,
-            max_depth: value::MAX_PLY,
-            max_vcf_depth: pos::BOARD_SIZE - 5,
+            max_depth: 5,
+            max_vcf_depth: 24,
             tt_size: ByteSize::from_mib(128),
             workers: 1,
             initial_time_manager: None,
         }
     }
+}
+
+#[derive(Debug)]
+pub enum ConfigValidationError {
+    DrawConditionDeeperThenMaxHistory,
+    DepthDeeperThanMaxPly,
+}
+
+impl Display for ConfigValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl Error for ConfigValidationError {}
+
+impl Config {
+
+    pub fn validate(self) -> Result<Self, ConfigValidationError> {
+        if self.draw_condition > history::MAX_HISTORY_SIZE {
+            Err(ConfigValidationError::DrawConditionDeeperThenMaxHistory)
+        } else if self.max_depth > value::MAX_PLY {
+            Err(ConfigValidationError::DepthDeeperThanMaxPly)
+        } else {
+            Ok(self)
+        }
+    }
+
 }

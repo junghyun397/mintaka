@@ -60,9 +60,10 @@ pub fn vcf_search(
     state: &GameState,
     alpha: Score,
     beta: Score,
-) -> Option<Score> {
+    static_eval: Score
+) -> Score {
     if state.board.patterns.counts.global.access(state.board.player_color).total_fours() == 0 {
-        return None;
+        return static_eval;
     }
 
     let mut vcf_moves = generate_vcf_moves(
@@ -72,19 +73,20 @@ pub fn vcf_search(
     );
 
     if vcf_moves.is_empty() {
-        return None;
+        return static_eval;
     }
 
     vcf_moves.sort_moves(state.history.recent_player_action().unwrap_or(pos::CENTER));
 
-    Some(vcf::<Score>(td, VcfWin, max_vcf_ply, *state, vcf_moves, alpha, beta))
+    vcf::<Score>(td, VcfWin, max_vcf_ply, *state, vcf_moves, alpha, beta, static_eval)
 }
 
 pub fn vcf_defend(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     max_vcf_ply: usize,
     state: &GameState,
-    target_pos: Pos
+    target_pos: Pos,
+    static_eval: Score
 ) -> Score {
     let vcf_moves = generate_vcf_moves(
         &state.board,
@@ -92,7 +94,7 @@ pub fn vcf_defend(
         state.history.recent_action().unwrap_or(target_pos)
     );
 
-    vcf::<Score>(td, VcfDefend { target_pos }, max_vcf_ply, *state, vcf_moves, Score::MIN, Score::MAX)
+    vcf::<Score>(td, VcfDefend { target_pos }, max_vcf_ply, *state, vcf_moves, Score::MIN, Score::MAX, static_eval)
 }
 
 pub fn vcf_sequence(
@@ -101,7 +103,11 @@ pub fn vcf_sequence(
 ) -> Option<Vec<MaybePos>> {
     let vcf_moves = generate_vcf_moves(&state.board, 8, pos::CENTER);
 
-    vcf::<SequenceEndgameAccumulator>(td, VcfWin, usize::MAX, *state, vcf_moves, Score::MIN, Score::MAX)
+    if vcf_moves.is_empty() {
+        return None;
+    }
+
+    vcf::<SequenceEndgameAccumulator>(td, VcfWin, usize::MAX, *state, vcf_moves, Score::MIN, Score::MAX, SequenceEndgameAccumulator::ZERO)
         .map(|mut sequence| {
             sequence.reverse();
             sequence
@@ -115,10 +121,11 @@ fn vcf<ACC: EndgameAccumulator>(
     state: GameState,
     vcf_moves: VcfMovesUnchecked,
     alpha: Score, beta: Score,
+    acc: ACC
 ) -> ACC {
     match state.board.player_color {
-        Color::Black => try_vcf::<{ Color::Black }, _, ACC>(td, dest, vcf_max_ply, state, vcf_moves, alpha, beta),
-        Color::White => try_vcf::<{ Color::White }, _, ACC>(td, dest, vcf_max_ply, state, vcf_moves, alpha, beta),
+        Color::Black => try_vcf::<{ Color::Black }, _, ACC>(td, dest, vcf_max_ply, state, vcf_moves, alpha, beta, acc),
+        Color::White => try_vcf::<{ Color::White }, _, ACC>(td, dest, vcf_max_ply, state, vcf_moves, alpha, beta, acc),
     }
 }
 
@@ -129,6 +136,7 @@ fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
     mut state: GameState,
     mut vcf_moves: VcfMovesUnchecked,
     mut alpha: Score, mut beta: Score,
+    mut acc: ACC
 ) -> ACC {
     td.clear_vcf_stack_mut();
 
@@ -336,7 +344,7 @@ fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
         }
     }
 
-    ACC::ZERO
+    acc
 }
 
 #[inline]
@@ -353,7 +361,7 @@ fn tt_store_vcf_win(
         four_pos.into(),
         ScoreKind::LowerBound,
         EndgameFlag::Win,
-        total_ply as u8,
+        total_ply,
         score,
         score,
         is_pv,
@@ -373,7 +381,7 @@ fn tt_store_vcf_lose(
         MaybePos::NONE,
         ScoreKind::UpperBound,
         EndgameFlag::Lose,
-        total_ply as u8,
+        total_ply,
         score,
         score,
         is_pv,

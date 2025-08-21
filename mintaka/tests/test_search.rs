@@ -13,8 +13,8 @@ mod test_search {
         ($source:expr) => {{
             let mut agent = {
                 let mut config = Config::default();
-                config.max_nodes_in_1k = Some(3000);
-                config.max_depth = 2;
+                config.max_nodes_in_1k = Some(100);
+                config.max_depth = 5;
 
                 let state: GameState = $source.into();
 
@@ -39,9 +39,9 @@ mod test_search {
         12 . . . . . . . . . . . . . . . 12
         11 . . . . . . . . . . . . . . . 11
         10 . . . . . . . . . X . . . . . 10
-         9 . . . . . . . O . . . . . . . 9
-         8 . . . . . . . X X . . . . . . 8
-         7 . . . . . . X O . . . . . . . 7
+         9 . . . . . . . O . O . . . . . 9
+         8 . . . . . . . X X X O . . . . 8
+         7 . . . . . . X O X . . . . . . 7
          6 . . . . . . . . O . . . . . . 6
          5 . . . . . . . . . . . . . . . 5
          4 . . . . . . . . . . . . . . . 4

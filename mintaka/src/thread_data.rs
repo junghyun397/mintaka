@@ -36,7 +36,6 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub depth: usize,
     pub ply: usize,
 
-    // todo: debug
     pub root_scores: [f32; pos::BOARD_SIZE],
     pub root_moves: usize,
 }
@@ -96,8 +95,9 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
 
     pub fn push_ply_mut(&mut self, pos: Pos) {
         self.ply += 1;
-        self.ss[self.ply].pos = pos.into();
         self.batch_counter.increment_single_mut();
+
+        self.ss[self.ply].last_pos = pos.into();
     }
 
     pub fn pop_ply_mut(&mut self) {

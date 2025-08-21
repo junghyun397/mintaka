@@ -2,15 +2,17 @@ use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::opening::opening_utils::find_forbidden_symmetry_moves;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub enum OpeningKind {
     Soosyrv8,
     Taraguchi10,
     Random4,
 }
 
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum OpeningStage {
     Move(OpeningMove),
     Swap(OpeningSwap),
@@ -74,6 +76,7 @@ macro_rules! impl_opening_agent {
     };
 }
 
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct OpeningMove {
     moves: usize,
     opening_kind: OpeningKind,
@@ -138,6 +141,7 @@ impl OpeningMove {
 
 }
 
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct OpeningSwap {
     moves: usize,
     opening_kind: OpeningKind,
@@ -190,6 +194,7 @@ impl OpeningSwap {
 
 }
 
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct OpeningDeclare {
     moves: usize,
     opening_kind: OpeningKind,
@@ -222,6 +227,7 @@ impl OpeningDeclare {
 
 }
 
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct OpeningOffer {
     moves: usize,
     opening_kind: OpeningKind,
@@ -275,6 +281,7 @@ impl OpeningOffer {
 
 }
 
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct OpeningSelect {
     moves: usize,
     opening_kind: OpeningKind,
@@ -306,6 +313,7 @@ impl OpeningSelect {
 
 }
 
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct OpeningBranch {
     moves: usize,
     opening_kind: OpeningKind,

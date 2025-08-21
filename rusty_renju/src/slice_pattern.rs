@@ -33,26 +33,19 @@ impl Slice {
     pub fn calculate_slice_pattern<const R: RuleKind, const C: Color>(&self) -> SlicePattern {
         // padding = 3
         let block: usize = !(!(usize::MAX << self.length as u32) << 3);
-        let extended_p: usize = (self.stones::<C>() as usize) << 3;
-        let extended_q: usize = ((self.stones_reversed_color::<C>() as usize) << 3) | block;
+        let extended_p: usize = (self.stones.get::<C>() as usize) << 3;
+        let extended_q: usize = ((self.stones.get_reversed::<C>() as usize) << 3) | block;
 
         let mut acc: SlicePattern = SlicePattern::EMPTY;
         for shift in 0 .. self.length as isize - 1 {
             let p = (extended_p >> shift) & 0x00FF;
             let q = (extended_q >> shift) & 0x00FF;
 
-            // little-endian
-            let shift_offset = (shift - 3) * 8;
-            let shl = shift_offset.min(0).abs();
-            let shr = shift_offset.max(0);
-
             lookup_patterns::<R, C>(
                 &mut acc,
                 shift,
                 p | (q << 8),
                 extended_p,
-                shl,
-                shr
             );
         }
 
@@ -60,22 +53,22 @@ impl Slice {
     }
 
     pub fn eval_slice<const C: Color>(&self) -> u8 {
-        let (mut stones, mut blocks) = {
+        let (mut stones, blocks) = {
             let (stones, blocks) = self.stones_with_boundary_mask::<C>();
             ((stones as u32) << 1, ((blocks as u32) << 1) | 0b1)
         };
 
         let open = !blocks;
 
-        let mut start5 = open;
-        start5 &= open >> 1;
-        start5 &= open >> 2;
-        start5 &= open >> 3;
-        start5 &= open >> 4;
+        let mut start_five = open;
+        start_five &= open >> 1;
+        start_five &= open >> 2;
+        start_five &= open >> 3;
+        start_five &= open >> 4;
 
-        let cover5 = start5 | (start5 << 1) | (start5 << 2) | (start5 << 3) | (start5 << 4);
+        let cover_five = start_five | (start_five << 1) | (start_five << 2) | (start_five << 3) | (start_five << 4);
 
-        stones = stones & cover5;
+        stones = stones & cover_five;
         if stones == 0 { return 0; }
 
         let empty = !(stones | blocks);
@@ -124,8 +117,6 @@ fn lookup_patterns<const R: RuleKind, const C: Color>(
     shift: isize,
     vector: usize,
     raw: usize,
-    shl: isize,
-    shr: isize
 ) {
     #[cold]
     fn extended_match_for_black(direction: ExtendedMatch, b_raw: usize, shift: isize) -> bool {
@@ -141,29 +132,40 @@ fn lookup_patterns<const R: RuleKind, const C: Color>(
     };
 
     if patch_pointer != 0 {
-        let slice_patch_data = unsafe { match C {
-            Color::Black => SLICE_PATTERN_LUT.patch.black.get_unchecked(patch_pointer as usize),
-            Color::White => SLICE_PATTERN_LUT.patch.white.get_unchecked(patch_pointer as usize),
+        let slice_patch_data = unsafe { match (R, C) {
+            (RuleKind::Renju, Color::Black) => SLICE_PATTERN_LUT.patch.black.get_unchecked(patch_pointer as usize),
+            _ => SLICE_PATTERN_LUT.patch.white.get_unchecked(patch_pointer as usize),
         } };
 
         if R == RuleKind::Renju && C == Color::Black
-            && slice_patch_data.extended_match.is_some_and(|extended_match|
-            !extended_match_for_black(extended_match, raw, shift)
-        ) {
+            && let Some(extended_match) = slice_patch_data.extended_match
+            && !extended_match_for_black(extended_match, raw, shift)
+        {
             return;
         }
 
+        let lane_shift = (shift - 3) * 8;
+
         if slice_patch_data.patch_mask != 0 {
-            acc.patterns |= ((slice_patch_data.patch_mask as u128) << shr) >> shl;
+            acc.patterns |= shift_and_fit_u128(slice_patch_data.patch_mask, lane_shift);
         }
 
         if slice_patch_data.closed_four_mask != 0 {
             acc.patterns |= increase_closed_four(
                 acc.patterns,
-                ((slice_patch_data.closed_four_clear_mask as u128) << shr) >> shl,
-                ((slice_patch_data.closed_four_mask as u128) << shr) >> shl
+                shift_and_fit_u128(slice_patch_data.closed_four_clear_mask, lane_shift),
+                shift_and_fit_u128(slice_patch_data.closed_four_mask, lane_shift)
             );
         }
+    }
+}
+
+#[inline(always)]
+fn shift_and_fit_u128(x: u64, shift: isize) -> u128 {
+    if shift < 0 {
+        (x as u128) >> -shift
+    } else {
+        (x as u128) << shift
     }
 }
 
@@ -413,10 +415,19 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
     embed_pattern!(black, asymmetry, "O.OOOO", "O6OOOO");
     embed_pattern!(black, asymmetry, "OO.OOO", "OO6OOO");
 
-    slice_pattern_lut.patch._dbg_black_length =
-        compress_pattern_lut(temp_vector_match_lut_black, &mut slice_pattern_lut.vector.black, &mut slice_pattern_lut.patch.black, patch_top_black);
-    slice_pattern_lut.patch._dbg_white_length =
-        compress_pattern_lut(temp_vector_match_lut_white, &mut slice_pattern_lut.vector.white, &mut slice_pattern_lut.patch.white, patch_top_white);
+    slice_pattern_lut.patch._dbg_black_length = compress_pattern_lut(
+        temp_vector_match_lut_black,
+        &mut slice_pattern_lut.vector.black,
+        &mut slice_pattern_lut.patch.black,
+        patch_top_black
+    );
+
+    slice_pattern_lut.patch._dbg_white_length = compress_pattern_lut(
+        temp_vector_match_lut_white,
+        &mut slice_pattern_lut.vector.white,
+        &mut slice_pattern_lut.patch.white,
+        patch_top_white
+    );
 
     slice_pattern_lut
 }

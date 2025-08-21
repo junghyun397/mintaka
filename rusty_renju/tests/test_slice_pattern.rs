@@ -4,7 +4,6 @@ mod test_slice_pattern {
     use rusty_renju::notation::rule::RuleKind;
     use rusty_renju::pattern::*;
     use rusty_renju::slice::*;
-    use std::str::FromStr;
 
     macro_rules! test {
         ($case:expr, $expected:expr, $color:expr, $mask:expr, $result:expr) => {{

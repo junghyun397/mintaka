@@ -1,7 +1,7 @@
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::movegen::move_generator::generate_defend_open_four_moves;
-use crate::movegen::move_list::MoveList;
+use crate::movegen::move_list::{MoveEntry, MoveList};
 use crate::search_frame::KILLER_MOVE_SLOTS;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
@@ -46,14 +46,17 @@ impl MovePicker {
         &mut self,
         td: &ThreadData<impl ThreadType, impl Evaluator>,
         state: &GameState,
-    ) -> Option<(Pos, Score)> {
+    ) -> Option<MoveEntry> {
         loop {
             match self.stage {
                 MoveStage::TT => {
                     self.stage = MoveStage::Killer;
 
                     if self.tt_move.is_some() {
-                        return Some((self.tt_move.unwrap(), TT_MOVE_SCORE));
+                        return Some(MoveEntry {
+                            pos: self.tt_move.unwrap(),
+                            score: TT_MOVE_SCORE
+                        });
                     }
                 },
                 MoveStage::Killer => {
@@ -63,7 +66,10 @@ impl MovePicker {
                         self.killer_moves[0] = self.killer_moves[1];
                         self.killer_moves[1] = MaybePos::NONE;
 
-                        return Some((killer_move, KILLER_MOVE_SCORE));
+                        return Some(MoveEntry {
+                            pos: killer_move,
+                            score: KILLER_MOVE_SCORE
+                        });
                     }
 
                     if Self::opponent_has_open_four(state) {

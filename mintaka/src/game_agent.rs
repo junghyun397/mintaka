@@ -142,7 +142,7 @@ impl GameAgent {
 
                 if self.state.board.stones == pos::U8_BOARD_SIZE {
                     return Ok(Some(GameResult::Full));
-                } else if self.state.height() >= self.config.draw_condition {
+                } else if self.state.len() >= self.config.draw_condition {
                     return Ok(Some(GameResult::Draw));
                 }
             },
@@ -201,8 +201,8 @@ impl GameAgent {
                             }
                         }
 
-                        if self.executed_moves.is_hot_idx(self.state.height()) {
-                            self.executed_moves.unset_idx_mut(self.state.height());
+                        if self.executed_moves.is_hot_idx(self.state.len()) {
+                            self.executed_moves.unset_idx_mut(self.state.len());
 
                             if let Some(time_management) = &mut self.time_management
                                 && let Some((pos, time)) = time_management.time_history.pop()
@@ -389,7 +389,7 @@ impl GameAgent {
         self.tt.increase_age();
         self.ht = *main_td.ht;
 
-        self.executed_moves.set_idx_mut(self.state.height());
+        self.executed_moves.set_idx_mut(self.state.len());
 
         let time_elapsed = started_time.elapsed();
 
@@ -406,7 +406,7 @@ impl GameAgent {
             hash: self.state.board.hash_key,
             pos: main_td.best_move,
             score,
-            depth_reached: main_td.depth,
+            depth_reached: main_td.depth as usize,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed,
         }
