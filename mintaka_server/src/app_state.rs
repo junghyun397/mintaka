@@ -89,15 +89,17 @@ impl AppState {
 
         let encoded = tokio::task::spawn_blocking(move || rmp_serde::to_vec(&session))
             .await
-            .map_err(AppError::from)?
-            .map_err(AppError::from)?;
+            .map_err(AppError::from_general_error)?
+            .map_err(AppError::from_general_error)?;
 
         let mut file = tokio::fs::File::create(format!("{sessions_directory}/{session_key}"))
             .await
             .map_err(|_| AppError::SessionFileAlreadyExists)?;
 
-        file.write_all(&encoded).await?;
-        file.flush().await?;
+        file.write_all(&encoded).await
+            .map_err(AppError::from_general_error)?;
+        file.flush().await
+            .map_err(AppError::from_general_error)?;
 
         info!("session hibernated: sid={session_key}");
 
@@ -111,8 +113,8 @@ impl AppState {
 
         let session = tokio::task::spawn_blocking(move || rmp_serde::from_slice(&buf))
             .await
-            .map_err(AppError::from)?
-            .map_err(AppError::from)?;
+            .map_err(AppError::from_general_error)?
+            .map_err(AppError::from_general_error)?;
 
         self.sessions.insert(session_key, session);
 
@@ -250,10 +252,11 @@ impl AppState {
     pub async fn wakeup_all_sessions(&self) -> Result<(), AppError> {
         let sessions_directory = &self.preference.sessions_directory;
 
-        let mut read_dir = tokio::fs::read_dir(sessions_directory).await?;
+        let mut read_dir = tokio::fs::read_dir(sessions_directory).await
+            .map_err(AppError::from_general_error)?;
         let mut session_keys = vec![];
 
-        while let Some(entry) = read_dir.next_entry().await? {
+        while let Some(entry) = read_dir.next_entry().await.map_err(AppError::from_general_error)? {
             if let Ok(session_key) = SessionKey::from_str(&entry.file_name().to_string_lossy()) {
                 session_keys.push(session_key);
             }

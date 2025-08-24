@@ -10,6 +10,7 @@ use crate::thread_type::ThreadType;
 use crate::value::MAX_PLY;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::notation::value::Depth;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 #[derive(Clone)]
@@ -33,7 +34,7 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     aborted: &'a AtomicBool,
 
     pub best_move: MaybePos,
-    pub depth: usize,
+    pub depth: Depth,
     pub ply: usize,
 
     pub root_scores: [f32; pos::BOARD_SIZE],

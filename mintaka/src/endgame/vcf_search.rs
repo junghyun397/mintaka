@@ -11,7 +11,7 @@ use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::value::{Score, Scores};
+use rusty_renju::notation::value::{Depth, Score, Scores};
 use rusty_renju::pattern::{Pattern, PatternCount};
 
 pub trait VcfDestination {
@@ -56,7 +56,7 @@ pub struct VcfFrame {
 
 pub fn vcf_search(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
-    max_vcf_ply: usize,
+    max_vcf_ply: Depth,
     state: &GameState,
     alpha: Score,
     beta: Score,
@@ -81,22 +81,6 @@ pub fn vcf_search(
     vcf::<Score>(td, VcfWin, max_vcf_ply, *state, vcf_moves, alpha, beta, static_eval)
 }
 
-pub fn vcf_defend(
-    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
-    max_vcf_ply: usize,
-    state: &GameState,
-    target_pos: Pos,
-    static_eval: Score
-) -> Score {
-    let vcf_moves = generate_vcf_moves(
-        &state.board,
-        8,
-        state.history.recent_action().unwrap_or(target_pos)
-    );
-
-    vcf::<Score>(td, VcfDefend { target_pos }, max_vcf_ply, *state, vcf_moves, Score::MIN, Score::MAX, static_eval)
-}
-
 pub fn vcf_sequence(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     state: &GameState
@@ -107,7 +91,7 @@ pub fn vcf_sequence(
         return None;
     }
 
-    vcf::<SequenceEndgameAccumulator>(td, VcfWin, usize::MAX, *state, vcf_moves, Score::MIN, Score::MAX, SequenceEndgameAccumulator::ZERO)
+    vcf::<SequenceEndgameAccumulator>(td, VcfWin, Depth::MAX, *state, vcf_moves, Score::MIN, Score::MAX, SequenceEndgameAccumulator::ZERO)
         .map(|mut sequence| {
             sequence.reverse();
             sequence
@@ -117,22 +101,22 @@ pub fn vcf_sequence(
 fn vcf<ACC: EndgameAccumulator>(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     dest: impl VcfDestination,
-    vcf_max_ply: usize,
+    vcf_max_depth: Depth,
     state: GameState,
     vcf_moves: VcfMovesUnchecked,
     alpha: Score, beta: Score,
     acc: ACC
 ) -> ACC {
     match state.board.player_color {
-        Color::Black => try_vcf::<{ Color::Black }, _, ACC>(td, dest, vcf_max_ply, state, vcf_moves, alpha, beta, acc),
-        Color::White => try_vcf::<{ Color::White }, _, ACC>(td, dest, vcf_max_ply, state, vcf_moves, alpha, beta, acc),
+        Color::Black => try_vcf::<{ Color::Black }, _, ACC>(td, dest, vcf_max_depth, state, vcf_moves, alpha, beta, acc),
+        Color::White => try_vcf::<{ Color::White }, _, ACC>(td, dest, vcf_max_depth, state, vcf_moves, alpha, beta, acc),
     }
 }
 
 fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
     td: &mut ThreadData<TH, impl Evaluator>,
     dest: impl VcfDestination,
-    vcf_max_ply: usize,
+    mut depth_left: Depth,
     mut state: GameState,
     mut vcf_moves: VcfMovesUnchecked,
     mut alpha: Score, mut beta: Score,
@@ -161,10 +145,10 @@ fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
 
         while let Some(frame) = td.pop_vcf_frame_mut() {
             hash_key = hash_key.set(opponent_color, frame.defend_pos);
-            tt_store_vcf_lose(&td.tt, hash_key, td.ply + vcf_ply, lose_score, true);
+            tt_store_vcf_lose(&td.tt, hash_key, frame.defend_pos, lose_score, true);
 
             hash_key = hash_key.set(board.player_color, frame.four_pos);
-            tt_store_vcf_win(&td.tt, hash_key, frame.four_pos, td.ply + vcf_ply, win_score, true);
+            tt_store_vcf_win(&td.tt, hash_key, frame.four_pos, win_score, true);
 
             result = result.append_pos(frame.defend_pos, frame.four_pos);
         }
@@ -201,7 +185,7 @@ fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
                 let total_ply = td.ply + vcf_ply;
                 let win_score = Score::win_in(total_ply);
 
-                tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, total_ply, win_score, false);
+                tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, win_score, false);
 
                 return backtrace_frames(td, state.board, vcf_ply, four_pos);
             }
@@ -209,6 +193,7 @@ fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
             state.board.set_mut(four_pos);
             td.batch_counter.increment_single_mut();
             vcf_ply += 1;
+            depth_left -= 1;
 
             let defend_pos = state.board.patterns.unchecked_five_pos.get_ref::<C>().unwrap();
             let tt_key = state.board.hash_key.set(C.reversed(), defend_pos);
@@ -226,6 +211,7 @@ fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
             } || dest.conditional_abort(defend_pattern) {
                 state.board.unset_mut(four_pos);
                 vcf_ply -= 1;
+                depth_left += 1;
                 continue 'position_search;
             }
 
@@ -236,38 +222,62 @@ fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
                 let total_ply = td.ply + vcf_ply;
                 let win_score = Score::win_in(total_ply);
 
-                tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, total_ply, win_score, false);
+                tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, win_score, false);
 
                 return backtrace_frames(td, state.board, vcf_ply, four_pos);
             }
 
-            if state.board.stones + 2 >= pos::U8_BOARD_SIZE {
-                score = 0;
-                state.board.unset_mut(four_pos);
-                vcf_ply -= 1;
-                continue 'position_search;
-            }
-
-            if vcf_ply + 2 >= vcf_max_ply {
-                score = td.evaluator.eval_value(&state);
-                state.board.unset_mut(four_pos);
-                vcf_ply -= 1;
-                continue 'position_search;
-            }
+            let abort: bool;
 
             alpha = alpha.max(Score::lose_in(td.ply + vcf_ply));
             beta = beta.min(Score::win_in(td.ply + vcf_ply));
+
             if alpha >= beta { // mate distance pruning
                 score = alpha;
+                abort = true;
+            } else if state.board.stones + 2 >= pos::U8_BOARD_SIZE {
+                score = Score::DRAW;
+                abort = true;
+            } else if depth_left <= 2 {
+                score = td.evaluator.eval_value(&state);
+                abort = true;
+            } else {
+                abort = false;
+            }
+
+            if abort {
                 state.board.unset_mut(four_pos);
                 vcf_ply -= 1;
+                depth_left += 1;
                 continue 'position_search;
             }
 
             if let Some(entry) = td.tt.probe(tt_key) {
+                let mut abort = false;
+
                 if entry.tt_flag.endgame_flag() == EndgameFlag::Cold { // endgame-cold pruning
+                    abort = true;
+                } else if depth_left <= entry.depth as Depth { // tt-cutoff
+                    match entry.tt_flag.score_kind() {
+                        ScoreKind::LowerBound => {
+                            alpha = alpha.max(entry.score as Score);
+                        }
+                        ScoreKind::UpperBound => {
+                            beta = beta.min(entry.score as Score);
+                        }
+                        _ => {}
+                    }
+
+                    if alpha >= beta {
+                        score = alpha;
+                        abort = true;
+                    }
+                }
+
+                if abort {
                     state.board.unset_mut(four_pos);
                     vcf_ply -= 1;
+                    depth_left += 1;
                     continue 'position_search;
                 }
             }
@@ -275,11 +285,13 @@ fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
             state.board.set_mut(defend_pos);
             td.batch_counter.increment_single_mut();
             vcf_ply += 1;
+            depth_left -= 1;
 
             if state.board.patterns.counts.global.get_ref::<C>().total_fours() == 0 { // cold branch pruning
                 state.board.unset_mut(defend_pos);
                 state.board.unset_mut(four_pos);
                 vcf_ply -= 2;
+                depth_left += 2;
                 continue 'position_search;
             }
 
@@ -300,6 +312,7 @@ fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
                     state.board.unset_mut(defend_pos);
                     state.board.unset_mut(four_pos);
                     vcf_ply -= 2;
+                    depth_left += 2;
                     continue 'position_search;
                 }
 
@@ -336,6 +349,7 @@ fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
             state.board.unset_mut(frame.four_pos);
 
             vcf_ply -= 2;
+            depth_left += 2;
 
             vcf_moves = frame.vcf_moves;
             move_counter = frame.next_move_counter;
@@ -352,16 +366,15 @@ fn tt_store_vcf_win(
     tt: &TTView,
     hash_key: HashKey,
     four_pos: Pos,
-    total_ply: usize,
     score: Score,
     is_pv: bool,
 ) {
     tt.store(
         hash_key,
         four_pos.into(),
-        ScoreKind::LowerBound,
+        ScoreKind::Exact,
         EndgameFlag::Win,
-        total_ply,
+        0,
         score,
         score,
         is_pv,
@@ -372,16 +385,16 @@ fn tt_store_vcf_win(
 fn tt_store_vcf_lose(
     tt: &TTView,
     hash_key: HashKey,
-    total_ply: usize,
+    defend_pos: Pos,
     score: Score,
     is_pv: bool,
 ) {
     tt.store(
         hash_key,
-        MaybePos::NONE,
-        ScoreKind::UpperBound,
+        defend_pos.into(),
+        ScoreKind::Exact,
         EndgameFlag::Lose,
-        total_ply,
+        0,
         score,
         score,
         is_pv,

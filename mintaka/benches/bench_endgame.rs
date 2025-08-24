@@ -17,6 +17,7 @@ mod bench_vcf {
     use rusty_renju::history::History;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use rusty_renju::notation::pos::pos_unchecked;
+    use rusty_renju::notation::value::Depth;
     use rusty_renju::notation::value::{Score, Scores};
     use rusty_renju::utils::byte_size::ByteSize;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
@@ -50,7 +51,7 @@ mod bench_vcf {
             let td = ThreadData::new(WorkerThread, 0, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
-                let result = vcf_search::vcf_search(&mut td.clone(), usize::MAX, &state, -Score::INF, Score::INF, 0);
+                let result = vcf_search::vcf_search(&mut td.clone(), Depth::MAX, &state, -Score::INF, Score::INF, 0);
 
                 assert!(result > $score);
 

@@ -100,18 +100,16 @@ impl TranspositionTable {
 
         let tt_len = payload.len() / size_of::<TTEntryBucket>();
 
-        let mut table = unsafe {
-            let mut table = Vec::with_capacity(tt_len);
+        let mut table = Vec::with_capacity(tt_len);
 
+        unsafe {
             table.set_len(tt_len);
             std::ptr::copy_nonoverlapping(
                 payload.as_ptr(),
                 table.as_mut_ptr() as *mut u8,
-                payload.len(),
+                payload.len()
             );
-
-            table
-        };
+        }
 
         Ok(Self {
             table,
@@ -152,7 +150,7 @@ impl TTView<'_> {
         maybe_best_move: MaybePos,
         score_kind: ScoreKind,
         endgame_flag: EndgameFlag,
-        depth: usize,
+        depth: i32,
         eval: Score,
         score: Score,
         is_pv: bool,

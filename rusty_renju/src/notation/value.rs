@@ -1,3 +1,10 @@
+pub type Depth = i32;
+
+pub trait Depths {
+}
+
+impl Depths for Depth {}
+
 pub type Score = i32;
 
 pub trait Scores {

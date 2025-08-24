@@ -8,7 +8,7 @@ use crate::value::MAX_PLY;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::{Score, Scores};
+use rusty_renju::notation::value::{Depth, Score, Scores};
 
 pub fn iterative_deepening_minimal<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH, impl Evaluator>,
@@ -32,7 +32,7 @@ pub fn iterative_deepening_minimal<const R: RuleKind, TH: ThreadType>(
 fn negamax<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH, impl Evaluator>,
     state: &mut GameState,
-    depth_left: usize,
+    depth_left: Depth,
     mut alpha: Score,
     beta: Score,
 ) -> Score {

@@ -327,6 +327,7 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
     }
 
     println!("{}", game_result.unwrap());
+    println!("total {}k nodes", game_agent.overall_nodes_in_1k);
 
     Ok(())
 }

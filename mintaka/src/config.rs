@@ -3,6 +3,7 @@ use crate::value;
 use rusty_renju::history;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::rule::RuleKind;
+use rusty_renju::notation::value::Depth;
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -23,8 +24,8 @@ pub struct Config {
     pub search_objective: SearchObjective,
 
     pub max_nodes_in_1k: Option<usize>,
-    pub max_depth: usize,
-    pub max_vcf_depth: usize,
+    pub max_depth: Depth,
+    pub max_vcf_depth: Depth,
 
     pub tt_size: ByteSize,
     pub workers: u32,
@@ -67,7 +68,7 @@ impl Config {
     pub fn validate(self) -> Result<Self, ConfigValidationError> {
         if self.draw_condition > history::MAX_HISTORY_SIZE {
             Err(ConfigValidationError::DrawConditionDeeperThenMaxHistory)
-        } else if self.max_depth > value::MAX_PLY {
+        } else if self.max_depth > value::MAX_PLY as Depth {
             Err(ConfigValidationError::DepthDeeperThanMaxPly)
         } else {
             Ok(self)

@@ -11,7 +11,7 @@ use crate::value;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::{Score, Scores};
+use rusty_renju::notation::value::{Depth, Score, Scores};
 
 pub trait NodeType {
 
@@ -66,7 +66,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
 pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH, impl Evaluator>,
     state: &mut GameState,
-    max_depth: usize,
+    max_depth: Depth,
     prev_score: Score,
 ) -> Score {
     let mut delta = value::ASPIRATION_INITIAL_DELTA + prev_score / 1024;
@@ -100,7 +100,7 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
 pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     td: &mut ThreadData<TH, impl Evaluator>,
     state: &mut GameState,
-    depth_left: usize,
+    depth_left: Depth,
     mut alpha: Score,
     mut beta: Score,
 ) -> Score {
@@ -143,7 +143,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         td.push_ply_mut(pos);
         state.set_mut(pos);
 
-        let score = -pvs::<R, NT::NextType, TH>(td, state, depth_left.saturating_sub(1), -beta, -alpha);
+        let score = -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha);
 
         td.pop_ply_mut();
         state.unset_mut(td.ss[td.ply].movegen_window);
@@ -199,7 +199,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         tt_pv = entry.tt_flag.is_pv();
 
         if !NT::IS_PV // tt-cutoff
-            && td.ply <= entry.depth as usize
+            && depth_left <= entry.depth as Depth
             && match entry.tt_flag.score_kind() {
                 ScoreKind::LowerBound => tt_score >= beta,
                 ScoreKind::UpperBound => tt_score as Score <= alpha,
@@ -213,7 +213,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             return entry.score as Score;
         }
 
-        static_eval = entry.score as Score;
+        // static_eval = entry.score as Score;
     } else {
         static_eval = td.evaluator.eval_value(state);
 
@@ -223,7 +223,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         tt_endgame_flag = EndgameFlag::Unknown;
     }
 
-    if td.ply >= value::MAX_PLY || depth_left == 0 {
+    if td.ply >= value::MAX_PLY || depth_left <= 0 {
         return vcf_search(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
     }
 
@@ -322,7 +322,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         best_move,
         score_kind,
         tt_endgame_flag,
-        td.ply,
+        depth_left,
         static_eval,
         best_score,
         NT::IS_PV

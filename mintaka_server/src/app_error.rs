@@ -23,10 +23,12 @@ impl Display for AppError {
     }
 }
 
-impl<T: Error> From<T> for AppError {
-    fn from(e: T) -> Self {
-        Self::InternalError(e.to_string())
-    }
-}
-
 impl Error for AppError {}
+
+impl AppError {
+
+    pub fn from_general_error<T: Error>(err: T) -> Self {
+        Self::InternalError(err.to_string())
+    }
+
+}

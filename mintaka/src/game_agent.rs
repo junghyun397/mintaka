@@ -18,7 +18,7 @@ use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::value::{Depth, Score};
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
@@ -32,7 +32,7 @@ pub struct BestMove {
     pub hash: HashKey,
     pub pos: MaybePos,
     pub score: Score,
-    pub depth_reached: usize,
+    pub depth_reached: Depth,
     pub total_nodes_in_1k: usize,
     pub time_elapsed: Duration,
 }
@@ -93,6 +93,7 @@ pub struct GameAgent {
     ht: HistoryTable,
     executed_moves: Bitfield,
     pub time_management: Option<TimeManagement>,
+    pub overall_nodes_in_1k: usize,
 }
 
 impl GameAgent {
@@ -112,6 +113,7 @@ impl GameAgent {
             ht: HistoryTable {},
             executed_moves: Bitfield::default(),
             time_management: config.initial_time_manager.map(TimeManagement::from),
+            overall_nodes_in_1k: 0,
         }
     }
 
@@ -398,15 +400,18 @@ impl GameAgent {
             time_management.time_history.push((main_td.best_move, time_elapsed));
         }
 
-        println!("{} {:?}", main_td.root_moves, main_td.root_scores); // todo: debug
+        self.overall_nodes_in_1k += main_td.batch_counter.count_global_in_1k();
 
-        println!("{}", self.state.board.to_string_with_heatmap(main_td.root_scores.map(f32::from), true));
+        {
+            println!("{} {:?}", main_td.root_moves, main_td.root_scores); // todo: debug
+            println!("{}", self.state.board.to_string_with_heatmap(main_td.root_scores.map(f32::from), true));
+        }
 
         BestMove {
             hash: self.state.board.hash_key,
             pos: main_td.best_move,
             score,
-            depth_reached: main_td.depth as usize,
+            depth_reached: main_td.depth,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed,
         }
@@ -416,13 +421,14 @@ impl GameAgent {
 
 impl Serialize for GameAgent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
-        let mut state = serializer.serialize_struct("GameAgent", 6)?;
+        let mut state = serializer.serialize_struct("GameAgent", 7)?;
         state.serialize_field("config", &self.config)?;
         state.serialize_field("state", &self.state)?;
         state.serialize_field("tt", &self.tt)?;
         state.serialize_field("ht", &self.ht)?;
         state.serialize_field("executed_moves", &self.executed_moves)?;
         state.serialize_field("time_management", &self.time_management)?;
+        state.serialize_field("overall_nodes_in_1k", &self.overall_nodes_in_1k)?;
         state.end()
     }
 }
@@ -437,6 +443,7 @@ impl<'de> Deserialize<'de> for GameAgent {
             ht: HistoryTable,
             time_management: Option<TimeManagement>,
             executed_moves: Bitfield,
+            overall_nodes_in_1k: usize,
         }
 
         let data = GameAgentData::deserialize(deserializer)?;
@@ -451,6 +458,7 @@ impl<'de> Deserialize<'de> for GameAgent {
             ht: data.ht,
             executed_moves: data.executed_moves,
             time_management: data.time_management,
+            overall_nodes_in_1k: data.overall_nodes_in_1k,
         })
     }
 }
