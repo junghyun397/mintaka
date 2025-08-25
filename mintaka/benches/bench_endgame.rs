@@ -17,6 +17,7 @@ mod bench_vcf {
     use rusty_renju::history::History;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use rusty_renju::notation::pos::pos_unchecked;
+    use rusty_renju::notation::rule::RuleKind;
     use rusty_renju::notation::value::Depth;
     use rusty_renju::notation::value::{Score, Scores};
     use rusty_renju::utils::byte_size::ByteSize;
@@ -42,7 +43,7 @@ mod bench_vcf {
 
             let evaluator = ActiveEvaluator::from_state(&state);
 
-            let tt = TranspositionTable::new_with_size(ByteSize::from_kib(32));
+            let tt = TranspositionTable::new_with_size(ByteSize::from_kib(8));
             let ht = HistoryTable {};
 
             let global_counter_in_1k = AtomicUsize::new(0);
@@ -51,7 +52,7 @@ mod bench_vcf {
             let td = ThreadData::new(WorkerThread, 0, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
-                let result = vcf_search::vcf_search(&mut td.clone(), Depth::MAX, &state, -Score::INF, Score::INF, 0);
+                let result = vcf_search::vcf_search::<{ RuleKind::Renju }>(&mut td.clone(), Depth::MAX, &state, -Score::INF, Score::INF, 0);
 
                 assert!(result > $score);
 

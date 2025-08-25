@@ -93,7 +93,6 @@ pub struct GameAgent {
     ht: HistoryTable,
     executed_moves: Bitfield,
     pub time_management: Option<TimeManagement>,
-    pub overall_nodes_in_1k: usize,
 }
 
 impl GameAgent {
@@ -113,7 +112,6 @@ impl GameAgent {
             ht: HistoryTable {},
             executed_moves: Bitfield::default(),
             time_management: config.initial_time_manager.map(TimeManagement::from),
-            overall_nodes_in_1k: 0,
         }
     }
 
@@ -400,8 +398,6 @@ impl GameAgent {
             time_management.time_history.push((main_td.best_move, time_elapsed));
         }
 
-        self.overall_nodes_in_1k += main_td.batch_counter.count_global_in_1k();
-
         {
             println!("{} {:?}", main_td.root_moves, main_td.root_scores); // todo: debug
             println!("{}", self.state.board.to_string_with_heatmap(main_td.root_scores.map(f32::from), true));
@@ -421,14 +417,13 @@ impl GameAgent {
 
 impl Serialize for GameAgent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
-        let mut state = serializer.serialize_struct("GameAgent", 7)?;
+        let mut state = serializer.serialize_struct("GameAgent", 6)?;
         state.serialize_field("config", &self.config)?;
         state.serialize_field("state", &self.state)?;
         state.serialize_field("tt", &self.tt)?;
         state.serialize_field("ht", &self.ht)?;
         state.serialize_field("executed_moves", &self.executed_moves)?;
         state.serialize_field("time_management", &self.time_management)?;
-        state.serialize_field("overall_nodes_in_1k", &self.overall_nodes_in_1k)?;
         state.end()
     }
 }
@@ -458,7 +453,6 @@ impl<'de> Deserialize<'de> for GameAgent {
             ht: data.ht,
             executed_moves: data.executed_moves,
             time_management: data.time_management,
-            overall_nodes_in_1k: data.overall_nodes_in_1k,
         })
     }
 }

@@ -250,23 +250,28 @@ fn handle_command(
                 message_sender.status(StatusCommand::Version);
             },
             "set" => {
-                let pos = args.get(1).ok_or("position not provided.")?.parse()
+                let pos = args.get(1).ok_or("position not provided.")?
+                    .parse()
                     .map_err(|e: PosError| e.to_string())?;
-                let color = args.get(2).ok_or("color not provided.")?.parse()
+                let color = args.get(2).ok_or("color not provided.")?
+                    .parse()
                     .map_err(|e: UnknownColorError| e.to_string())?;
 
                 message_sender.command(Command::Set { pos, color });
             },
             "unset" => {
-                let pos = args.get(1).ok_or("position not provided.")?.parse()
+                let pos = args.get(1).ok_or("position not provided.")?
+                    .parse()
                     .map_err(|e: PosError| e.to_string())?;
-                let color = args.get(2).ok_or("color not provided.")?.parse()
+                let color = args.get(2).ok_or("color not provided.")?
+                    .parse()
                     .map_err(|e: UnknownColorError| e.to_string())?;
 
                 message_sender.command(Command::Unset { pos, color });
             },
             "p" | "play" => {
-                let pos: Pos = args.get(1).ok_or("position not provided.")?.parse()
+                let pos: Pos = args.get(1).ok_or("position not provided.")?
+                    .parse()
                     .map_err(|e: PosError| e.to_string())?;
 
                 message_sender.command(Command::Play(pos.into()));
@@ -298,6 +303,7 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
 
     message_sender.launch();
 
+    let mut overall_nodes_in_1k = 0;
     let mut game_result = None;
     for message in message_receiver {
         match message {
@@ -316,6 +322,8 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
                     best_move.pos, best_move.score, best_move.depth_reached, best_move.total_nodes_in_1k, best_move.time_elapsed
                 );
 
+                overall_nodes_in_1k += best_move.total_nodes_in_1k;
+
                 message_sender.launch();
             },
             Message::Finished(result) => {
@@ -327,7 +335,7 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
     }
 
     println!("{}", game_result.unwrap());
-    println!("total {}k nodes", game_agent.overall_nodes_in_1k);
+    println!("total {}k nodes", overall_nodes_in_1k);
 
     Ok(())
 }

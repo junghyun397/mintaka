@@ -179,11 +179,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
     let mut static_eval: Score;
     let mut tt_move: MaybePos;
-    let mut tt_score: Score;
     let mut tt_pv: bool;
     let mut tt_endgame_flag: EndgameFlag;
 
-    if let Some(entry) = td.tt.probe(state.board.hash_key) {
+    if let Some(entry) = td.tt.probe(state.board.hash_key) { // tt-lookup
         tt_endgame_flag = entry.tt_flag.endgame_flag();
         if tt_endgame_flag.is_deterministic() { // endgame tt-hit
             if NT::IS_ROOT {
@@ -193,38 +192,31 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             return entry.score as Score;
         }
 
-        static_eval = entry.eval as Score;
+        let tt_score = entry.score as Score;
         tt_move = entry.best_move;
-        tt_score = entry.score as Score;
         tt_pv = entry.tt_flag.is_pv();
 
         if !NT::IS_PV // tt-cutoff
-            && depth_left <= entry.depth as Depth
             && match entry.tt_flag.score_kind() {
                 ScoreKind::LowerBound => tt_score >= beta,
                 ScoreKind::UpperBound => tt_score as Score <= alpha,
                 ScoreKind::Exact => true,
             }
         {
-            if NT::IS_ROOT {
-                td.best_move = tt_move;
-            }
-
-            return entry.score as Score;
+            return tt_score;
         }
 
-        // static_eval = entry.score as Score;
+        static_eval = entry.eval as Score;
     } else {
-        static_eval = td.evaluator.eval_value(state);
-
         tt_move = MaybePos::NONE;
-        tt_score = static_eval;
         tt_pv = false;
         tt_endgame_flag = EndgameFlag::Unknown;
+
+        static_eval = td.evaluator.eval_value(state);
     }
 
-    if td.ply >= value::MAX_PLY || depth_left <= 0 {
-        return vcf_search(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
+    if depth_left <= 0 || td.ply >= value::MAX_PLY {
+        return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
     }
 
     let original_alpha = alpha;
@@ -258,7 +250,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
         moves_made += 1;
 
-        let score = if moves_made == 1 || true { // full-window search
+        let score = if moves_made == 1 { // full-window search
             -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
         } else { // zero-window search
             let mut score = -pvs::<R, OffPVNode, TH>(td, state, depth_left - 1, -alpha - 1, -alpha);

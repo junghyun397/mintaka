@@ -2,7 +2,7 @@ use crate::memo::tt_entry::{EndgameFlag, ScoreKind, TTEntry, TTEntryBucket, TTFl
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::value::{Depth, Score};
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize, Serializer};
 use std::io::{Read, Write};
@@ -147,61 +147,70 @@ impl TTView<'_> {
     pub fn store(
         &self,
         key: HashKey,
-        maybe_best_move: MaybePos,
+        best_move: MaybePos,
         score_kind: ScoreKind,
         endgame_flag: EndgameFlag,
-        depth: i32,
+        depth: Depth,
         eval: Score,
         score: Score,
         is_pv: bool,
     ) {
         let idx = self.calculate_index(key);
+        let depth = depth as u8;
+        let eval = eval as i16;
+        let score = score as i16;
 
-        if let Some(mut entry) = self.table[idx].probe(key.into()) {
+        let bucket = &self.table[idx];
+
+        if let Some(mut entry) = bucket.probe(key.into()) {
+            let entry_score_kind = entry.tt_flag.score_kind();
+
+            let replace_score = depth + score_kind as u8 + 5;
+            let keep_score = entry.depth + entry_score_kind as u8;
+
             if self.age > entry.age
-                || score_kind == ScoreKind::Exact
-                || entry.depth.saturating_add(5) > entry.depth
+                || score_kind == ScoreKind::Exact && entry_score_kind != ScoreKind::Exact
+                || replace_score > keep_score
             {
-                if maybe_best_move.is_some() {
-                    entry.best_move = maybe_best_move;
+                if best_move.is_some() {
+                    entry.best_move = best_move;
                 }
 
                 entry.tt_flag = TTFlag::new(score_kind, endgame_flag, is_pv);
                 entry.age = self.age;
-                entry.depth = depth as u8;
-                entry.eval = eval as i16;
-                entry.score = score as i16;
+                entry.depth = depth;
+                entry.eval = eval;
+                entry.score = score;
 
-                self.table[idx].store(key.into(), entry);
+                bucket.store(key.into(), entry);
             }
         } else {
             let entry = TTEntry {
-                best_move: maybe_best_move,
-                tt_flag: TTFlag::new(score_kind, endgame_flag, false),
+                best_move,
+                tt_flag: TTFlag::new(score_kind, endgame_flag, is_pv),
                 age: self.age,
-                depth: depth as u8,
-                eval: eval as i16,
-                score: score as i16,
+                depth,
+                eval,
+                score,
             };
 
-            self.table[idx].store(key.into(), entry);
+            bucket.store(key.into(), entry);
         }
     }
 
     pub fn prefetch(&self, key: HashKey) {
         #[cfg(target_arch = "x86_64")]
         unsafe {
-            use std::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
             let idx = self.calculate_index(key);
             let entry = &self.table[idx];
             _mm_prefetch::<_MM_HINT_T0>((entry as *const TTEntryBucket).cast());
         }
         #[cfg(target_arch = "aarch64")]
         unsafe {
-            use std::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY0, _PREFETCH_READ};
+            use std::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY3, _PREFETCH_READ};
             let idx = self.calculate_index(key);
             let entry = &self.table[idx];
-            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY0>((entry as *const TTEntryBucket).cast());
+            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY3>((entry as *const TTEntryBucket).cast());
         }
     }
 

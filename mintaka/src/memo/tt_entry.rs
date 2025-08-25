@@ -9,14 +9,14 @@ const KEY_MASK: u64 = !(u64::MAX << KEY_SIZE as u64);
 
 #[derive(Copy, Clone)]
 pub struct TTEntryKey {
-    lower_21_bits: u64
+    upper_21_bits: u64
 }
 
 impl From<HashKey> for TTEntryKey {
 
     fn from(hash_key: HashKey) -> Self {
         Self {
-            lower_21_bits: hash_key.0 & KEY_MASK
+            upper_21_bits: hash_key.0 >> (64 - KEY_SIZE)
         }
     }
 
@@ -25,8 +25,8 @@ impl From<HashKey> for TTEntryKey {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
 pub enum ScoreKind {
-    LowerBound = 0,
-    UpperBound = 1,
+    UpperBound = 0,
+    LowerBound = 1,
     Exact = 2,
 }
 
@@ -173,7 +173,7 @@ impl TTEntryBucket {
 
     #[inline(always)]
     fn calculate_entry_index(entry_key: TTEntryKey) -> usize {
-        (((entry_key.lower_21_bits << 11) * Self::BUCKET_SIZE) >> 32) as usize
+        (((entry_key.upper_21_bits << 11) * Self::BUCKET_SIZE) >> 32) as usize
     }
 
     #[inline]
@@ -183,7 +183,7 @@ impl TTEntryBucket {
         let mask = KEY_MASK << bit_offset;
 
         let original_keys = self.keys[key_position].load(Ordering::Acquire);
-        let keys = (original_keys & !mask) | (entry_key.lower_21_bits << bit_offset);
+        let keys = (original_keys & !mask) | (entry_key.upper_21_bits << bit_offset);
 
         self.keys[key_position].store(keys, Ordering::Release);
     }
@@ -193,7 +193,7 @@ impl TTEntryBucket {
         let bucket_idx = Self::calculate_entry_index(entry_key);
 
         let keys = self.keys[bucket_idx / 3].load(Ordering::Relaxed);
-        ((keys >> (KEY_SIZE * (bucket_idx % 3))) & KEY_MASK == entry_key.lower_21_bits)
+        ((keys >> (KEY_SIZE * (bucket_idx % 3))) & KEY_MASK == entry_key.upper_21_bits)
             .then(|| self.entries[bucket_idx].load(Ordering::Relaxed).into())
     }
 

@@ -11,6 +11,7 @@ use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::value::{Depth, Score, Scores};
 use rusty_renju::pattern::{Pattern, PatternCount};
 
@@ -54,7 +55,7 @@ pub struct VcfFrame {
     defend_pos: Pos,
 }
 
-pub fn vcf_search(
+pub fn vcf_search<const R: RuleKind>(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     max_vcf_ply: Depth,
     state: &GameState,
@@ -78,10 +79,10 @@ pub fn vcf_search(
 
     vcf_moves.sort_moves(state.history.recent_player_action().unwrap_or(pos::CENTER));
 
-    vcf::<Score>(td, VcfWin, max_vcf_ply, *state, vcf_moves, alpha, beta, static_eval)
+    vcf::<R, Score>(td, VcfWin, max_vcf_ply, *state, vcf_moves, alpha, beta, static_eval)
 }
 
-pub fn vcf_sequence(
+pub fn vcf_sequence<const R: RuleKind>(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     state: &GameState
 ) -> Option<Vec<MaybePos>> {
@@ -91,14 +92,14 @@ pub fn vcf_sequence(
         return None;
     }
 
-    vcf::<SequenceEndgameAccumulator>(td, VcfWin, Depth::MAX, *state, vcf_moves, Score::MIN, Score::MAX, SequenceEndgameAccumulator::ZERO)
+    vcf::<R, SequenceEndgameAccumulator>(td, VcfWin, Depth::MAX, *state, vcf_moves, Score::MIN, Score::MAX, SequenceEndgameAccumulator::ZERO)
         .map(|mut sequence| {
             sequence.reverse();
             sequence
         })
 }
 
-fn vcf<ACC: EndgameAccumulator>(
+fn vcf<const R: RuleKind, ACC: EndgameAccumulator>(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     dest: impl VcfDestination,
     vcf_max_depth: Depth,
@@ -108,12 +109,12 @@ fn vcf<ACC: EndgameAccumulator>(
     acc: ACC
 ) -> ACC {
     match state.board.player_color {
-        Color::Black => try_vcf::<{ Color::Black }, _, ACC>(td, dest, vcf_max_depth, state, vcf_moves, alpha, beta, acc),
-        Color::White => try_vcf::<{ Color::White }, _, ACC>(td, dest, vcf_max_depth, state, vcf_moves, alpha, beta, acc),
+        Color::Black => try_vcf::<R, { Color::Black }, _, ACC>(td, dest, vcf_max_depth, state, vcf_moves, alpha, beta, acc),
+        Color::White => try_vcf::<R, { Color::White }, _, ACC>(td, dest, vcf_max_depth, state, vcf_moves, alpha, beta, acc),
     }
 }
 
-fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
+fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
     td: &mut ThreadData<TH, impl Evaluator>,
     dest: impl VcfDestination,
     mut depth_left: Depth,
@@ -201,13 +202,14 @@ fn try_vcf<const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
 
             let defend_pattern = state.board.patterns.field.get_reversed::<C>()[defend_pos.idx_usize()];
             let defend_four_count = defend_pattern.count_fours();
-            let defend_is_forbidden = C == Color::White && defend_pattern.is_forbidden();
+            let defend_is_forbidden = R == RuleKind::Renju
+                && C == Color::White
+                && defend_pattern.is_forbidden();
 
-            if match C {
-                Color::Black => defend_four_count == PatternCount::Multiple
+            if match (R, C) {
+                (RuleKind::Renju, Color::Black) => defend_four_count == PatternCount::Multiple
                     || defend_pattern.has_open_four(),
-                Color::White => defend_pattern.has_open_four()
-                    && !defend_is_forbidden
+                _ => defend_pattern.has_open_four() && !defend_is_forbidden
             } || dest.conditional_abort(defend_pattern) {
                 state.board.unset_mut(four_pos);
                 vcf_ply -= 1;
