@@ -30,23 +30,6 @@ pub enum ScoreKind {
     Exact = 2,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
-#[repr(u8)]
-pub enum EndgameFlag {
-    #[default] Unknown = 0,
-    Cold = 1,
-    Win = 2,
-    Lose = 3,
-}
-
-impl EndgameFlag {
-
-    pub fn is_deterministic(&self) -> bool {
-        *self == Self::Win || *self == Self::Lose
-    }
-
-}
-
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct TTFlag(u8);
 
@@ -62,32 +45,32 @@ impl TTFlag {
 
     const DEFAULT: Self = Self(0);
 
-    pub fn new(score_kind: ScoreKind, endgame_flag: EndgameFlag, is_pv: bool) -> Self {
-        Self((score_kind as u8) | ((endgame_flag as u8) << 2) | ((is_pv as u8) << 4))
+    pub fn new(score_kind: ScoreKind, endgame_visited: bool, is_pv: bool) -> Self {
+        Self((score_kind as u8) | ((endgame_visited as u8) << 2) | ((is_pv as u8) << 3))
     }
 
     pub fn score_kind(&self) -> ScoreKind {
-        unsafe { std::mem::transmute(self.0 & 0b11) }
+        unsafe { std::mem::transmute::<u8, ScoreKind>(self.0 & 0b11) }
     }
 
-    pub fn endgame_flag(&self) -> EndgameFlag {
-        unsafe { std::mem::transmute((self.0 >> 2) & 0b11) }
+    pub fn endgame_visited(&self) -> bool {
+        (self.0 >> 2) & 0b1 == 0b1
     }
 
     pub fn is_pv(&self) -> bool {
-        (self.0 >> 4) & 1 == 1
+        (self.0 >> 3) & 0b1 == 0b1
     }
 
     pub fn set_score_kind(&mut self, score_kind: ScoreKind) {
         self.0 = (self.0 & !0b11) | score_kind as u8;
     }
 
-    pub fn set_endgame_flag(&mut self, endgame_flag: EndgameFlag) {
-        self.0 = (self.0 & !(0b11 << 2)) | ((endgame_flag as u8) << 2);
+    pub fn set_endgame_visited(&mut self, endgame_visited: bool) {
+        self.0 = (self.0 & !(0b1 << 2)) | ((endgame_visited as u8) << 2);
     }
 
     pub fn set_pv(&mut self, is_pv: bool) {
-        self.0 = (self.0 & !(0b1 << 4)) | ((is_pv as u8) << 4);
+        self.0 = (self.0 & !(0b1 << 3)) | ((is_pv as u8) << 3);
     }
 
 }
@@ -173,7 +156,16 @@ impl TTEntryBucket {
 
     #[inline(always)]
     fn calculate_entry_index(entry_key: TTEntryKey) -> usize {
-        (((entry_key.upper_21_bits << 11) * Self::BUCKET_SIZE) >> 32) as usize
+        (((entry_key.upper_21_bits) * Self::BUCKET_SIZE) >> KEY_SIZE) as usize
+    }
+
+    #[inline]
+    pub(crate) fn probe(&self, entry_key: TTEntryKey) -> Option<TTEntry> {
+        let bucket_idx = Self::calculate_entry_index(entry_key);
+
+        let keys = self.keys[bucket_idx / 3].load(Ordering::Relaxed);
+        ((keys >> (KEY_SIZE * (bucket_idx % 3))) & KEY_MASK == entry_key.upper_21_bits)
+            .then(|| self.entries[bucket_idx].load(Ordering::Relaxed).into())
     }
 
     #[inline]
@@ -189,16 +181,7 @@ impl TTEntryBucket {
     }
 
     #[inline]
-    pub fn probe(&self, entry_key: TTEntryKey) -> Option<TTEntry> {
-        let bucket_idx = Self::calculate_entry_index(entry_key);
-
-        let keys = self.keys[bucket_idx / 3].load(Ordering::Relaxed);
-        ((keys >> (KEY_SIZE * (bucket_idx % 3))) & KEY_MASK == entry_key.upper_21_bits)
-            .then(|| self.entries[bucket_idx].load(Ordering::Relaxed).into())
-    }
-
-    #[inline]
-    pub fn store(&self, entry_key: TTEntryKey, entry: TTEntry) {
+    pub(crate) fn store(&self, entry_key: TTEntryKey, entry: TTEntry) {
         let bucket_idx = Self::calculate_entry_index(entry_key);
 
         self.store_key(bucket_idx, entry_key);

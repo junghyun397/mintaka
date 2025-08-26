@@ -11,6 +11,7 @@ use crate::search;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::time_manager::TimeManager;
+use crate::value::Depth;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
@@ -18,7 +19,7 @@ use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::{Depth, Score};
+use rusty_renju::notation::value::Score;
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
@@ -398,10 +399,11 @@ impl GameAgent {
             time_management.time_history.push((main_td.best_move, time_elapsed));
         }
 
-        {
+        false && {
             println!("{} {:?}", main_td.root_moves, main_td.root_scores); // todo: debug
             println!("{}", self.state.board.to_string_with_heatmap(main_td.root_scores.map(f32::from), true));
-        }
+            false
+        };
 
         BestMove {
             hash: self.state.board.hash_key,

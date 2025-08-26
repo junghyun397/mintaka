@@ -13,19 +13,19 @@ mod bench_vcf {
     use mintaka::memo::transposition_table::TranspositionTable;
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
+    use mintaka::value::Depth;
     use rusty_renju::board;
     use rusty_renju::history::History;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use rusty_renju::notation::pos::pos_unchecked;
     use rusty_renju::notation::rule::RuleKind;
-    use rusty_renju::notation::value::Depth;
     use rusty_renju::notation::value::{Score, Scores};
     use rusty_renju::utils::byte_size::ByteSize;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
     use test::Bencher;
 
     macro_rules! bench_vcf {
-        ($bencher:expr,$board:expr,$score:expr,$player_move:expr,$opponent_move:expr) => {{
+        ($bencher:expr,$board:expr,$player_move:expr,$opponent_move:expr,$expect_vcf:expr) => {{
             let config = Config::default();
 
             let state = GameState {
@@ -54,9 +54,9 @@ mod bench_vcf {
             $bencher.iter(|| {
                 let result = vcf_search::vcf_search::<{ RuleKind::Renju }>(&mut td.clone(), Depth::MAX, &state, -Score::INF, Score::INF, 0);
 
-                assert!(result > $score);
-
                 tt.clear_mut(1);
+
+                assert_eq!(Score::is_deterministic(result), $expect_vcf)
             })
         }};
     }
@@ -83,11 +83,32 @@ mod bench_vcf {
            A B C D E F G H I J K L M N O"
         });
 
-        bench_vcf!(b, case, Score::WIN - 256, pos_unchecked("h6"), pos_unchecked("i6"));
+        bench_vcf!(b, case, pos_unchecked("h6"), pos_unchecked("i6"), true);
     }
 
     #[bench]
     fn white_reject_vcf(b: &mut Bencher) {
+        let case = board!(indoc! {"\
+           A B C D E F G H I J K L M N O
+        15 . . . . . . . . . . . . . . . 15
+        14 . . . . . . . . . . . . . . . 14
+        13 . . . . . X . . O . . . . . . 13
+        12 . . . . . . . O . . . . . . . 12
+        11 . . . . O . X . . . . . . . . 11
+        10 . O . X . . O X O . . . . . . 10
+         9 . . X X O . O X O . . . . . . 9
+         8 . . . . X O . X X . . . . . . 8
+         7 . . . . X . . . . . . . . . . 7
+         6 . . . . . . . O X . . . . . . 6
+         5 . . . . . . . . . . . . . . . 5
+         4 . . . . . . . . . . . . . . . 4
+         3 . . . . . . . . . . . . . . . 3
+         2 . . . . . . . . . . . . . . . 2
+         1 . . . . . . . . . . . . . . . 1
+           A B C D E F G H I J K L M N O"
+        });
+
+        bench_vcf!(b, case, pos_unchecked("h6"), pos_unchecked("i6"), false);
     }
 
     #[bench]
@@ -112,15 +133,32 @@ mod bench_vcf {
            A B C D E F G H I J K L M N O"
         });
 
-        bench_vcf!(b, case, Score::WIN - 256, pos_unchecked("e8"), pos_unchecked("e7"));
+        bench_vcf!(b, case, pos_unchecked("e8"), pos_unchecked("e7"), true);
     }
 
     #[bench]
     fn black_reject_vcf(b: &mut Bencher) {
+        let case = board!(indoc! {"\
+           A B C D E F G H I J K L M N O
+        15 . . . . . . . . . . . . . . . 15
+        14 . . . . . . . . . . . . . . . 14
+        13 . . . . . . . . . . . . . . . 13
+        12 . . . . . . . . . . . . . . . 12
+        11 . . . . . . . . . . . . . . . 11
+        10 . . . . . X . . . . . . . . . 10
+         9 . . . . . O . O . . . O . . . 9
+         8 . . O X X . . X . . X . . . . 8
+         7 . . . . O . . . . X . . . . . 7
+         6 . . . . . X O . . . . O . . . 6
+         5 . . . . . . . . . . . . . . . 5
+         4 . . . . . . . X . . . . . . . 4
+         3 . . . . . . O . . . . . . . . 3
+         2 . . . . . . . . . . . . . . . 2
+         1 . . . . . . . . . . . . . . . 1
+           A B C D E F G H I J K L M N O"
+        });
+
+        bench_vcf!(b, case, pos_unchecked("e8"), pos_unchecked("e7"), false);
     }
-
-}
-
-mod bench_vct {
 
 }

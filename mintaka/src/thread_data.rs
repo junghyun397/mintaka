@@ -7,10 +7,9 @@ use crate::memo::transposition_table::TTView;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_frame::{SearchFrame, KILLER_MOVE_SLOTS};
 use crate::thread_type::ThreadType;
-use crate::value::MAX_PLY;
+use crate::value::{Depth, MAX_PLY};
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::value::Depth;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 #[derive(Clone)]

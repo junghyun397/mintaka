@@ -11,6 +11,8 @@ pub trait EndgameAccumulator {
 
     fn append_pos(self, defend: Pos, threat: Pos) -> Self;
 
+    fn score(&self) -> Score;
+
 }
 
 pub type SequenceEndgameAccumulator = Option<Vec<MaybePos>>;
@@ -35,6 +37,10 @@ impl EndgameAccumulator for SequenceEndgameAccumulator {
         })
     }
 
+    fn score(&self) -> Score {
+        0
+    }
+
 }
 
 impl EndgameAccumulator for Score {
@@ -51,6 +57,10 @@ impl EndgameAccumulator for Score {
     #[inline]
     fn append_pos(self, _defend: Pos, _four: Pos) -> Self {
         self
+    }
+
+    fn score(&self) -> Score {
+        *self
     }
 
 }

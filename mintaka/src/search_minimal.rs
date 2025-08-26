@@ -4,11 +4,11 @@ use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker::MovePicker;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
-use crate::value::MAX_PLY;
+use crate::value::{Depth, MAX_PLY};
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::{Depth, Score, Scores};
+use rusty_renju::notation::value::{Score, Scores};
 
 pub fn iterative_deepening_minimal<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH, impl Evaluator>,

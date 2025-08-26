@@ -1,8 +1,9 @@
-use crate::memo::tt_entry::{EndgameFlag, ScoreKind, TTEntry, TTEntryBucket, TTFlag};
+use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucket, TTFlag};
+use crate::value::Depth;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
-use rusty_renju::notation::value::{Depth, Score};
+use rusty_renju::notation::value::Score;
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize, Serializer};
 use std::io::{Read, Write};
@@ -149,7 +150,7 @@ impl TTView<'_> {
         key: HashKey,
         best_move: MaybePos,
         score_kind: ScoreKind,
-        endgame_flag: EndgameFlag,
+        endgame_visited: bool,
         depth: Depth,
         eval: Score,
         score: Score,
@@ -169,14 +170,14 @@ impl TTView<'_> {
             let keep_score = entry.depth + entry_score_kind as u8;
 
             if self.age > entry.age
-                || score_kind == ScoreKind::Exact && entry_score_kind != ScoreKind::Exact
+                || (score_kind == ScoreKind::Exact && entry_score_kind != ScoreKind::Exact)
                 || replace_score > keep_score
             {
                 if best_move.is_some() {
                     entry.best_move = best_move;
                 }
 
-                entry.tt_flag = TTFlag::new(score_kind, endgame_flag, is_pv);
+                entry.tt_flag = TTFlag::new(score_kind, endgame_visited, is_pv);
                 entry.age = self.age;
                 entry.depth = depth;
                 entry.eval = eval;
@@ -187,7 +188,7 @@ impl TTView<'_> {
         } else {
             let entry = TTEntry {
                 best_move,
-                tt_flag: TTFlag::new(score_kind, endgame_flag, is_pv),
+                tt_flag: TTFlag::new(score_kind, endgame_visited, is_pv),
                 age: self.age,
                 depth,
                 eval,
@@ -201,6 +202,7 @@ impl TTView<'_> {
     pub fn prefetch(&self, key: HashKey) {
         #[cfg(target_arch = "x86_64")]
         unsafe {
+            use std::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
             let idx = self.calculate_index(key);
             let entry = &self.table[idx];
             _mm_prefetch::<_MM_HINT_T0>((entry as *const TTEntryBucket).cast());

@@ -1,17 +1,18 @@
 use crate::endgame::vcf_search::vcf_search;
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
-use crate::memo::tt_entry::{EndgameFlag, ScoreKind};
+use crate::memo::tt_entry::ScoreKind;
 use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker::MovePicker;
 use crate::search_frame::SearchFrame;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use crate::value;
+use crate::value::Depth;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::{Depth, Score, Scores};
+use rusty_renju::notation::value::{Score, Scores};
 
 pub trait NodeType {
 
@@ -180,11 +181,12 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     let mut static_eval: Score;
     let mut tt_move: MaybePos;
     let mut tt_pv: bool;
-    let mut tt_endgame_flag: EndgameFlag;
+    let mut tt_endgame_visited: bool;
 
     if let Some(entry) = td.tt.probe(state.board.hash_key) { // tt-lookup
-        tt_endgame_flag = entry.tt_flag.endgame_flag();
-        if tt_endgame_flag.is_deterministic() { // endgame tt-hit
+        let tt_score = entry.score as Score;
+
+        if Score::is_deterministic(tt_score) { // endgame tt-hit
             if NT::IS_ROOT {
                 td.best_move = entry.best_move;
             }
@@ -192,14 +194,14 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
             return entry.score as Score;
         }
 
-        let tt_score = entry.score as Score;
         tt_move = entry.best_move;
         tt_pv = entry.tt_flag.is_pv();
+        tt_endgame_visited = entry.tt_flag.endgame_visited();
 
         if !NT::IS_PV // tt-cutoff
             && match entry.tt_flag.score_kind() {
                 ScoreKind::LowerBound => tt_score >= beta,
-                ScoreKind::UpperBound => tt_score as Score <= alpha,
+                ScoreKind::UpperBound => tt_score <= alpha,
                 ScoreKind::Exact => true,
             }
         {
@@ -210,7 +212,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     } else {
         tt_move = MaybePos::NONE;
         tt_pv = false;
-        tt_endgame_flag = EndgameFlag::Unknown;
+        tt_endgame_visited = false;
 
         static_eval = td.evaluator.eval_value(state);
     }
@@ -313,7 +315,7 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         state.board.hash_key,
         best_move,
         score_kind,
-        tt_endgame_flag,
+        tt_endgame_visited,
         depth_left,
         static_eval,
         best_score,
