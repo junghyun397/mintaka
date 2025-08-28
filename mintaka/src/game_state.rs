@@ -2,7 +2,6 @@ use crate::movegen::movegen_window::MovegenWindow;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 
 #[derive(Default, Debug, Copy, Clone)]

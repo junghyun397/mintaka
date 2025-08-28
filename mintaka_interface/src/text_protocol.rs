@@ -310,20 +310,24 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
             Message::Launch => {
                 let best_move = game_agent.launch(CallBackResponseSender::new(response_printer), aborted.clone());
 
-                println!(
-                    "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}",
-                    best_move.pos, best_move.score, best_move.depth_reached, best_move.total_nodes_in_1k, best_move.time_elapsed
-                );
-
                 let result = game_agent.command(Command::Play(best_move.pos))?;
-                message_sender.result(result);
 
                 println!("{}",
-                    game_agent.state.board.to_string_with_last_moves(game_agent.state.history.recent_action_pair())
+                     game_agent.state.board.to_string_with_heatmap(
+                         best_move.root_scores,
+                         true,
+                         game_agent.state.history.recent_action_pair()
+                     )
+                );
+
+                println!(
+                    "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}, pv={:?}",
+                    best_move.pos, best_move.score, best_move.depth_reached, best_move.total_nodes_in_1k, best_move.time_elapsed, best_move.pv
                 );
 
                 overall_nodes_in_1k += best_move.total_nodes_in_1k;
 
+                message_sender.result(result);
                 message_sender.launch();
             },
             Message::Finished(result) => {

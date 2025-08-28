@@ -102,21 +102,26 @@ impl Board {
         )
     }
 
-    pub fn to_string_with_last_moves(&self, pair: [MaybePos; 2]) -> String {
-        let post_marker = ["[".to_string(), "]".to_string()];
-        let pre_marker = ["|".to_string(), "|".to_string()];
+    #[inline]
+    fn make_last_moves_marker(pair: [MaybePos; 2]) -> impl Fn(Pos, &BoardIterItem) -> Option<(bool, [String; 2])> {
+        const POST_MARKER: [&str; 2] = ["[", "]"];
+        const PRE_MARKER: [&str; 2] = ["|", "|"];
 
+        move |iter_pos, _| match MaybePos::from(iter_pos) {
+            pos if pos == pair[1] => Some((true, POST_MARKER.map(String::from))),
+            pos if pos == pair[0] => Some((false, PRE_MARKER.map(String::from))),
+            _ => None,
+        }
+    }
+
+    pub fn to_string_with_last_moves(&self, pair: [MaybePos; 2]) -> String {
         self.render_with_attributes(
             |_, &item| board_iter_item_to_symbol(item),
-            |iter_pos, _| match MaybePos::from(iter_pos) {
-                pos if pos == pair[1] => Some((true, post_marker.clone())),
-                pos if pos == pair[0] => Some((false, pre_marker.clone())),
-                _ => None,
-            },
+            Self::make_last_moves_marker(pair)
         )
     }
 
-    pub fn to_string_with_heatmap(&self, heatmap: [f32; pos::BOARD_SIZE], log_scale: bool) -> String {
+    pub fn to_string_with_heatmap(&self, heatmap: [f32; pos::BOARD_SIZE], log_scale: bool, last_moves: [MaybePos; 2]) -> String {
         let min = heatmap.into_iter()
             .fold(f32::NAN, f32::min);
 
@@ -153,7 +158,7 @@ impl Board {
                     cell
                 }
             },
-            |_, _| None,
+            Self::make_last_moves_marker(last_moves)
         );
 
         format!("min={min} max={max}\n{board_string}")

@@ -1,12 +1,10 @@
 use crate::board_io::{SYMBOL_BLACK, SYMBOL_WHITE};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::marker::ConstParamTy;
 use std::ops::Not;
 use std::str::FromStr;
 
-//noinspection RsUnresolvedPath
-#[derive(ConstParamTy, PartialEq, Eq, Clone, Copy, Debug, Default, Serialize, Deserialize)]
+#[derive(std::marker::ConstParamTy, PartialEq, Eq, Clone, Copy, Debug, Default, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Color {
     #[default] Black,

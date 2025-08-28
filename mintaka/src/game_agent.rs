@@ -4,6 +4,7 @@ use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::game_state::GameState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
+use crate::principal_variation::PrincipalVariation;
 use crate::protocol::command::Command;
 use crate::protocol::message::GameResult;
 use crate::protocol::response::{Response, ResponseSender};
@@ -36,6 +37,12 @@ pub struct BestMove {
     pub depth_reached: Depth,
     pub total_nodes_in_1k: usize,
     pub time_elapsed: Duration,
+    #[serde(
+        serialize_with = "crate::utils::serde::serialize_array",
+        deserialize_with = "crate::utils::serde::deserialize_array"
+    )]
+    pub root_scores: [f32; pos::BOARD_SIZE],
+    pub pv: PrincipalVariation,
 }
 
 #[derive(Debug)]
@@ -399,12 +406,6 @@ impl GameAgent {
             time_management.time_history.push((main_td.best_move, time_elapsed));
         }
 
-        false && {
-            println!("{} {:?}", main_td.root_moves, main_td.root_scores); // todo: debug
-            println!("{}", self.state.board.to_string_with_heatmap(main_td.root_scores.map(f32::from), true));
-            false
-        };
-
         BestMove {
             hash: self.state.board.hash_key,
             pos: main_td.best_move,
@@ -412,6 +413,8 @@ impl GameAgent {
             depth_reached: main_td.depth,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed,
+            root_scores: main_td.root_scores,
+            pv: main_td.pvs[0]
         }
     }
 

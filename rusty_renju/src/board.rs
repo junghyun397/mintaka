@@ -463,7 +463,6 @@ impl Board {
 
 }
 
-//noinspection RsUnresolvedPath
 #[derive(std::marker::ConstParamTy, Eq, PartialEq,)]
 pub enum MoveType {
     Set, Unset

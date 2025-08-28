@@ -1,4 +1,3 @@
-use crate::endgame::vcf_search::vcf_search;
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::memo::tt_entry::ScoreKind;
@@ -186,14 +185,6 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     if let Some(entry) = td.tt.probe(state.board.hash_key) { // tt-lookup
         let tt_score = entry.score as Score;
 
-        if Score::is_deterministic(tt_score) { // endgame tt-hit
-            if NT::IS_ROOT {
-                td.best_move = entry.best_move;
-            }
-
-            return entry.score as Score;
-        }
-
         tt_move = entry.best_move;
         tt_pv = entry.tt_flag.is_pv();
         tt_endgame_visited = entry.tt_flag.endgame_visited();
@@ -218,7 +209,8 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     }
 
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
-        return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
+        return static_eval;
+        // return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
     }
 
     let original_alpha = alpha;
@@ -267,9 +259,8 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         td.pop_ply_mut();
         state.unset_mut(td.ss[td.ply].movegen_window);
 
-        if NT::IS_ROOT { // todo: debug
-            td.root_moves += 1;
-            td.root_scores[pos.idx_usize()] = score as f32;
+        if NT::IS_ROOT {
+            td.push_root_move(pos, score);
         }
 
         if score <= best_score {

@@ -10,6 +10,7 @@ use crate::thread_type::ThreadType;
 use crate::value::{Depth, MAX_PLY};
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::notation::value::Score;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 #[derive(Clone)]
@@ -37,7 +38,6 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub ply: usize,
 
     pub root_scores: [f32; pos::BOARD_SIZE],
-    pub root_moves: usize,
 }
 
 impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
@@ -70,7 +70,6 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
             depth: 0,
             ply: 0,
             root_scores: [f32::NAN; pos::BOARD_SIZE],
-            root_moves: 0,
         }
     }
 
@@ -91,6 +90,10 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
 
     pub fn is_aborted(&self) -> bool {
         self.aborted.load(Ordering::Relaxed)
+    }
+
+    pub fn push_root_move(&mut self, pos: Pos, score: Score) {
+        self.root_scores[pos.idx_usize()] = score as f32;
     }
 
     pub fn push_ply_mut(&mut self, pos: Pos) {

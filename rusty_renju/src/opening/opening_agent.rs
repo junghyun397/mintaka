@@ -28,7 +28,7 @@ pub fn new_agent(opening_kind: OpeningKind) -> OpeningStage {
         moves: 0,
         opening_kind,
         opener_color: Color::Black,
-        move_window_width: 1,
+        move_window_half_width: 0,
     })
 }
 
@@ -81,7 +81,7 @@ pub struct OpeningMove {
     moves: usize,
     opening_kind: OpeningKind,
     opener_color: Color,
-    pub move_window_width: u8,
+    move_window_half_width: u8
 }
 
 impl_opening_agent!(OpeningMove);
@@ -89,29 +89,29 @@ impl_opening_agent!(OpeningMove);
 impl MoveStageOpeningAgent for OpeningMove {
 
     fn validate_move(&self, pos: Pos) -> bool {
-        let pole: u8 = pos::BOARD_WIDTH / 2 - self.move_window_width / 2;
+        let pole: u8 = pos::CENTER_ROW_COL - self.move_window_half_width;
         let (row, col) = pos.to_cartesian();
 
-        (pole <= row && row < pole + self.move_window_width)
-            && (pole <= col && col < pole + self.move_window_width)
+        (pole <= row && row <= pole + self.move_window_half_width * 2)
+            && (pole <= col && col <= pole + self.move_window_half_width * 2)
     }
 
 }
 
 impl OpeningMove {
 
-    fn set(&self, pos: Pos) -> Option<OpeningStage> {
+    pub fn set(&self, pos: Pos) -> Option<OpeningStage> {
         self.validate_move(pos).then(|| {
             match self.opening_kind {
                 OpeningKind::Soosyrv8 => match self.moves {
-                    0 ..= 3 => OpeningStage::Move(OpeningMove {
+                    0 .. 3 => OpeningStage::Move(OpeningMove {
                         opening_kind: self.opening_kind,
                         opener_color: if self.moves % 2 == 1 { Color::White } else { Color::Black },
-                        moves: self.moves,
-                        move_window_width: (self.moves * 2 - 1) as u8,
-                    }),
-                    4 => OpeningStage::Swap(OpeningSwap {
                         moves: self.moves + 1,
+                        move_window_half_width: self.moves as u8 + 1
+                    }),
+                    3 => OpeningStage::Swap(OpeningSwap {
+                        moves: 4,
                         opening_kind: self.opening_kind,
                         opener_color: self.opener_color,
                         offer_count: None,
@@ -120,14 +120,14 @@ impl OpeningMove {
                     _ => OpeningStage::Finish
                 },
                 OpeningKind::Taraguchi10 => match self.moves {
-                    0 ..= 3 => OpeningStage::Swap(OpeningSwap {
+                    0 .. 3 => OpeningStage::Swap(OpeningSwap {
                         moves: self.moves,
                         opening_kind: self.opening_kind,
                         opener_color: self.opener_color,
                         offer_count: None,
                         color: Color::Black,
                     }),
-                    4 => OpeningStage::Branch(OpeningBranch {
+                    3 => OpeningStage::Branch(OpeningBranch {
                         moves: 4,
                         opening_kind: self.opening_kind,
                         opener_color: self.opener_color,
@@ -154,7 +154,7 @@ impl_opening_agent!(OpeningSwap);
 
 impl OpeningSwap {
 
-    fn swap(&self, do_swap: bool) -> OpeningStage {
+    pub fn swap(&self, do_swap: bool) -> OpeningStage {
         let opener_color = if do_swap {
             !self.opener_color
         } else {
@@ -167,7 +167,7 @@ impl OpeningSwap {
                     moves: self.moves,
                     opening_kind: self.opening_kind,
                     opener_color,
-                    move_window_width: pos::BOARD_WIDTH,
+                    move_window_half_width: pos::BOARD_WIDTH,
                 }),
                 Some(offer_count) => OpeningStage::Offer(OpeningOffer {
                     moves: self.moves,
@@ -184,7 +184,7 @@ impl OpeningSwap {
                     moves: self.moves,
                     opening_kind: self.opening_kind,
                     opener_color,
-                    move_window_width: 0,
+                    move_window_half_width: 0,
                 }),
                 _ => OpeningStage::Finish
             },
@@ -207,7 +207,7 @@ impl_opening_agent!(OpeningDeclare);
 
 impl OpeningDeclare {
     
-    fn declare(&self, count: usize) -> Option<OpeningStage> {
+    pub fn declare(&self, count: usize) -> Option<OpeningStage> {
         match self.opening_kind() {
             OpeningKind::Soosyrv8 => {
                 (self.min_candidates ..= self.max_candidates).contains(&count).then(||
@@ -250,7 +250,7 @@ impl MoveStageOpeningAgent for OpeningOffer {
 
 impl OpeningOffer {
 
-    fn add(&self, partial_history: &[Pos; 4], pos: Pos) -> Option<OpeningStage> {
+    pub fn add(&self, partial_history: &[Pos; 4], pos: Pos) -> Option<OpeningStage> {
         self.validate_move(pos).then(|| {
             let mut offers = self.offers.clone();
             offers.push(pos);
@@ -301,7 +301,7 @@ impl MoveStageOpeningAgent for OpeningSelect {
 
 impl OpeningSelect {
 
-    fn select(&self, pos: Pos) -> Option<OpeningStage> {
+    pub fn select(&self, pos: Pos) -> Option<OpeningStage> {
         self.validate_move(pos).then(||
             match self.opening_kind {
                 OpeningKind::Soosyrv8 => OpeningStage::Finish,
@@ -324,7 +324,7 @@ impl_opening_agent!(OpeningBranch);
 
 impl OpeningBranch {
 
-    fn branch(&self, make_offer: bool) -> OpeningStage {
+    pub fn branch(&self, make_offer: bool) -> OpeningStage {
         match self.opening_kind {
             OpeningKind::Taraguchi10 =>
                 if make_offer {

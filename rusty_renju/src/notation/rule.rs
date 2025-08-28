@@ -1,28 +1,23 @@
 use serde::{Deserialize, Serialize};
-use std::marker::ConstParamTy;
 
-//noinspection RsUnresolvedPath
-#[derive(ConstParamTy, Default, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(std::marker::ConstParamTy, Default, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum RuleKind {
     Gomoku = 0,
-    SimplifiedRenju = 1,
-    #[default] Renju = 2
+    #[default] Renju = 1
 }
 
 impl RuleKind {
 
     pub const fn relaxed(&self) -> Self {
         match self {
-            Self::Renju => Self::SimplifiedRenju,
-            Self::SimplifiedRenju => Self::Gomoku,
+            Self::Renju => Self::Gomoku,
             _ => Self::Gomoku
         }
     }
 
     pub const fn stricter(&self) -> Self {
         match self {
-            Self::SimplifiedRenju => Self::Renju,
-            Self::Gomoku => Self::SimplifiedRenju,
+            Self::Gomoku => Self::Renju,
             _ => Self::Renju
         }
     }
