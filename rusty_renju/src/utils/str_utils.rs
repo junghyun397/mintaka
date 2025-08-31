@@ -19,19 +19,15 @@ pub fn join_str_horizontally(sources: &[&str]) -> String {
         .map(|row_idx|
             split.iter()
                 .map(|rows| {
-                    let row = rows[row_idx].to_string();
-                    let padding: String = " ".repeat(max_len - row.len());
-                    format!("{row}{padding}")
+                    let mut row = rows[row_idx].to_string();
+                    row.extend(std::iter::repeat(' ').take(max_len - row.len()));
+                    row
                 })
-                .reduce(|head, tail|
-                    format!("{head} {tail}")
-                )
-                .unwrap()
+                .collect::<Vec<_>>()
+                .join(" ")
         )
-        .reduce(|head, tail|
-            format!("{head}\n{tail}")
-        )
-        .unwrap()
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 pub const fn u8_from_str(source: &str, skip: usize) -> u8 {

@@ -95,7 +95,7 @@ impl HeuristicEvaluator {
 
         score += counts.closed_fours as Score * HeuristicThreatScores::CLOSED_FOUR;
         score += counts.threes as Score * HeuristicThreatScores::OPEN_THREE;
-        score += counts.score as Score;
+        score += counts.score as Score * 3;
 
         if P {
             score += counts.open_fours as Score * HeuristicThreatScores::PLAYER_OPEN_FOUR;

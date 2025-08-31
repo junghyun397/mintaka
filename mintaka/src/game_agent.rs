@@ -8,7 +8,7 @@ use crate::principal_variation::PrincipalVariation;
 use crate::protocol::command::Command;
 use crate::protocol::message::GameResult;
 use crate::protocol::response::{Response, ResponseSender};
-use crate::search;
+use crate::search_minimal::iterative_deepening_minimal;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::time_manager::TimeManager;
@@ -349,7 +349,7 @@ impl GameAgent {
 
         let tt_view = self.tt.view();
 
-        let (main_td, score) = std::thread::scope(|s| {
+        let (main_td, score, best_move) = std::thread::scope(|s| {
             let state = self.state;
 
             let mut main_td = ThreadData::new(
@@ -367,11 +367,11 @@ impl GameAgent {
             );
 
             let handle = s.spawn(move || {
-                let score = search::iterative_deepening::<{ RuleKind::Renju }, MainThread<_>>(
+                let (score, best_move) = iterative_deepening_minimal::<{ RuleKind::Renju }, MainThread<_>>( // todo: debug
                     &mut main_td, state
                 );
 
-                (main_td, score)
+                (main_td, score, best_move)
             });
 
             for tid in 1 ..self.config.workers {
@@ -385,7 +385,7 @@ impl GameAgent {
                 );
 
                 s.spawn(move || {
-                    search::iterative_deepening::<{ RuleKind::Renju }, WorkerThread>(
+                    iterative_deepening_minimal::<{ RuleKind::Renju }, WorkerThread>( // todo: debug
                         &mut worker_td, state
                     );
                 });
@@ -403,12 +403,12 @@ impl GameAgent {
 
         if let Some(time_management) = &mut self.time_management {
             time_management.time_manager.consume_mut(time_elapsed);
-            time_management.time_history.push((main_td.best_move, time_elapsed));
+            time_management.time_history.push((best_move, time_elapsed));
         }
 
         BestMove {
             hash: self.state.board.hash_key,
-            pos: main_td.best_move,
+            pos: best_move,
             score,
             depth_reached: main_td.depth,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),

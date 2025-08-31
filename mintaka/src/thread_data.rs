@@ -1,6 +1,6 @@
 use crate::batch_counter::BatchCounter;
 use crate::config::Config;
-use crate::endgame::vcf_search::VcfFrame;
+use crate::endgame::accumulator::EndgameFrame;
 use crate::eval::evaluator::Evaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
@@ -27,8 +27,8 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub pvs: Box<[PrincipalVariation; MAX_PLY]>,
     pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; MAX_PLY]>,
 
-    pub vcf_stack: Box<[VcfFrame; MAX_PLY]>,
-    pub vcf_stack_top: usize,
+    pub vcf_stack: Box<[EndgameFrame; MAX_PLY]>,
+    pub endgame_stack_top: usize,
 
     pub batch_counter: BatchCounter<'a>,
     aborted: &'a AtomicBool,
@@ -63,7 +63,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
             pvs: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             killers: Box::new([[MaybePos::NONE; 2]; MAX_PLY]),
             vcf_stack: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
-            vcf_stack_top: 0,
+            endgame_stack_top: 0,
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
             best_move: MaybePos::NONE,
@@ -107,7 +107,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
         self.ply -= 1;
     }
 
-    pub fn insert_killer_move_mut(&mut self, pos: Pos) {
+    pub fn push_killer_move_mut(&mut self, pos: Pos) {
         self.killers[self.ply][1] = self.killers[self.ply][0];
         self.killers[self.ply][0] = pos.into();
     }
@@ -120,22 +120,22 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
         // TODO
     }
 
-    pub fn clear_vcf_stack_mut(&mut self) {
-        self.vcf_stack_top = 0;
+    pub fn clear_endgame_stack_mut(&mut self) {
+        self.endgame_stack_top = 0;
     }
 
-    pub fn push_vcf_frame_mut(&mut self, frame: VcfFrame) {
-        self.vcf_stack[self.vcf_stack_top] = frame;
-        self.vcf_stack_top += 1;
+    pub fn push_endgame_frame_mut(&mut self, frame: EndgameFrame) {
+        self.vcf_stack[self.endgame_stack_top] = frame;
+        self.endgame_stack_top += 1;
     }
 
-    pub fn pop_vcf_frame_mut(&mut self) -> Option<VcfFrame> {
-        if self.vcf_stack_top == 0 {
+    pub fn pop_endgame_frame_mut(&mut self) -> Option<EndgameFrame> {
+        if self.endgame_stack_top == 0 {
             return None;
         }
 
-        self.vcf_stack_top -= 1;
-        Some(self.vcf_stack[self.vcf_stack_top])
+        self.endgame_stack_top -= 1;
+        Some(self.vcf_stack[self.endgame_stack_top])
     }
 
 }

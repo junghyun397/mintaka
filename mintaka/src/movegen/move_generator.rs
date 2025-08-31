@@ -1,3 +1,4 @@
+use crate::endgame::accumulator::{EndgameMovesUnchecked, ENDGAME_MAX_MOVES};
 use crate::game_state::GameState;
 use crate::movegen::move_list::MoveList;
 use rusty_renju::board::Board;
@@ -9,52 +10,14 @@ use rusty_renju::{cartesian_to_index, chebyshev_distance, index_to_col, index_to
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
 
-pub const VCF_MAX_MOVES: usize = 31;
-
-#[derive(Debug, Copy, Clone)]
-pub struct VcfMovesUnchecked {
-    pub moves: [Pos; VCF_MAX_MOVES],
-    pub top: u8,
-}
-
-impl VcfMovesUnchecked {
-
-    pub fn unit(pos: Pos) -> Self {
-        Self {
-            moves: {
-                const EMPTY_MOVES: [Pos; VCF_MAX_MOVES] = [MaybePos::INVALID_POS; VCF_MAX_MOVES];
-
-                let mut new_moves = EMPTY_MOVES;
-                new_moves[0] = pos;
-                new_moves
-            },
-            top: 1,
-        }
-    }
-
-    pub fn sort_moves(&mut self, ref_pos: Pos) {
-        let ref_row = ref_pos.row() as i16;
-        let ref_col = ref_pos.col() as i16;
-
-        self.moves[..self.top as usize].sort_by_key(|&pos|
-            chebyshev_distance!(ref_row, ref_col, pos.row() as i16, pos.col() as i16)
-        );
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.top == 0
-    }
-
-}
-
 fn score_move(state: &GameState, pos: Pos) -> Score {
     let distance = (state.history.avg_distance_to_recent_actions(pos).max(8) + 4) as f32;
 
     16 - distance as Score
 }
 
-pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Pos) -> VcfMovesUnchecked {
-    let mut vcf_moves = [MaybePos::INVALID_POS; VCF_MAX_MOVES];
+pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Pos) -> EndgameMovesUnchecked {
+    let mut vcf_moves = [MaybePos::NONE; ENDGAME_MAX_MOVES];
     let mut vcf_moves_top = 0;
 
     let field_ptr = board.patterns.field.access(board.player_color).as_ptr() as *const u32;
@@ -105,12 +68,12 @@ pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Po
                 continue;
             }
 
-            vcf_moves[vcf_moves_top] = Pos::from_index(pos_idx as u8);
+            vcf_moves[vcf_moves_top] = Pos::from_index(pos_idx as u8).into();
             vcf_moves_top += 1;
         }
     }
 
-    VcfMovesUnchecked { moves: vcf_moves, top: vcf_moves_top as u8 }
+    EndgameMovesUnchecked { moves: vcf_moves, top: vcf_moves_top as u8 }
 }
 
 pub fn generate_defend_open_four_moves(state: &GameState, moves: &mut MoveList) {

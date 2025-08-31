@@ -77,14 +77,17 @@ fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
 fn response_printer(response: Response) {
     match response {
         Response::Begins(ComputingResource { workers, time, nodes_in_1k, tt_size }) =>
-            println!("begins: workers={workers}, running-time={time:?}, nodes={nodes_in_1k:?}, tt-size={tt_size}"),
-        Response::Status { score, pv, total_nodes_in_1k, depth, hash_usage } =>
+            println!("begins: workers={workers}, \
+                running-time={time:?}, \
+                nodes={nodes_in_1k:?}, \
+                tt-size={tt_size}"),
+        Response::Status { best_move, score, pv, total_nodes_in_1k, depth } =>
             println!(
-                "status: score={score}, \
-                pv={pv:?}, \
+                "status: depth={depth}, \
+                score={score}, \
+                best_move={best_move}, \
                 total_nodes_in_1k={total_nodes_in_1k}, \
-                depth={depth}, \
-                hash_usage={hash_usage}"
+                pv={pv:?}"
             ),
         _ => {}
     }
@@ -299,7 +302,7 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
 
     let mut game_agent = GameAgent::from_state(config, game_state);
 
-    // game_agent.command(Command::Workers(num_cpus::get_physical() as u32))?;
+    game_agent.command(Command::Workers(num_cpus::get_physical() as u32))?;
 
     message_sender.launch();
 
@@ -312,6 +315,7 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
 
                 let result = game_agent.command(Command::Play(best_move.pos))?;
 
+                println!("{:?}", best_move.root_scores);
                 println!("{}",
                      game_agent.state.board.to_string_with_heatmap(
                          best_move.root_scores,

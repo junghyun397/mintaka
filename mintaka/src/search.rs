@@ -1,8 +1,10 @@
+use crate::endgame::vcf_search::vcf_search;
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::memo::tt_entry::ScoreKind;
 use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker::MovePicker;
+use crate::protocol::response::Response;
 use crate::search_frame::SearchFrame;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
@@ -43,14 +45,15 @@ struct OffPVNode; impl NodeType for OffPVNode {
 pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH, impl Evaluator>,
     mut state: GameState,
-) -> Score {
+) -> (Score, MaybePos) {
     let mut score: Score = 0;
+    let mut best_move = MaybePos::NONE;
 
     'iterative_deepening: for depth in 1 ..= td.config.max_depth {
         td.depth = depth;
 
-        score = if depth < 7 || true { // todo: debug
-            pvs::<R, RootNode, TH>(td, &mut state, depth, -Score::INF, Score::INF)
+        let iter_score = if depth < 7 {
+            pvs::<R, TH, RootNode>(td, &mut state, depth, -Score::INF, Score::INF)
         } else {
             aspiration::<R, TH>(td, &mut state, depth, score)
         };
@@ -58,9 +61,22 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
         if td.is_aborted() {
             break 'iterative_deepening;
         }
+
+        score = iter_score;
+        best_move = td.best_move;
+
+        if TH::IS_MAIN {
+            td.thread_type.make_response(Response::Status {
+                best_move,
+                score,
+                pv: td.pvs[0],
+                total_nodes_in_1k: td.batch_counter.count_global_in_1k(),
+                depth
+            })
+        }
     }
 
-    score
+    (score, best_move)
 }
 
 pub fn aspiration<const R: RuleKind, TH: ThreadType>(
@@ -76,7 +92,7 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     let min_depth = (depth / 2).max(1);
 
     loop {
-        let score = pvs::<R, RootNode, TH>(td, state, depth, alpha, beta);
+        let score = pvs::<R, TH, RootNode>(td, state, depth, alpha, beta);
 
         if td.is_aborted() {
             return score;
@@ -97,14 +113,22 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     }
 }
 
-pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
+pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     td: &mut ThreadData<TH, impl Evaluator>,
     state: &mut GameState,
     depth_left: Depth,
     mut alpha: Score,
     mut beta: Score,
 ) -> Score {
-    if state.board.stones as usize >= td.config.draw_condition {
+    if TH::IS_MAIN
+        && td.should_check_limit()
+        && td.search_limit_exceeded()
+    {
+        td.set_aborted_mut();
+        return Score::DRAW;
+    }
+
+    if td.is_aborted() || state.board.stones as usize >= td.config.draw_condition {
         return Score::DRAW;
     }
 
@@ -143,10 +167,17 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         td.push_ply_mut(pos);
         state.set_mut(pos);
 
-        let score = -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha);
+        let score = -pvs::<R, TH, NT::NextType>(td, state, depth_left, -beta, -alpha);
 
         td.pop_ply_mut();
         state.unset_mut(td.ss[td.ply].movegen_window);
+
+        if td.is_aborted() {
+            return Score::DRAW;
+        }
+
+        if NT::IS_PV {
+        }
 
         if NT::IS_ROOT {
             td.best_move = pos.into();
@@ -161,18 +192,6 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         if alpha >= beta { // mate distance pruning
             return alpha;
         }
-    }
-
-    if TH::IS_MAIN
-        && td.should_check_limit()
-        && td.search_limit_exceeded()
-    {
-        td.set_aborted_mut();
-        return Score::DRAW;
-    }
-
-    if td.is_aborted() {
-        return Score::DRAW;
     }
 
     td.pvs[td.ply].clear();
@@ -209,14 +228,13 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
     }
 
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
-        return static_eval;
-        // return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
+        return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
     }
-
-    let original_alpha = alpha;
 
     let mut best_score = -Score::INF;
     let mut best_move = MaybePos::NONE;
+
+    let mut score_kind = ScoreKind::UpperBound;
 
     td.ss[td.ply] = SearchFrame {
         movegen_window: state.movegen_window,
@@ -245,12 +263,12 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         moves_made += 1;
 
         let score = if moves_made == 1 { // full-window search
-            -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha)
+            -pvs::<R, TH, NT::NextType>(td, state, depth_left - 1, -beta, -alpha)
         } else { // zero-window search
-            let mut score = -pvs::<R, OffPVNode, TH>(td, state, depth_left - 1, -alpha - 1, -alpha);
+            let mut score = -pvs::<R, TH, OffPVNode>(td, state, depth_left - 1, -alpha - 1, -alpha);
 
             if score > alpha { // zero-window failed, full-window search
-                score = -pvs::<R, NT::NextType, TH>(td, state, depth_left - 1, -beta, -alpha);
+                score = -pvs::<R, TH, NT::NextType>(td, state, depth_left - 1, -beta, -alpha);
             }
 
             score
@@ -258,6 +276,10 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
 
         td.pop_ply_mut();
         state.unset_mut(td.ss[td.ply].movegen_window);
+
+        if td.is_aborted() {
+            return Score::DRAW;
+        }
 
         if NT::IS_ROOT {
             td.push_root_move(pos, score);
@@ -268,12 +290,14 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
         }
 
         best_score = score;
-        best_move = pos.into();
 
         if score > alpha { // improve alpha
+            score_kind = ScoreKind::Exact;
+
+            best_move = pos.into();
             alpha = score;
 
-            if NT::IS_PV {
+            if NT::IS_PV { // update pv-line
                 if NT::IS_ROOT {
                     td.pvs[0].init(pos.into());
                 } else {
@@ -281,26 +305,20 @@ pub fn pvs<const R: RuleKind, NT: NodeType, TH: ThreadType>(
                     td.pvs[td.ply - 1].load(pos.into(), sub_pv);
                 }
             }
-        }
 
-        if alpha >= beta { // beta cutoff
-            td.ss[td.ply].cutoffs += 1;
-            td.insert_killer_move_mut(pos);
-            break 'position_search;
+            if alpha >= beta { // beta cutoff
+                score_kind = ScoreKind::LowerBound;
+
+                td.ss[td.ply].cutoffs += 1;
+                td.push_killer_move_mut(pos);
+                break 'position_search;
+            }
         }
     }
 
     if NT::IS_ROOT {
         td.best_move = best_move;
     }
-
-    let score_kind = if best_score >= beta {
-        ScoreKind::LowerBound
-    } else if best_score > original_alpha {
-        ScoreKind::Exact
-    } else {
-        ScoreKind::UpperBound
-    };
 
     td.tt.store(
         state.board.hash_key,

@@ -233,6 +233,10 @@ impl MaybePos {
         self.0
     }
 
+    pub const fn unwrap_unchecked(self) -> Pos {
+        self.0
+    }
+
     pub const fn unwrap_or(self, default: Pos) -> Pos {
         if self.is_none() {
             default

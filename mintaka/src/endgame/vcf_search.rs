@@ -1,9 +1,9 @@
-use crate::endgame::accumulator::{EndgameAccumulator, SequenceEndgameAccumulator};
+use crate::endgame::accumulator::{EndgameAccumulator, EndgameFrame, EndgameMovesUnchecked, SequenceEndgameAccumulator};
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::memo::transposition_table::TTView;
 use crate::memo::tt_entry::ScoreKind;
-use crate::movegen::move_generator::{generate_vcf_moves, VcfMovesUnchecked};
+use crate::movegen::move_generator::generate_vcf_moves;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use crate::value::Depth;
@@ -48,15 +48,6 @@ impl VcfDestination for VcfDefend {
     }
 }
 
-#[derive(Copy, Clone)]
-pub struct VcfFrame {
-    vcf_moves: VcfMovesUnchecked,
-    next_move_counter: usize,
-    alpha: Score,
-    four_pos: Pos,
-    defend_pos: Pos,
-}
-
 pub fn vcf_search<const R: RuleKind>(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     max_vcf_ply: Depth,
@@ -80,6 +71,7 @@ pub fn vcf_search<const R: RuleKind>(
     }
 
     vcf_moves.sort_moves(state.history.recent_player_action().unwrap_or(pos::CENTER));
+    vcf_moves.init();
 
     vcf::<R, Score>(td, VcfWin, max_vcf_ply, *state, vcf_moves, alpha, beta, static_eval)
 }
@@ -88,11 +80,13 @@ pub fn vcf_sequence<const R: RuleKind>(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     state: &GameState
 ) -> Option<Vec<MaybePos>> {
-    let vcf_moves = generate_vcf_moves(&state.board, 8, pos::CENTER);
+    let mut vcf_moves = generate_vcf_moves(&state.board, 8, pos::CENTER);
 
     if vcf_moves.is_empty() {
         return None;
     }
+
+    vcf_moves.init();
 
     vcf::<R, SequenceEndgameAccumulator>(td, VcfWin, Depth::MAX, *state, vcf_moves, Score::MIN, Score::MAX, SequenceEndgameAccumulator::ZERO)
         .map(|mut sequence| {
@@ -106,7 +100,7 @@ fn vcf<const R: RuleKind, ACC: EndgameAccumulator>(
     dest: impl VcfDestination,
     vcf_max_depth: Depth,
     state: GameState,
-    vcf_moves: VcfMovesUnchecked,
+    vcf_moves: EndgameMovesUnchecked,
     alpha: Score, beta: Score,
     acc: ACC
 ) -> ACC {
@@ -121,11 +115,11 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
     dest: impl VcfDestination,
     mut depth_left: Depth,
     mut state: GameState,
-    mut vcf_moves: VcfMovesUnchecked,
+    mut vcf_moves: EndgameMovesUnchecked,
     mut alpha: Score, beta: Score,
-    mut acc: ACC
+    acc: ACC
 ) -> ACC {
-    td.clear_vcf_stack_mut();
+    td.clear_endgame_stack_mut();
 
     let mut vcf_ply = 0;
     let mut move_counter: usize = 0;
@@ -145,7 +139,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
 
         let opponent_color = !board.player_color;
 
-        while let Some(frame) = td.pop_vcf_frame_mut() {
+        while let Some(frame) = td.pop_endgame_frame_mut() {
             hash_key = hash_key.set(opponent_color, frame.defend_pos);
             tt_store_vcf_lose(&td.tt, hash_key, frame.defend_pos, lose_score, true);
 
@@ -159,10 +153,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
     }
 
     'vcf_search: loop {
-        'position_search: for (seq, &four_pos) in vcf_moves.moves[.. vcf_moves.top as usize].iter()
-            .enumerate()
-            .skip(move_counter)
-        {
+        'position_search: while let Some(four_pos) = vcf_moves.next() {
             if TH::IS_MAIN
                 && td.should_check_limit()
                 && td.search_limit_exceeded()
@@ -286,9 +277,8 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
                 continue 'position_search;
             }
 
-            td.push_vcf_frame_mut(VcfFrame {
-                vcf_moves,
-                next_move_counter: seq + 1,
+            td.push_endgame_frame_mut(EndgameFrame {
+                moves: vcf_moves,
                 alpha,
                 four_pos,
                 defend_pos,
@@ -300,7 +290,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
                 if !state.board.patterns.field.get_ref::<C>()[defend_move.idx_usize()].has_any_four()
                     || (C == Color::Black && defend_pattern.is_forbidden())
                 {
-                    td.vcf_stack_top -= 1;
+                    td.endgame_stack_top -= 1;
                     state.board.unset_mut(defend_pos);
                     state.board.unset_mut(four_pos);
                     vcf_ply -= 2;
@@ -308,13 +298,12 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
                     continue 'position_search;
                 }
 
-                vcf_moves = VcfMovesUnchecked::unit(
-                    state.board.patterns.unchecked_five_pos.get_reversed_ref::<C>().unwrap()
-                );
+                vcf_moves = EndgameMovesUnchecked::unit(defend_move);
             } else {
                 vcf_moves = generate_vcf_moves(&state.board, ACC::DISTANCE_WINDOW, four_pos)
             }
 
+            vcf_moves.init();
             move_counter = 0;
 
             continue 'vcf_search;
@@ -337,16 +326,15 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
             );
         }
 
-        if let Some(frame) = td.pop_vcf_frame_mut() {
+        if let Some(frame) = td.pop_endgame_frame_mut() {
             state.board.unset_mut(frame.defend_pos);
             state.board.unset_mut(frame.four_pos);
 
             vcf_ply -= 2;
             depth_left += 2;
 
-            vcf_moves = frame.vcf_moves;
+            vcf_moves = frame.moves;
             alpha = frame.alpha;
-            move_counter = frame.next_move_counter;
         } else {
             break 'vcf_search;
         }

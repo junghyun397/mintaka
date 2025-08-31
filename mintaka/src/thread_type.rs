@@ -5,7 +5,7 @@ pub trait ThreadType {
 
     const IS_MAIN: bool;
 
-    fn make_response<F>(&self, produce: F) where F: FnOnce() -> Response;
+    fn make_response(&self, response: Response);
 
     fn time_exceeded(&self) -> bool;
 
@@ -36,8 +36,7 @@ impl<T: ResponseSender> MainThread<T> {
 impl<T: ResponseSender> ThreadType for MainThread<T> {
     const IS_MAIN: bool = true;
 
-    fn make_response<F>(&self, produce: F) where F: FnOnce() -> Response {
-        let response = produce();
+    fn make_response(&self, response: Response) {
         self.response_sender.response(response);
     }
 
@@ -52,7 +51,7 @@ pub struct WorkerThread;
 impl ThreadType for WorkerThread {
     const IS_MAIN: bool = false;
 
-    fn make_response<F>(&self, _action: F) where F: FnOnce() -> Response { }
+    fn make_response(&self, _response: Response) {}
 
     fn time_exceeded(&self) -> bool {
         false

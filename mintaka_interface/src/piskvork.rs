@@ -102,13 +102,13 @@ fn response_receiver(response: Response) {
             PiskvorkResponse::Info(format!(
                 "begins: workers={workers}, running-time={time:?}, nodes={nodes_in_1k:?}k, tt-size={tt_size}"
             )),
-        Response::Status { score, pv, total_nodes_in_1k, depth, hash_usage } =>
+        Response::Status { best_move, score, pv, total_nodes_in_1k, depth } =>
             PiskvorkResponse::Info(format!(
                 "status score={score}, \
-                pv={pv:?}, \
-                total_nodes_in_1k={total_nodes_in_1k}, \
+                best-move={best_move:?}, \
                 depth={depth}, \
-                hash_usage={hash_usage}"
+                total_nodes_in_1k={total_nodes_in_1k}, \
+                pv={pv:?}"
             )),
         Response::Finished => return
     };

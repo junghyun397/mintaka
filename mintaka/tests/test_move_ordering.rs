@@ -48,7 +48,7 @@ mod test_movegen {
                 print!("{:?}, ", (pos, score));
             }
 
-            println!("\n{}", state.board.to_string_with_heatmap(heatmap, true));
+            println!("\n{}", state.board.to_string_with_heatmap(heatmap, true, [MaybePos::NONE; 2]));
         }};
     }
 
