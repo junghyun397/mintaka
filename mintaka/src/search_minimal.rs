@@ -2,6 +2,7 @@ use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker::MovePicker;
+use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
@@ -22,6 +23,7 @@ pub fn iterative_deepening_minimal<const R: RuleKind, TH: ThreadType>(
 
     let mut score: Score = 0;
     let mut best_move = MaybePos::NONE;
+    let mut pv = PrincipalVariation::EMPTY;
 
     'iterative_deepening: for depth in 1 ..= td.config.max_depth {
         td.depth = depth;
@@ -34,12 +36,14 @@ pub fn iterative_deepening_minimal<const R: RuleKind, TH: ThreadType>(
 
         score = iter_score;
         best_move = td.best_move;
+        pv = td.pvs[0];
+        td.depth_reached = depth;
 
         if TH::IS_MAIN {
             td.thread_type.make_response(Response::Status {
                 best_move,
                 score,
-                pv: td.pvs[0],
+                pv,
                 total_nodes_in_1k: td.batch_counter.count_global_in_1k(),
                 depth
             })
@@ -58,6 +62,7 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
     mut beta: Score,
 ) -> Score {
     let is_root = td.ply == 0;
+    let is_pv = beta > alpha + 1;
 
     if TH::IS_MAIN
         && td.should_check_limit()
@@ -71,11 +76,17 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
         return Score::DRAW;
     }
 
+    td.pvs[td.ply].clear();
+
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
         .access(state.board.player_color)
     { // immediate win
         if is_root {
             td.best_move = pos.into();
+        }
+
+        if is_pv {
+            td.pvs[td.ply].init(pos.into());
         }
 
         return Score::win_in(td.ply + 1)
@@ -89,6 +100,10 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
         { // trapped
             if is_root {
                 td.best_move = MaybePos::NONE;
+            }
+
+            if is_pv {
+                td.pvs[td.ply].init(MaybePos::NONE);
             }
 
             return Score::lose_in(td.ply + 2)
@@ -109,6 +124,11 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
 
         if is_root {
             td.best_move = pos.into();
+        }
+
+        if is_pv {
+            let sub_pv = td.pvs[td.ply + 1];
+            td.pvs[td.ply].load(pos.into(), sub_pv);
         }
 
         return score;
@@ -176,9 +196,13 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
         best_score = score;
 
         if score > alpha { // improve alpha
-
             best_move = pos.into();
             alpha = score;
+
+            if is_pv {
+                let sub_pv = td.pvs[td.ply + 1];
+                td.pvs[td.ply].load(pos.into(), sub_pv);
+            }
 
             if alpha >= beta { // beta cutoff
                 break 'position_search;

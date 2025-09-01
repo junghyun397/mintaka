@@ -14,7 +14,7 @@ pub fn deserialize_array<'de, D, T, const N: usize>(deserializer: D) -> Result<[
     let array: Vec<T> = serde::Deserialize::deserialize(deserializer)?;
 
     if array.len() != N {
-        return Err(serde::de::Error::custom("array length is not equal to N"));
+        return Err(serde::de::Error::custom(format!("array length is not equal to {N}")));
     }
 
     Ok(array.try_into().unwrap())

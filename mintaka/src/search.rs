@@ -64,6 +64,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
 
         score = iter_score;
         best_move = td.best_move;
+        td.depth_reached = depth;
 
         if TH::IS_MAIN {
             td.thread_type.make_response(Response::Status {
@@ -132,6 +133,8 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         return Score::DRAW;
     }
 
+    td.pvs[td.ply].clear();
+
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
         .access(state.board.player_color)
     { // immediate win
@@ -177,6 +180,8 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         }
 
         if NT::IS_PV {
+            let sub_pv = td.pvs[td.ply + 1];
+            td.pvs[td.ply].load(pos.into(), sub_pv);
         }
 
         if NT::IS_ROOT {
@@ -193,8 +198,6 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             return alpha;
         }
     }
-
-    td.pvs[td.ply].clear();
 
     let mut static_eval: Score;
     let mut tt_move: MaybePos;
@@ -298,12 +301,8 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             alpha = score;
 
             if NT::IS_PV { // update pv-line
-                if NT::IS_ROOT {
-                    td.pvs[0].init(pos.into());
-                } else {
-                    let sub_pv = td.pvs[td.ply];
-                    td.pvs[td.ply - 1].load(pos.into(), sub_pv);
-                }
+                let sub_pv = td.pvs[td.ply];
+                td.pvs[td.ply - 1].load(pos.into(), sub_pv);
             }
 
             if alpha >= beta { // beta cutoff
@@ -314,6 +313,10 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 break 'position_search;
             }
         }
+    }
+
+    if moves_made == 0 {
+        best_score = static_eval;
     }
 
     if NT::IS_ROOT {
@@ -331,9 +334,5 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         NT::IS_PV
     );
 
-    if moves_made == 0 {
-        static_eval
-    } else {
-        best_score
-    }
+    best_score
 }

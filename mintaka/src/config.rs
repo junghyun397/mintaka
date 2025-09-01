@@ -19,8 +19,6 @@ pub struct Config {
     pub rule_kind: RuleKind,
     pub draw_condition: usize,
 
-    pub search_objective: SearchObjective,
-
     pub max_nodes_in_1k: Option<usize>,
     pub max_depth: Depth,
     pub max_vcf_depth: Depth,
@@ -36,7 +34,6 @@ impl Default for Config {
         Config {
             rule_kind: RuleKind::Renju,
             draw_condition: pos::BOARD_SIZE,
-            search_objective: SearchObjective::default(),
             max_nodes_in_1k: None,
             max_depth: Depth::PLY_LIMIT,
             max_vcf_depth: 24,

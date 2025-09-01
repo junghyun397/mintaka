@@ -4,7 +4,6 @@ use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::game_state::GameState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
-use crate::principal_variation::PrincipalVariation;
 use crate::protocol::command::Command;
 use crate::protocol::message::GameResult;
 use crate::protocol::response::{Response, ResponseSender};
@@ -42,7 +41,6 @@ pub struct BestMove {
         deserialize_with = "crate::utils::serde::deserialize_array"
     )]
     pub root_scores: [f32; pos::BOARD_SIZE],
-    pub pv: PrincipalVariation,
 }
 
 #[derive(Debug)]
@@ -154,6 +152,32 @@ impl GameAgent {
                     return Ok(Some(GameResult::Draw));
                 }
             },
+            Command::Undo => {
+                match self.state.history.pop_mut() {
+                    None => return Err(GameError::NoHistoryToUndo),
+                    Some(action) => {
+                        match action {
+                            MaybePos::NONE => {
+                                self.state.board.switch_player_mut();
+                            },
+                            pos => {
+                                self.state.board.unset_mut(pos.unwrap());
+                            }
+                        }
+
+                        if self.executed_moves.is_hot_idx(self.state.len()) {
+                            self.executed_moves.unset_idx_mut(self.state.len());
+
+                            if let Some(time_management) = &mut self.time_management
+                                && let Some((pos, time)) = time_management.time_history.pop()
+                                && pos == action
+                            {
+                                time_management.time_manager.append_mut(time);
+                            }
+                        }
+                    }
+                }
+            },
             Command::Set { pos, color } => {
                 if !self.state.board.is_pos_empty(pos) {
                     return Err(GameError::StoneAlreadyExist);
@@ -196,41 +220,6 @@ impl GameAgent {
                     None => return Err(GameError::StoneDoesNotExist),
                 }
             },
-            Command::Undo => {
-                match self.state.history.pop_mut() {
-                    None => return Err(GameError::NoHistoryToUndo),
-                    Some(action) => {
-                        match action {
-                            MaybePos::NONE => {
-                                self.state.board.switch_player_mut();
-                            },
-                            pos => {
-                                self.state.board.unset_mut(pos.unwrap());
-                            }
-                        }
-
-                        if self.executed_moves.is_hot_idx(self.state.len()) {
-                            self.executed_moves.unset_idx_mut(self.state.len());
-
-                            if let Some(time_management) = &mut self.time_management
-                                && let Some((pos, time)) = time_management.time_history.pop()
-                                && pos == action
-                            {
-                                time_management.time_manager.append_mut(time);
-                            }
-                        }
-                    }
-                }
-            },
-            Command::Load(boxed) => {
-                let (board, history) = *boxed;
-
-                self.state = GameState::from_board_and_history(board, history);
-                self.evaluator = HeuristicEvaluator::from_state(&self.state);
-
-                self.tt.clear_mut(self.config.workers.into());
-                self.executed_moves = Bitfield::default();
-            },
             Command::BatchSet { player_moves, opponent_moves } => {
                 let (black_stones, white_stones) =
                     match self.state.board.player_color {
@@ -254,7 +243,16 @@ impl GameAgent {
                 );
 
                 self.evaluator = HeuristicEvaluator::from_state(&self.state);
-            }
+            },
+            Command::Load(boxed) => {
+                let (board, history) = *boxed;
+
+                self.state = GameState::from_board_and_history(board, history);
+                self.evaluator = HeuristicEvaluator::from_state(&self.state);
+
+                self.tt.clear_mut(self.config.workers.into());
+                self.executed_moves = Bitfield::default();
+            },
             Command::TurnTime(time) => {
                 if let Some(time_management) = &mut self.time_management {
                     time_management.time_manager.turn = time;
@@ -410,11 +408,10 @@ impl GameAgent {
             hash: self.state.board.hash_key,
             pos: best_move,
             score,
-            depth_reached: main_td.depth,
+            depth_reached: main_td.depth_reached,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed,
             root_scores: main_td.root_scores,
-            pv: main_td.pvs[0]
         }
     }
 

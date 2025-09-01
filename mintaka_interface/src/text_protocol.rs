@@ -325,8 +325,8 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
                 );
 
                 println!(
-                    "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}, pv={:?}",
-                    best_move.pos, best_move.score, best_move.depth_reached, best_move.total_nodes_in_1k, best_move.time_elapsed, best_move.pv
+                    "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}",
+                    best_move.pos, best_move.score, best_move.depth_reached, best_move.total_nodes_in_1k, best_move.time_elapsed
                 );
 
                 overall_nodes_in_1k += best_move.total_nodes_in_1k;

@@ -12,32 +12,25 @@ pub struct PrincipalVariation {
 
 impl PrincipalVariation {
 
+    pub const EMPTY: Self = Self { line: [MaybePos::NONE; MAX_PLY], top: 0 };
+
     pub fn moves(&self) -> &[MaybePos] {
         &self.line[0 .. self.top]
-    }
-
-    pub fn init(&mut self, pos: MaybePos) {
-        self.line[0] = pos;
-        self.top = 1;
-    }
-
-    pub fn head(&self) -> MaybePos {
-        self.line[0]
-    }
-
-    pub fn last(&self) -> MaybePos {
-        self.line[self.top - 1]
     }
 
     pub fn clear(&mut self) {
         self.top = 0;
     }
 
+    pub fn init(&mut self, head: MaybePos) {
+        self.line[0] = head;
+        self.top = 1;
+    }
+
     pub fn load(&mut self, head: MaybePos, rest: Self) {
-        self.clear();
         self.line[0] = head;
         self.top = rest.top + 1;
-        self.line[1 .. self.top].copy_from_slice(&rest.line[0 .. rest.top]);
+        self.line[1 .. self.top].copy_from_slice(rest.moves());
     }
 
 }
