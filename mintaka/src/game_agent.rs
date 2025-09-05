@@ -411,7 +411,7 @@ impl GameAgent {
             depth_reached: main_td.depth_reached,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed,
-            root_scores: main_td.root_scores,
+            root_scores: main_td.root_scores[main_td.depth_reached as usize - 1],
         }
     }
 

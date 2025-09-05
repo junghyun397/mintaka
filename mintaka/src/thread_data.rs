@@ -26,6 +26,7 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub ss: Box<[SearchFrame; MAX_PLY]>,
     pub pvs: Box<[PrincipalVariation; MAX_PLY]>,
     pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; MAX_PLY]>,
+    pub root_scores: Box<[[f32; pos::BOARD_SIZE]; MAX_PLY]>,
 
     pub vcf_stack: Box<[EndgameFrame; MAX_PLY]>,
     pub endgame_stack_top: usize,
@@ -37,8 +38,6 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub depth: Depth,
     pub depth_reached: Depth,
     pub ply: usize,
-
-    pub root_scores: [f32; pos::BOARD_SIZE],
 }
 
 impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
@@ -63,6 +62,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
             ss: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             pvs: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             killers: Box::new([[MaybePos::NONE; 2]; MAX_PLY]),
+            root_scores: Box::new([[f32::NAN; pos::BOARD_SIZE]; MAX_PLY]),
             vcf_stack: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             endgame_stack_top: 0,
             batch_counter: BatchCounter::new(global_counter_in_1k),
@@ -71,7 +71,6 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
             depth: 0,
             depth_reached: 0,
             ply: 0,
-            root_scores: [f32::NAN; pos::BOARD_SIZE],
         }
     }
 
@@ -95,7 +94,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
     }
 
     pub fn push_root_move(&mut self, pos: Pos, score: Score) {
-        self.root_scores[pos.idx_usize()] = score as f32;
+        self.root_scores[self.depth as usize - 1][pos.idx_usize()] = score as f32;
     }
 
     pub fn push_ply_mut(&mut self, pos: Pos) {

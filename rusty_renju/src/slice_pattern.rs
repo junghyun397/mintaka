@@ -52,63 +52,6 @@ impl Slice {
         acc
     }
 
-    pub fn eval_slice<const C: Color>(&self) -> u8 {
-        let (mut stones, blocks) = {
-            let (stones, blocks) = self.stones_with_boundary_mask::<C>();
-            ((stones as u32) << 1, ((blocks as u32) << 1) | 0b1)
-        };
-
-        let open = !blocks;
-
-        let mut start_five = open;
-        start_five &= open >> 1;
-        start_five &= open >> 2;
-        start_five &= open >> 3;
-        start_five &= open >> 4;
-
-        let cover_five = start_five | (start_five << 1) | (start_five << 2) | (start_five << 3) | (start_five << 4);
-
-        stones = stones & cover_five;
-        if stones == 0 { return 0; }
-
-        let empty = !(stones | blocks);
-        let mut score: u8 = 0;
-
-        let pair_left = stones & (stones >> 1);
-        let paired = (stones & (stones << 1)) | (stones & (stones >> 1));
-        let singles = stones & !paired;
-
-        // . . O . .
-        let open_both = singles & (empty << 1) & (empty << 2) & (empty >> 1) & (empty >> 2);
-        score += 3 * (open_both.count_ones() as u8);
-
-        // X . O . . . | . . . O . X
-        let blocked_loose_left = singles & (empty << 1) & (blocks << 2) & (empty >> 1);
-        let blocked_loose_right = singles & (empty >> 1) & (blocks >> 2) & (empty << 1);
-        let blocked_loose = (blocked_loose_left | blocked_loose_right) & !open_both;
-        score += 1 * (blocked_loose.count_ones() as u8);
-
-        // X O O . . . | . . . O O X
-        let blocked_none_gap = pair_left & ((blocks << 1) | (blocks >> 2));
-        score += 2 * (blocked_none_gap.count_ones() as u8);
-
-        // X O . O . . | . . O . O X
-        let single_gap = stones & (empty >> 1) & (stones >> 2);
-        let blocked_single_gap = single_gap & ((blocks << 1) | (blocks >> 3));
-        score += 2 * (blocked_single_gap.count_ones() as u8);
-
-        // X O . . O . | . O . . O X
-        let double_gap = stones & (empty >> 1) & (empty >> 2) & (stones >> 3);
-        let blocked_double_gap = double_gap & ((blocks << 1) | (blocks >> 4));
-        score += 2 * (blocked_double_gap.count_ones() as u8);
-
-        // . O . . . O .
-        let bridged = stones & (empty >> 1) & (empty >> 2) & (empty >> 3) & (stones >> 4) & (empty << 1) & (empty >> 5);
-        score += 3 * (bridged.count_ones() as u8);
-
-        score
-    }
-
 }
 
 #[inline(always)]
@@ -284,8 +227,8 @@ impl SlicePatchData {
 
 }
 
-const BLACK_LUT_SIZE: usize = 76;
-const WHITE_LUT_SIZE: usize = 71;
+const BLACK_LUT_SIZE: usize = 128;
+const WHITE_LUT_SIZE: usize = 128;
 
 #[repr(align(32))]
 struct PatchLut {
@@ -340,22 +283,29 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
     }
 
     macro_rules! embed_pattern {
+        (both,$mirror:ident,$pattern:literal,$($patch:literal),+) => {
+            embed_pattern!(black, $mirror, $pattern, $($patch),+);
+            embed_pattern!(white, $mirror, $pattern, $($patch),+);
+        };
         (black,asymmetry,long-pattern,$direction:expr,$pattern:literal,$($patch:literal),+) => {
-            embed_pattern!(black, rev=false, Some($direction), $pattern, fill_array!($($patch),+));
-            embed_pattern!(black, rev=true, Some($direction.reverse()), $pattern, fill_array!($($patch),+));
+            flash_pattern!(black, rev=false, Some($direction), $pattern, fill_array!($($patch),+));
+            flash_pattern!(black, rev=true, Some($direction.reverse()), $pattern, fill_array!($($patch),+));
         };
         ($color:ident,symmetry,$pattern:literal,$($patch:literal),+) => {
-            embed_pattern!($color, rev=false, Option::None, $pattern, fill_array!($($patch),+));
+            flash_pattern!($color, rev=false, Option::None, $pattern, fill_array!($($patch),+));
         };
         ($color:ident,asymmetry,$pattern:literal,$($patch:literal),+) => {
-            embed_pattern!($color, rev=false, Option::None, $pattern, fill_array!($($patch),+));
-            embed_pattern!($color, rev=true, Option::None, $pattern, fill_array!($($patch),+));
+            flash_pattern!($color, rev=false, Option::None, $pattern, fill_array!($($patch),+));
+            flash_pattern!($color, rev=true, Option::None, $pattern, fill_array!($($patch),+));
         };
+    }
+
+    macro_rules! flash_pattern {
         (black,rev=$rev:expr,$extended_match:expr,$pattern:literal,$patches:expr) => {
-            embed_pattern!(rev=$rev, temp_vector_match_lut_black, slice_pattern_lut.patch.black, patch_top_black, $extended_match, $pattern, $patches);
+            flash_pattern!(rev=$rev, temp_vector_match_lut_black, slice_pattern_lut.patch.black, patch_top_black, $extended_match, $pattern, $patches);
         };
         (white,rev=$rev:expr,$extended_match:expr,$pattern:literal,$patches:expr) => {
-            embed_pattern!(rev=$rev, temp_vector_match_lut_white, slice_pattern_lut.patch.white, patch_top_white, $extended_match, $pattern, $patches);
+            flash_pattern!(rev=$rev, temp_vector_match_lut_white, slice_pattern_lut.patch.white, patch_top_white, $extended_match, $pattern, $patches);
         };
         (rev=$rev:expr,$vector_expr:expr,$patch_expr:expr,$patch_top_expr:expr,$extended_match:expr,$pattern:literal,$patches:expr) => {{
             $patch_top_expr += 1;
@@ -368,15 +318,15 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
 
     // potential
 
-    // embed_pattern!(both, symmetry, "!O...O!", "!OP..O!", "!O.P.O!", "!O..PO!");
-    //
-    // embed_pattern!(both, symmetry, "!..O..!", "!.PO..!", "!..OP.!");
-    // embed_pattern!(both, asymmetry, "!..O...!", "!..O.P.!");
-    // embed_pattern!(both, asymmetry, "X.O...!", "X.OP..!", "X.O.P.!");
-    //
-    // embed_pattern!(both, asymmetry, "XOO...!", "XOOP..!", "XOO.P.!", "XOO..P!");
-    // embed_pattern!(both, asymmetry, "XO.O..!", "XOPO..!", "XO.OP.!", "XO.O.P!");
-    // embed_pattern!(both, asymmetry, "XO..O.!", "XOP.O.!", "XO.PO.!", "XO..OP!");
+    embed_pattern!(both, symmetry, "!O...O!", "!OP..O!", "!O.P.O!", "!O..PO!");
+
+    embed_pattern!(both, symmetry, "!..O..!", "!.PO..!", "!..OP.!");
+    embed_pattern!(both, asymmetry, "!..O...!", "!..O.P.!");
+    embed_pattern!(both, asymmetry, "X.O...!", "X.OP..!", "X.O.P.!");
+
+    embed_pattern!(both, asymmetry, "XOO...!", "XOOP..!", "XOO.P.!", "XOO..P!");
+    embed_pattern!(both, asymmetry, "XO.O..!", "XOPO..!", "XO.OP.!", "XO.O.P!");
+    embed_pattern!(both, asymmetry, "XO..O.!", "XOP.O.!", "XO.PO.!", "XO..OP!");
 
     // black-open-three
 
@@ -605,7 +555,7 @@ const fn parse_patch_literal(source: &str, reversed: bool) -> (usize, u8) {
     const_for!(idx in 0, source.len(); {
         let pos = if reversed { 7 - idx } else { idx };
         match source.as_bytes()[idx] as char {
-            'P' => return (pos, pattern::MARKER),
+            'P' => return (pos, pattern::POTENTIAL),
             '3' => return (pos, pattern::OPEN_THREE),
             'C' => return (pos, pattern::CLOSE_THREE),
             '4' => return (pos, pattern::OPEN_FOUR),

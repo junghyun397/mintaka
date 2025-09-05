@@ -25,10 +25,8 @@ impl Board {
     }
 
     pub fn is_legal_move(&self, pos: Pos) -> bool {
-        self.is_pos_empty(pos) && (
-            self.player_color != Color::Black
-                || self.patterns.forbidden_field.is_cold(pos)
-        )
+        self.is_pos_empty(pos)
+            && (self.player_color != Color::Black || !self.patterns.is_forbidden(pos))
     }
 
     pub fn stone_kind(&self, pos: Pos) -> Option<Color> {
@@ -139,9 +137,7 @@ impl Board {
                     (false, false) => {
                         self.patterns.clear_with_slice_mut::<{ $color }, { $direction }>($slice);
                     },
-                    _ => {
-                        self.patterns.touch_with_slice_mut::<{ $color }, { $direction }>($slice)
-                    }
+                    _ => {}
                 }
             };
         }
@@ -217,38 +213,24 @@ impl Board {
 
             let mark_forbidden: bool;
             let delete_forbidden: bool;
-            let pattern_marker_update: Option<bool>;
 
             if pattern.has_five() {
                 mark_forbidden = false;
                 delete_forbidden = false;
-                pattern_marker_update = None;
             } else if pattern.has_fours() || pattern.has_overline() {
                 mark_forbidden = true;
                 delete_forbidden = false;
-                pattern_marker_update = None;
             } else if pattern.has_threes() {
                 if self.is_valid_double_three(ValidateThreeRoot { root_pos }) {
                     mark_forbidden = true;
                     delete_forbidden = false;
-                    pattern_marker_update = Some(false);
                 } else {
                     mark_forbidden = false;
                     delete_forbidden = false;
-                    pattern_marker_update = Some(true);
                 }
             } else {
                 mark_forbidden = false;
                 delete_forbidden = true;
-                pattern_marker_update = Some(true);
-            }
-
-            if let Some(mark) = pattern_marker_update {
-                if mark {
-                    self.patterns.field.black[root_pos.idx_usize()].mark_invalid_double_three();
-                } else {
-                    self.patterns.field.black[root_pos.idx_usize()].unmark_invalid_double_three();
-                }
             }
 
             if mark_forbidden {

@@ -20,7 +20,7 @@ pub const FIVE: u8                      = 0b0001_0000;
 pub const OPEN_THREE: u8                = 0b0000_1000;
 pub const CLOSE_THREE: u8               = 0b0000_0100;
 pub const OVERLINE: u8                  = 0b0000_0010;
-pub const MARKER: u8                    = 0b0000_0001;
+pub const POTENTIAL: u8                 = 0b0000_0001;
 
 pub const UNIT_CLOSED_FOUR_SINGLE_MASK: u32 = repeat_4x(CLOSED_FOUR_SINGLE);
 pub const UNIT_CLOSED_FOUR_MASK: u32        = repeat_4x(CLOSED_FOUR_DOUBLE);
@@ -31,8 +31,7 @@ pub const UNIT_FIVE_MASK: u32               = repeat_4x(FIVE);
 pub const UNIT_OPEN_THREE_MASK: u32         = repeat_4x(OPEN_THREE);
 pub const UNIT_CLOSE_THREE_MASK: u32        = repeat_4x(CLOSE_THREE);
 pub const UNIT_OVERLINE_MASK: u32           = repeat_4x(OVERLINE);
-
-pub const UNIT_PATTERN_MASK: u32            = repeat_4x(!MARKER);
+pub const UNIT_POTENTIAL_MASK: u32          = repeat_4x(POTENTIAL);
 
 pub const SLICE_PATTERN_CLOSED_FOUR_MASK: u128  = repeat_16x(CLOSED_FOUR_SINGLE);
 pub const SLICE_PATTERN_OPEN_FOUR_MASK: u128    = repeat_16x(OPEN_FOUR);
@@ -149,6 +148,10 @@ impl Pattern {
         self.apply_mask(UNIT_FIVE_MASK).count_ones()
     }
 
+    pub fn count_potentials(&self) -> u32 {
+        self.apply_mask(UNIT_POTENTIAL_MASK).count_ones()
+    }
+
     pub fn iter_three_directions(&self) -> impl Iterator<Item=Direction> + '_ {
         DirectionIterator { packed_unit: self.apply_mask(UNIT_OPEN_THREE_MASK) }
     }
@@ -158,63 +161,36 @@ impl Pattern {
     }
 
     pub fn has_invalid_double_three(&self) -> bool {
-        self.descending & MARKER == MARKER
+        self.descending & POTENTIAL == POTENTIAL
     }
 
     pub fn mark_invalid_double_three(&mut self) {
-        self.descending |= MARKER;
+        self.descending |= POTENTIAL;
     }
 
     pub fn unmark_invalid_double_three(&mut self) {
-        self.descending &= !MARKER;
+        self.descending &= !POTENTIAL;
     }
 
-    pub fn is_forbidden(&self) -> bool {
+    pub fn is_forbidden_unchecked(&self) -> bool {
         let four_masked = self.apply_mask(UNIT_ANY_FOUR_MASK);
         let three_masked = self.apply_mask(UNIT_OPEN_THREE_MASK);
         let overline_masked = self.apply_mask(UNIT_OVERLINE_MASK);
         let five_masked = self.apply_mask(UNIT_FIVE_MASK);
-        let marker_masked = self.apply_mask(!UNIT_PATTERN_MASK);
 
         (four_masked.count_ones() > 1
-            || (three_masked.count_ones() > 1 && marker_masked == 0)
+            || three_masked.count_ones() > 1
             || overline_masked != 0
         ) && five_masked == 0
     }
 
-    fn is_forbidden_ignoring_marker(&self) -> bool {
-        let four_masked = self.apply_mask(UNIT_ANY_FOUR_MASK);
-        let three_masked = self.apply_mask(UNIT_OPEN_THREE_MASK);
-        let overline_masked = self.apply_mask(UNIT_OVERLINE_MASK);
-
-        four_masked.count_ones() > 1
-            || (three_masked.count_ones() > 1)
-            || overline_masked != 0
-    }
-
-    pub fn forbidden_kind(&self) -> Option<ForbiddenKind> {
-        if self.is_forbidden() {
-            if self.has_threes() {
-                Some(ForbiddenKind::DoubleThree)
-            } else if self.has_fours() {
-                Some(ForbiddenKind::DoubleFour)
-            } else {
-                Some(ForbiddenKind::Overline)
-            }
-        } else {
-            None
-        }
-    }
-
     #[inline(always)]
-    pub fn apply_mask_mut<const C: Color, const D: Direction>(&mut self, pattern: u8) {
-        match (C, D) {
-            (_, Direction::Horizontal) => self.horizontal = pattern,
-            (_, Direction::Vertical) => self.vertical = pattern,
-            (_, Direction::Ascending) => self.ascending = pattern,
-            (Color::Black, Direction::Descending) =>
-                self.descending = pattern | (self.descending & MARKER), // retain invalid three makers
-            (Color::White, Direction::Descending) => self.descending = pattern
+    pub fn apply_mask_mut<const D: Direction>(&mut self, pattern: u8) {
+        match D {
+            Direction::Horizontal => self.horizontal = pattern,
+            Direction::Vertical => self.vertical = pattern,
+            Direction::Ascending => self.ascending = pattern,
+            Direction::Descending => self.descending = pattern
         }
     }
 
@@ -233,7 +209,7 @@ pub struct Patterns {
     pub forbidden_field: Bitfield,
 }
 
-assert_struct_sizes!(Patterns, size=2752, align=64);
+assert_struct_sizes!(Patterns, size=2560, align=64);
 
 impl Default for Patterns {
 
@@ -259,6 +235,24 @@ impl Patterns {
         white: None
     };
 
+    pub fn is_forbidden(&self, pos: Pos) -> bool {
+        self.forbidden_field.is_hot(pos)
+    }
+
+    pub fn forbidden_kind(&self, pos: Pos) -> Option<ForbiddenKind> {
+        self.is_forbidden(pos).then(|| {
+            let pattern = self.field.get::<{ Color::Black }>()[pos.idx_usize()];
+
+            if pattern.has_threes() {
+                ForbiddenKind::DoubleThree
+            } else if pattern.has_fours() {
+                ForbiddenKind::DoubleFour
+            } else {
+                ForbiddenKind::Overline
+            }
+        })
+    }
+
     #[inline]
     pub fn update_with_slice_mut<const R: RuleKind, const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
         let slice_pattern = slice.calculate_slice_pattern::<R, C>();
@@ -268,15 +262,13 @@ impl Patterns {
                 self.clear_with_slice_mut::<C, D>(slice),
             (_, false) =>
                 self.update_with_slice_pattern_mut::<C, D>(slice, slice_pattern),
-            _ => {
-                self.touch_with_slice_mut::<C, D>(slice)
-            }
+            _ => {}
         };
     }
 
     #[inline]
     pub fn clear_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
-        self.counts.clear_slice_mut::<C, D>(slice.idx as usize, slice.eval_slice::<C>());
+        self.counts.clear_slice_mut::<C, D>(slice.idx as usize);
 
         let start_idx = slice.start_pos.idx_usize();
         let mut clear_mask = slice.pattern_bitmap.get::<C>();
@@ -285,15 +277,10 @@ impl Patterns {
             clear_mask &= clear_mask - 1;
 
             let idx = step_idx!(D, start_idx, slice_idx);
-            self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(0);
+            self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<D>(0);
         }
 
         *slice.pattern_bitmap.get_ref_mut::<C>() = 0;
-    }
-
-    #[inline]
-    pub fn touch_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &Slice) {
-        self.counts.update_slice_score_mut::<C, D>(slice.idx as usize, slice.eval_slice::<C>());
     }
 
     #[inline]
@@ -312,7 +299,6 @@ impl Patterns {
             (slice_pattern.patterns & SLICE_PATTERN_THREE_MASK).count_ones() as u8,
             (slice_pattern.patterns & SLICE_PATTERN_CLOSED_FOUR_MASK).count_ones() as u8,
             (slice_pattern.patterns & SLICE_PATTERN_OPEN_FOUR_MASK).count_ones() as u8,
-            slice.eval_slice::<C>()
         );
 
         let pattern_bitmap = encode_u128_into_u16(slice_pattern.patterns);
@@ -325,9 +311,9 @@ impl Patterns {
             update_mask &= update_mask - 1;
 
             let idx = step_idx!(D, start_idx, slice_idx);
-            self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<C, D>(slice_patterns[slice_idx]);
+            self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<D>(slice_patterns[slice_idx]);
 
-            if C == Color::Black && self.field.black[idx].is_forbidden_ignoring_marker() {
+            if C == Color::Black && self.field.black[idx].is_forbidden_unchecked() {
                 self.candidate_forbidden_field.set_idx_mut(idx);
             }
         }

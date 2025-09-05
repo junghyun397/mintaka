@@ -339,7 +339,7 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
         match message {
             Message::Launch => {
                 let best_move = game_agent.launch(
-                    CallBackResponseSender::new(response_printer_with_pv(game_agent.state)),
+                    CallBackResponseSender::new(response_printer),
                     aborted.clone()
                 );
 

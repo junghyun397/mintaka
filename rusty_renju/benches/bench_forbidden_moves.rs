@@ -66,7 +66,7 @@ mod bench_forbidden_moves {
 
         b.iter(|| {
             let board = board.set(pos);
-            assert_eq!(board.patterns.field.black[validate_pos.idx_usize()].is_forbidden(), false);
+            assert_eq!(board.patterns.is_forbidden(pos), false);
         })
     }
 
@@ -97,7 +97,7 @@ mod bench_forbidden_moves {
 
         b.iter(|| {
             let board = board.set(pos);
-            assert_eq!(board.patterns.field.black[validate_pos.idx_usize()].is_forbidden(), false);
+            assert_eq!(board.patterns.is_forbidden(pos), false);
         })
     }
 }

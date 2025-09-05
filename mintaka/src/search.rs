@@ -301,8 +301,8 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             alpha = score;
 
             if NT::IS_PV { // update pv-line
-                let sub_pv = td.pvs[td.ply];
-                td.pvs[td.ply - 1].load(pos.into(), sub_pv);
+                let sub_pv = td.pvs[td.ply + 1];
+                td.pvs[td.ply].load(pos.into(), sub_pv);
             }
 
             if alpha >= beta { // beta cutoff

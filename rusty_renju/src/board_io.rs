@@ -40,11 +40,11 @@ fn match_symbol(c: char) -> Option<BoardElement> {
     }
 }
 
-fn board_iter_item_to_symbol(item: BoardIterItem) -> String {
+fn board_iter_item_to_symbol(board: &Board, pos: Pos, item: BoardIterItem) -> String {
     match item {
         BoardIterItem::Stone(color) => char::from(color),
-        BoardIterItem::Pattern(pattern) =>
-            pattern.black.forbidden_kind()
+        BoardIterItem::Pattern(_) =>
+            board.patterns.forbidden_kind(pos)
                 .map(char::from)
                 .unwrap_or(SYMBOL_EMPTY)
     }.to_string()
@@ -97,7 +97,7 @@ impl Board {
         let marker = ["[".to_string(), "]".to_string()];
 
         self.render_with_attributes(
-            |_, &item| board_iter_item_to_symbol(item),
+            |pos, &item| board_iter_item_to_symbol(self, pos, item),
             |iter_pos, _| (iter_pos == pos).then(|| (false, marker.clone()))
         )
     }
@@ -116,7 +116,7 @@ impl Board {
 
     pub fn to_string_with_last_moves(&self, pair: [MaybePos; 2]) -> String {
         self.render_with_attributes(
-            |_, &item| board_iter_item_to_symbol(item),
+            |pos, &item| board_iter_item_to_symbol(self, pos, item),
             Self::make_last_moves_marker(pair)
         )
     }
@@ -137,7 +137,7 @@ impl Board {
 
         let board_string = self.render_with_attributes(
             |pos, &item| {
-                let cell = board_iter_item_to_symbol(item);
+                let cell = board_iter_item_to_symbol(self, pos, item);
 
                 if heatmap[pos.idx_usize()].is_finite() {
                     let value = heatmap[pos.idx_usize()];
@@ -258,7 +258,7 @@ impl From<History> for Board {
 impl Display for Board {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.render_with_attributes(
-            |_, &item| board_iter_item_to_symbol(item),
+            |pos, &item| board_iter_item_to_symbol(self, pos, item),
             |_, _| None
         ))
     }

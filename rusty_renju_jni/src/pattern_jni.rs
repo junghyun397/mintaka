@@ -4,6 +4,7 @@ use jni::sys::{jboolean, jint, jlong};
 use jni::JNIEnv;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
+use rusty_renju::notation::pos::Pos;
 use rusty_renju::pattern::Pattern;
 
 fn count_pattern<F>(board_ptr: jlong, pos: jint, is_black: jboolean, count: F) -> jint where F: FnOnce(&Pattern) -> u32 {
@@ -19,7 +20,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_isForbidden(
     board_ptr: jlong,
     pos: jint,
 ) -> jboolean {
-    retrieve_ref::<Board>(board_ptr).patterns.field.black[pos as usize].is_forbidden() as jboolean
+    retrieve_ref::<Board>(board_ptr).patterns.field.black[pos as usize].is_forbidden_unchecked() as jboolean
 }
 
 #[unsafe(no_mangle)]
@@ -29,8 +30,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_forbiddenKind(
     board_ptr: jlong,
     pos: jint,
 ) -> jint {
-    retrieve_ref::<Board>(board_ptr).patterns.field.black[pos as usize]
-        .forbidden_kind()
+    retrieve_ref::<Board>(board_ptr).patterns.forbidden_kind(Pos::from_index(pos as u8))
         .map(|kind| kind as jint)
         .unwrap_or(0)
 }

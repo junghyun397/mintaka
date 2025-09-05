@@ -88,7 +88,7 @@ pub fn vcf_sequence<const R: RuleKind>(
 
     vcf_moves.init();
 
-    vcf::<R, SequenceEndgameAccumulator>(td, VcfWin, Depth::MAX, *state, vcf_moves, Score::MIN, Score::MAX, SequenceEndgameAccumulator::ZERO)
+    vcf::<R, SequenceEndgameAccumulator>(td, VcfWin, Depth::MAX, *state, vcf_moves, Score::MIN, Score::MAX, None)
         .map(|mut sequence| {
             sequence.reverse();
             sequence
@@ -170,7 +170,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
 
             let player_pattern = state.board.patterns.field.get_ref::<C>()[idx];
 
-            if C == Color::Black && player_pattern.is_forbidden() {
+            if C == Color::Black && state.board.patterns.is_forbidden(four_pos) {
                 continue 'position_search;
             }
 
@@ -196,7 +196,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
             let defend_four_count = defend_pattern.count_fours();
             let defend_is_forbidden = R == RuleKind::Renju
                 && C == Color::White
-                && defend_pattern.is_forbidden();
+                && state.board.patterns.is_forbidden(defend_pos);
 
             if match (R, C) {
                 (RuleKind::Renju, Color::Black) => defend_four_count == PatternCount::Multiple
@@ -288,7 +288,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
                 let defend_move = state.board.patterns.unchecked_five_pos.get_reversed_ref::<C>().unwrap();
 
                 if !state.board.patterns.field.get_ref::<C>()[defend_move.idx_usize()].has_any_four()
-                    || (C == Color::Black && defend_pattern.is_forbidden())
+                    || (C == Color::Black && state.board.patterns.is_forbidden(defend_move))
                 {
                     td.endgame_stack_top -= 1;
                     state.board.unset_mut(defend_pos);

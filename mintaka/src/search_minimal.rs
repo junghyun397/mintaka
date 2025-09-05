@@ -139,9 +139,9 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
         }
     }
 
-    let static_eval = td.evaluator.eval_value(state);
-
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
+        let static_eval = td.evaluator.eval_value(state);
+
         // return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
         return static_eval;
     }

@@ -56,6 +56,7 @@ mod test_slice_pattern {
         (
             color = both,
             case = $case:expr,
+            $(potential = $potential:expr,)?
             $(open_three = $open_three:expr,)?
             $(closed_four_single = $closed_four_single:expr,)?
             $(closed_four_double = $closed_four_double:expr,)?
@@ -67,6 +68,7 @@ mod test_slice_pattern {
             test_pattern!(
                 color = Color::White,
                 case = $case,
+                $(potential = $potential,)?
                 $(open_three = $open_three,)?
                 $(closed_four_single = $closed_four_single,)?
                 $(closed_four_double = $closed_four_double,)?
@@ -79,6 +81,7 @@ mod test_slice_pattern {
             test_pattern!(
                 color = Color::Black,
                 case = &invert_color($case),
+                $(potential = &invert_color($potential),)?
                 $(open_three = &invert_color($open_three),)?
                 $(closed_four_single = &invert_color($closed_four_single),)?
                 $(closed_four_double = &invert_color($closed_four_double),)?
@@ -91,6 +94,7 @@ mod test_slice_pattern {
         (
             color = $color:expr,
             case = $case:expr,
+            $(potential = $potential:expr,)?
             $(open_three = $open_three:expr,)?
             $(closed_four_single = $closed_four_single:expr,)?
             $(closed_four_double = $closed_four_double:expr,)?
@@ -99,6 +103,8 @@ mod test_slice_pattern {
             $(five = $five:expr,)?
             $(overline = $overline:expr,)?
         ) => {
+            $(test_both_flow!($case, $potential, $color, POTENTIAL, POTENTIAL);)?
+
             $(test_both_flow!($case, $open_three, $color, OPEN_THREE, OPEN_THREE);)?
 
             $(test_both_flow!($case, $closed_four_single, $color, CLOSED_FOUR_DOUBLE, CLOSED_FOUR_SINGLE);)?

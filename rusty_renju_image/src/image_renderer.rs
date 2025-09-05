@@ -306,7 +306,7 @@ impl ImageBoardRenderer {
                 .enumerate()
                 .filter(|(_, item)|
                     if let BoardIterItem::Pattern(container) = item {
-                        container.black.is_forbidden()
+                        container.black.is_forbidden_unchecked()
                     } else {
                         false
                     }

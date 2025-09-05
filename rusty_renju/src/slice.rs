@@ -84,14 +84,10 @@ impl Slice {
     }
 
     pub fn has_potential_pattern<const C: Color>(&self) -> bool {
-        // filter . . O . . . .
         // filter O X . . O X .
-        // filter O . . . O . .
         #[inline(always)]
         fn is_pattern_available(p: u16, q: u16) -> bool {
-            p.count_ones() > 1
-                && p & !(q << 1) & !(q >> 1) != 0
-                && p & ((p << 3) | (p << 2) | (p << 1) | (p >> 1) | (p >> 2) | (p >> 3)) != 0
+            p & !(q << 1) & !(q >> 1) != 0
         }
 
         match C {
