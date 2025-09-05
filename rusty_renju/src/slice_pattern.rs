@@ -2,7 +2,7 @@ use crate::notation::color::Color;
 use crate::notation::rule::RuleKind;
 use crate::slice::Slice;
 use crate::slice_pattern::ExtendedMatch::{Left, Right};
-use crate::{assert_struct_sizes, const_for, pattern};
+use crate::{assert_struct_sizes, const_for, const_pow, pattern};
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 #[repr(transparent)]
@@ -44,7 +44,7 @@ impl Slice {
             lookup_patterns::<R, C>(
                 &mut acc,
                 shift,
-                p | (q << 8),
+                encode_vector_match_key(p, q),
                 extended_p,
             );
         }
@@ -115,7 +115,7 @@ impl Slice {
 fn lookup_patterns<const R: RuleKind, const C: Color>(
     acc: &mut SlicePattern,
     shift: isize,
-    vector: usize,
+    key: usize,
     raw: usize,
 ) {
     #[cold]
@@ -127,8 +127,8 @@ fn lookup_patterns<const R: RuleKind, const C: Color>(
     }
 
     let patch_pointer = match (R, C) {
-        (RuleKind::Renju, Color::Black) => SLICE_PATTERN_LUT.vector.black[vector],
-        _ => SLICE_PATTERN_LUT.vector.white[vector],
+        (RuleKind::Renju, Color::Black) => SLICE_PATTERN_LUT.vector.black[key],
+        _ => SLICE_PATTERN_LUT.vector.white[key],
     };
 
     if patch_pointer != 0 {
@@ -189,11 +189,40 @@ pub fn contains_five_in_a_row(stones: u16) -> bool {
     calculate_five_in_a_rows(stones) != 0
 }
 
+const POW3_LUT: [u16; 256] = {
+    const POW3: [u16; 8] = [1, 3, 9, 27, 81, 243, 729, 2187];
+    let mut lut = [0; 256];
+
+    const_for!(idx in 0, 256; {
+        const_for!(bit_idx in 0, 8; {
+            if ((idx >> bit_idx) & 1) == 1 {
+                lut[idx] += POW3[bit_idx];
+            }
+        });
+    });
+
+    lut
+};
+
+const VECTOR_MATCH_LUT_SIZE_ALT: usize = const_pow!(3, 8) - 1;
+
+#[inline(always)]
+const fn encode_vector_match_key_alt(stones: usize, blocks: usize) -> usize {
+    POW3_LUT[stones] as usize + POW3_LUT[blocks] as usize * 2
+}
+
+const VECTOR_MATCH_LUT_SIZE: usize = u16::MAX as usize + 1;
+
+#[inline(always)]
+const fn encode_vector_match_key(stones: usize, blocks: usize) -> usize {
+    (blocks << 8) | stones
+}
+
 // 128 KiB
 #[repr(align(32))]
 struct VectorMatchLut {
-    black: [u8; u16::MAX as usize],
-    white: [u8; u16::MAX as usize],
+    black: [u8; VECTOR_MATCH_LUT_SIZE],
+    white: [u8; VECTOR_MATCH_LUT_SIZE],
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -255,10 +284,13 @@ impl SlicePatchData {
 
 }
 
+const BLACK_LUT_SIZE: usize = 76;
+const WHITE_LUT_SIZE: usize = 71;
+
 #[repr(align(32))]
 struct PatchLut {
-    black: [SlicePatchData; 76],
-    white: [SlicePatchData; 71],
+    black: [SlicePatchData; BLACK_LUT_SIZE],
+    white: [SlicePatchData; WHITE_LUT_SIZE],
     _dbg_black_length: usize,
     _dbg_white_length: usize,
 }
@@ -282,20 +314,20 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
 
         SlicePatternLut {
             vector: VectorMatchLut {
-                black: [0; u16::MAX as usize],
-                white: [0; u16::MAX as usize],
+                black: [0; VECTOR_MATCH_LUT_SIZE],
+                white: [0; VECTOR_MATCH_LUT_SIZE],
             },
             patch: PatchLut {
-                black: [initial_patch_data; 76],
-                white: [initial_patch_data; 71],
+                black: [initial_patch_data; BLACK_LUT_SIZE],
+                white: [initial_patch_data; WHITE_LUT_SIZE],
                 _dbg_black_length: 0,
                 _dbg_white_length: 0,
             },
         }
     };
 
-    let mut temp_vector_match_lut_black: [[u8; 4]; u16::MAX as usize] = [[0; 4]; u16::MAX as usize];
-    let mut temp_vector_match_lut_white: [[u8; 4]; u16::MAX as usize] = [[0; 4]; u16::MAX as usize];
+    let mut temp_vector_match_lut_black: [[u8; 4]; VECTOR_MATCH_LUT_SIZE] = [[0; 4]; VECTOR_MATCH_LUT_SIZE];
+    let mut temp_vector_match_lut_white: [[u8; 4]; VECTOR_MATCH_LUT_SIZE] = [[0; 4]; VECTOR_MATCH_LUT_SIZE];
 
     let mut patch_top_black: usize = 0;
     let mut patch_top_white: usize = 0;
@@ -330,9 +362,21 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
             $patch_expr[$patch_top_expr] = build_slice_patch_data($extended_match, $rev, $patches);
 
             let vector_variants = parse_vector_variant_literal($pattern, $rev);
-            flash_vector_variants(&mut $vector_expr, $patch_top_expr, vector_variants, 0, 0);
+            flash_vector_variants(&mut $vector_expr, $patch_top_expr, vector_variants, 0, 0, 0);
         }};
     }
+
+    // potential
+
+    // embed_pattern!(both, symmetry, "!O...O!", "!OP..O!", "!O.P.O!", "!O..PO!");
+    //
+    // embed_pattern!(both, symmetry, "!..O..!", "!.PO..!", "!..OP.!");
+    // embed_pattern!(both, asymmetry, "!..O...!", "!..O.P.!");
+    // embed_pattern!(both, asymmetry, "X.O...!", "X.OP..!", "X.O.P.!");
+    //
+    // embed_pattern!(both, asymmetry, "XOO...!", "XOOP..!", "XOO.P.!", "XOO..P!");
+    // embed_pattern!(both, asymmetry, "XO.O..!", "XOPO..!", "XO.OP.!", "XO.O.P!");
+    // embed_pattern!(both, asymmetry, "XO..O.!", "XOP.O.!", "XO.PO.!", "XO..OP!");
 
     // black-open-three
 
@@ -433,21 +477,24 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
 }
 
 const fn flash_vector_variant(
-    lut: &mut [[u8; 4]; u16::MAX as usize],
+    lut: &mut [[u8; 4]; VECTOR_MATCH_LUT_SIZE],
     patch_pointer: usize,
     variants: VectorVariants,
     depth: usize,
-    new_vector: u16,
+    stones: u16,
+    blocks: u16
 ) {
     if depth < 7 {
-        flash_vector_variants(lut, patch_pointer, variants, depth + 1, new_vector)
+        flash_vector_variants(lut, patch_pointer, variants, depth + 1, stones, blocks)
     } else {
-        let mut bucket = lut[new_vector as usize];
+        let lut_key = encode_vector_match_key(stones as usize, blocks as usize);
+
+        let mut bucket = lut[lut_key];
 
         const_for!(idx in 0, 4; {
             if bucket[idx] == 0 {
                 bucket[idx] = patch_pointer as u8;
-                lut[new_vector as usize] = bucket;
+                lut[lut_key] = bucket;
                 return;
             }
         });
@@ -455,30 +502,31 @@ const fn flash_vector_variant(
 }
 
 const fn flash_vector_variants(
-    lut: &mut [[u8; 4]; u16::MAX as usize],
+    lut: &mut [[u8; 4]; VECTOR_MATCH_LUT_SIZE],
     patch_pointer: usize,
     variants: VectorVariants,
     depth: usize,
-    vector: u16,
+    stones: u16,
+    blocks: u16
 ) {
     if variants[depth].stone {
-        let new_vector = (0b0000_0000_0000_0001 << depth) | vector;
-        flash_vector_variant(lut, patch_pointer, variants, depth, new_vector);
+        let new_stones = (0b1 << depth) | stones;
+        flash_vector_variant(lut, patch_pointer, variants, depth, new_stones, blocks);
     }
 
     if variants[depth].block {
-        let new_vector = (0b0000_0001_0000_0000 << depth) | vector;
-        flash_vector_variant(lut, patch_pointer, variants, depth, new_vector);
+        let new_blocks = (0b1 << depth) | blocks;
+        flash_vector_variant(lut, patch_pointer, variants, depth, stones, new_blocks);
     }
 
     if variants[depth].empty {
-        flash_vector_variant(lut, patch_pointer, variants, depth, vector);
+        flash_vector_variant(lut, patch_pointer, variants, depth, stones, blocks);
     }
 }
 
 const fn compress_pattern_lut<const N: usize>(
-    temp_vector: [[u8; 4]; u16::MAX as usize],
-    vector: &mut [u8; u16::MAX as usize],
+    temp_vector: [[u8; 4]; VECTOR_MATCH_LUT_SIZE],
+    vector: &mut [u8; VECTOR_MATCH_LUT_SIZE],
     patch: &mut [SlicePatchData; N],
     mut patch_top: usize
 ) -> usize {
@@ -557,6 +605,7 @@ const fn parse_patch_literal(source: &str, reversed: bool) -> (usize, u8) {
     const_for!(idx in 0, source.len(); {
         let pos = if reversed { 7 - idx } else { idx };
         match source.as_bytes()[idx] as char {
+            'P' => return (pos, pattern::MARKER),
             '3' => return (pos, pattern::OPEN_THREE),
             'C' => return (pos, pattern::CLOSE_THREE),
             '4' => return (pos, pattern::OPEN_FOUR),

@@ -2,7 +2,6 @@ use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker::MovePicker;
-use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
@@ -17,13 +16,12 @@ pub fn iterative_deepening_minimal<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH, impl Evaluator>,
     mut state: GameState,
 ) -> (Score, MaybePos) {
-    if !TH::IS_MAIN {
+    if !TH::IS_MAIN { // enforce single-thread
         return (0, MaybePos::NONE);
     }
 
     let mut score: Score = 0;
     let mut best_move = MaybePos::NONE;
-    let mut pv = PrincipalVariation::EMPTY;
 
     'iterative_deepening: for depth in 1 ..= td.config.max_depth {
         td.depth = depth;
@@ -36,14 +34,13 @@ pub fn iterative_deepening_minimal<const R: RuleKind, TH: ThreadType>(
 
         score = iter_score;
         best_move = td.best_move;
-        pv = td.pvs[0];
         td.depth_reached = depth;
 
         if TH::IS_MAIN {
             td.thread_type.make_response(Response::Status {
                 best_move,
                 score,
-                pv,
+                pv: td.pvs[0],
                 total_nodes_in_1k: td.batch_counter.count_global_in_1k(),
                 depth
             })

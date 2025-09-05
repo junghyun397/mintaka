@@ -46,6 +46,20 @@
     };
 }
 
+#[macro_export] macro_rules! const_pow {
+    ($base:expr, $exp:expr) => {
+        {{
+            let mut result = 1;
+            let mut idx = 0;
+            while idx < $exp {
+                result *= $base;
+                idx += 1;
+            }
+            result
+        }}
+    }
+}
+
 pub const fn repeat_4x(source: u8) -> u32 {
     u32::from_ne_bytes([source, source, source, source])
 }

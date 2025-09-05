@@ -74,6 +74,34 @@ fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
     Ok(())
 }
 
+fn response_printer_with_pv(state: GameState) -> impl Fn(Response) -> () {
+    move |response| match response {
+        Response::Begins(ComputingResource { workers, time, nodes_in_1k, tt_size }) =>
+            println!("begins: workers={workers}, \
+                running-time={time:?}, \
+                nodes={nodes_in_1k:?}, \
+                tt-size={tt_size}"
+            ),
+        Response::Status { best_move, score, pv, total_nodes_in_1k, depth } => {
+            let mut state = state;
+
+            for &pos in pv.moves().iter() {
+                state.set_mut(pos.unwrap());
+            }
+
+            println!("{}", state.board);
+            println!(
+                "status: depth={depth}, \
+                score={score}, \
+                best_move={best_move}, \
+                total_nodes_in_1k={total_nodes_in_1k}, \
+                pv={pv:?}"
+            )
+        }
+        _ => {}
+    }
+}
+
 fn response_printer(response: Response) {
     match response {
         Response::Begins(ComputingResource { workers, time, nodes_in_1k, tt_size }) =>
@@ -91,7 +119,6 @@ fn response_printer(response: Response) {
             ),
         _ => {}
     }
-
 }
 
 fn spawn_command_listener(launched: Arc<AtomicBool>, abort: Arc<AtomicBool>, message_sender: MessageSender) {
@@ -311,7 +338,10 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
     for message in message_receiver {
         match message {
             Message::Launch => {
-                let best_move = game_agent.launch(CallBackResponseSender::new(response_printer), aborted.clone());
+                let best_move = game_agent.launch(
+                    CallBackResponseSender::new(response_printer_with_pv(game_agent.state)),
+                    aborted.clone()
+                );
 
                 let result = game_agent.command(Command::Play(best_move.pos))?;
 
