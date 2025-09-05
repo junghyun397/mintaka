@@ -302,7 +302,7 @@ impl Patterns {
         );
 
         let pattern_bitmap = encode_u128_into_u16(slice_pattern.patterns);
-        let slice_patterns = slice_pattern.patterns.to_ne_bytes();
+        let slice_patterns = slice_pattern.patterns.to_le_bytes();
 
         let start_idx = slice.start_pos.idx_usize();
         let mut update_mask = slice.pattern_bitmap.get::<C>() | pattern_bitmap;
@@ -343,7 +343,7 @@ impl Iterator for DirectionIterator {
 }
 
 fn encode_u128_into_u16(source: u128) -> u16 {
-    Simd::<u8, 16>::from(source.to_ne_bytes())
+    Simd::<u8, 16>::from(source.to_le_bytes())
         .simd_ne(Simd::splat(0))
         .to_bitmask() as u16
 }

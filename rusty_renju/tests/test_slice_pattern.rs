@@ -13,8 +13,8 @@ mod test_slice_pattern {
             let black_patterns = slice.calculate_slice_pattern::<{ RuleKind::Renju }, { Color::Black }>();
             let white_patterns = slice.calculate_slice_pattern::<{ RuleKind::Renju }, { Color::White }>();
 
-            let content_pattern = black_patterns.patterns.to_ne_bytes().iter()
-                .zip(white_patterns.patterns.to_ne_bytes().iter())
+            let content_pattern = black_patterns.patterns.to_le_bytes().iter()
+                .zip(white_patterns.patterns.to_le_bytes().iter())
                 .take(slice.length as usize)
                 .enumerate()
                 .map(|(idx, (black, white))| {
@@ -64,7 +64,7 @@ mod test_slice_pattern {
             $(close_three = $close_three:expr,)?
             $(five = $five:expr,)?
             $(overline = $overline:expr,)?
-        ) => {
+        ) => {{
             test_pattern!(
                 color = Color::White,
                 case = $case,
@@ -90,7 +90,7 @@ mod test_slice_pattern {
                 $(five = &invert_color($five),)?
                 $(overline = &invert_color($overline),)?
             );
-        };
+        }};
         (
             color = $color:expr,
             case = $case:expr,
@@ -102,7 +102,7 @@ mod test_slice_pattern {
             $(close_three = $close_three:expr,)?
             $(five = $five:expr,)?
             $(overline = $overline:expr,)?
-        ) => {
+        ) => {{
             $(test_both_flow!($case, $potential, $color, POTENTIAL, POTENTIAL);)?
 
             $(test_both_flow!($case, $open_three, $color, OPEN_THREE, OPEN_THREE);)?
@@ -118,7 +118,7 @@ mod test_slice_pattern {
             $(test_both_flow!($case, $five, $color, FIVE, FIVE);)?
 
             $(test_both_flow!($case, $overline, $color, OVERLINE, OVERLINE);)?
-        };
+        }};
     }
 
     #[test]
@@ -443,6 +443,45 @@ mod test_slice_pattern {
             case                = "X X X X . X",
             five                = "X X X X . X",
             overline            = "X X X X V X",
+        );
+    }
+
+    #[test]
+    fn potential() {
+        test_pattern!(
+            color               = both,
+            case                = ". . . O . . .",
+            potential           = ". V V O V V .",
+        );
+
+        test_pattern!(
+            color               = both,
+            case                = ". . O . . . .",
+            potential           = ". V O V V . .",
+        );
+
+        test_pattern!(
+            color               = both,
+            case                = ". O . . O . . .",
+            potential           = ". O . . O . . .",
+        );
+
+        test_pattern!(
+            color               = both,
+            case                = ". O . . . . .",
+            potential           = ". O V V V . .",
+        );
+
+        test_pattern!(
+            color               = both,
+            case                = ". . O . .",
+            potential           = ". . O . .",
+        );
+
+        test_pattern!(
+            color               = both,
+            case                = "O . . O . . . .",
+            potential           = "O V V O V V . .",
         );
     }
 

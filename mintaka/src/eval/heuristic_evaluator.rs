@@ -185,36 +185,34 @@ const fn build_value_score_lut() -> ColorContainer<ValueScoreLut> {
 }
 
 struct HeuristicValueScores; impl HeuristicValueScores {
-    const POTENTIAL: [i16; 5]       = [0, 1, 8, 20, 50];
+    const POTENTIAL: [i16; 5]       = [0, 1, 8, 16, 40];
 
-    const OPEN_THREE: i16           = 24;
-    const CLOSED_FOUR: i16          = 10;
-    const OPEN_FOUR: i16            = 20000;
+    const OPEN_THREE: i16           = 22;
+    const CLOSED_FOUR: i16          = 8;
+    const OPEN_FOUR: i16            = 2000;
 
-    const THREE_FOUR_FORK: i16      = 18000;
-    const DOUBLE_THREE_FORK: i16    = 4000;
-    const DOUBLE_FOUR_FORK: i16     = 20000;
+    const THREE_FOUR_FORK: i16      = 1800;
+    const DOUBLE_THREE_FORK: i16    = 400;
+    const DOUBLE_FOUR_FORK: i16     = 2000;
 
-    const OVERLINE_FORBID: i16      = -400;
-    const DOUBLE_FOUR_FORBID: i16   = -200;
-    const DOUBLE_THREE_FORBID: i16  = -70;
+    const OVERLINE_FORBID: i16      = -100;
+    const DOUBLE_FOUR_FORBID: i16   = -50;
+    const DOUBLE_THREE_FORBID: i16  = -40;
 }
 
+const POLICY_SCORE_LUT_SIZE: usize = (0b1 << 8) + 1;
+const POLICY_SCORE_LUT_OVERLINE_MASK: u32 = !(u32::MAX << 8);
 
-const POLICY_SCORE_LUT_SIZE: usize = (0b1 << 9) + 1;
-const POLICY_SCORE_LUT_OVERLINE_MASK: u32 = !(u32::MAX << 9);
-
-// (open_fours(1), fours(2), open_threes(2), close_three(1), potential(3)
+// (open_fours(1), fours(2), open_threes(2), potential(3)
 // overline override for full-bits
-// total 9 bits
+// total 8 bits
 fn encode_policy_key(pattern: Pattern) -> usize {
     let mut pattern_key = 0;
 
     pattern_key |= pattern.has_open_four() as u32;
     pattern_key |= (pattern.count_total_fours() & 0b11) << 1;
     pattern_key |= (pattern.count_open_threes() & 0b11) << 3;
-    pattern_key |= (pattern.has_close_three() as u32) << 5;
-    pattern_key |= (pattern.count_potentials() & 0b111) << 6;
+    pattern_key |= (pattern.count_potentials() & 0b111) << 5;
     pattern_key |= (pattern.has_overline() as u32) * POLICY_SCORE_LUT_OVERLINE_MASK;
 
     pattern_key as usize
@@ -236,8 +234,7 @@ const fn build_pattern_score_lut() -> ColorContainer<PolicyScoreLut> {
             let fours = (pattern_key >> 1) & 0b11;
             let closed_fours = fours.saturating_sub(has_open_four as usize);
             let open_threes = (pattern_key >> 3) & 0b11;
-            let has_close_three = ((pattern_key >> 5) & 0b1) == 0b1;
-            let mut potentials = (pattern_key >> 6) & 0b111;
+            let mut potentials = (pattern_key >> 5) & 0b111;
 
             if potentials > 4 {
                 potentials = 4;
@@ -260,8 +257,6 @@ const fn build_pattern_score_lut() -> ColorContainer<PolicyScoreLut> {
                             HeuristicPolicyScores::OPEN_THREE
                         } else if closed_fours == 1 {
                             HeuristicPolicyScores::CLOSED_FOUR
-                        } else if has_close_three {
-                            HeuristicPolicyScores::CLOSE_THREE
                         } else {
                             0
                         };
@@ -286,8 +281,6 @@ const fn build_pattern_score_lut() -> ColorContainer<PolicyScoreLut> {
                         HeuristicPolicyScores::OPEN_THREE
                     } else if closed_fours == 1 {
                         HeuristicPolicyScores::CLOSED_FOUR
-                    } else if has_close_three {
-                        HeuristicPolicyScores::CLOSE_THREE
                     } else {
                         0
                     };
@@ -312,7 +305,6 @@ struct HeuristicPolicyScores; impl HeuristicPolicyScores {
     const POTENTIAL: [i8; 5] = [0, 1, 8, 25, 50];
 
     const OPEN_THREE: i8 = 20;
-    const CLOSE_THREE: i8 = i8::MAX;
     const CLOSED_FOUR: i8 = 10;
     const OPEN_FOUR: i8 = i8::MAX;
 

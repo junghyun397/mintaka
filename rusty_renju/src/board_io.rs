@@ -231,8 +231,9 @@ impl Board {
             let open_four = format!("open_four\n{}", render_pattern(board, color, Pattern::count_open_fours));
             let close_three = format!("close_three\n{}", render_pattern(board, color, Pattern::count_close_threes));
             let five = format!("five\n{}", render_pattern(board, color, Pattern::count_fives));
+            let potential = format!("potential\n{}", render_pattern(board, color, Pattern::count_potentials));
 
-            join_str_horizontally(&[&open_three, &closed_four, &open_four, &close_three, &five])
+            join_str_horizontally(&[&open_three, &closed_four, &open_four, &close_three, &five, &potential])
         }
 
         format!(

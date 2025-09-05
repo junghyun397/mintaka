@@ -2,7 +2,7 @@ pub type Score = i32;
 
 pub trait Scores {
     const INF: Score = i16::MAX as i32;
-    const WIN: Score = i16::MAX as i32 - 1;
+    const WIN: Score = 30000;
     const DETERMINISTIC: Score = Score::WIN - 400;
     const DRAW: Score = 0;
 
@@ -16,6 +16,10 @@ pub trait Scores {
 
     fn is_deterministic(score: Score) -> bool {
         !(-Score::DETERMINISTIC ..= Score::DETERMINISTIC).contains(&score)
+    }
+
+    fn clamp(score: Score) -> Score {
+        score.clamp(-Score::INF, Score::INF)
     }
 
 }

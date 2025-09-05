@@ -2,7 +2,7 @@ use crate::notation::color::Color;
 use crate::notation::rule::RuleKind;
 use crate::slice::Slice;
 use crate::slice_pattern::ExtendedMatch::{Left, Right};
-use crate::{assert_struct_sizes, const_for, const_pow, pattern};
+use crate::{assert_struct_sizes, const_for, pattern};
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 #[repr(transparent)]
@@ -33,19 +33,19 @@ impl Slice {
     pub fn calculate_slice_pattern<const R: RuleKind, const C: Color>(&self) -> SlicePattern {
         // padding = 3
         let block: usize = !(!(usize::MAX << self.length as u32) << 3);
-        let extended_p: usize = (self.stones.get::<C>() as usize) << 3;
-        let extended_q: usize = ((self.stones.get_reversed::<C>() as usize) << 3) | block;
+        let extended_stones: usize = (self.stones.get::<C>() as usize) << 3;
+        let extended_blocks: usize = ((self.stones.get_reversed::<C>() as usize) << 3) | block;
 
         let mut acc: SlicePattern = SlicePattern::EMPTY;
-        for shift in 0 .. self.length as isize - 1 {
-            let p = (extended_p >> shift) & 0x00FF;
-            let q = (extended_q >> shift) & 0x00FF;
+        for shift in 0 .. self.length as usize - 1 {
+            let stones = (extended_stones >> shift) & 0x00FF;
+            let blocks = (extended_blocks >> shift) & 0x00FF;
 
             lookup_patterns::<R, C>(
                 &mut acc,
                 shift,
-                encode_vector_match_key(p, q),
-                extended_p,
+                encode_vector_match_key(stones, blocks),
+                extended_stones,
             );
         }
 
@@ -57,14 +57,14 @@ impl Slice {
 #[inline(always)]
 fn lookup_patterns<const R: RuleKind, const C: Color>(
     acc: &mut SlicePattern,
-    shift: isize,
+    shift: usize,
     key: usize,
     raw: usize,
 ) {
     #[cold]
-    fn extended_match_for_black(direction: ExtendedMatch, b_raw: usize, shift: isize) -> bool {
+    fn extended_match_for_black(direction: ExtendedMatch, b_raw: usize, shift: usize) -> bool {
         match direction {
-            Left => b_raw & (0b1 << (shift as usize).saturating_sub(1)) == 0,
+            Left => b_raw & (0b1 << (shift).saturating_sub(1)) == 0,
             Right => b_raw & (0b1 << (shift + 8)) == 0
         }
     }
@@ -87,7 +87,7 @@ fn lookup_patterns<const R: RuleKind, const C: Color>(
             return;
         }
 
-        let lane_shift = (shift - 3) * 8;
+        let lane_shift = (shift as isize - 3) * 8;
 
         if slice_patch_data.patch_mask != 0 {
             acc.patterns |= shift_and_fit_u128(slice_patch_data.patch_mask, lane_shift);
@@ -132,30 +132,11 @@ pub fn contains_five_in_a_row(stones: u16) -> bool {
     calculate_five_in_a_rows(stones) != 0
 }
 
-const POW3_LUT: [u16; 256] = {
-    const POW3: [u16; 8] = [1, 3, 9, 27, 81, 243, 729, 2187];
-    let mut lut = [0; 256];
-
-    const_for!(idx in 0, 256; {
-        const_for!(bit_idx in 0, 8; {
-            if ((idx >> bit_idx) & 1) == 1 {
-                lut[idx] += POW3[bit_idx];
-            }
-        });
-    });
-
-    lut
-};
-
-const VECTOR_MATCH_LUT_SIZE_ALT: usize = const_pow!(3, 8) - 1;
-
-#[inline(always)]
-const fn encode_vector_match_key_alt(stones: usize, blocks: usize) -> usize {
-    POW3_LUT[stones] as usize + POW3_LUT[blocks] as usize * 2
-}
-
 const VECTOR_MATCH_LUT_SIZE: usize = u16::MAX as usize + 1;
 
+// attempted 3^8 + 1 lookup table using base-3 and nibble-based indexing,
+// but observed over 60% slowdown due to pipeline stalls.
+// to avoid pipeline stalls, use simpler indexing.
 #[inline(always)]
 const fn encode_vector_match_key(stones: usize, blocks: usize) -> usize {
     (blocks << 8) | stones
@@ -205,8 +186,8 @@ impl SlicePatchData {
             other.extended_match
         };
 
-        let self_fours: [u8; 8] = self.closed_four_mask.to_ne_bytes();
-        let other_fours: [u8; 8] = other.closed_four_mask.to_ne_bytes();
+        let self_fours: [u8; 8] = self.closed_four_mask.to_le_bytes();
+        let other_fours: [u8; 8] = other.closed_four_mask.to_le_bytes();
         let mut double_four_mask: [u8; 8] = [0; 8];
 
         const_for!(idx in 0, 8; {
@@ -218,7 +199,7 @@ impl SlicePatchData {
         });
 
         Self {
-            patch_mask: self.patch_mask | other.patch_mask | u64::from_ne_bytes(double_four_mask),
+            patch_mask: self.patch_mask | other.patch_mask | u64::from_le_bytes(double_four_mask),
             closed_four_clear_mask: self.closed_four_clear_mask ^ other.closed_four_clear_mask,
             closed_four_mask: self.closed_four_mask ^ other.closed_four_mask,
             extended_match
@@ -320,9 +301,10 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
 
     embed_pattern!(both, symmetry, "!O...O!", "!OP..O!", "!O.P.O!", "!O..PO!");
 
-    embed_pattern!(both, symmetry, "!..O..!", "!.PO..!", "!..OP.!");
-    embed_pattern!(both, asymmetry, "!..O...!", "!..O.P.!");
-    embed_pattern!(both, asymmetry, "X.O...!", "X.OP..!", "X.O.P.!");
+    embed_pattern!(both, asymmetry, "!..O...", "!.PO...", "!..OP..", "!..O.P.");
+    embed_pattern!(both, asymmetry, "XO..O...", "XO..O.P.");
+    embed_pattern!(both, asymmetry, "X.O....!", "X.OP...!", "X.O.P..!");
+    embed_pattern!(both, asymmetry, "X.O....!", "X.O..P..");
 
     embed_pattern!(both, asymmetry, "XOO...!", "XOOP..!", "XOO.P.!", "XOO..P!");
     embed_pattern!(both, asymmetry, "XO.O..!", "XOPO..!", "XO.OP.!", "XO.O.P!");
@@ -518,9 +500,9 @@ const fn build_slice_patch_data(extended_match: Option<ExtendedMatch>, reversed:
     });
 
     SlicePatchData {
-        patch_mask: u64::from_ne_bytes(patch_mask),
-        closed_four_clear_mask: u64::from_ne_bytes(closed_four_clear_mask),
-        closed_four_mask: u64::from_ne_bytes(closed_four_mask),
+        patch_mask: u64::from_le_bytes(patch_mask),
+        closed_four_clear_mask: u64::from_le_bytes(closed_four_clear_mask),
+        closed_four_mask: u64::from_le_bytes(closed_four_mask),
         extended_match,
     }
 }

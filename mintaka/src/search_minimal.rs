@@ -142,6 +142,12 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
         let static_eval = td.evaluator.eval_value(state);
 
+        if static_eval > Score::INF {
+            println!("{}", state.board);
+            println!("{}", state.history);
+            panic!();
+        }
+
         // return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
         return static_eval;
     }
