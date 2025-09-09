@@ -51,11 +51,10 @@ fn board_iter_item_to_symbol(board: &Board, pos: Pos, item: BoardIterItem) -> St
 }
 
 fn parse_board_elements(source: &str) -> Result<Box<[BoardElement]>, &'static str> {
-    const BOARD_WIDTH: usize = pos::U_BOARD_WIDTH;
     static RE: OnceLock<Regex> = OnceLock::new();
     let re = RE.get_or_init(||
-        // regex: \d[\s\[\(](\S[\s\[\]\)]){N}\d
-        format!(r"\d[\s\[](\S[\s\[\]]){}{BOARD_WIDTH}{}\d", "{", "}")
+        // regex: \d[\s\[\|](\S[\s\[\]\|]){N}\d
+        format!(r"\d[\s\[\|](\S[\s\[\]\|]){{{}}}\d", pos::U_BOARD_WIDTH)
             .as_str()
             .parse::<Regex>()
             .unwrap()
@@ -102,7 +101,6 @@ impl Board {
         )
     }
 
-    #[inline]
     fn make_last_moves_marker(pair: [MaybePos; 2]) -> impl Fn(Pos, &BoardIterItem) -> Option<(bool, [String; 2])> {
         const POST_MARKER: [&str; 2] = ["[", "]"];
         const PRE_MARKER: [&str; 2] = ["|", "|"];
@@ -129,7 +127,7 @@ impl Board {
             .fold(f32::NAN, f32::max);
 
         if min.is_nan() {
-            return self.to_string();
+            return self.to_string_with_last_moves(last_moves);
         }
 
         let range = max - min;

@@ -184,7 +184,6 @@ impl Pattern {
         ) && five_masked == 0
     }
 
-    #[inline(always)]
     pub fn apply_mask_mut<const D: Direction>(&mut self, pattern: u8) {
         match D {
             Direction::Horizontal => self.horizontal = pattern,
@@ -253,7 +252,6 @@ impl Patterns {
         })
     }
 
-    #[inline]
     pub fn update_with_slice_mut<const R: RuleKind, const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
         let slice_pattern = slice.calculate_slice_pattern::<R, C>();
 
@@ -266,7 +264,6 @@ impl Patterns {
         };
     }
 
-    #[inline]
     pub fn clear_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
         self.counts.clear_slice_mut::<C, D>(slice.idx as usize);
 
@@ -283,7 +280,6 @@ impl Patterns {
         *slice.pattern_bitmap.get_ref_mut::<C>() = 0;
     }
 
-    #[inline]
     fn update_with_slice_pattern_mut<const C: Color, const D: Direction>(
         &mut self, slice: &mut Slice, slice_pattern: SlicePattern
     ) {

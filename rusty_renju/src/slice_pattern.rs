@@ -32,9 +32,8 @@ impl Slice {
 
     pub fn calculate_slice_pattern<const R: RuleKind, const C: Color>(&self) -> SlicePattern {
         // padding = 3
-        let block: usize = !(!(usize::MAX << self.length as u32) << 3);
         let extended_stones: usize = (self.stones.get::<C>() as usize) << 3;
-        let extended_blocks: usize = ((self.stones.get_reversed::<C>() as usize) << 3) | block;
+        let extended_blocks: usize = (self.blocks::<C>() as usize) << 3 | 0b111;
 
         let mut acc: SlicePattern = SlicePattern::EMPTY;
         for shift in 0 .. self.length as usize - 1 {
@@ -64,7 +63,7 @@ fn lookup_patterns<const R: RuleKind, const C: Color>(
     #[cold]
     fn extended_match_for_black(direction: ExtendedMatch, b_raw: usize, shift: usize) -> bool {
         match direction {
-            Left => b_raw & (0b1 << (shift).saturating_sub(1)) == 0,
+            Left => b_raw & (0b1 << shift.saturating_sub(1)) == 0,
             Right => b_raw & (0b1 << (shift + 8)) == 0
         }
     }
@@ -137,7 +136,7 @@ const VECTOR_MATCH_LUT_SIZE: usize = u16::MAX as usize + 1;
 // attempted 3^8 + 1 lookup table using base-3 and nibble-based indexing,
 // but observed over 60% slowdown due to pipeline stalls.
 // to avoid pipeline stalls, use simpler indexing.
-#[inline(always)]
+#[inline]
 const fn encode_vector_match_key(stones: usize, blocks: usize) -> usize {
     (blocks << 8) | stones
 }

@@ -17,11 +17,11 @@
     };
 }
 
-#[macro_export] macro_rules! min {
+#[macro_export] macro_rules! const_min {
     ($a:expr,$b:expr) => ({ if $a < $b { $a } else { $b } });
 }
 
-#[macro_export] macro_rules! max {
+#[macro_export] macro_rules! const_max {
     ($a:expr,$b:expr) => ({ if $a > $b { $a } else { $b } });
 }
 

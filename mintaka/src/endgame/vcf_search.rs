@@ -124,7 +124,6 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
     let mut vcf_ply = 0;
     let mut move_counter: usize = 0;
 
-    #[inline]
     fn backtrace_frames<ACC: EndgameAccumulator>(
         td: &mut ThreadData<impl ThreadType, impl Evaluator>,
         board: Board,
@@ -343,7 +342,6 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
     acc
 }
 
-#[inline]
 fn tt_store_vcf_win(
     tt: &TTView,
     hash_key: HashKey,

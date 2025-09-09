@@ -3,7 +3,7 @@ use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::{assert_struct_sizes, const_for, max, slice_pattern};
+use crate::{assert_struct_sizes, const_for, const_max, slice_pattern};
 
 pub const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
@@ -84,16 +84,11 @@ impl Slice {
     }
 
     pub fn has_potential_pattern<const C: Color>(&self) -> bool {
-        // filter O X . . O X .
-        #[inline(always)]
-        fn is_pattern_available(p: u16, q: u16) -> bool {
-            p & !(q << 1) & !(q >> 1) != 0
-        }
+        let stones = self.stones.get::<C>();
+        let blocks = self.blocks::<C>();
 
-        match C {
-            Color::Black => is_pattern_available(self.stones.black, self.stones.white),
-            Color::White => is_pattern_available(self.stones.white, self.stones.black),
-        }
+        // filter O X . . O X .
+        stones & !(blocks << 1) & !(blocks >> 1) != 0
     }
 
     pub fn winner(&self) -> Option<Color> {
@@ -106,8 +101,8 @@ impl Slice {
         }
     }
 
-    pub fn stones_with_boundary_mask<const C: Color>(&self) -> (u16, u16) {
-        (self.stones.get::<C>(), (u16::MAX << self.length) | self.stones.get_reversed::<C>())
+    pub fn blocks<const C: Color>(&self) -> u16 {
+        u16::MAX << self.length | self.stones.get_reversed::<C>()
     }
 
 }
@@ -144,8 +139,8 @@ impl Slices {
         const_for!(idx in 0, DIAGONAL_SLICE_AMOUNT; {
             let seq_num = idx as isize + DIAGONAL_BOARD_PADDING;
             let len = (seq_num.abs() - pos::I_BOARD_WIDTH).unsigned_abs() as u8;
-            let start_offset = max!(0, -seq_num) as u8;
-            let end_offset = max!(0, seq_num) as u8;
+            let start_offset = const_max!(0, -seq_num) as u8;
+            let end_offset = const_max!(0, seq_num) as u8;
 
             ascending_slices[idx] = Slice::empty(
                 idx as u8,
@@ -194,27 +189,51 @@ impl Slices {
             Direction::Descending => &self.descending_slices[Self::calculate_descending_slice_idx(pos) as usize],
         }
     }
-    
+
+    #[inline]
     fn calculate_ascending_slice_idx(pos: Pos) -> isize {
         // y = x + b, b = y - x (reversed row sequence)
         I_DIAGONAL_SLICE_AMOUNT - (pos.row() as isize - pos.col() as isize + pos::I_BOARD_WIDTH - 4)
     }
 
-    pub fn ascending_slice_idx(pos: Pos) -> Option<usize> {
+    #[inline]
+    fn ascending_slice_idx(pos: Pos) -> Option<usize> {
         let idx = Self::calculate_ascending_slice_idx(pos);
         (0 .. I_DIAGONAL_SLICE_AMOUNT).contains(&idx)
             .then_some(idx as usize)
     }
-    
+
+    #[inline]
+    pub fn ascending_slice(&self, pos: Pos) -> Option<&Slice> {
+        Self::ascending_slice_idx(pos).map(|idx| &self.ascending_slices[idx])
+    }
+
+    #[inline]
+    pub fn ascending_slice_mut(&mut self, pos: Pos) -> Option<&mut Slice> {
+        Self::ascending_slice_idx(pos).map(|idx| &mut self.ascending_slices[idx])
+    }
+
+    #[inline]
     fn calculate_descending_slice_idx(pos: Pos) -> isize {
         // y = -x + 15 + b, b = y + x - 15
         pos.row() as isize + pos.col() as isize - 4
     }
 
-    pub fn descending_slice_idx(pos: Pos) -> Option<usize> {
+    #[inline]
+    fn descending_slice_idx(pos: Pos) -> Option<usize> {
         let idx = Self::calculate_descending_slice_idx(pos);
         (0 .. I_DIAGONAL_SLICE_AMOUNT).contains(&idx)
             .then_some(idx as usize)
+    }
+
+    #[inline]
+    pub fn descending_slice(&self, pos: Pos) -> Option<&Slice> {
+        Self::descending_slice_idx(pos).map(|idx| &self.descending_slices[idx])
+    }
+
+    #[inline]
+    pub fn descending_slice_mut(&mut self, pos: Pos) -> Option<&mut Slice> {
+        Self::descending_slice_idx(pos).map(|idx| &mut self.descending_slices[idx])
     }
 
     pub fn bitfield(&self) -> ColorContainer<Bitfield> {

@@ -3,7 +3,7 @@ use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::value::Score;
 use rusty_renju::utils::platform;
-use rusty_renju::{cartesian_to_index, const_for, max, min};
+use rusty_renju::{cartesian_to_index, const_for, const_max, const_min};
 use std::simd::Simd;
 use std::slice;
 
@@ -121,10 +121,10 @@ const fn build_neighborhood_score_lut() -> NeighborhoodScoreLUT {
 
     const_for!(row in 0, pos::I_BOARD_WIDTH; {
         const_for!(col in 0, pos::I_BOARD_WIDTH; {
-            let row_begin = max!(row - 3, 0);
-            let row_end = min!(row + 3, pos::I_BOARD_WIDTH - 1);
-            let col_begin = max!(col - 3, 0);
-            let col_end = min!(col + 3, pos::I_BOARD_WIDTH - 1);
+            let row_begin = const_max!(row - 3, 0);
+            let row_end = const_min!(row + 3, pos::I_BOARD_WIDTH - 1);
+            let col_begin = const_max!(col - 3, 0);
+            let col_end = const_min!(col + 3, pos::I_BOARD_WIDTH - 1);
 
             const_for!(target_row in row_begin, row_end + 1; {
                 const_for!(target_col in col_begin, col_end + 1; {

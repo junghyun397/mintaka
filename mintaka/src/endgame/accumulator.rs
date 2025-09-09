@@ -24,12 +24,10 @@ impl EndgameAccumulator for SequenceEndgameAccumulator {
 
     const ZERO: Self = None;
 
-    #[inline]
     fn unit(pos: Pos, _score: Score) -> Self {
         Some(vec![pos.into()])
     }
 
-    #[inline]
     fn append_pos(self, defend: Pos, four: Pos) -> Self {
         self.map(|mut sequence| {
             sequence.push(defend.into());
@@ -50,12 +48,10 @@ impl EndgameAccumulator for Score {
 
     const ZERO: Self = 0;
 
-    #[inline]
     fn unit(_pos: Pos, score: Score) -> Self {
         score
     }
 
-    #[inline]
     fn append_pos(self, _defend: Pos, _four: Pos) -> Self {
         self
     }

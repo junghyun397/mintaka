@@ -128,13 +128,13 @@ impl Board {
         macro_rules! update_by_slice_each_color {
             ($color:expr,$direction:expr,$slice:expr,$slice_idx:expr) => {
                 match (
-                    $slice.pattern_bitmap.get::<{ $color }>() == 0,
+                    $slice.pattern_bitmap.get::<{ $color }>() != 0,
                     $slice.has_potential_pattern::<{ $color }>()
                 ) {
                     (_, true) => {
                         self.patterns.update_with_slice_mut::<{ RuleKind::Renju }, { $color }, { $direction }>($slice);
                     },
-                    (false, false) => {
+                    (true, false) => {
                         self.patterns.clear_with_slice_mut::<{ $color }, { $direction }>($slice);
                     },
                     _ => {}
@@ -162,13 +162,11 @@ impl Board {
         let vertical_slice = &mut self.slices.vertical_slices[pos.col_usize()];
         update_by_slice!(Direction::Vertical, vertical_slice, pos.row());
 
-        if let Some(ascending_slice_idx) = Slices::ascending_slice_idx(pos) {
-            let ascending_slice = &mut self.slices.ascending_slices[ascending_slice_idx];
+        if let Some(ascending_slice) = self.slices.ascending_slice_mut(pos) {
             update_by_slice!(Direction::Ascending, ascending_slice, pos.col() - ascending_slice.start_col);
         }
 
-        if let Some(descending_slice_idx) = Slices::descending_slice_idx(pos) {
-            let descending_slice = &mut self.slices.descending_slices[descending_slice_idx];
+        if let Some(descending_slice) = self.slices.descending_slice_mut(pos) {
             update_by_slice!(Direction::Descending, descending_slice, pos.col() - descending_slice.start_col);
         }
 
@@ -427,8 +425,8 @@ impl Board {
         [
             Some(&self.slices.horizontal_slices[pos.row_usize()]),
             Some(&self.slices.vertical_slices[pos.col_usize()]),
-            Slices::ascending_slice_idx(pos).map(|idx| &self.slices.ascending_slices[idx]),
-            Slices::descending_slice_idx(pos).map(|idx| &self.slices.descending_slices[idx])
+            self.slices.ascending_slice(pos),
+            self.slices.descending_slice(pos),
         ].iter()
             .find_map(|maybe_slice| maybe_slice
                 .and_then(Slice::winner)

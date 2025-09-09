@@ -132,13 +132,11 @@ impl TTView<'_> {
         ((key.0 as u128 * (self.table.len() as u128)) >> 64) as usize
     }
 
-    #[inline]
     pub fn probe(&self, key: HashKey) -> Option<TTEntry> {
         let idx = self.calculate_index(key);
         self.table[idx].probe(key.into())
     }
 
-    #[inline]
     pub fn store_entry(&self, key: HashKey, entry: TTEntry) {
         let idx = self.calculate_index(key);
         self.table[idx].store(key.into(), entry);

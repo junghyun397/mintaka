@@ -58,22 +58,18 @@ fn try_vct<const C: Color, ACC: EndgameAccumulator>(
     ACC::ZERO
 }
 
-#[inline]
 fn find_defend_open_four_unchecked<const C: Color>(board: &Board) -> Pos {
     todo!()
 }
 
-#[inline]
 fn find_vcf_to_defend_pos<const C: Color>(board: &Board) -> MaybePos {
     todo!()
 }
 
-#[inline]
 fn build_vct_win_tt_entry(depth: usize, four_pos: Pos) -> TTEntry {
     todo!()
 }
 
-#[inline]
 fn build_vcf_lose_tt_entry(depth: usize) -> TTEntry {
     todo!()
 }

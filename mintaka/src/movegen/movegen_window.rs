@@ -1,7 +1,7 @@
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
-use rusty_renju::{cartesian_to_index, const_for, max, min};
+use rusty_renju::{cartesian_to_index, const_for, const_max, const_min};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
@@ -127,10 +127,10 @@ const fn build_movegen_imprint_mask_lut() -> [Bitfield; pos::BOARD_SIZE] {
 
     const_for!(row in 0, pos::I_BOARD_WIDTH; {
         const_for!(col in 0, pos::I_BOARD_WIDTH; {
-            let row_begin = max!(row - 3, 0);
-            let row_end = min!(row + 3, pos::I_BOARD_WIDTH - 1);
-            let col_begin = max!(col - 3, 0);
-            let col_end = min!(col + 3, pos::I_BOARD_WIDTH - 1);
+            let row_begin = const_max!(row - 3, 0);
+            let row_end = const_min!(row + 3, pos::I_BOARD_WIDTH - 1);
+            let col_begin = const_max!(col - 3, 0);
+            let col_end = const_min!(col + 3, pos::I_BOARD_WIDTH - 1);
 
             const_for!(row_offset in row_begin - row, row_end - row + 1; {
                 const_for!(col_offset in col_begin - col, col_end - col + 1; {

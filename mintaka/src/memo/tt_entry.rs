@@ -155,17 +155,14 @@ impl AbstractTTEntry for TTEntryBucket {
 
 impl TTEntryBucket {
 
-    #[inline(always)]
     fn calculate_slot_index(entry_key: TTEntryKey) -> usize {
         (((entry_key.key) * Self::BUCKET_SIZE) >> KEY_SIZE) as usize
     }
 
-    #[inline(always)]
     fn calculate_lane_shift(slot_idx: usize) -> usize {
         KEY_SIZE * (slot_idx % 3)
     }
 
-    #[inline]
     pub(crate) fn probe(&self, entry_key: TTEntryKey) -> Option<TTEntry> {
         let slot_idx = Self::calculate_slot_index(entry_key);
         let keys_idx = slot_idx / 3;
@@ -176,7 +173,6 @@ impl TTEntryBucket {
             .then(|| self.entries[slot_idx].load(Ordering::Relaxed).into())
     }
 
-    #[inline]
     fn store_key(&self, bucket_idx: usize, entry_key: TTEntryKey) {
         let keys_idx = bucket_idx / 3;
         let lane_shift = Self::calculate_lane_shift(bucket_idx);
@@ -187,7 +183,6 @@ impl TTEntryBucket {
         self.keys[keys_idx].store(keys, Ordering::Release);
     }
 
-    #[inline]
     pub(crate) fn store(&self, entry_key: TTEntryKey, entry: TTEntry) {
         let slot_idx = Self::calculate_slot_index(entry_key);
 

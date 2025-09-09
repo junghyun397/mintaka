@@ -25,7 +25,6 @@ impl<'a> BatchCounter<'a> {
         self.increment_amount_mut(2);
     }
 
-    #[inline(always)]
     fn increment_amount_mut(&mut self, amount: usize) {
         self.buffer += amount;
         if self.buffer >= 1024 {

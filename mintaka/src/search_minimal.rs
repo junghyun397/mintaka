@@ -110,7 +110,7 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
         td.push_ply_mut(pos);
         state.set_mut(pos);
 
-        let score = -pvs_minimal::<R, TH>(td, state, zero_window, depth_left - 1, -beta, -alpha);
+        let score = -pvs_minimal::<R, TH>(td, state, zero_window, depth_left, -beta, -alpha);
 
         td.pop_ply_mut();
         state.unset_mut(td.ss[td.ply].movegen_window);
@@ -131,7 +131,7 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
         return score;
     }
 
-    if !is_root {
+    if !(is_root || Score::is_deterministic(alpha) || Score::is_deterministic(beta)) {
         alpha = alpha.max(Score::lose_in(td.ply));
         beta = beta.min(Score::win_in(td.ply));
         if alpha >= beta { // mate distance pruning
@@ -141,12 +141,6 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
 
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
         let static_eval = td.evaluator.eval_value(state);
-
-        if static_eval > Score::INF {
-            println!("{}", state.board);
-            println!("{}", state.history);
-            panic!();
-        }
 
         // return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
         return static_eval;
@@ -217,5 +211,9 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
         td.best_move = best_move;
     }
 
-    best_score
+    if moves_made == 0 {
+        td.evaluator.eval_value(state)
+    } else {
+        best_score
+    }
 }
