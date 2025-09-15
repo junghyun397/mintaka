@@ -26,6 +26,8 @@ impl Bitfield {
 
     pub const ZERO_FILLED: Bitfield = Bitfield([0; 32]);
 
+    pub const ONE_FILLED: Bitfield = Bitfield([0xFF; 32]);
+
     pub const fn is_hot_idx(&self, idx: usize) -> bool {
         self.0[idx / 8] & (0b1 << (idx % 8)) != 0
     }
@@ -220,12 +222,10 @@ struct BitfieldSetBitsIterator {
 
 impl From<[u64; 4]> for BitfieldSetBitsIterator {
     fn from(chunks: [u64; 4]) -> Self {
-        let mut chunk_mask = 0;
-
-        chunk_mask |= (chunks[0] != 0) as usize;
-        chunk_mask |= ((chunks[1] != 0) as usize) << 1;
-        chunk_mask |= ((chunks[2] != 0) as usize) << 2;
-        chunk_mask |= ((chunks[3] != 0) as usize) << 3;
+        let chunk_mask = (chunks[0] != 0) as usize
+            | (((chunks[1] != 0) as usize) << 1)
+            | (((chunks[2] != 0) as usize) << 2)
+            | (((chunks[3] != 0) as usize) << 3);
 
         Self {
             chunks,

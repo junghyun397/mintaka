@@ -88,7 +88,8 @@ impl Slice {
         let blocks = self.blocks::<C>();
 
         // filter O X . . O X .
-        stones & !(blocks << 1) & !(blocks >> 1) != 0
+        stones != 0
+            && stones & !(blocks << 1) & !(blocks >> 1) != 0
     }
 
     pub fn winner(&self) -> Option<Color> {

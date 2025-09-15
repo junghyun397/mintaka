@@ -6,10 +6,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct MovegenWindow {
-    pub start_row: u8,
-    pub start_col: u8,
-    pub end_row: u8,
-    pub end_col: u8,
+    start_row: u8,
+    start_col: u8,
+    end_row: u8,
+    end_col: u8,
     pub movegen_field: Bitfield,
 }
 
@@ -38,6 +38,14 @@ impl MovegenWindow {
             end_col: pos::CENTER_ROW_COL,
             movegen_field,
         }
+    };
+
+    pub const FULL: MovegenWindow = MovegenWindow {
+        start_row: 0,
+        start_col: 0,
+        end_row: pos::BOARD_WIDTH,
+        end_col: pos::BOARD_WIDTH,
+        movegen_field: Bitfield::ONE_FILLED,
     };
 
     fn expand_bounds_mut(&mut self, pos: Pos) {

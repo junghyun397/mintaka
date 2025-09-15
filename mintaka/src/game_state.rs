@@ -11,6 +11,11 @@ pub struct GameState {
     pub movegen_window: MovegenWindow,
 }
 
+#[derive(Default, Debug, Copy, Clone)]
+pub struct RecoveryState {
+    pub movegen_window: MovegenWindow
+}
+
 impl GameState {
 
     pub fn from_board_and_history(board: Board, history: History) -> Self {
@@ -18,6 +23,12 @@ impl GameState {
             board,
             history,
             movegen_window: MovegenWindow::from(&board.hot_field),
+        }
+    }
+
+    pub fn recovery_state(&self) -> RecoveryState {
+        RecoveryState {
+            movegen_window: self.movegen_window
         }
     }
 
@@ -33,8 +44,8 @@ impl GameState {
         self.history.pass_mut();
     }
 
-    pub fn unset_mut(&mut self, movegen_window: MovegenWindow) {
-        self.movegen_window = movegen_window;
+    pub fn unset_mut(&mut self, recovery_state: RecoveryState) {
+        self.movegen_window = recovery_state.movegen_window;
 
         match self.history.pop_mut().unwrap() {
             MaybePos::NONE => {

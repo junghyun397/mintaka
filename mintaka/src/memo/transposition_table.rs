@@ -3,7 +3,7 @@ use crate::value::Depth;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::score::Score;
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize, Serializer};
 use std::io::{Read, Write};

@@ -113,6 +113,14 @@ macro_rules! impl_color_container {
             }
 
             #[inline]
+            pub fn access_pair(&self, color: Color) -> (&T, &T) {
+                match color {
+                    Color::Black => (&self.black, &self.white),
+                    Color::White => (&self.white, &self.black),
+                }
+            }
+
+            #[inline]
             pub fn access_mut(&mut self, color: Color) -> &mut T {
                 match color {
                     Color::Black => &mut self.black,
@@ -189,26 +197,20 @@ macro_rules! impl_color_container {
 }
 
 impl_color_container!(
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
     ColorContainer
 );
+
+impl<T: Copy> Clone for ColorContainer<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T: Copy> Copy for ColorContainer<T> {}
 
 impl_color_container!(
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
     #[repr(align(64))]
     AlignedColorContainer
 );
-
-impl_color_container!(
-    #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-    DynamicColorContainer
-);
-
-impl<T: Clone> Clone for DynamicColorContainer<T> {
-    fn clone(&self) -> Self {
-        Self {
-            black: self.black.clone(),
-            white: self.white.clone(),
-        }
-    }
-}

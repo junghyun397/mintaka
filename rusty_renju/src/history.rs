@@ -95,7 +95,7 @@ impl History {
 
     pub fn recent_action(&self) -> MaybePos {
         debug_assert_ne!(self.top, 0);
-        self.entries[self.top]
+        self.entries[self.top - 1]
     }
 
     pub fn recent_player_action(&self) -> MaybePos {

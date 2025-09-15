@@ -10,7 +10,7 @@ use crate::thread_type::ThreadType;
 use crate::value::{Depth, MAX_PLY};
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::score::Score;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 #[derive(Clone)]

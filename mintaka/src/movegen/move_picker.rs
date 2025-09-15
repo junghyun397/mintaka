@@ -7,11 +7,11 @@ use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::value::{Score, Scores};
+use rusty_renju::notation::score::{Score, Scores};
 
-pub const TT_MOVE_SCORE: Score = Score::INF - 500;
-pub const KILLER_MOVE_SCORE: Score = Score::INF - 1000;
-pub const HISTORY_MOVE_SCORE: Score = Score::INF - 2000;
+pub const TT_MOVE_POLICY_SCORE: i16 = Score::INF as i16 - 500;
+pub const KILLER_MOVE_POLICY_SCORE: i16 = Score::INF as i16 - 1000;
+pub const HISTORY_MOVE_POLICY_SCORE: i16 = Score::INF as i16 - 2000;
 
 #[derive(Eq, PartialEq)]
 enum MoveStage {
@@ -44,7 +44,7 @@ impl MovePicker {
 
     pub fn next(
         &mut self,
-        td: &ThreadData<impl ThreadType, impl Evaluator>,
+        td: &mut ThreadData<impl ThreadType, impl Evaluator>,
         state: &GameState,
     ) -> Option<MoveEntry> {
         loop {
@@ -55,7 +55,7 @@ impl MovePicker {
                     if self.tt_move.is_some() {
                         return Some(MoveEntry {
                             pos: self.tt_move.unwrap(),
-                            score: TT_MOVE_SCORE
+                            policy_score: TT_MOVE_POLICY_SCORE
                         });
                     }
                 },
@@ -68,7 +68,7 @@ impl MovePicker {
 
                         return Some(MoveEntry {
                             pos: killer_move,
-                            score: KILLER_MOVE_SCORE
+                            policy_score: KILLER_MOVE_POLICY_SCORE
                         });
                     }
 

@@ -1,7 +1,7 @@
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::score::Score;
 use rusty_renju::utils::platform;
 use rusty_renju::{cartesian_to_index, const_for, const_max, const_min};
 use std::simd::Simd;

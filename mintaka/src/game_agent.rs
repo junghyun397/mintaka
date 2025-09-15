@@ -19,7 +19,7 @@ use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::score::Score;
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};

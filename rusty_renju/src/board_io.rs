@@ -119,7 +119,11 @@ impl Board {
         )
     }
 
-    pub fn to_string_with_heatmap(&self, heatmap: [f32; pos::BOARD_SIZE], log_scale: bool, last_moves: [MaybePos; 2]) -> String {
+    pub fn to_string_with_heatmap(&self, heatmap: [f32; pos::BOARD_SIZE], log_scale: bool) -> String {
+        self.to_string_with_heatmap_and_last_moves(heatmap, log_scale, [MaybePos::NONE; 2])
+    }
+
+    pub fn to_string_with_heatmap_and_last_moves(&self, heatmap: [f32; pos::BOARD_SIZE], log_scale: bool, last_moves: [MaybePos; 2]) -> String {
         let min = heatmap.into_iter()
             .fold(f32::NAN, f32::min);
 

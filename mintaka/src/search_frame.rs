@@ -1,7 +1,7 @@
-use crate::movegen::movegen_window::MovegenWindow;
+use crate::game_state::RecoveryState;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::score::Score;
 
 pub const KILLER_MOVE_SLOTS: usize = 2;
 
@@ -10,7 +10,7 @@ pub struct SearchFrame {
     pub hash_key: HashKey,
     pub static_eval: Score,
     pub on_pv: bool,
-    pub movegen_window: MovegenWindow,
+    pub recovery_state: RecoveryState,
     pub last_pos: MaybePos,
     pub cutoffs: usize,
 }

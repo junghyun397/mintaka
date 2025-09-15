@@ -13,7 +13,7 @@ use crate::value::Depth;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::{Score, Scores};
+use rusty_renju::notation::score::{Score, Scores};
 
 pub trait NodeType {
 
@@ -162,7 +162,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             hash_key: state.board.hash_key,
             static_eval: Score::lose_in(td.ply + 1),
             on_pv: NT::IS_PV,
-            movegen_window: state.movegen_window,
+            recovery_state: state.recovery_state(),
             last_pos: pos.into(),
             cutoffs: 0,
         };
@@ -173,7 +173,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         let score = -pvs::<R, TH, NT::NextType>(td, state, depth_left, -beta, -alpha);
 
         td.pop_ply_mut();
-        state.unset_mut(td.ss[td.ply].movegen_window);
+        state.unset_mut(td.ss[td.ply].recovery_state);
 
         if td.is_aborted() {
             return Score::DRAW;
@@ -240,7 +240,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     let mut score_kind = ScoreKind::UpperBound;
 
     td.ss[td.ply] = SearchFrame {
-        movegen_window: state.movegen_window,
+        recovery_state: state.recovery_state(),
         hash_key: state.board.hash_key,
         static_eval,
         on_pv: NT::IS_PV || tt_pv,
@@ -278,7 +278,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         };
 
         td.pop_ply_mut();
-        state.unset_mut(td.ss[td.ply].movegen_window);
+        state.unset_mut(td.ss[td.ply].recovery_state);
 
         if td.is_aborted() {
             return Score::DRAW;

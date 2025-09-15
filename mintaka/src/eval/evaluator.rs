@@ -1,15 +1,15 @@
 use crate::game_state::GameState;
 use rusty_renju::notation::color::Color;
-use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::score::Score;
+use rusty_renju::pattern;
 
 #[cfg(feature = "heuristic-eval")]
 pub type ActiveEvaluator = crate::eval::heuristic_evaluator::HeuristicEvaluator;
 #[cfg(feature = "nnue-eval")]
 pub type ActiveEvaluator = crate::eval::nnue_evaluator::NnueEvaluator;
 
-pub type PolicyDistribution = [Score; pos::BOARD_SIZE];
+pub type PolicyDistribution = [i16; pattern::PATTERN_SIZE];
 
 pub trait Evaluator {
 
@@ -21,8 +21,8 @@ pub trait Evaluator {
 
     fn undo(&mut self, state: &GameState, color: Color, pos: Pos);
 
-    fn eval_policy(&self, state: &GameState) -> PolicyDistribution;
+    fn eval_policy(&mut self, state: &GameState) -> PolicyDistribution;
 
-    fn eval_value(&self, state: &GameState) -> Score;
+    fn eval_value(&mut self, state: &GameState) -> Score;
 
 }

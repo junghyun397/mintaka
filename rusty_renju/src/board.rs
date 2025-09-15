@@ -186,6 +186,8 @@ impl Board {
             }};
         }
 
+        self.patterns.unchecked_five_pos = Patterns::EMPTY_UNCHECKED_FIVE_POS;
+
         for horizontal_slice in self.slices.horizontal_slices.iter_mut() {
             update_by_slice!(horizontal_slice, Direction::Horizontal);
         }

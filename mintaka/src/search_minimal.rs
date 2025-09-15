@@ -10,7 +10,7 @@ use crate::value::Depth;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::{Score, Scores};
+use rusty_renju::notation::score::{Score, Scores};
 
 pub fn iterative_deepening_minimal<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH, impl Evaluator>,
@@ -75,9 +75,8 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
 
     td.pvs[td.ply].clear();
 
-    if let &Some(pos) = state.board.patterns.unchecked_five_pos
-        .access(state.board.player_color)
-    { // immediate win
+    // immediate win
+    if let &Some(pos) = state.board.patterns.unchecked_five_pos.access(state.board.player_color) {
         if is_root {
             td.best_move = pos.into();
         }
@@ -89,9 +88,8 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
         return Score::win_in(td.ply + 1)
     }
 
-    if let &Some(pos) = state.board.patterns.unchecked_five_pos
-        .access(!state.board.player_color)
-    { // defend immediate win
+    // defend immediate win
+    if let &Some(pos) = state.board.patterns.unchecked_five_pos.access(!state.board.player_color) {
         if state.board.player_color == Color::Black
             && state.board.patterns.forbidden_field.is_hot(pos)
         { // trapped
@@ -106,14 +104,14 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
             return Score::lose_in(td.ply + 2)
         }
 
-        td.ss[td.ply].movegen_window = state.movegen_window;
+        td.ss[td.ply].recovery_state = state.recovery_state();
         td.push_ply_mut(pos);
         state.set_mut(pos);
 
         let score = -pvs_minimal::<R, TH>(td, state, zero_window, depth_left, -beta, -alpha);
 
         td.pop_ply_mut();
-        state.unset_mut(td.ss[td.ply].movegen_window);
+        state.unset_mut(td.ss[td.ply].recovery_state);
 
         if td.is_aborted() {
             return Score::DRAW;
@@ -139,9 +137,9 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
         }
     }
 
-    if depth_left <= 0 || td.ply >= value::MAX_PLY {
-        let static_eval = td.evaluator.eval_value(state);
+    let static_eval = td.evaluator.eval_value(state);
 
+    if depth_left <= 0 || td.ply >= value::MAX_PLY {
         // return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
         return static_eval;
     }
@@ -157,7 +155,7 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
             continue;
         }
 
-        td.ss[td.ply].movegen_window = state.movegen_window;
+        td.ss[td.ply].recovery_state = state.recovery_state();
         td.push_ply_mut(pos);
         state.set_mut(pos);
 
@@ -176,7 +174,7 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
         };
 
         td.pop_ply_mut();
-        state.unset_mut(td.ss[td.ply].movegen_window);
+        state.unset_mut(td.ss[td.ply].recovery_state);
 
         if td.is_aborted() {
             return Score::DRAW;
@@ -212,7 +210,7 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
     }
 
     if moves_made == 0 {
-        td.evaluator.eval_value(state)
+        static_eval
     } else {
         best_score
     }

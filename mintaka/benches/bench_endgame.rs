@@ -19,7 +19,7 @@ mod bench_vcf {
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use rusty_renju::notation::pos::pos_unchecked;
     use rusty_renju::notation::rule::RuleKind;
-    use rusty_renju::notation::value::{Score, Scores};
+    use rusty_renju::notation::score::{Score, Scores};
     use rusty_renju::utils::byte_size::ByteSize;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
     use test::Bencher;

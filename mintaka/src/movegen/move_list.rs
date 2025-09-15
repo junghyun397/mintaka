@@ -1,11 +1,10 @@
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
-use rusty_renju::notation::value::Score;
 
 #[derive(Debug, Copy, Clone)]
 pub struct MoveEntry {
     pub pos: Pos,
-    pub score: Score,
+    pub policy_score: i16,
 }
 
 #[derive(Debug)]
@@ -24,8 +23,8 @@ impl MoveList {
 
     const EMPTY: Self = unsafe { std::mem::zeroed() };
 
-    pub fn push(&mut self, pos: Pos, score: Score) {
-        self.moves[self.top] = MoveEntry { pos, score };
+    pub fn push(&mut self, pos: Pos, policy_score: i16) {
+        self.moves[self.top] = MoveEntry { pos, policy_score };
         self.top += 1;
     }
 
@@ -35,9 +34,9 @@ impl MoveList {
         }
 
         let mut best_idx = 0;
-        let mut best_score = Score::MIN;
+        let mut best_score = i16::MIN;
 
-        for (idx, &MoveEntry { score, .. }) in self.moves[0 .. self.top].iter().enumerate() {
+        for (idx, &MoveEntry { policy_score: score, .. }) in self.moves[0 .. self.top].iter().enumerate() {
             if score > best_score {
                 best_score = score;
                 best_idx = idx;

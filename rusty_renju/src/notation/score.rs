@@ -2,8 +2,8 @@ pub type Score = i32;
 
 pub trait Scores {
     const INF: Score = i16::MAX as i32;
-    const WIN: Score = 30000;
-    const DETERMINISTIC: Score = Score::WIN - 400;
+    const WIN: Score = 32000;
+    const DETERMINISTIC: Score = Score::WIN - 300;
     const DRAW: Score = 0;
 
     fn win_in(ply: usize) -> Score {

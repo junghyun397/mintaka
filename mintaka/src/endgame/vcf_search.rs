@@ -13,7 +13,7 @@ use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::value::{Score, Scores};
+use rusty_renju::notation::score::{Score, Scores};
 use rusty_renju::pattern::{Pattern, PatternCount};
 
 pub trait VcfDestination {

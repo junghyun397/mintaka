@@ -5,7 +5,7 @@ use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::score::Score;
 
 struct NNUEInput {
     threes: [i8; 256],
@@ -38,11 +38,11 @@ impl Evaluator for NnueEvaluator {
         todo!()
     }
 
-    fn eval_policy(&self, state: &GameState) -> PolicyDistribution {
+    fn eval_policy(&mut self, state: &GameState) -> PolicyDistribution {
         todo!()
     }
 
-    fn eval_value(&self, state: &GameState) -> Score {
+    fn eval_value(&mut self, state: &GameState) -> Score {
         todo!()
     }
 

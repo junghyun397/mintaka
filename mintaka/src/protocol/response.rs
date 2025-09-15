@@ -2,7 +2,7 @@ use crate::game_agent::ComputingResource;
 use crate::principal_variation::PrincipalVariation;
 use crate::value::Depth;
 use rusty_renju::notation::pos::MaybePos;
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::score::Score;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

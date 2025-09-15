@@ -1,6 +1,6 @@
 use rusty_renju::chebyshev_distance;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::score::Score;
 
 pub trait EndgameAccumulator {
 

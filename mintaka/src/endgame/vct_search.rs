@@ -7,7 +7,7 @@ use crate::thread_type::ThreadType;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::score::Score;
 
 pub(crate) struct VCTFrame {
     vct_moves: MoveList,

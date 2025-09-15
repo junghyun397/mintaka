@@ -4,16 +4,15 @@ use crate::movegen::move_list::MoveList;
 use rusty_renju::board::Board;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::value::Score;
 use rusty_renju::utils::platform;
 use rusty_renju::{cartesian_to_index, chebyshev_distance, index_to_col, index_to_row, pattern};
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
 
-fn score_move(state: &GameState, pos: Pos) -> Score {
+fn score_move(state: &GameState, pos: Pos) -> i16 {
     let distance = (state.history.avg_distance_to_recent_actions(pos).max(8) + 4) as f32;
 
-    16 - distance as Score
+    16 - distance as i16
 }
 
 pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Pos) -> EndgameMovesUnchecked {

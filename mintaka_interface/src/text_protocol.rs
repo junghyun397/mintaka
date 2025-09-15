@@ -1,4 +1,5 @@
 use mintaka::config::Config;
+use mintaka::eval::evaluator::Evaluator;
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::game_state::GameState;
 use mintaka::protocol::command::Command;
@@ -83,13 +84,11 @@ fn response_printer_with_pv(state: GameState) -> impl Fn(Response) -> () {
                 tt-size={tt_size}"
             ),
         Response::Status { best_move, score, pv, total_nodes_in_1k, depth } => {
-            let mut state = state;
+            let mut board = state.board;
 
-            for &pos in pv.moves().iter() {
-                state.set_mut(pos.unwrap());
-            }
+            board.batch_set_mut(pv.moves());
 
-            println!("{}", state.board);
+            println!("{}", board);
             println!(
                 "status: depth={depth}, \
                 score={score}, \
@@ -347,7 +346,7 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
 
                 println!("{:?}", best_move.root_scores);
                 println!("{}",
-                     game_agent.state.board.to_string_with_heatmap(
+                     game_agent.state.board.to_string_with_heatmap_and_last_moves(
                          best_move.root_scores,
                          true,
                          game_agent.state.history.recent_action_pair()

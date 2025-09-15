@@ -7,7 +7,7 @@ use crate::{cartesian_to_index, impl_debug_from_display};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 
-#[derive(Copy, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone)]
 pub struct HashKey(pub u64);
 
 impl HashKey {
