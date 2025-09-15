@@ -1,16 +1,21 @@
 use crate::eval::evaluator::{Evaluator, PolicyDistribution};
 use crate::game_state::GameState;
 use crate::movegen::move_scores::MoveScores;
-use rusty_renju::const_for;
+use crate::value;
+use rusty_renju::bitfield::Bitfield;
+use rusty_renju::board::Board;
+use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::{Color, ColorContainer};
-use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
-use rusty_renju::notation::value::Score;
+use rusty_renju::notation::score::{Score, Scores};
 use rusty_renju::pattern::Pattern;
+use rusty_renju::slice_pattern_count::GlobalPatternCount;
+use rusty_renju::{const_for, pattern};
 
 #[derive(Clone)]
 pub struct HeuristicEvaluator {
-    move_scores: MoveScores
+    move_scores: MoveScores,
+    eval_history: [(HashKey, Score); value::MAX_PLY]
 }
 
 impl Evaluator for HeuristicEvaluator {
@@ -19,7 +24,8 @@ impl Evaluator for HeuristicEvaluator {
 
     fn from_state(state: &GameState) -> Self {
         Self {
-            move_scores: (&state.board.hot_field).into()
+            move_scores: (&state.board.hot_field).into(),
+            eval_history: [(HashKey(0), Score::DRAW); value::MAX_PLY]
         }
     }
 
@@ -27,8 +33,8 @@ impl Evaluator for HeuristicEvaluator {
 
     fn undo(&mut self, _state: &GameState, _color: Color, _pos: Pos) {}
 
-    fn eval_policy(&self, state: &GameState) -> PolicyDistribution {
-        let mut policy = [0; pos::BOARD_SIZE];
+    fn eval_policy(&mut self, state: &GameState) -> PolicyDistribution {
+        let mut policy = [0; pattern::PATTERN_SIZE];
 
         let movegen_field = state.movegen_window.movegen_field & !state.board.hot_field;
 
@@ -39,18 +45,18 @@ impl Evaluator for HeuristicEvaluator {
         let opponent_policy_score_lut = POLICY_SCORE_LUT.access(!state.board.player_color);
 
         for idx in movegen_field.iter_hot_idx() {
-            let neighbor_score = self.move_scores.scores[idx] as Score;
+            let neighbor_score = self.move_scores.scores[idx] as i16;
 
             let distance_score = {
-                let distance = state.history.avg_distance_to_recent_actions(Pos::from_index(idx as u8)) as Score;
+                let distance = state.history.avg_distance_to_recent_actions(Pos::from_index(idx as u8)) as i16;
                 (10 - distance) / 2
             };
 
             let player_pattern_key = encode_policy_key(player_pattern_field[idx]);
             let opponent_pattern_key = encode_policy_key(opponent_pattern_field[idx]);
 
-            let player_pattern_score = player_policy_score_lut[player_pattern_key] as Score;
-            let opponent_pattern_score = opponent_policy_score_lut[opponent_pattern_key] as Score;
+            let player_pattern_score = player_policy_score_lut[player_pattern_key] as i16;
+            let opponent_pattern_score = opponent_policy_score_lut[opponent_pattern_key] as i16;
 
             policy[idx] = neighbor_score + distance_score + player_pattern_score + opponent_pattern_score / 2;
         }
@@ -58,43 +64,91 @@ impl Evaluator for HeuristicEvaluator {
         policy
     }
 
-    fn eval_value(&self, state: &GameState) -> Score {
+    fn eval_value(&mut self, state: &GameState) -> Score {
+        if state.len() == 0 {
+            return 0;
+        }
+
+        let parent_score =
+            if let Some(&(hash_key, score)) = self.eval_history.get(state.len() - 2)
+                && hash_key == state.board.hash_key.set(!state.board.player_color, state.history.recent_action().unwrap())
+            {
+                -score
+            } else if state.len() > 1 {
+                let parent_board = state.board.unset(state.history.recent_action().unwrap());
+
+                let score = self.eval_board_value(&parent_board, !parent_board.hot_field);
+
+                self.eval_history[state.len() - 2] = (parent_board.hash_key, score);
+
+                -score
+            } else {
+                0
+            };
+
+        let movegen_field = state.movegen_window.movegen_field & !state.board.hot_field;
+
+        let current_score = self.eval_board_value(&state.board, movegen_field);
+
+        self.eval_history[state.len() - 1] = (state.board.hash_key, current_score);
+
+        (current_score + parent_score) / 2
+    }
+
+}
+
+impl HeuristicEvaluator {
+
+    fn eval_board_value(&self, board: &Board, eval_window: Bitfield) -> Score {
         let mut acc_black = 0;
 
-        let eval_field = state.movegen_window.movegen_field & !state.board.hot_field;
+        for idx in eval_window.iter_hot_idx() {
+            let black_pattern = board.patterns.field.black[idx];
+            let white_pattern = board.patterns.field.white[idx];
 
-        for idx in eval_field.iter_hot_idx() {
-            let black_pattern_key = encode_value_key(state.board.patterns.field.black[idx]);
-            let white_pattern_key = encode_value_key(state.board.patterns.field.white[idx]);
+            let black_pattern_key = encode_value_key(black_pattern, white_pattern.has_any_four());
+            let white_pattern_key = encode_value_key(white_pattern, black_pattern.has_any_four());
 
             acc_black += VALUE_SCORE_LUT.black[black_pattern_key] as Score;
             acc_black -= VALUE_SCORE_LUT.white[white_pattern_key] as Score;
         }
 
-        match state.board.player_color {
+        match board.player_color {
             Color::Black => acc_black,
             Color::White => -acc_black
         }
     }
 
+    fn eval_tactical_value(&self, my_counts: &GlobalPatternCount, opponent_counts: &GlobalPatternCount) -> Score {
+        if my_counts.open_fours > 0 {
+            return 10000;
+        }
+
+        if opponent_counts.open_fours > 2 {
+            return -10000;
+        }
+
+        0
+    }
+
 }
 
 const VALUE_SCORE_LUT_SIZE: usize = (0b1 << 8) + 1;
-const VALUE_SCORE_LUT_OVERLINE_MASK: u32 = !(u32::MAX << 8);
+const VALUE_SCORE_LUT_SPAN_MASK: u32 = !(u32::MAX << 8);
 
 // (open_fours(1), fours(2), open_threes(2), potential(3)
 // overline override for full-bits
 // total 8 bits
-fn encode_value_key(pattern: Pattern) -> usize {
-    let mut pattern_key = 0;
+fn encode_value_key(pattern: Pattern, opponent_closed_four: bool) -> usize {
+    let valid_pattern = (!opponent_closed_four as u32) * VALUE_SCORE_LUT_SPAN_MASK;
 
-    pattern_key |= pattern.has_open_four() as u32;
-    pattern_key |= (pattern.count_total_fours() & 0b11) << 1;
-    pattern_key |= (pattern.count_open_threes() & 0b11) << 3;
-    pattern_key |= (pattern.count_potentials() & 0b111) << 5;
-    pattern_key |= (pattern.has_overline() as u32) * VALUE_SCORE_LUT_OVERLINE_MASK;
+    let has_open_four = pattern.has_open_four() as u32;
+    let total_fours = (pattern.count_total_fours() & 0b11) << 1;
+    let open_threes = (pattern.count_open_threes() & 0b11) << 3;
+    let potentials = (pattern.count_potentials() & 0b111) << 5;
+    let has_overline = pattern.has_overline() as u32 * VALUE_SCORE_LUT_SPAN_MASK;
 
-    pattern_key as usize
+    ((has_overline | has_open_four | total_fours | open_threes | potentials) & valid_pattern) as usize
 }
 
 type ValueScoreLut = [i16; VALUE_SCORE_LUT_SIZE];
@@ -123,7 +177,7 @@ const fn build_value_score_lut() -> ColorContainer<ValueScoreLut> {
 
             match color {
                 Color::Black => {
-                    if pattern_key == VALUE_SCORE_LUT_OVERLINE_MASK as usize {
+                    if pattern_key == VALUE_SCORE_LUT_SPAN_MASK as usize {
                         acc = HeuristicValueScores::OVERLINE_FORBID;
                     } else {
                         if fours > 1 {
@@ -187,35 +241,33 @@ const fn build_value_score_lut() -> ColorContainer<ValueScoreLut> {
 struct HeuristicValueScores; impl HeuristicValueScores {
     const POTENTIAL: [i16; 5]       = [0, 1, 8, 16, 40];
 
-    const OPEN_THREE: i16           = 22;
-    const CLOSED_FOUR: i16          = 8;
-    const OPEN_FOUR: i16            = 2000;
+    const OPEN_THREE: i16           = 256;
+    const CLOSED_FOUR: i16          = 256;
+    const OPEN_FOUR: i16            = 0;
 
-    const THREE_FOUR_FORK: i16      = 1800;
-    const DOUBLE_THREE_FORK: i16    = 400;
-    const DOUBLE_FOUR_FORK: i16     = 2000;
+    const DOUBLE_THREE_FORK: i16    = 0;
+    const THREE_FOUR_FORK: i16      = 0;
+    const DOUBLE_FOUR_FORK: i16     = 0;
 
-    const OVERLINE_FORBID: i16      = -100;
+    const OVERLINE_FORBID: i16      = -80;
     const DOUBLE_FOUR_FORBID: i16   = -50;
     const DOUBLE_THREE_FORBID: i16  = -40;
 }
 
 const POLICY_SCORE_LUT_SIZE: usize = (0b1 << 8) + 1;
-const POLICY_SCORE_LUT_OVERLINE_MASK: u32 = !(u32::MAX << 8);
+const POLICY_SCORE_LUT_SPAN_MASK: u32 = !(u32::MAX << 8);
 
 // (open_fours(1), fours(2), open_threes(2), potential(3)
 // overline override for full-bits
 // total 8 bits
 fn encode_policy_key(pattern: Pattern) -> usize {
-    let mut pattern_key = 0;
+    let has_overline_pattern = (pattern.has_overline() as u32) * POLICY_SCORE_LUT_SPAN_MASK;
+    let has_open_four = pattern.has_open_four() as u32;
+    let total_fours = (pattern.count_total_fours() & 0b11) << 1;
+    let open_threes = (pattern.count_open_threes() & 0b11) << 3;
+    let potentials = (pattern.count_potentials() & 0b111) << 5;
 
-    pattern_key |= pattern.has_open_four() as u32;
-    pattern_key |= (pattern.count_total_fours() & 0b11) << 1;
-    pattern_key |= (pattern.count_open_threes() & 0b11) << 3;
-    pattern_key |= (pattern.count_potentials() & 0b111) << 5;
-    pattern_key |= (pattern.has_overline() as u32) * POLICY_SCORE_LUT_OVERLINE_MASK;
-
-    pattern_key as usize
+    (has_overline_pattern | has_open_four | total_fours | open_threes | potentials) as usize
 }
 
 type PolicyScoreLut = [i8; POLICY_SCORE_LUT_SIZE];
@@ -242,7 +294,7 @@ const fn build_pattern_score_lut() -> ColorContainer<PolicyScoreLut> {
 
             lut[pattern_key] = match color {
                 Color::Black => {
-                    if pattern_key == POLICY_SCORE_LUT_OVERLINE_MASK as usize {
+                    if pattern_key == POLICY_SCORE_LUT_SPAN_MASK as usize {
                         HeuristicPolicyScores::OVERLINE_FORBID
                     } else {
                         let acc = if fours > 1 {
