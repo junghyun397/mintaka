@@ -173,7 +173,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         let score = -pvs::<R, TH, NT::NextType>(td, state, depth_left, -beta, -alpha);
 
         td.pop_ply_mut();
-        state.unset_mut(td.ss[td.ply].recovery_state);
+        state.undo_mut(td.ss[td.ply].recovery_state);
 
         if td.is_aborted() {
             return Score::DRAW;
@@ -278,7 +278,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         };
 
         td.pop_ply_mut();
-        state.unset_mut(td.ss[td.ply].recovery_state);
+        state.undo_mut(td.ss[td.ply].recovery_state);
 
         if td.is_aborted() {
             return Score::DRAW;

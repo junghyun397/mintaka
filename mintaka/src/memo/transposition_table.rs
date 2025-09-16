@@ -129,7 +129,7 @@ pub struct TTView<'a> {
 impl TTView<'_> {
 
     fn calculate_index(&self, key: HashKey) -> usize {
-        ((key.0 as u128 * (self.table.len() as u128)) >> 64) as usize
+        ((u64::from(key) as u128 * (self.table.len() as u128)) >> 64) as usize
     }
 
     pub fn probe(&self, key: HashKey) -> Option<TTEntry> {

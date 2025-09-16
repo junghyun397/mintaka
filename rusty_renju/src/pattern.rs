@@ -6,8 +6,8 @@ use crate::notation::rule::{ForbiddenKind, RuleKind};
 use crate::slice::Slice;
 use crate::slice_pattern::SlicePattern;
 use crate::slice_pattern_count::SlicePatternCounts;
+use crate::step_idx;
 use crate::utils::lang_utils::{repeat_16x, repeat_4x};
-use crate::{assert_struct_sizes, step_idx};
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
 
@@ -207,8 +207,6 @@ pub struct Patterns {
     pub candidate_forbidden_field: Bitfield,
     pub forbidden_field: Bitfield,
 }
-
-assert_struct_sizes!(Patterns, size=2560, align=64);
 
 impl Default for Patterns {
 

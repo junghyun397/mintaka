@@ -2,12 +2,41 @@ use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::slice;
+use std::simd::cmp::SimdPartialEq;
+use std::simd::Simd;
+
+pub const PADDED_SLICE_AMOUNT: usize = (slice::TOTAL_SLICE_AMOUNT | 31) + 1;
 
 #[derive(Debug, Copy, Clone)]
 pub struct SlicePatternCount {
-    pub threes: u8,
-    pub closed_fours: u8,
-    pub open_fours: u8,
+    pub threes: [u8; PADDED_SLICE_AMOUNT],
+    pub closed_fours: [u8; PADDED_SLICE_AMOUNT],
+    pub open_fours: [u8; PADDED_SLICE_AMOUNT],
+}
+
+impl SlicePatternCount {
+
+    pub fn total_open_four_structs_unchecked(&self) -> u32 {
+        let ptr = self.open_fours.as_ptr();
+
+        let zero_mask = Simd::splat(0);
+
+        let mut total_components_unchecked = 0;
+
+        for start_idx in (0 .. PADDED_SLICE_AMOUNT).step_by(32) {
+            let vector = Simd::<u8, 32>::from_slice(
+                unsafe { std::slice::from_raw_parts(ptr.add(start_idx), 32) }
+            );
+
+            total_components_unchecked += vector
+                .simd_ne(zero_mask)
+                .to_bitmask()
+                .count_ones();
+        }
+
+        total_components_unchecked
+    }
+
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -17,13 +46,7 @@ pub struct GlobalPatternCount {
     pub open_fours: u8,
 }
 
-impl SlicePatternCount {
-
-    pub const EMPTY: Self = Self {
-        threes: 0,
-        closed_fours: 0,
-        open_fours: 0,
-    };
+impl GlobalPatternCount {
 
     pub fn total_fours(&self) -> u8 {
         self.closed_fours + self.open_fours
@@ -33,7 +56,7 @@ impl SlicePatternCount {
 
 #[derive(Debug, Copy, Clone)]
 pub struct SlicePatternCounts {
-    locals: ColorContainer<[SlicePatternCount; slice::TOTAL_SLICE_AMOUNT]>,
+    pub slice: ColorContainer<SlicePatternCount>,
     pub global: ColorContainer<GlobalPatternCount>,
 }
 
@@ -41,60 +64,51 @@ impl SlicePatternCounts {
 
     pub const EMPTY: Self = unsafe { std::mem::zeroed() };
 
-    fn access_local_mut<const C: Color, const D: Direction>(
-        locals: &mut ColorContainer<[SlicePatternCount; slice::TOTAL_SLICE_AMOUNT]>, slice_idx: usize
-    ) -> &mut SlicePatternCount {
-        &mut locals.get_ref_mut::<C>()[match D {
+    fn calculate_local_slice_idx<const D: Direction>(slice_idx: usize) -> usize {
+        (match D {
             Direction::Horizontal => 0,
             Direction::Vertical => pos::U_BOARD_WIDTH,
             Direction::Ascending => pos::U_BOARD_WIDTH * 2,
             Direction::Descending => pos::U_BOARD_WIDTH * 2 + slice::DIAGONAL_SLICE_AMOUNT,
-        } + slice_idx]
+        }) + slice_idx
     }
 
     pub fn update_slice_mut<const C: Color, const D: Direction>(
-        &mut self, slice_idx: usize, threes: u8, closed_fours: u8, open_fours: u8
+        &mut self, slice_idx: usize, mut threes: u8, mut closed_fours: u8, mut open_fours: u8
     ) {
         let global_count = self.global.get_ref_mut::<C>();
-        let slice_count = Self::access_local_mut::<C, D>(&mut self.locals, slice_idx);
+
+        let local_slice_idx = Self::calculate_local_slice_idx::<D>(slice_idx);
 
         global_count.threes += threes;
-        global_count.threes -= slice_count.threes;
-
         global_count.closed_fours += closed_fours;
-        global_count.closed_fours -= slice_count.closed_fours;
-
         global_count.open_fours += open_fours;
-        global_count.open_fours -= slice_count.open_fours;
 
-        *slice_count = SlicePatternCount {
-            threes,
-            closed_fours,
-            open_fours,
-        };
+        std::mem::swap(&mut threes, &mut self.slice.get_ref_mut::<C>().threes[local_slice_idx]);
+        std::mem::swap(&mut closed_fours, &mut self.slice.get_ref_mut::<C>().closed_fours[local_slice_idx]);
+        std::mem::swap(&mut open_fours, &mut self.slice.get_ref_mut::<C>().open_fours[local_slice_idx]);
+
+        global_count.threes -= threes;
+        global_count.closed_fours -= closed_fours;
+        global_count.open_fours -= open_fours;
     }
 
     pub fn clear_slice_mut<const C: Color, const D: Direction>(&mut self, slice_idx: usize) {
         let global_count = self.global.get_ref_mut::<C>();
-        let slice_count = Self::access_local_mut::<C, D>(&mut self.locals, slice_idx);
 
-        global_count.threes -= slice_count.threes;
-        global_count.closed_fours -= slice_count.closed_fours;
-        global_count.open_fours -= slice_count.open_fours;
+        let local_slice_idx = Self::calculate_local_slice_idx::<D>(slice_idx);
 
-        *slice_count = SlicePatternCount {
-            threes: 0,
-            closed_fours: 0,
-            open_fours: 0,
-        };
-    }
+        let mut threes = 0;
+        let mut closed_fours = 0;
+        let mut open_fours = 0;
 
-}
+        std::mem::swap(&mut threes, &mut self.slice.get_ref_mut::<C>().threes[local_slice_idx]);
+        std::mem::swap(&mut closed_fours, &mut self.slice.get_ref_mut::<C>().closed_fours[local_slice_idx]);
+        std::mem::swap(&mut open_fours, &mut self.slice.get_ref_mut::<C>().open_fours[local_slice_idx]);
 
-impl GlobalPatternCount {
-
-    pub fn total_fours(&self) -> u8 {
-        self.closed_fours + self.open_fours
+        global_count.threes -= threes;
+        global_count.closed_fours -= closed_fours;
+        global_count.open_fours -= open_fours;
     }
 
 }

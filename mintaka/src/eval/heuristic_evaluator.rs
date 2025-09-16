@@ -9,7 +9,6 @@ use rusty_renju::notation::color::{Color, ColorContainer};
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::score::{Score, Scores};
 use rusty_renju::pattern::Pattern;
-use rusty_renju::slice_pattern_count::GlobalPatternCount;
 use rusty_renju::{const_for, pattern};
 
 #[derive(Clone)]
@@ -25,7 +24,7 @@ impl Evaluator for HeuristicEvaluator {
     fn from_state(state: &GameState) -> Self {
         Self {
             move_scores: (&state.board.hot_field).into(),
-            eval_history: [(HashKey(0), Score::DRAW); value::MAX_PLY]
+            eval_history: [(HashKey::INVALID, Score::DRAW); value::MAX_PLY]
         }
     }
 
@@ -77,11 +76,11 @@ impl Evaluator for HeuristicEvaluator {
             } else if state.len() > 1 {
                 let parent_board = state.board.unset(state.history.recent_action().unwrap());
 
-                let score = self.eval_board_value(&parent_board, !parent_board.hot_field);
+                let parent_score = self.eval_board_value(&parent_board, !parent_board.hot_field);
 
-                self.eval_history[state.len() - 2] = (parent_board.hash_key, score);
+                self.eval_history[state.len() - 2] = (parent_board.hash_key, parent_score);
 
-                -score
+                -parent_score
             } else {
                 0
             };
@@ -100,31 +99,44 @@ impl Evaluator for HeuristicEvaluator {
 impl HeuristicEvaluator {
 
     fn eval_board_value(&self, board: &Board, eval_window: Bitfield) -> Score {
-        let mut acc_black = 0;
+        let mut value_black = 0;
+        let mut tactical_black = 0;
+        let mut tactical_white = 0;
 
         for idx in eval_window.iter_hot_idx() {
             let black_pattern = board.patterns.field.black[idx];
             let white_pattern = board.patterns.field.white[idx];
 
-            let black_pattern_key = encode_value_key(black_pattern, white_pattern.has_any_four());
-            let white_pattern_key = encode_value_key(white_pattern, black_pattern.has_any_four());
+            let black_pattern_key = encode_value_key(black_pattern);
+            let white_pattern_key = encode_value_key(white_pattern);
 
-            acc_black += VALUE_SCORE_LUT.black[black_pattern_key] as Score;
-            acc_black -= VALUE_SCORE_LUT.white[white_pattern_key] as Score;
+            let (value_local_black, tactical_local_black) = VALUE_SCORE_LUT.black[black_pattern_key];
+            let (value_local_white, tactical_local_white) = VALUE_SCORE_LUT.white[white_pattern_key];
+
+            value_black += value_local_black as Score;
+            value_black -= value_local_white as Score;
+
+            tactical_black += tactical_local_black;
+            tactical_white += tactical_local_white;
         }
 
-        match board.player_color {
-            Color::Black => acc_black,
-            Color::White => -acc_black
-        }
+        let (score, tactical_points, opponent_tactical_points) = match board.player_color {
+            Color::Black => (value_black, tactical_black, tactical_white),
+            Color::White => (-value_black, tactical_white, tactical_black)
+        };
+
+        let tactical_black = Self::eval_tactical_value(board, tactical_points, opponent_tactical_points);
+
+        score + tactical_black
     }
 
-    fn eval_tactical_value(&self, my_counts: &GlobalPatternCount, opponent_counts: &GlobalPatternCount) -> Score {
-        if my_counts.open_fours > 0 {
-            return 10000;
-        }
+    fn eval_tactical_value(board: &Board, mut tactical_points: u16, mut opponent_tactical_points: u16) -> Score {
+        tactical_points += board.patterns.counts.slice.access(board.player_color).total_open_four_structs_unchecked() as u16;
+        opponent_tactical_points += board.patterns.counts.slice.access(!board.player_color).total_open_four_structs_unchecked() as u16;
 
-        if opponent_counts.open_fours > 2 {
+        if tactical_points > 0 {
+            return 10000;
+        } else if opponent_tactical_points > 1 {
             return -10000;
         }
 
@@ -139,26 +151,24 @@ const VALUE_SCORE_LUT_SPAN_MASK: u32 = !(u32::MAX << 8);
 // (open_fours(1), fours(2), open_threes(2), potential(3)
 // overline override for full-bits
 // total 8 bits
-fn encode_value_key(pattern: Pattern, opponent_closed_four: bool) -> usize {
-    let valid_pattern = (!opponent_closed_four as u32) * VALUE_SCORE_LUT_SPAN_MASK;
-
+fn encode_value_key(pattern: Pattern) -> usize {
     let has_open_four = pattern.has_open_four() as u32;
     let total_fours = (pattern.count_total_fours() & 0b11) << 1;
     let open_threes = (pattern.count_open_threes() & 0b11) << 3;
     let potentials = (pattern.count_potentials() & 0b111) << 5;
     let has_overline = pattern.has_overline() as u32 * VALUE_SCORE_LUT_SPAN_MASK;
 
-    ((has_overline | has_open_four | total_fours | open_threes | potentials) & valid_pattern) as usize
+    (has_overline | has_open_four | total_fours | open_threes | potentials) as usize
 }
 
-type ValueScoreLut = [i16; VALUE_SCORE_LUT_SIZE];
+type ValueScoreLut = [(i16, u16); VALUE_SCORE_LUT_SIZE];
 
 const VALUE_SCORE_LUT: ColorContainer<ValueScoreLut> = build_value_score_lut();
 
 const fn build_value_score_lut() -> ColorContainer<ValueScoreLut> {
     let mut acc = ColorContainer::new(
-        [0; VALUE_SCORE_LUT_SIZE],
-        [0; VALUE_SCORE_LUT_SIZE]
+        [(0, 0); VALUE_SCORE_LUT_SIZE],
+        [(0, 0); VALUE_SCORE_LUT_SIZE]
     );
 
     const fn flash_score_variants(color: Color, lut: &mut ValueScoreLut) {
@@ -174,6 +184,7 @@ const fn build_value_score_lut() -> ColorContainer<ValueScoreLut> {
             }
 
             let mut acc = 0;
+            let mut tactical_points = 0;
 
             match color {
                 Color::Black => {
@@ -186,8 +197,8 @@ const fn build_value_score_lut() -> ColorContainer<ValueScoreLut> {
                             acc = HeuristicValueScores::DOUBLE_THREE_FORBID;
                         } else if has_open_four {
                             acc = HeuristicValueScores::OPEN_FOUR;
-                        } else if fours == 1 && open_threes == 1 {
-                            acc = HeuristicValueScores::THREE_FOUR_FORK;
+                        } else if closed_fours == 1 && open_threes == 1 { // three-four fork
+                            tactical_points += 1;
                         } else if open_threes == 1 {
                             acc = HeuristicValueScores::OPEN_THREE;
                         } else if closed_fours == 1 {
@@ -206,12 +217,12 @@ const fn build_value_score_lut() -> ColorContainer<ValueScoreLut> {
                 Color::White => {
                     if has_open_four {
                         acc = HeuristicValueScores::OPEN_FOUR;
-                    } else if fours > 1 {
-                        acc = HeuristicValueScores::DOUBLE_FOUR_FORK;
-                    } else if fours == 1 && open_threes > 0 {
-                        acc = HeuristicValueScores::THREE_FOUR_FORK;
-                    } else if open_threes > 1 {
-                        acc = HeuristicValueScores::DOUBLE_THREE_FORK
+                    } else if closed_fours > 1 { // double-four fork
+                        tactical_points += 1;
+                    } else if closed_fours == 1 && open_threes > 0 { // three-four fork
+                        tactical_points += 1;
+                    } else if open_threes > 1 { // double-three fork
+                        tactical_points += 1;
                     } else if open_threes == 1 {
                         acc = HeuristicValueScores::OPEN_THREE;
                     } else if fours == 1 {
@@ -228,7 +239,7 @@ const fn build_value_score_lut() -> ColorContainer<ValueScoreLut> {
                 }
             }
 
-            lut[pattern_key] = acc;
+            lut[pattern_key] = (acc, tactical_points);
         });
     }
 
@@ -244,10 +255,6 @@ struct HeuristicValueScores; impl HeuristicValueScores {
     const OPEN_THREE: i16           = 256;
     const CLOSED_FOUR: i16          = 256;
     const OPEN_FOUR: i16            = 0;
-
-    const DOUBLE_THREE_FORK: i16    = 0;
-    const THREE_FOUR_FORK: i16      = 0;
-    const DOUBLE_FOUR_FORK: i16     = 0;
 
     const OVERLINE_FORBID: i16      = -80;
     const DOUBLE_FOUR_FORBID: i16   = -50;

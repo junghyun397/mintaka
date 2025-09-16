@@ -26,7 +26,7 @@ pub fn iterative_deepening_minimal<const R: RuleKind, TH: ThreadType>(
     'iterative_deepening: for depth in 1 ..= td.config.max_depth {
         td.depth = depth;
 
-        let iter_score = pvs_minimal::<R, TH>(td, &mut state, false, depth, -Score::INF, Score::INF);
+        let iter_score = pvs_minimal::<R, TH>(td, &mut state, true, depth, -Score::INF, Score::INF);
 
         if td.is_aborted() {
             break 'iterative_deepening;
@@ -53,13 +53,12 @@ pub fn iterative_deepening_minimal<const R: RuleKind, TH: ThreadType>(
 pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH, impl Evaluator>,
     state: &mut GameState,
-    zero_window: bool,
+    on_pv: bool,
     depth_left: Depth,
     mut alpha: Score,
     mut beta: Score,
 ) -> Score {
     let is_root = td.ply == 0;
-    let is_pv = beta > alpha + 1;
 
     if TH::IS_MAIN
         && td.should_check_limit()
@@ -81,7 +80,7 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
             td.best_move = pos.into();
         }
 
-        if is_pv {
+        if on_pv {
             td.pvs[td.ply].init(pos.into());
         }
 
@@ -97,7 +96,7 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
                 td.best_move = MaybePos::NONE;
             }
 
-            if is_pv {
+            if on_pv {
                 td.pvs[td.ply].init(MaybePos::NONE);
             }
 
@@ -108,10 +107,10 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
         td.push_ply_mut(pos);
         state.set_mut(pos);
 
-        let score = -pvs_minimal::<R, TH>(td, state, zero_window, depth_left, -beta, -alpha);
+        let score = -pvs_minimal::<R, TH>(td, state, on_pv, depth_left, -beta, -alpha);
 
         td.pop_ply_mut();
-        state.unset_mut(td.ss[td.ply].recovery_state);
+        state.undo_mut(td.ss[td.ply].recovery_state);
 
         if td.is_aborted() {
             return Score::DRAW;
@@ -121,7 +120,7 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
             td.best_move = pos.into();
         }
 
-        if is_pv {
+        if on_pv {
             let sub_pv = td.pvs[td.ply + 1];
             td.pvs[td.ply].load(pos.into(), sub_pv);
         }
@@ -129,7 +128,7 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
         return score;
     }
 
-    if !(is_root || Score::is_deterministic(alpha) || Score::is_deterministic(beta)) {
+    if !is_root {
         alpha = alpha.max(Score::lose_in(td.ply));
         beta = beta.min(Score::win_in(td.ply));
         if alpha >= beta { // mate distance pruning
@@ -161,20 +160,20 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
 
         moves_made += 1;
 
-        let score = if moves_made == 1 { // full-window search
-            -pvs_minimal::<R, TH>(td, state, false, depth_left - 1, -beta, -alpha)
+        let score = if moves_made == 1 {
+            -pvs_minimal::<R, TH>(td, state, on_pv, depth_left - 1, -beta, -alpha)
         } else { // zero-window search
-            let mut score = -pvs_minimal::<R, TH>(td, state, true, depth_left - 1, -alpha - 1, -alpha);
+            let mut score = -pvs_minimal::<R, TH>(td, state, false, depth_left - 1, -alpha - 1, -alpha);
 
-            if score > alpha { // zero-window failed, full-window search
-                score = -pvs_minimal::<R, TH>(td, state, false, depth_left - 1, -beta, -alpha);
+            if score > alpha { // zero-window failed, full-window re-search on PV
+                score = -pvs_minimal::<R, TH>(td, state, on_pv, depth_left - 1, -beta, -alpha);
             }
 
             score
         };
 
         td.pop_ply_mut();
-        state.unset_mut(td.ss[td.ply].recovery_state);
+        state.undo_mut(td.ss[td.ply].recovery_state);
 
         if td.is_aborted() {
             return Score::DRAW;
@@ -194,7 +193,7 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
             best_move = pos.into();
             alpha = score;
 
-            if is_pv {
+            if on_pv {
                 let sub_pv = td.pvs[td.ply + 1];
                 td.pvs[td.ply].load(pos.into(), sub_pv);
             }

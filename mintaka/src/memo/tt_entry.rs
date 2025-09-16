@@ -17,7 +17,7 @@ impl From<HashKey> for TTEntryKey {
 
     fn from(hash_key: HashKey) -> Self {
         Self {
-            key: hash_key.0 >> KEY_SHIFT,
+            key: u64::from(hash_key) >> KEY_SHIFT,
         }
     }
 

@@ -32,6 +32,21 @@ impl GameState {
         }
     }
 
+    pub fn play(mut self, pos: Pos) -> Self {
+        self.set_mut(pos);
+        self
+    }
+
+    pub fn pass(mut self) -> Self {
+        self.pass_mut();
+        self
+    }
+
+    pub fn undo(mut self, recovery_state: RecoveryState) -> Self {
+        self.undo_mut(recovery_state);
+        self
+    }
+
     pub fn set_mut(&mut self, pos: Pos) {
         self.board.set_mut(pos);
         self.history.set_mut(pos);
@@ -44,7 +59,7 @@ impl GameState {
         self.history.pass_mut();
     }
 
-    pub fn unset_mut(&mut self, recovery_state: RecoveryState) {
+    pub fn undo_mut(&mut self, recovery_state: RecoveryState) {
         self.movegen_window = recovery_state.movegen_window;
 
         match self.history.pop_mut().unwrap() {

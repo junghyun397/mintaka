@@ -8,9 +8,13 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 
 #[derive(Eq, PartialEq, Copy, Clone)]
-pub struct HashKey(pub u64);
+pub struct HashKey(u64);
 
 impl HashKey {
+
+    pub const INVALID: HashKey = HashKey(0);
+
+    pub const EMPTY: HashKey = HashKey(hash_table::EMPTY_HASH);
 
     pub fn set(self, color: Color, pos: Pos) -> Self {
         self.set_idx(color, pos.idx_usize())
@@ -47,6 +51,12 @@ impl From<&[Slice; pos::U_BOARD_WIDTH]> for HashKey {
 
                 key
             })
+    }
+}
+
+impl From<HashKey> for u64 {
+    fn from(value: HashKey) -> u64 {
+        value.0
     }
 }
 
