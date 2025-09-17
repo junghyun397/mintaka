@@ -7,10 +7,9 @@ pub enum Direction {
     Descending = 3
 }
 
-impl Direction {
-
-    pub fn from_pattern_position(position: u32) -> Self {
-        unsafe { std::mem::transmute::<u8, Self>((position / 8) as u8) }
+impl From<u8> for Direction {
+    fn from(value: u8) -> Self {
+        debug_assert!(value < 4);
+        unsafe { std::mem::transmute(value) }
     }
-
 }

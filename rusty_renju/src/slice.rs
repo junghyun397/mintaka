@@ -15,7 +15,6 @@ const DIAGONAL_BOARD_PADDING: isize = 5 - pos::I_BOARD_WIDTH;
 pub struct Slice {
     pub idx: u8,
     pub length: u8,
-    pub start_row: u8,
     pub start_col: u8,
     pub start_pos: Pos,
     pub stones: ColorContainer<u16>,
@@ -32,7 +31,6 @@ impl Slice {
         Slice {
             idx,
             length,
-            start_row,
             start_col,
             start_pos: Pos::from_cartesian(start_row, start_col),
             stones: ColorContainer::new(0, 0),

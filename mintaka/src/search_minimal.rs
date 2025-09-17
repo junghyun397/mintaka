@@ -160,13 +160,20 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
 
         moves_made += 1;
 
+        let mut extension = 0;
+
+        // extend on three-four-fork, open-four, double-three-fork, open-four, double-four-fork
+        if state.board.patterns.counts.global.access(state.board.player_color).open_fours != 0 {
+            extension += 1;
+        }
+
         let score = if moves_made == 1 {
-            -pvs_minimal::<R, TH>(td, state, on_pv, depth_left - 1, -beta, -alpha)
+            -pvs_minimal::<R, TH>(td, state, on_pv, depth_left + extension - 1, -beta, -alpha)
         } else { // zero-window search
-            let mut score = -pvs_minimal::<R, TH>(td, state, false, depth_left - 1, -alpha - 1, -alpha);
+            let mut score = -pvs_minimal::<R, TH>(td, state, false, depth_left + extension - 1, -alpha - 1, -alpha);
 
             if score > alpha { // zero-window failed, full-window re-search on PV
-                score = -pvs_minimal::<R, TH>(td, state, on_pv, depth_left - 1, -beta, -alpha);
+                score = -pvs_minimal::<R, TH>(td, state, on_pv, depth_left + extension - 1, -beta, -alpha);
             }
 
             score

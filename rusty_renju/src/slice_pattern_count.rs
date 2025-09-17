@@ -74,7 +74,7 @@ impl SlicePatternCounts {
     }
 
     pub fn update_slice_mut<const C: Color, const D: Direction>(
-        &mut self, slice_idx: usize, mut threes: u8, mut closed_fours: u8, mut open_fours: u8
+        &mut self, slice_idx: usize, threes: u8, closed_fours: u8, open_fours: u8
     ) {
         let global_count = self.global.get_ref_mut::<C>();
 
@@ -84,13 +84,9 @@ impl SlicePatternCounts {
         global_count.closed_fours += closed_fours;
         global_count.open_fours += open_fours;
 
-        std::mem::swap(&mut threes, &mut self.slice.get_ref_mut::<C>().threes[local_slice_idx]);
-        std::mem::swap(&mut closed_fours, &mut self.slice.get_ref_mut::<C>().closed_fours[local_slice_idx]);
-        std::mem::swap(&mut open_fours, &mut self.slice.get_ref_mut::<C>().open_fours[local_slice_idx]);
-
-        global_count.threes -= threes;
-        global_count.closed_fours -= closed_fours;
-        global_count.open_fours -= open_fours;
+        global_count.threes -= std::mem::replace(&mut self.slice.get_ref_mut::<C>().threes[local_slice_idx], threes);
+        global_count.closed_fours -= std::mem::replace(&mut self.slice.get_ref_mut::<C>().closed_fours[local_slice_idx], closed_fours);
+        global_count.open_fours -= std::mem::replace(&mut self.slice.get_ref_mut::<C>().open_fours[local_slice_idx], open_fours);
     }
 
     pub fn clear_slice_mut<const C: Color, const D: Direction>(&mut self, slice_idx: usize) {
@@ -98,13 +94,9 @@ impl SlicePatternCounts {
 
         let local_slice_idx = Self::calculate_local_slice_idx::<D>(slice_idx);
 
-        let mut threes = 0;
-        let mut closed_fours = 0;
-        let mut open_fours = 0;
-
-        std::mem::swap(&mut threes, &mut self.slice.get_ref_mut::<C>().threes[local_slice_idx]);
-        std::mem::swap(&mut closed_fours, &mut self.slice.get_ref_mut::<C>().closed_fours[local_slice_idx]);
-        std::mem::swap(&mut open_fours, &mut self.slice.get_ref_mut::<C>().open_fours[local_slice_idx]);
+        let threes = std::mem::take(&mut self.slice.get_ref_mut::<C>().threes[local_slice_idx]);
+        let closed_fours = std::mem::take(&mut self.slice.get_ref_mut::<C>().closed_fours[local_slice_idx]);
+        let open_fours = std::mem::take(&mut self.slice.get_ref_mut::<C>().open_fours[local_slice_idx]);
 
         global_count.threes -= threes;
         global_count.closed_fours -= closed_fours;

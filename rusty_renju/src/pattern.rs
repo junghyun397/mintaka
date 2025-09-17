@@ -33,11 +33,12 @@ pub const UNIT_CLOSE_THREE_MASK: u32        = repeat_4x(CLOSE_THREE);
 pub const UNIT_OVERLINE_MASK: u32           = repeat_4x(OVERLINE);
 pub const UNIT_POTENTIAL_MASK: u32          = repeat_4x(POTENTIAL);
 
-pub const SLICE_PATTERN_CLOSED_FOUR_MASK: u128  = repeat_16x(CLOSED_FOUR_SINGLE);
+pub const SLICE_PATTERN_CLOSED_FOUR_MASK: u128  = repeat_16x(CLOSED_FOUR_DOUBLE);
 pub const SLICE_PATTERN_OPEN_FOUR_MASK: u128    = repeat_16x(OPEN_FOUR);
 pub const SLICE_PATTERN_FIVE_MASK: u128         = repeat_16x(FIVE);
 pub const SLICE_PATTERN_THREE_MASK: u128        = repeat_16x(OPEN_THREE);
 pub const SLICE_PATTERN_OVERLINE_MASK: u128     = repeat_16x(OVERLINE);
+pub const SLICE_PATTERN_MASK: u128              = repeat_16x(OVERLINE | ANY_FOUR | OPEN_THREE);
 
 pub const PATTERN_SIZE: usize = 256;
 
@@ -112,10 +113,6 @@ impl Pattern {
         self.apply_mask(UNIT_OVERLINE_MASK) != 0
     }
 
-    pub fn has_three_four_fork(&self) -> bool {
-        self.apply_mask(UNIT_ANY_FOUR_MASK) != 0 && self.apply_mask(UNIT_OPEN_THREE_MASK) != 0
-    }
-
     pub fn count_threes(&self) -> PatternCount {
         PatternCount::from_masked_unit(self.apply_mask(UNIT_OPEN_THREE_MASK))
     }
@@ -172,16 +169,13 @@ impl Pattern {
         self.descending &= !POTENTIAL;
     }
 
-    pub fn is_forbidden_unchecked(&self) -> bool {
-        let four_masked = self.apply_mask(UNIT_ANY_FOUR_MASK);
-        let three_masked = self.apply_mask(UNIT_OPEN_THREE_MASK);
-        let overline_masked = self.apply_mask(UNIT_OVERLINE_MASK);
-        let five_masked = self.apply_mask(UNIT_FIVE_MASK);
+    pub fn has_fork_unchecked(&self) -> bool {
+        self.apply_mask(UNIT_CLOSED_FOUR_MASK | UNIT_OPEN_THREE_MASK).count_ones() > 1
+    }
 
-        (four_masked.count_ones() > 1
-            || three_masked.count_ones() > 1
-            || overline_masked != 0
-        ) && five_masked == 0
+    pub fn is_forbidden_unchecked(&self) -> bool {
+        (self.count_total_fours() > 1 || self.count_open_threes() > 1 || self.has_overline())
+            && !self.has_five()
     }
 
     pub fn apply_mask_mut<const D: Direction>(&mut self, pattern: u8) {
@@ -266,7 +260,9 @@ impl Patterns {
         self.counts.clear_slice_mut::<C, D>(slice.idx as usize);
 
         let start_idx = slice.start_pos.idx_usize();
-        let mut clear_mask = slice.pattern_bitmap.get::<C>();
+
+        let mut clear_mask = std::mem::take(slice.pattern_bitmap.get_ref_mut::<C>());
+
         while clear_mask != 0 {
             let slice_idx = clear_mask.trailing_zeros() as usize;
             clear_mask &= clear_mask - 1;
@@ -274,8 +270,6 @@ impl Patterns {
             let idx = step_idx!(D, start_idx, slice_idx);
             self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<D>(0);
         }
-
-        *slice.pattern_bitmap.get_ref_mut::<C>() = 0;
     }
 
     fn update_with_slice_pattern_mut<const C: Color, const D: Direction>(
@@ -295,7 +289,11 @@ impl Patterns {
             (slice_pattern.patterns & SLICE_PATTERN_OPEN_FOUR_MASK).count_ones() as u8,
         );
 
-        let pattern_bitmap = encode_u128_into_u16(slice_pattern.patterns);
+        let pattern_bitmap = std::mem::replace(
+            slice.pattern_bitmap.get_ref_mut::<C>(),
+            encode_u128_into_u16(slice_pattern.patterns)
+        );
+
         let slice_patterns = slice_pattern.patterns.to_le_bytes();
 
         let start_idx = slice.start_pos.idx_usize();
@@ -311,8 +309,6 @@ impl Patterns {
                 self.candidate_forbidden_field.set_idx_mut(idx);
             }
         }
-
-        *slice.pattern_bitmap.get_ref_mut::<C>() = pattern_bitmap;
     }
 
 }
@@ -330,7 +326,7 @@ impl Iterator for DirectionIterator {
             let tails = self.packed_unit.trailing_zeros();
             self.packed_unit &= self.packed_unit - 1;
 
-            Direction::from_pattern_position(tails)
+            Direction::from(tails as u8 / 8)
         })
     }
 
