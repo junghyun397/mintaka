@@ -7,7 +7,7 @@ use crate::memo::transposition_table::TranspositionTable;
 use crate::protocol::command::Command;
 use crate::protocol::message::GameResult;
 use crate::protocol::response::{Response, ResponseSender};
-use crate::search_minimal::iterative_deepening_minimal;
+use crate::search::iterative_deepening;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::time_manager::TimeManager;
@@ -365,7 +365,7 @@ impl GameAgent {
             );
 
             let handle = s.spawn(move || {
-                let (score, best_move) = iterative_deepening_minimal::<{ RuleKind::Renju }, MainThread<_>>( // todo: debug
+                let (score, best_move) = iterative_deepening::<{ RuleKind::Renju }, MainThread<_>>(
                     &mut main_td, state
                 );
 
@@ -383,7 +383,7 @@ impl GameAgent {
                 );
 
                 s.spawn(move || {
-                    iterative_deepening_minimal::<{ RuleKind::Renju }, WorkerThread>( // todo: debug
+                    iterative_deepening::<{ RuleKind::Renju }, WorkerThread>(
                         &mut worker_td, state
                     );
                 });

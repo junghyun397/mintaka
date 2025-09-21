@@ -69,18 +69,20 @@ impl Evaluator for HeuristicEvaluator {
         }
 
         let parent_score =
-            if let Some(&(hash_key, score)) = self.eval_history.get(state.len() - 2)
-                && hash_key == state.board.hash_key.set(!state.board.player_color, state.history.recent_action().unwrap())
-            {
-                -score
-            } else if state.len() > 1 {
-                let parent_board = state.board.unset(state.history.recent_action().unwrap());
+            if state.len() > 1 {
+                if let Some(&(hash_key, score)) = self.eval_history.get(state.len() - 2)
+                    && hash_key == state.board.hash_key.set(!state.board.player_color, state.history.recent_action().unwrap())
+                {
+                    -score
+                } else {
+                    let parent_board = state.board.unset(state.history.recent_action().unwrap());
 
-                let parent_score = self.eval_board_value(&parent_board, !parent_board.hot_field);
+                    let parent_score = self.eval_board_value(&parent_board, !parent_board.hot_field);
 
-                self.eval_history[state.len() - 2] = (parent_board.hash_key, parent_score);
+                    self.eval_history[state.len() - 2] = (parent_board.hash_key, parent_score);
 
-                -parent_score
+                    -parent_score
+                }
             } else {
                 0
             };

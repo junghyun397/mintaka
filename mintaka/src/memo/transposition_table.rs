@@ -134,12 +134,12 @@ impl TTView<'_> {
 
     pub fn probe(&self, key: HashKey) -> Option<TTEntry> {
         let idx = self.calculate_index(key);
-        self.table[idx].probe(key.into())
+        self.table[idx].probe(key)
     }
 
     pub fn store_entry(&self, key: HashKey, entry: TTEntry) {
         let idx = self.calculate_index(key);
-        self.table[idx].store(key.into(), entry);
+        self.table[idx].store(key, entry);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -161,7 +161,7 @@ impl TTView<'_> {
 
         let bucket = &self.table[idx];
 
-        if let Some(mut entry) = bucket.probe(key.into()) {
+        if let Some(mut entry) = bucket.probe(key) {
             let entry_score_kind = entry.tt_flag.score_kind();
 
             let replace_score = depth + score_kind as u8 + 5;
@@ -181,7 +181,7 @@ impl TTView<'_> {
                 entry.eval = eval;
                 entry.score = score;
 
-                bucket.store(key.into(), entry);
+                bucket.store(key, entry);
             }
         } else {
             let entry = TTEntry {
@@ -193,7 +193,7 @@ impl TTView<'_> {
                 score,
             };
 
-            bucket.store(key.into(), entry);
+            bucket.store(key, entry);
         }
     }
 

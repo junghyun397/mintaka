@@ -348,7 +348,7 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
                 println!("{}",
                      game_agent.state.board.to_string_with_heatmap_and_last_moves(
                          best_move.root_scores,
-                         true,
+                         false,
                          game_agent.state.history.recent_action_pair()
                      )
                 );

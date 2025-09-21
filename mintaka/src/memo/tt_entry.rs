@@ -8,21 +8,6 @@ const KEY_SIZE: usize = 21;
 const KEY_SHIFT: usize = 64 - KEY_SIZE;
 const KEY_MASK: u64 = !(u64::MAX << KEY_SIZE as u64);
 
-#[derive(Copy, Clone)]
-pub struct TTEntryKey {
-    key: u64
-}
-
-impl From<HashKey> for TTEntryKey {
-
-    fn from(hash_key: HashKey) -> Self {
-        Self {
-            key: u64::from(hash_key) >> KEY_SHIFT,
-        }
-    }
-
-}
-
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
 pub enum ScoreKind {
@@ -155,38 +140,44 @@ impl AbstractTTEntry for TTEntryBucket {
 
 impl TTEntryBucket {
 
-    fn calculate_slot_index(entry_key: TTEntryKey) -> usize {
-        (((entry_key.key) * Self::BUCKET_SIZE) >> KEY_SIZE) as usize
+    fn calculate_slot_index(key: HashKey) -> usize {
+        let masked_key = u64::from(key) & KEY_MASK;
+
+        ((masked_key * Self::BUCKET_SIZE) >> KEY_SIZE) as usize
     }
 
     fn calculate_lane_shift(slot_idx: usize) -> usize {
         KEY_SIZE * (slot_idx % 3)
     }
 
-    pub(crate) fn probe(&self, entry_key: TTEntryKey) -> Option<TTEntry> {
-        let slot_idx = Self::calculate_slot_index(entry_key);
+    pub(crate) fn probe(&self, key: HashKey) -> Option<TTEntry> {
+        let masked_key = u64::from(key) & KEY_MASK;
+
+        let slot_idx = Self::calculate_slot_index(key);
         let keys_idx = slot_idx / 3;
         let lane_shift = Self::calculate_lane_shift(slot_idx);
 
         let keys = self.keys[keys_idx].load(Ordering::Relaxed);
-        (((keys >> lane_shift) & KEY_MASK) == entry_key.key)
+        (((keys >> lane_shift) & KEY_MASK) == masked_key)
             .then(|| self.entries[slot_idx].load(Ordering::Relaxed).into())
     }
 
-    fn store_key(&self, bucket_idx: usize, entry_key: TTEntryKey) {
+    fn store_key(&self, bucket_idx: usize, masked_key: u64) {
         let keys_idx = bucket_idx / 3;
         let lane_shift = Self::calculate_lane_shift(bucket_idx);
 
         let mut keys = self.keys[keys_idx].load(Ordering::Acquire);
-        keys = (keys & !(KEY_MASK << lane_shift)) | (entry_key.key << lane_shift);
+        keys = (keys & !(KEY_MASK << lane_shift)) | (masked_key << lane_shift);
 
         self.keys[keys_idx].store(keys, Ordering::Release);
     }
 
-    pub(crate) fn store(&self, entry_key: TTEntryKey, entry: TTEntry) {
-        let slot_idx = Self::calculate_slot_index(entry_key);
+    pub(crate) fn store(&self, key: HashKey, entry: TTEntry) {
+        let masked_key = u64::from(key) & KEY_MASK;
 
-        self.store_key(slot_idx, entry_key);
+        let slot_idx = Self::calculate_slot_index(key);
+
+        self.store_key(slot_idx, masked_key);
         self.entries[slot_idx].store(entry.into(), Ordering::Relaxed);
     }
 
