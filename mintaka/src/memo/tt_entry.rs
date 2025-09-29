@@ -140,10 +140,12 @@ impl AbstractTTEntry for TTEntryBucket {
 
 impl TTEntryBucket {
 
-    fn calculate_slot_index(key: HashKey) -> usize {
-        let masked_key = u64::from(key) & KEY_MASK;
+    fn pack_hash_key(key: HashKey) -> u64 {
+        u64::from(key) & KEY_MASK
+    }
 
-        ((masked_key * Self::BUCKET_SIZE) >> KEY_SIZE) as usize
+    fn calculate_slot_index(packed_key: u64) -> usize {
+        ((packed_key * Self::BUCKET_SIZE) >> KEY_SIZE) as usize
     }
 
     fn calculate_lane_shift(slot_idx: usize) -> usize {
@@ -151,20 +153,20 @@ impl TTEntryBucket {
     }
 
     pub(crate) fn probe(&self, key: HashKey) -> Option<TTEntry> {
-        let masked_key = u64::from(key) & KEY_MASK;
+        let packed_key = Self::pack_hash_key(key);
 
-        let slot_idx = Self::calculate_slot_index(key);
+        let slot_idx = Self::calculate_slot_index(packed_key);
         let keys_idx = slot_idx / 3;
         let lane_shift = Self::calculate_lane_shift(slot_idx);
 
         let keys = self.keys[keys_idx].load(Ordering::Relaxed);
-        (((keys >> lane_shift) & KEY_MASK) == masked_key)
+        (((keys >> lane_shift) & KEY_MASK) == packed_key)
             .then(|| self.entries[slot_idx].load(Ordering::Relaxed).into())
     }
 
-    fn store_key(&self, bucket_idx: usize, masked_key: u64) {
-        let keys_idx = bucket_idx / 3;
-        let lane_shift = Self::calculate_lane_shift(bucket_idx);
+    fn store_key(&self, slot_idx: usize, masked_key: u64) {
+        let keys_idx = slot_idx / 3;
+        let lane_shift = Self::calculate_lane_shift(slot_idx);
 
         let mut keys = self.keys[keys_idx].load(Ordering::Acquire);
         keys = (keys & !(KEY_MASK << lane_shift)) | (masked_key << lane_shift);
@@ -173,11 +175,11 @@ impl TTEntryBucket {
     }
 
     pub(crate) fn store(&self, key: HashKey, entry: TTEntry) {
-        let masked_key = u64::from(key) & KEY_MASK;
+        let packed_key = Self::pack_hash_key(key);
 
-        let slot_idx = Self::calculate_slot_index(key);
+        let slot_idx = Self::calculate_slot_index(packed_key);
 
-        self.store_key(slot_idx, masked_key);
+        self.store_key(slot_idx, packed_key);
         self.entries[slot_idx].store(entry.into(), Ordering::Relaxed);
     }
 

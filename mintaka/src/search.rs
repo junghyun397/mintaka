@@ -147,6 +147,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
         .access(!state.board.player_color)
+        && td.ply + 1 <= value::MAX_PLY
     { // defend immediate win
         if state.board.player_color == Color::Black
             && state.board.patterns.forbidden_field.is_hot(pos)
@@ -170,6 +171,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         td.push_ply_mut(pos);
         state.set_mut(pos);
 
+        // no depth reduction for forced defense
         let score = -pvs::<R, TH, NT::NextType>(td, state, depth_left, -beta, -alpha);
 
         td.pop_ply_mut();
@@ -265,13 +267,19 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         moves_made += 1;
 
+        let reduced_depth_left = {
+            let mut reduce = 1;
+
+            depth_left - reduce
+        };
+
         let score = if moves_made == 1 { // full-window search
-            -pvs::<R, TH, NT::NextType>(td, state, depth_left - 1, -beta, -alpha)
+            -pvs::<R, TH, NT::NextType>(td, state, reduced_depth_left, -beta, -alpha)
         } else { // zero-window search
-            let mut score = -pvs::<R, TH, OffPVNode>(td, state, depth_left - 1, -alpha - 1, -alpha);
+            let mut score = -pvs::<R, TH, OffPVNode>(td, state, reduced_depth_left, -alpha - 1, -alpha);
 
             if score > alpha { // zero-window failed, full-window search
-                score = -pvs::<R, TH, NT::NextType>(td, state, depth_left - 1, -beta, -alpha);
+                score = -pvs::<R, TH, NT::NextType>(td, state, reduced_depth_left, -beta, -alpha);
             }
 
             score

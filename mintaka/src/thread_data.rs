@@ -7,6 +7,7 @@ use crate::memo::transposition_table::TTView;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_frame::{SearchFrame, KILLER_MOVE_SLOTS};
 use crate::thread_type::ThreadType;
+use crate::value;
 use crate::value::{Depth, MAX_PLY};
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
@@ -23,12 +24,12 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
 
     pub tt: TTView<'a>,
     pub ht: Box<HistoryTable>,
-    pub ss: Box<[SearchFrame; MAX_PLY]>,
-    pub pvs: Box<[PrincipalVariation; MAX_PLY]>,
-    pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; MAX_PLY]>,
-    pub root_scores: Box<[[f32; pos::BOARD_SIZE]; MAX_PLY]>,
+    pub ss: Box<[SearchFrame; value::MAX_PLY_SLOTS]>,
+    pub pvs: Box<[PrincipalVariation; value::MAX_PLY_SLOTS]>,
+    pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; value::MAX_PLY_SLOTS]>,
+    pub root_scores: Box<[[f32; pos::BOARD_SIZE]; value::MAX_PLY_SLOTS]>,
 
-    pub vcf_stack: Box<[EndgameFrame; MAX_PLY]>,
+    pub vcf_stack: Box<[EndgameFrame; MAX_PLY + 1]>,
     pub endgame_stack_top: usize,
 
     pub batch_counter: BatchCounter<'a>,
@@ -61,8 +62,8 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
             ht: Box::new(ht),
             ss: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             pvs: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
-            killers: Box::new([[MaybePos::NONE; 2]; MAX_PLY]),
-            root_scores: Box::new([[f32::NAN; pos::BOARD_SIZE]; MAX_PLY]),
+            killers: Box::new([[MaybePos::NONE; 2]; value::MAX_PLY_SLOTS]),
+            root_scores: Box::new([[f32::NAN; pos::BOARD_SIZE]; value::MAX_PLY_SLOTS]),
             vcf_stack: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             endgame_stack_top: 0,
             batch_counter: BatchCounter::new(global_counter_in_1k),

@@ -14,7 +14,7 @@ use rusty_renju::{const_for, pattern};
 #[derive(Clone)]
 pub struct HeuristicEvaluator {
     move_scores: MoveScores,
-    eval_history: [(HashKey, Score); value::MAX_PLY]
+    eval_history: [(HashKey, Score); value::MAX_PLY_SLOTS]
 }
 
 impl Evaluator for HeuristicEvaluator {
@@ -24,7 +24,7 @@ impl Evaluator for HeuristicEvaluator {
     fn from_state(state: &GameState) -> Self {
         Self {
             move_scores: (&state.board.hot_field).into(),
-            eval_history: [(HashKey::INVALID, Score::DRAW); value::MAX_PLY]
+            eval_history: [(HashKey::INVALID, Score::DRAW); value::MAX_PLY_SLOTS]
         }
     }
 
