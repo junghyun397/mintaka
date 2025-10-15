@@ -52,7 +52,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     'iterative_deepening: for depth in 1 ..= td.config.max_depth {
         td.depth = depth;
 
-        let iter_score = if depth < 7 {
+        let iter_score = if depth < 7 || true { // todo: debug
             pvs::<R, TH, RootNode>(td, &mut state, depth, -Score::INF, Score::INF)
         } else {
             aspiration::<R, TH>(td, &mut state, depth, score)
@@ -72,7 +72,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
                 score,
                 pv: td.pvs[0],
                 total_nodes_in_1k: td.batch_counter.count_global_in_1k(),
-                depth
+                depth,
             })
         }
     }
@@ -86,11 +86,12 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     max_depth: Depth,
     prev_score: Score,
 ) -> Score {
+    let min_depth = (max_depth / 2).max(1);
+    let mut depth = max_depth;
+
     let mut delta = value::ASPIRATION_INITIAL_DELTA + prev_score / 1024;
     let mut alpha = (prev_score - delta).max(-Score::INF);
     let mut beta = (prev_score + delta).min(Score::INF);
-    let mut depth = max_depth;
-    let min_depth = (depth / 2).max(1);
 
     loop {
         let score = pvs::<R, TH, RootNode>(td, state, depth, alpha, beta);
@@ -213,7 +214,9 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         tt_pv = entry.tt_flag.is_pv();
         tt_endgame_visited = entry.tt_flag.endgame_visited();
 
-        if !NT::IS_PV // tt-cutoff
+        // tt-cutoff
+        if !NT::IS_PV
+            && depth_left <= entry.depth as Depth
             && match entry.tt_flag.score_kind() {
                 ScoreKind::LowerBound => tt_score >= beta,
                 ScoreKind::UpperBound => tt_score <= alpha,
@@ -233,6 +236,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     }
 
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
+        return static_eval; // todo: debug
         return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
     }
 
@@ -253,7 +257,11 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
     let mut moves_made = 0;
 
-    'position_search: while let Some(MoveEntry { pos, .. }) = move_picker.next(td, state) {
+    'position_search: while let Some(MoveEntry { pos, policy_score }) = move_picker.next(td, state) {
+        // if td.ply == 0 { // todo: debug
+        //     println!("{}, {}, {}", depth_left, moves_made, td.batch_counter.count_global_in_1k());
+        // }
+
         if !state.board.is_legal_move(pos) {
             continue;
         }
@@ -292,10 +300,6 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             return Score::DRAW;
         }
 
-        if NT::IS_ROOT {
-            td.push_root_move(pos, score);
-        }
-
         if score <= best_score {
             continue;
         }
@@ -303,6 +307,10 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         best_score = score;
 
         if score > alpha { // improve alpha
+            if NT::IS_ROOT {
+                td.push_root_move_mut(pos, score, score_kind, 0);
+            }
+
             score_kind = ScoreKind::Exact;
 
             best_move = pos.into();

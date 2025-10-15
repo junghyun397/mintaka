@@ -4,6 +4,7 @@ use crate::endgame::accumulator::EndgameFrame;
 use crate::eval::evaluator::Evaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
+use crate::memo::tt_entry::ScoreKind;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_frame::{SearchFrame, KILLER_MOVE_SLOTS};
 use crate::thread_type::ThreadType;
@@ -12,7 +13,22 @@ use crate::value::{Depth, MAX_PLY};
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::Score;
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct RootMove {
+    pub score: RootScore,
+    pub nodes_in_1k: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum RootScore {
+    Exact(Score),
+    FailHigh,
+    FailLow,
+    #[default] Unknown,
+}
 
 #[derive(Clone)]
 pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
@@ -27,7 +43,7 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub ss: Box<[SearchFrame; value::MAX_PLY_SLOTS]>,
     pub pvs: Box<[PrincipalVariation; value::MAX_PLY_SLOTS]>,
     pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; value::MAX_PLY_SLOTS]>,
-    pub root_scores: Box<[[f32; pos::BOARD_SIZE]; value::MAX_PLY_SLOTS]>,
+    pub root_moves: Box<[RootMove; pos::BOARD_SIZE]>,
 
     pub vcf_stack: Box<[EndgameFrame; MAX_PLY + 1]>,
     pub endgame_stack_top: usize,
@@ -63,7 +79,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
             ss: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             pvs: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             killers: Box::new([[MaybePos::NONE; 2]; value::MAX_PLY_SLOTS]),
-            root_scores: Box::new([[f32::NAN; pos::BOARD_SIZE]; value::MAX_PLY_SLOTS]),
+            root_moves: Box::new([RootMove::default(); pos::BOARD_SIZE]),
             vcf_stack: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             endgame_stack_top: 0,
             batch_counter: BatchCounter::new(global_counter_in_1k),
@@ -94,8 +110,17 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
         self.aborted.load(Ordering::Relaxed)
     }
 
-    pub fn push_root_move(&mut self, pos: Pos, score: Score) {
-        self.root_scores[self.depth as usize - 1][pos.idx_usize()] = score as f32;
+    pub fn push_root_move_mut(&mut self, pos: Pos, score: Score, score_kind: ScoreKind, nodes_in_1k: usize) {
+        let score = match score_kind {
+            ScoreKind::UpperBound => RootScore::FailLow,
+            ScoreKind::LowerBound => RootScore::FailHigh,
+            ScoreKind::Exact => RootScore::Exact(score),
+        };
+
+        self.root_moves[pos.idx_usize()] = RootMove {
+            score,
+            nodes_in_1k
+        }
     }
 
     pub fn push_ply_mut(&mut self, pos: Pos) {

@@ -8,7 +8,7 @@ use crate::protocol::command::Command;
 use crate::protocol::message::GameResult;
 use crate::protocol::response::{Response, ResponseSender};
 use crate::search::iterative_deepening;
-use crate::thread_data::ThreadData;
+use crate::thread_data::{RootMove, ThreadData};
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::time_manager::TimeManager;
 use crate::value::Depth;
@@ -40,7 +40,7 @@ pub struct BestMove {
         serialize_with = "crate::utils::serde::serialize_array",
         deserialize_with = "crate::utils::serde::deserialize_array"
     )]
-    pub root_scores: [f32; pos::BOARD_SIZE],
+    pub root_moves: [RootMove; pos::BOARD_SIZE],
 }
 
 #[derive(Debug)]
@@ -411,7 +411,7 @@ impl GameAgent {
             depth_reached: main_td.depth_reached,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed,
-            root_scores: main_td.root_scores[main_td.depth_reached as usize - 1],
+            root_moves: *main_td.root_moves,
         }
     }
 

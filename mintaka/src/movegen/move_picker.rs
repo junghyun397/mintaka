@@ -76,18 +76,7 @@ impl MovePicker {
                         generate_defend_open_four_moves(state, &mut self.moves_buffer);
                         self.stage = MoveStage::DefendFour;
                     } else {
-                        let mut field = !state.board.hot_field & state.movegen_window.movegen_field;
-
-                        if state.board.player_color == Color::Black {
-                            field &= !state.board.patterns.forbidden_field;
-                        }
-
-                        let policy_buffer = td.evaluator.eval_policy(state);
-
-                        for idx in field.iter_hot_idx() {
-                            self.moves_buffer.push(Pos::from_index(idx as u8), policy_buffer[idx]);
-                        }
-
+                        self.push_all_moves(td, state);
                         self.stage = MoveStage::Neighbor;
                     }
                 },
@@ -95,6 +84,24 @@ impl MovePicker {
                     return self.moves_buffer.consume_best();
                 },
             }
+        }
+    }
+
+    fn push_all_moves(
+        &mut self,
+        td: &mut ThreadData<impl ThreadType, impl Evaluator>,
+        state: &GameState
+    ) {
+        let mut field = !state.board.hot_field & state.movegen_window.movegen_field;
+
+        if state.board.player_color == Color::Black {
+            field &= !state.board.patterns.forbidden_field;
+        }
+
+        let policy_buffer = td.evaluator.eval_policy(state);
+
+        for idx in field.iter_hot_idx() {
+            self.moves_buffer.push(Pos::from_index(idx as u8), policy_buffer[idx]);
         }
     }
 

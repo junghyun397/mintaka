@@ -186,10 +186,6 @@ pub fn pvs_minimal<const R: RuleKind, TH: ThreadType>(
             return Score::DRAW;
         }
 
-        if is_root {
-            td.push_root_move(pos, score);
-        }
-
         if score <= best_score {
             continue;
         }

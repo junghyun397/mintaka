@@ -27,10 +27,10 @@ impl<'a> BatchCounter<'a> {
 
     fn increment_amount_mut(&mut self, amount: usize) {
         self.buffer += amount;
-        if self.buffer >= 1024 {
+        if self.buffer >= 1000 {
             self.global_counter_in_1k.fetch_add(1, Ordering::Relaxed);
             self.local_counter_in_1k += 1;
-            self.buffer = 0;
+            self.buffer -= 1000;
         }
     }
 
