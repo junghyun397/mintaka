@@ -42,8 +42,13 @@ fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
     for message in message_receiver {
         match message {
             Message::Command(command) => {
-                let result = game_agent.command(command)?;
-                message_sender.result(result);
+                match game_agent.command(command) {
+                    Ok(result) => message_sender.result(result),
+                    Err(err) => {
+                        println!("error: {err}");
+                        continue;
+                    }
+                }
             },
             Message::Status(command) => match command {
                 StatusCommand::Version =>
@@ -68,8 +73,13 @@ fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
                     best_move.pos, best_move.score, best_move.depth_reached, best_move.total_nodes_in_1k, best_move.time_elapsed
                 );
 
-                let result = game_agent.command(Command::Play(best_move.pos))?;
-                message_sender.result(result);
+                match game_agent.command(Command::Play(best_move.pos)) {
+                    Ok(result) => message_sender.result(result),
+                    Err(err) => {
+                        println!("error: {err}");
+                        continue;
+                    }
+                }
             },
         }
     }
