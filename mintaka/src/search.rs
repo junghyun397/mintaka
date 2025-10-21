@@ -1,6 +1,6 @@
-use crate::endgame::vcf_search::vcf_search;
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
+use crate::memo::transposition_table::TTHit;
 use crate::memo::tt_entry::ScoreKind;
 use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker::MovePicker;
@@ -10,7 +10,6 @@ use crate::thread_data::{RootMove, ThreadData};
 use crate::thread_type::ThreadType;
 use crate::value;
 use crate::value::Depth;
-use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
@@ -225,37 +224,58 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     let mut tt_pv: bool;
     let mut tt_endgame_visited: bool;
 
-    if let Some(entry) = td.tt.probe(state.board.hash_key) { // tt-lookup
-        let tt_score = entry.score as Score;
+    match td.tt.probe(state.board.hash_key) {
+        TTHit::Eval(tt_eval) => {
+            tt_move = MaybePos::NONE;
+            tt_pv = false;
+            tt_endgame_visited = false;
 
-        tt_move = entry.best_move;
-        tt_pv = entry.tt_flag.is_pv();
-        tt_endgame_visited = entry.tt_flag.endgame_visited();
-
-        // tt-cutoff
-        if !NT::IS_PV
-            && depth_left <= entry.depth as Depth
-            && match entry.tt_flag.score_kind() {
-                ScoreKind::LowerBound => tt_score >= beta,
-                ScoreKind::UpperBound => tt_score <= alpha,
-                ScoreKind::Exact => true,
-            }
-        {
-            return tt_score;
+            static_eval = tt_eval;
         }
+        TTHit::Entry(entry) => {
+            let tt_score = entry.score as Score;
 
-        static_eval = entry.eval as Score;
-    } else {
-        tt_move = MaybePos::NONE;
-        tt_pv = false;
-        tt_endgame_visited = false;
+            tt_move = entry.best_move;
+            tt_pv = entry.tt_flag.is_pv();
+            tt_endgame_visited = entry.tt_flag.endgame_visited();
 
-        static_eval = td.evaluator.eval_value(state);
+            // tt-cutoff
+            if !NT::IS_PV
+                && depth_left <= entry.depth as Depth
+                && match entry.tt_flag.score_kind() {
+                    ScoreKind::LowerBound => tt_score >= beta,
+                    ScoreKind::UpperBound => tt_score <= alpha,
+                    ScoreKind::Exact => true,
+                }
+            {
+                return tt_score;
+            }
+
+            static_eval = entry.eval as Score;
+        },
+        TTHit::None => {
+            tt_move = MaybePos::NONE;
+            tt_pv = false;
+            tt_endgame_visited = false;
+
+            static_eval = td.evaluator.eval_value(state);
+
+            td.tt.store(
+                state.board.hash_key,
+                MaybePos::NONE,
+                None,
+                false,
+                0,
+                static_eval,
+                0,
+                false,
+            );
+        }
     }
 
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
         return static_eval; // todo: debug
-        return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
+        // return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
     }
 
     let original_alpha = alpha;
@@ -316,11 +336,11 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         td.pop_ply_mut();
         state.undo_mut(td.ss[td.ply].recovery_state);
 
-        if NT::IS_ROOT
-            && let Some(root_move_score_kind) = fetch_score_kind_from_tt(td, hash_key)
-        {
-            td.push_root_move_mut(pos, score, root_move_score_kind, 0);
-        }
+        // if NT::IS_ROOT
+        //     && let Some(root_move_score_kind) = fetch_score_kind_from_tt(td, hash_key)
+        // {
+        //     td.push_root_move_mut(pos, score, root_move_score_kind, 0);
+        // }
 
         if td.is_aborted() {
             return Score::DRAW;
@@ -372,20 +392,13 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     td.tt.store(
         state.board.hash_key,
         best_move,
-        score_kind,
+        Some(score_kind),
         tt_endgame_visited,
         depth_left,
         static_eval,
         best_score,
-        NT::IS_PV
+        NT::IS_PV,
     );
 
     best_score
-}
-
-fn fetch_score_kind_from_tt(
-    td: &ThreadData<impl ThreadType, impl Evaluator>,
-    key: HashKey
-) -> Option<ScoreKind> {
-    td.tt.probe(key).map(|entry| entry.tt_flag.score_kind())
 }

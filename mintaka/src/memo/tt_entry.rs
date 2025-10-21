@@ -11,9 +11,15 @@ const KEY_MASK: u64 = !(u64::MAX << KEY_SIZE as u64);
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
 pub enum ScoreKind {
-    UpperBound = 0,
-    LowerBound = 1,
-    Exact = 2,
+    UpperBound = 1,
+    LowerBound = 2,
+    Exact = 3,
+}
+
+impl Into<u8> for ScoreKind {
+    fn into(self) -> u8 {
+        self as u8
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -31,8 +37,16 @@ impl TTFlag {
 
     const DEFAULT: Self = Self(0);
 
-    pub fn new(score_kind: ScoreKind, endgame_visited: bool, is_pv: bool) -> Self {
-        Self((score_kind as u8) | ((endgame_visited as u8) << 2) | ((is_pv as u8) << 3))
+    pub fn new(maybe_score_kind: Option<ScoreKind>, endgame_visited: bool, is_pv: bool) -> Self {
+        let score_kind = maybe_score_kind.map_or(0, ScoreKind::into);
+
+        Self(score_kind | ((endgame_visited as u8) << 2) | ((is_pv as u8) << 3))
+    }
+
+    pub fn maybe_score_kind(&self) -> Option<ScoreKind> {
+        let source = self.0 & 0b11;
+
+        (source != 0).then(|| unsafe { std::mem::transmute::<u8, ScoreKind>(source) })
     }
 
     pub fn score_kind(&self) -> ScoreKind {

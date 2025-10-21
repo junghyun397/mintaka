@@ -1,7 +1,7 @@
 use crate::endgame::accumulator::{EndgameAccumulator, EndgameFrame, EndgameMovesUnchecked, SequenceEndgameAccumulator};
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
-use crate::memo::transposition_table::TTView;
+use crate::memo::transposition_table::{TTHit, TTView};
 use crate::memo::tt_entry::ScoreKind;
 use crate::movegen::move_generator::generate_vcf_moves;
 use crate::thread_data::ThreadData;
@@ -233,7 +233,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
                 continue 'position_search;
             }
 
-            if let Some(entry) = td.tt.probe(tt_key) {
+            if let TTHit::Entry(entry) = td.tt.probe(tt_key) {
                 let mut abort = false;
 
                 if entry.tt_flag.endgame_visited() && !Score::is_deterministic(entry.score as Score)
@@ -308,7 +308,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
             continue 'vcf_search;
         }
 
-        if let Some(mut entry) = td.tt.probe(state.board.hash_key) {
+        if let TTHit::Entry(mut entry) = td.tt.probe(state.board.hash_key) {
             entry.tt_flag.set_endgame_visited(true);
 
             td.tt.store_entry(state.board.hash_key, entry);
@@ -316,11 +316,11 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
             td.tt.store(
                 state.board.hash_key,
                 MaybePos::NONE,
-                ScoreKind::LowerBound,
+                None,
                 true,
                 0,
-                acc.score(),
-                acc.score(),
+                0,
+                0,
                 false,
             );
         }
@@ -352,7 +352,7 @@ fn tt_store_vcf_win(
     tt.store(
         hash_key,
         four_pos.into(),
-        ScoreKind::Exact,
+        Some(ScoreKind::Exact),
         true,
         0,
         score,
@@ -372,7 +372,7 @@ fn tt_store_vcf_lose(
     tt.store(
         hash_key,
         defend_pos.into(),
-        ScoreKind::Exact,
+        Some(ScoreKind::Exact),
         true,
         0,
         score,

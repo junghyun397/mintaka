@@ -120,6 +120,12 @@ impl TranspositionTable {
 
 }
 
+pub enum TTHit {
+    Entry(TTEntry),
+    Eval(Score),
+    None
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct TTView<'a> {
     table: &'a [TTEntryBucket],
@@ -132,9 +138,16 @@ impl TTView<'_> {
         ((u64::from(key) as u128 * (self.table.len() as u128)) >> 64) as usize
     }
 
-    pub fn probe(&self, key: HashKey) -> Option<TTEntry> {
+    pub fn probe(&self, key: HashKey) -> TTHit {
         let idx = self.calculate_index(key);
-        self.table[idx].probe(key)
+
+        match self.table[idx].probe(key) {
+            Some(entry) => match entry.tt_flag.maybe_score_kind() {
+                Some(_) => TTHit::Entry(entry),
+                None => TTHit::Eval(entry.eval as Score)
+            },
+            None => TTHit::None
+        }
     }
 
     pub fn store_entry(&self, key: HashKey, entry: TTEntry) {
@@ -147,7 +160,7 @@ impl TTView<'_> {
         &self,
         key: HashKey,
         best_move: MaybePos,
-        score_kind: ScoreKind,
+        maybe_score_kind: Option<ScoreKind>,
         endgame_visited: bool,
         depth: Depth,
         eval: Score,
@@ -162,20 +175,21 @@ impl TTView<'_> {
         let bucket = &self.table[idx];
 
         if let Some(mut entry) = bucket.probe(key) {
-            let entry_score_kind = entry.tt_flag.score_kind();
+            let entry_score_kind = entry.tt_flag.maybe_score_kind();
 
-            let replace_score = depth + score_kind as u8 + 5;
-            let keep_score = entry.depth + entry_score_kind as u8;
+            let score_kind_value = maybe_score_kind.map(|score_kind| score_kind as u8).unwrap_or(0);
+            let replace_score = depth + score_kind_value + 5;
+            let keep_score = entry.depth + entry_score_kind.map_or(0, ScoreKind::into);
 
             if self.age > entry.age
-                || (score_kind == ScoreKind::Exact && entry_score_kind != ScoreKind::Exact)
+                || (maybe_score_kind == Some(ScoreKind::Exact) && entry_score_kind != Some(ScoreKind::Exact))
                 || replace_score > keep_score
             {
                 if best_move.is_some() {
                     entry.best_move = best_move;
                 }
 
-                entry.tt_flag = TTFlag::new(score_kind, endgame_visited, is_pv);
+                entry.tt_flag = TTFlag::new(maybe_score_kind, endgame_visited, is_pv);
                 entry.age = self.age;
                 entry.depth = depth;
                 entry.eval = eval;
@@ -186,7 +200,7 @@ impl TTView<'_> {
         } else {
             let entry = TTEntry {
                 best_move,
-                tt_flag: TTFlag::new(score_kind, endgame_visited, is_pv),
+                tt_flag: TTFlag::new(maybe_score_kind, endgame_visited, is_pv),
                 age: self.age,
                 depth,
                 eval,
