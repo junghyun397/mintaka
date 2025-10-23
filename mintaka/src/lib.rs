@@ -21,6 +21,5 @@ pub mod thread_type;
 pub mod time_manager;
 pub mod value;
 pub mod utils;
-pub mod search_minimal;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

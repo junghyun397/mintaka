@@ -4,6 +4,7 @@ use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::game_state::GameState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
+use crate::principal_variation::PrincipalVariation;
 use crate::protocol::command::Command;
 use crate::protocol::message::GameResult;
 use crate::protocol::response::{Response, ResponseSender};
@@ -36,6 +37,7 @@ pub struct BestMove {
     pub depth_reached: Depth,
     pub total_nodes_in_1k: usize,
     pub time_elapsed: Duration,
+    pub pv: PrincipalVariation,
     #[serde(
         serialize_with = "crate::utils::serde::serialize_array",
         deserialize_with = "crate::utils::serde::deserialize_array"
@@ -412,6 +414,7 @@ impl GameAgent {
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed,
             root_moves: *main_td.root_moves,
+            pv: main_td.root_pv
         }
     }
 

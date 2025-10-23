@@ -1,7 +1,9 @@
+use crate::value::Depth;
 use rusty_renju::assert_struct_sizes;
 use rusty_renju::memo::abstract_transposition_table::AbstractTTEntry;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
+use rusty_renju::notation::score::{Score, Scores};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const KEY_SIZE: usize = 21;
@@ -37,10 +39,13 @@ impl TTFlag {
 
     const DEFAULT: Self = Self(0);
 
-    pub fn new(maybe_score_kind: Option<ScoreKind>, endgame_visited: bool, is_pv: bool) -> Self {
-        let score_kind = maybe_score_kind.map_or(0, ScoreKind::into);
+    pub const MAX_TT_ENDGAME_DEPTH: Depth = 0b11111;
 
-        Self(score_kind | ((endgame_visited as u8) << 2) | ((is_pv as u8) << 3))
+    pub fn new(maybe_score_kind: Option<ScoreKind>, is_pv: bool, endgame_depth: Depth) -> Self {
+        let score_kind = maybe_score_kind.map_or(0, ScoreKind::into);
+        let tt_endgame_depth = Self::clamp_endgame_depth(endgame_depth);
+
+        Self(score_kind | ((is_pv as u8) << 2) | tt_endgame_depth << 3)
     }
 
     pub fn maybe_score_kind(&self) -> Option<ScoreKind> {
@@ -50,27 +55,37 @@ impl TTFlag {
     }
 
     pub fn score_kind(&self) -> ScoreKind {
+        let source = self.0 & 0b11;
+
+        debug_assert_ne!(source, 0);
+
         unsafe { std::mem::transmute::<u8, ScoreKind>(self.0 & 0b11) }
     }
 
-    pub fn endgame_visited(&self) -> bool {
+    pub fn is_pv(&self) -> bool {
         (self.0 >> 2) & 0b1 == 0b1
     }
 
-    pub fn is_pv(&self) -> bool {
-        (self.0 >> 3) & 0b1 == 0b1
+    pub fn endgame_depth(&self) -> Depth {
+        (self.0 >> 3) as Depth
     }
 
     pub fn set_score_kind(&mut self, score_kind: ScoreKind) {
         self.0 = (self.0 & !0b11) | score_kind as u8;
     }
 
-    pub fn set_endgame_visited(&mut self, endgame_visited: bool) {
-        self.0 = (self.0 & !(0b1 << 2)) | ((endgame_visited as u8) << 2);
+    pub fn set_pv(&mut self, is_pv: bool) {
+        self.0 = (self.0 & !(0b1 << 2)) | ((is_pv as u8) << 2);
     }
 
-    pub fn set_pv(&mut self, is_pv: bool) {
-        self.0 = (self.0 & !(0b1 << 3)) | ((is_pv as u8) << 3);
+    pub fn set_endgame_depth(&mut self, endgame_depth: Depth) {
+        let tt_endgame_depth = Self::clamp_endgame_depth(endgame_depth);
+
+        self.0 = (self.0 & !(0b11111 << 3)) | (tt_endgame_depth << 3);
+    }
+
+    fn clamp_endgame_depth(endgame_depth: Depth) -> u8 {
+        endgame_depth.clamp(0, Self::MAX_TT_ENDGAME_DEPTH) as u8
     }
 
 }
@@ -114,6 +129,12 @@ impl TTEntry {
         eval: 0,
         score: 0,
     };
+
+    pub fn eval(&self) -> Score {
+        let eval = self.eval as Score;
+
+        if eval == Score::NAN { 0 } else { eval }
+    }
 
 }
 

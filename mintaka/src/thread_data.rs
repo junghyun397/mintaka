@@ -45,6 +45,7 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; value::MAX_PLY_SLOTS]>,
 
     pub root_moves: Box<[RootMove; pos::BOARD_SIZE]>,
+    pub root_pv: PrincipalVariation,
     pub singular_root: bool,
 
     pub vcf_stack: Box<[EndgameFrame; MAX_PLY + 1]>,
@@ -82,6 +83,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
             pvs: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             killers: Box::new([[MaybePos::NONE; 2]; value::MAX_PLY_SLOTS]),
             root_moves: Box::new([RootMove::default(); pos::BOARD_SIZE]),
+            root_pv: PrincipalVariation::EMPTY,
             singular_root: false,
             vcf_stack: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             endgame_stack_top: 0,

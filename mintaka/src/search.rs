@@ -1,9 +1,11 @@
+use crate::endgame::vcf_search::vcf_search;
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::memo::transposition_table::TTHit;
 use crate::memo::tt_entry::ScoreKind;
 use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker::MovePicker;
+use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
 use crate::search_frame::SearchFrame;
 use crate::thread_data::{RootMove, ThreadData};
@@ -50,13 +52,14 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
 ) -> (Score, MaybePos) {
     let mut score: Score = 0;
     let mut best_move = MaybePos::NONE;
+    let mut root_pv = PrincipalVariation::EMPTY;
 
     let mut root_moves = Box::new(unsafe { MaybeUninit::uninit().assume_init() });
 
     'iterative_deepening: for depth in 1 ..= td.config.max_depth {
         td.depth = depth;
 
-        let iter_score = if depth < 7 || true {
+        let iter_score = if depth < 5 {
             pvs::<R, TH, RootNode>(td, &mut state, depth, -Score::INF, Score::INF)
         } else {
             aspiration::<R, TH>(td, &mut state, depth, score)
@@ -68,6 +71,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
 
         score = iter_score;
         best_move = td.best_move;
+        root_pv = td.pvs[0];
         td.depth_reached = depth;
 
         root_moves = std::mem::replace(&mut td.root_moves, Box::new([RootMove::default(); pos::BOARD_SIZE]));
@@ -82,12 +86,13 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
             })
         }
 
-        if td.singular_root && Score::is_deterministic(iter_score) {
+        if td.singular_root && Score::is_winning(iter_score) {
             break 'iterative_deepening;
         }
     }
 
     td.root_moves = root_moves;
+    td.root_pv = root_pv;
 
     (score, best_move)
 }
@@ -109,21 +114,21 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
         let score = pvs::<R, TH, RootNode>(td, state, depth, alpha, beta);
 
         if td.is_aborted() {
-            return score;
+            return 0;
         }
 
         if score <= alpha { // fail-low
             beta = (alpha + beta) / 2;
-            alpha = (alpha - delta).max(-Score::INF);
+            alpha = (score - delta).max(-Score::INF);
             depth = max_depth;
         } else if score >= beta { // fail-high
-            beta = (beta + delta).min(Score::INF);
+            beta = (score + delta).min(Score::INF);
             depth = (depth - 1).max(min_depth);
-        } else { // expected
+        } else { // exact
             return score;
         }
 
-        delta += delta / 2;
+        delta *= 2;
     }
 }
 
@@ -222,13 +227,13 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     let mut static_eval: Score;
     let mut tt_move: MaybePos;
     let mut tt_pv: bool;
-    let mut tt_endgame_visited: bool;
+    let mut tt_vcf_depth: Depth;
 
     match td.tt.probe(state.board.hash_key) {
         TTHit::Eval(tt_eval) => {
             tt_move = MaybePos::NONE;
             tt_pv = false;
-            tt_endgame_visited = false;
+            tt_vcf_depth = 0;
 
             static_eval = tt_eval;
         }
@@ -237,7 +242,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
             tt_move = entry.best_move;
             tt_pv = entry.tt_flag.is_pv();
-            tt_endgame_visited = entry.tt_flag.endgame_visited();
+            tt_vcf_depth = entry.tt_flag.endgame_depth();
 
             // tt-cutoff
             if !NT::IS_PV
@@ -251,12 +256,12 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 return tt_score;
             }
 
-            static_eval = entry.eval as Score;
+            static_eval = entry.eval();
         },
         TTHit::None => {
             tt_move = MaybePos::NONE;
             tt_pv = false;
-            tt_endgame_visited = false;
+            tt_vcf_depth = 0;
 
             static_eval = td.evaluator.eval_value(state);
 
@@ -264,7 +269,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 state.board.hash_key,
                 MaybePos::NONE,
                 None,
-                false,
+                0,
                 0,
                 static_eval,
                 0,
@@ -274,8 +279,8 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     }
 
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
-        return static_eval; // todo: debug
-        // return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval);
+        // return static_eval; // todo: debug
+        return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval)
     }
 
     let original_alpha = alpha;
@@ -299,9 +304,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             continue;
         }
 
-        let hash_key = state.board.hash_key.set(state.board.player_color, pos);
-
-        td.tt.prefetch(hash_key);
+        td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
         td.ss[td.ply].last_pos = pos.into();
 
@@ -311,14 +314,26 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         moves_made += 1;
 
         let reduced_depth_left = {
-            let mut reduce = 1;
+            let mut reduction = 1;
 
             // late move reduction
-            if moves_made > 10 {
-                reduce += 1;
+            if !NT::IS_ROOT {
+                // move-count reduction
+                if depth_left != 1 && moves_made > 24 {
+                    reduction += 1;
+                }
+
+                // policy score reduction
+                if policy_score < 4 {
+                    reduction += 1;
+                }
             }
 
-            depth_left - reduce
+            // extension
+            if depth_left == 1 {
+            }
+
+            depth_left - reduction
         };
 
         let score = if moves_made == 1 { // full-window search
@@ -335,12 +350,6 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         td.pop_ply_mut();
         state.undo_mut(td.ss[td.ply].recovery_state);
-
-        // if NT::IS_ROOT
-        //     && let Some(root_move_score_kind) = fetch_score_kind_from_tt(td, hash_key)
-        // {
-        //     td.push_root_move_mut(pos, score, root_move_score_kind, 0);
-        // }
 
         if td.is_aborted() {
             return Score::DRAW;
@@ -393,7 +402,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         state.board.hash_key,
         best_move,
         Some(score_kind),
-        tt_endgame_visited,
+        tt_vcf_depth,
         depth_left,
         static_eval,
         best_score,

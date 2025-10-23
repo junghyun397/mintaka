@@ -3,7 +3,7 @@ use crate::value::Depth;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
-use rusty_renju::notation::score::Score;
+use rusty_renju::notation::score::{Score, Scores};
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize, Serializer};
 use std::io::{Read, Write};
@@ -138,13 +138,17 @@ impl TTView<'_> {
         ((u64::from(key) as u128 * (self.table.len() as u128)) >> 64) as usize
     }
 
-    pub fn probe(&self, key: HashKey) -> TTHit {
+    pub fn probe_entry(&self, key: HashKey) -> Option<TTEntry> {
         let idx = self.calculate_index(key);
+        self.table[idx].probe(key)
+    }
 
-        match self.table[idx].probe(key) {
-            Some(entry) => match entry.tt_flag.maybe_score_kind() {
-                Some(_) => TTHit::Entry(entry),
-                None => TTHit::Eval(entry.eval as Score)
+    pub fn probe(&self, key: HashKey) -> TTHit {
+        match self.probe_entry(key) {
+            Some(entry) => match (entry.tt_flag.maybe_score_kind(), entry.score as Score) {
+                (Some(_), _) => TTHit::Entry(entry),
+                (None, Score::NAN) => TTHit::None, // endgame entry
+                (None, _) => TTHit::Eval(entry.eval as Score),
             },
             None => TTHit::None
         }
@@ -161,7 +165,7 @@ impl TTView<'_> {
         key: HashKey,
         best_move: MaybePos,
         maybe_score_kind: Option<ScoreKind>,
-        endgame_visited: bool,
+        vcf_depth: Depth,
         depth: Depth,
         eval: Score,
         score: Score,
@@ -177,7 +181,7 @@ impl TTView<'_> {
         if let Some(mut entry) = bucket.probe(key) {
             let entry_score_kind = entry.tt_flag.maybe_score_kind();
 
-            let score_kind_value = maybe_score_kind.map(|score_kind| score_kind as u8).unwrap_or(0);
+            let score_kind_value = maybe_score_kind.map_or(0, ScoreKind::into);
             let replace_score = depth + score_kind_value + 5;
             let keep_score = entry.depth + entry_score_kind.map_or(0, ScoreKind::into);
 
@@ -189,7 +193,7 @@ impl TTView<'_> {
                     entry.best_move = best_move;
                 }
 
-                entry.tt_flag = TTFlag::new(maybe_score_kind, endgame_visited, is_pv);
+                entry.tt_flag = TTFlag::new(maybe_score_kind, is_pv, vcf_depth);
                 entry.age = self.age;
                 entry.depth = depth;
                 entry.eval = eval;
@@ -200,7 +204,7 @@ impl TTView<'_> {
         } else {
             let entry = TTEntry {
                 best_move,
-                tt_flag: TTFlag::new(maybe_score_kind, endgame_visited, is_pv),
+                tt_flag: TTFlag::new(maybe_score_kind, is_pv, vcf_depth),
                 age: self.age,
                 depth,
                 eval,
