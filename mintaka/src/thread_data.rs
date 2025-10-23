@@ -1,11 +1,11 @@
 use crate::batch_counter::BatchCounter;
 use crate::config::Config;
-use crate::endgame::accumulator::EndgameFrame;
 use crate::eval::evaluator::Evaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::memo::tt_entry::ScoreKind;
 use crate::principal_variation::PrincipalVariation;
+use crate::search_endgame::EndgameFrame;
 use crate::search_frame::{SearchFrame, KILLER_MOVE_SLOTS};
 use crate::thread_type::ThreadType;
 use crate::value;

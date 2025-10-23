@@ -1,12 +1,12 @@
-use crate::endgame::vcf_search::vcf_search;
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::memo::transposition_table::TTHit;
 use crate::memo::tt_entry::ScoreKind;
 use crate::movegen::move_list::MoveEntry;
-use crate::movegen::move_picker::MovePicker;
+use crate::movegen::move_picker::{MovePicker, KILLER_MOVE_POLICY_SCORE};
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
+use crate::search_endgame::vcf_search;
 use crate::search_frame::SearchFrame;
 use crate::thread_data::{RootMove, ThreadData};
 use crate::thread_type::ThreadType;
@@ -314,19 +314,21 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         moves_made += 1;
 
         let reduced_depth_left = {
-            let mut reduction = 1;
+            let mut reduction;
 
             // late move reduction
-            if !NT::IS_ROOT {
-                // move-count reduction
-                if depth_left != 1 && moves_made > 24 {
-                    reduction += 1;
-                }
+            if !NT::IS_ROOT
+                && policy_score < KILLER_MOVE_POLICY_SCORE
+                && depth_left > 1
+            {
+                reduction = 0;
 
                 // policy score reduction
                 if policy_score < 4 {
                     reduction += 1;
                 }
+            } else {
+                reduction = 0;
             }
 
             // extension

@@ -2,11 +2,11 @@
 mod test_vcf {
     use indoc::indoc;
     use mintaka::config::Config;
-    use mintaka::endgame::vcf_search;
     use mintaka::eval::evaluator::ActiveEvaluator;
     use mintaka::eval::evaluator::Evaluator;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
+    use mintaka::search_endgame;
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
     use rusty_renju::board;
@@ -32,7 +32,7 @@ mod test_vcf {
 
             let mut td = ThreadData::new(WorkerThread, 0, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
             let time = std::time::Instant::now();
-            let vcf_result = vcf_search::vcf_sequence::<{ RuleKind::Renju }>(&mut td, &state).unwrap();
+            let vcf_result = search_endgame::vcf_sequence::<{ RuleKind::Renju }>(&mut td, &state).unwrap();
             let time = time.elapsed();
 
             state.board.batch_set_mut(&vcf_result.clone().into_boxed_slice());

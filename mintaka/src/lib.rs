@@ -5,7 +5,6 @@
 
 pub mod batch_counter;
 pub mod config;
-pub mod endgame;
 pub mod eval;
 pub mod game_agent;
 pub mod game_state;
@@ -21,5 +20,6 @@ pub mod thread_type;
 pub mod time_manager;
 pub mod value;
 pub mod utils;
+pub mod search_endgame;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

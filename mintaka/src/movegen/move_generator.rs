@@ -1,6 +1,6 @@
-use crate::endgame::accumulator::{EndgameMovesUnchecked, ENDGAME_MAX_MOVES};
 use crate::game_state::GameState;
 use crate::movegen::move_list::MoveList;
+use crate::search_endgame::{EndgameMovesUnchecked, ENDGAME_MAX_MOVES};
 use rusty_renju::board::Board;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
