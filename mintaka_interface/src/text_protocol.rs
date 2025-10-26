@@ -340,7 +340,7 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
 
     let mut game_agent = GameAgent::from_state(config, game_state);
 
-    // game_agent.command(Command::Workers(num_cpus::get_physical() as u32))?; // todo: debug
+    game_agent.command(Command::Workers(num_cpus::get_physical() as u32))?; // todo: debug
 
     message_sender.launch();
 

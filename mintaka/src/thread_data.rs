@@ -44,6 +44,8 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub pvs: Box<[PrincipalVariation; value::MAX_PLY_SLOTS]>,
     pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; value::MAX_PLY_SLOTS]>,
 
+    pub lmr_table: Box<[[Depth; value::MAX_PLY_SLOTS]; 64]>,
+
     pub root_moves: Box<[RootMove; pos::BOARD_SIZE]>,
     pub root_pv: PrincipalVariation,
     pub singular_root: bool,
@@ -82,6 +84,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
             ss: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             pvs: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             killers: Box::new([[MaybePos::NONE; 2]; value::MAX_PLY_SLOTS]),
+            lmr_table: Box::new(build_lmr_table(config)),
             root_moves: Box::new([RootMove::default(); pos::BOARD_SIZE]),
             root_pv: PrincipalVariation::EMPTY,
             singular_root: false,
@@ -115,6 +118,13 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
         self.aborted.load(Ordering::Relaxed)
     }
 
+    pub fn lookup_lmr_table(&self, depth_left: Depth, moves_made: usize) -> Depth {
+        let depth_clamped = depth_left.clamp(0, 63) as usize;
+        let moves_made_clamped = moves_made.clamp(0, 63);
+
+        self.lmr_table[depth_clamped][moves_made_clamped]
+    }
+
     pub fn push_root_move_mut(&mut self, pos: Pos, score: Score, score_kind: ScoreKind, nodes_in_1k: usize) {
         let score = match score_kind {
             ScoreKind::UpperBound => RootScore::FailLow,
@@ -132,7 +142,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
         self.ply += 1;
         self.batch_counter.increment_single_mut();
 
-        self.ss[self.ply].last_pos = pos.into();
+        self.ss[self.ply].searching = pos.into();
     }
 
     pub fn pop_ply_mut(&mut self) {
@@ -170,4 +180,19 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
         Some(self.vcf_stack[self.endgame_stack_top])
     }
 
+}
+
+fn build_lmr_table(config: Config) -> [[Depth; value::MAX_PLY_SLOTS]; 64] {
+    let mut lmr_table = [[0; value::MAX_PLY_SLOTS]; 64];
+
+    let worker_factor = 1.0 + (config.workers.min(16) as f64) / 100.0;
+    let lmr_div = value::LMR_DIV * worker_factor;
+
+    for depth in 0 .. 64 {
+        for played in 0 .. 64 {
+            lmr_table[depth][played] = (value::LMR_BASE + (depth as f64).ln() * (played as f64).ln() / lmr_div) as Depth;
+        }
+    }
+
+    lmr_table
 }

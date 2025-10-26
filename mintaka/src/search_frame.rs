@@ -11,6 +11,6 @@ pub struct SearchFrame {
     pub static_eval: Score,
     pub on_pv: bool,
     pub recovery_state: RecoveryState,
-    pub last_pos: MaybePos,
+    pub searching: MaybePos,
     pub cutoffs: usize,
 }

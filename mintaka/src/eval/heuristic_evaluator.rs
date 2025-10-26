@@ -1,11 +1,11 @@
 use crate::eval::evaluator::{Evaluator, PolicyDistribution};
 use crate::game_state::GameState;
 use crate::movegen::move_scores::MoveScores;
-use crate::value;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::board::Board;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::{Color, ColorContainer};
+use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::score::{Score, Scores};
 use rusty_renju::pattern::Pattern;
@@ -14,7 +14,7 @@ use rusty_renju::{const_for, pattern};
 #[derive(Clone)]
 pub struct HeuristicEvaluator {
     move_scores: MoveScores,
-    eval_history: [(HashKey, Score); value::MAX_PLY_SLOTS]
+    eval_history: [(HashKey, Score); pos::BOARD_SIZE]
 }
 
 impl Evaluator for HeuristicEvaluator {
@@ -24,7 +24,7 @@ impl Evaluator for HeuristicEvaluator {
     fn from_state(state: &GameState) -> Self {
         Self {
             move_scores: (&state.board.hot_field).into(),
-            eval_history: [(HashKey::INVALID, Score::DRAW); value::MAX_PLY_SLOTS]
+            eval_history: [(HashKey::INVALID, Score::DRAW); pos::BOARD_SIZE]
         }
     }
 

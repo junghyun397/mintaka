@@ -19,7 +19,7 @@ use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{Score, Scores};
 use std::mem::MaybeUninit;
 
-pub trait NodeType {
+trait NodeType {
 
     const IS_ROOT: bool;
     const IS_PV: bool;
@@ -97,7 +97,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     (score, best_move)
 }
 
-pub fn aspiration<const R: RuleKind, TH: ThreadType>(
+fn aspiration<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<TH, impl Evaluator>,
     state: &mut GameState,
     max_depth: Depth,
@@ -132,7 +132,7 @@ pub fn aspiration<const R: RuleKind, TH: ThreadType>(
     }
 }
 
-pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
+fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     td: &mut ThreadData<TH, impl Evaluator>,
     state: &mut GameState,
     depth_left: Depth,
@@ -187,7 +187,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             static_eval: Score::lose_in(td.ply + 1),
             on_pv: NT::IS_PV,
             recovery_state: state.recovery_state(),
-            last_pos: pos.into(),
+            searching: pos.into(),
             cutoffs: 0,
         };
 
@@ -279,7 +279,6 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     }
 
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
-        // return static_eval; // todo: debug
         return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval)
     }
 
@@ -292,7 +291,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         hash_key: state.board.hash_key,
         static_eval,
         on_pv: NT::IS_PV || tt_pv,
-        last_pos: MaybePos::NONE,
+        searching: MaybePos::NONE,
         cutoffs: 0,
     };
 
@@ -306,7 +305,7 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
-        td.ss[td.ply].last_pos = pos.into();
+        td.ss[td.ply].searching = pos.into();
 
         td.push_ply_mut(pos);
         state.set_mut(pos);
@@ -314,25 +313,24 @@ pub fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         moves_made += 1;
 
         let reduced_depth_left = {
-            let mut reduction;
+            let mut reduction = 1;
 
             // late move reduction
             if !NT::IS_ROOT
                 && policy_score < KILLER_MOVE_POLICY_SCORE
                 && depth_left > 1
             {
-                reduction = 0;
+                // base reduction
+                reduction += td.lookup_lmr_table(depth_left, moves_made);
 
-                // policy score reduction
-                if policy_score < 4 {
-                    reduction += 1;
-                }
-            } else {
-                reduction = 0;
-            }
+                // reduction pv less
+                reduction -= NT::IS_PV as Depth;
 
-            // extension
-            if depth_left == 1 {
+                // reduction defense four less
+
+                // reduction sparse fail-highs
+
+                reduction = reduction.max(1);
             }
 
             depth_left - reduction
