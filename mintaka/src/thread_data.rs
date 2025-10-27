@@ -4,9 +4,10 @@ use crate::eval::evaluator::Evaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::memo::tt_entry::ScoreKind;
+use crate::movegen::move_picker;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_endgame::EndgameFrame;
-use crate::search_frame::{SearchFrame, KILLER_MOVE_SLOTS};
+use crate::search_frame::SearchFrame;
 use crate::thread_type::ThreadType;
 use crate::value;
 use crate::value::{Depth, MAX_PLY};
@@ -42,7 +43,7 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub ht: Box<HistoryTable>,
     pub ss: Box<[SearchFrame; value::MAX_PLY_SLOTS]>,
     pub pvs: Box<[PrincipalVariation; value::MAX_PLY_SLOTS]>,
-    pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; value::MAX_PLY_SLOTS]>,
+    pub killers: Box<[[MaybePos; move_picker::KILLER_MOVE_SLOTS]; value::MAX_PLY_SLOTS]>,
 
     pub lmr_table: Box<[[Depth; value::MAX_PLY_SLOTS]; 64]>,
 
@@ -141,8 +142,8 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
     pub fn push_ply_mut(&mut self, pos: Pos) {
         self.ply += 1;
         self.batch_counter.increment_single_mut();
-
-        self.ss[self.ply].searching = pos.into();
+        self.ss[self.ply].pos = pos.into();
+        self.ss[self.ply].cutoffs = 0;
     }
 
     pub fn pop_ply_mut(&mut self) {

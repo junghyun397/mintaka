@@ -3,7 +3,8 @@ use crate::game_state::GameState;
 use crate::memo::transposition_table::TTHit;
 use crate::memo::tt_entry::ScoreKind;
 use crate::movegen::move_list::MoveEntry;
-use crate::movegen::move_picker::{MovePicker, KILLER_MOVE_POLICY_SCORE};
+use crate::movegen::move_picker;
+use crate::movegen::move_picker::MovePicker;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
 use crate::search_endgame::vcf_search;
@@ -12,6 +13,7 @@ use crate::thread_data::{RootMove, ThreadData};
 use crate::thread_type::ThreadType;
 use crate::value;
 use crate::value::Depth;
+use rusty_renju::const_for;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
@@ -183,11 +185,11 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         }
 
         td.ss[td.ply] = SearchFrame {
-            hash_key: state.board.hash_key,
+            pos: pos.into(),
             static_eval: Score::lose_in(td.ply + 1),
             on_pv: NT::IS_PV,
             recovery_state: state.recovery_state(),
-            searching: pos.into(),
+            searching: MaybePos::NONE,
             cutoffs: 0,
         };
 
@@ -278,6 +280,14 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         }
     }
 
+    td.ss[td.ply].static_eval = static_eval;
+
+    let static_eval_improvement = if td.ply > 1 {
+        static_eval - td.ss[td.ply - 2].static_eval
+    } else {
+        0
+    };
+
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
         return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval)
     }
@@ -286,26 +296,38 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     let mut best_score = -Score::INF;
     let mut best_move = MaybePos::NONE;
 
-    td.ss[td.ply] = SearchFrame {
-        recovery_state: state.recovery_state(),
-        hash_key: state.board.hash_key,
-        static_eval,
-        on_pv: NT::IS_PV || tt_pv,
-        searching: MaybePos::NONE,
-        cutoffs: 0,
-    };
-
     let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
     let mut moves_made = 0;
+
+    td.ss[td.ply].recovery_state = state.recovery_state();
 
     'position_search: while let Some(MoveEntry { pos, policy_score }) = move_picker.next(td, state) {
         if !state.board.is_legal_move(pos) {
             continue;
         }
 
-        td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
+        if !NT::IS_PV
+            && !Score::is_losing(best_score)
+            && policy_score < move_picker::KILLER_MOVE_POLICY_SCORE
+        {
+            // move count pruning
+            let lmp_margin = lookup_lmp_table(depth_left, static_eval_improvement > 0);
+            if moves_made >= lmp_margin {
+                break;
+            }
 
-        td.ss[td.ply].searching = pos.into();
+            // futility pruning
+            let fp_margin = value::FP_BASE + value::FP_MUL * depth_left * depth_left;
+            if !Score::is_winning(alpha)
+                 && static_eval + fp_margin <= alpha
+            {
+                break;
+            }
+
+            // history pruning
+        }
+
+        td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
         td.push_ply_mut(pos);
         state.set_mut(pos);
@@ -317,7 +339,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
             // late move reduction
             if !NT::IS_ROOT
-                && policy_score < KILLER_MOVE_POLICY_SCORE
+                && policy_score < move_picker::KILLER_MOVE_POLICY_SCORE
                 && depth_left > 1
             {
                 // base reduction
@@ -327,11 +349,16 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 reduction -= NT::IS_PV as Depth;
 
                 // reduction defense four less
+                // reduction -= state.board.patterns.counts.global.access(state.board.player_color)
+                //     .open_fours.max(1) as Depth;
 
                 // reduction sparse fail-highs
+                // reduction -= (td.ss[td.ply].cutoffs < 4) as Depth;
 
                 reduction = reduction.max(1);
             }
+
+            // println!("{}", reduction);
 
             depth_left - reduction
         };
@@ -410,4 +437,25 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     );
 
     best_score
+}
+
+fn lookup_lmp_table(depth: Depth, is_improving: bool) -> usize {
+    let clamped_depth = (depth - 1).min(11) as usize;
+
+    LMP_TABLE[if is_improving { 1 } else { 0 }][clamped_depth]
+}
+
+const LMP_TABLE: [[usize; 12]; 2] = build_lmp_table();
+
+const fn build_lmp_table() -> [[usize; 12]; 2] {
+    let mut lmp_table = [[0; 12]; 2];
+
+    const_for!(depth in 0, 12; {
+        let pow_depth = depth as f64 * depth as f64;
+
+        lmp_table[0][depth] = value::LMP_BASE + (pow_depth / value::LMP_DIV_STATIC) as usize;
+        lmp_table[1][depth] = value::LMP_BASE + (pow_depth / value::LMP_DIV_IMPROVE) as usize;
+    });
+
+    lmp_table
 }

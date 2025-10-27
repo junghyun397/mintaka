@@ -2,12 +2,13 @@ use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::movegen::move_generator::generate_defend_open_four_moves;
 use crate::movegen::move_list::{MoveEntry, MoveList};
-use crate::search_frame::KILLER_MOVE_SLOTS;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::{Score, Scores};
+
+pub const KILLER_MOVE_SLOTS: usize = 2;
 
 pub const TT_MOVE_POLICY_SCORE: i16 = Score::INF as i16 - 500;
 pub const KILLER_MOVE_POLICY_SCORE: i16 = Score::INF as i16 - 1000;

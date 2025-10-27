@@ -23,6 +23,10 @@ pub trait Scores {
         score >= Self::DETERMINISTIC
     }
 
+    fn is_losing(score: Score) -> bool {
+        score <= -Self::DETERMINISTIC
+    }
+
     fn clamp(score: Score) -> Score {
         score.clamp(-Score::INF, Score::INF)
     }
