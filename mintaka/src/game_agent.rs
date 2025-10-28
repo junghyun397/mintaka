@@ -35,6 +35,7 @@ pub struct BestMove {
     pub pos: MaybePos,
     pub score: Score,
     pub depth_reached: Depth,
+    pub selective_depth: usize,
     pub total_nodes_in_1k: usize,
     pub time_elapsed: Duration,
     pub pv: PrincipalVariation,
@@ -369,7 +370,7 @@ impl GameAgent {
                 (main_td, score, best_move)
             });
 
-            for tid in 1 ..self.config.workers {
+            for tid in 1 .. self.config.workers {
                 let mut worker_td = ThreadData::new(
                     WorkerThread, tid,
                     self.config,
@@ -407,6 +408,7 @@ impl GameAgent {
             pos: best_move,
             score,
             depth_reached: main_td.depth_reached,
+            selective_depth: main_td.selective_depth,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed,
             pv: main_td.root_pv

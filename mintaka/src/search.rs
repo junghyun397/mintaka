@@ -54,9 +54,10 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     let mut best_move = MaybePos::NONE;
     let mut root_pv = PrincipalVariation::EMPTY;
 
-    'iterative_deepening: for depth in 1 ..= td.config.max_depth {
-        td.depth = depth;
+    let starting_depth = (td.tid % 10 + 1) as Depth;
+    let mut selective_depth = 0;
 
+    'iterative_deepening: for depth in starting_depth ..= td.config.max_depth {
         let iter_score = if depth < 5 {
             pvs::<R, TH, RootNode>(td, &mut state, depth, -Score::INF, Score::INF, false)
         } else {
@@ -71,6 +72,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
         best_move = td.best_move;
         root_pv = td.pvs[0];
         td.depth_reached = depth;
+        selective_depth = td.selective_depth;
 
         if TH::IS_MAIN {
             td.thread_type.make_response(Response::Status {
@@ -87,6 +89,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
         }
     }
 
+    td.selective_depth = selective_depth;
     td.root_pv = root_pv;
 
     (score, best_move)
@@ -148,6 +151,10 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     }
 
     td.pvs[td.ply].clear();
+
+    if td.selective_depth < td.ply {
+        td.selective_depth = td.ply;
+    }
 
     if let &Some(pos) = state.board.patterns.unchecked_five_pos
         .access(state.board.player_color)

@@ -55,8 +55,9 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     aborted: &'a AtomicBool,
 
     pub best_move: MaybePos,
-    pub depth: Depth,
+    pub selective_depth: usize,
     pub depth_reached: Depth,
+
     pub ply: usize,
 }
 
@@ -90,7 +91,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
             best_move: MaybePos::NONE,
-            depth: 0,
+            selective_depth: 0,
             depth_reached: 0,
             ply: 0,
         }

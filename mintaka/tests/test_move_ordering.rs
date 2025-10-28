@@ -23,7 +23,7 @@ mod test_movegen {
             let mut evaluator = ActiveEvaluator::from_state(&state);
 
             let tt = TranspositionTable::new_with_size(config.tt_size);
-            let ht = HistoryTable {};
+            let ht = HistoryTable::new();
 
             let global_counter_in_1k = AtomicUsize::new(0);
             let aborted = AtomicBool::new(false);
