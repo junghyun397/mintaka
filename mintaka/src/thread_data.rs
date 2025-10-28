@@ -3,7 +3,6 @@ use crate::config::Config;
 use crate::eval::evaluator::Evaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
-use crate::memo::tt_entry::ScoreKind;
 use crate::movegen::move_picker;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_endgame::EndgameFrame;
@@ -11,7 +10,6 @@ use crate::search_frame::SearchFrame;
 use crate::thread_type::ThreadType;
 use crate::value;
 use crate::value::{Depth, MAX_PLY};
-use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::Score;
 use serde::{Deserialize, Serialize};
@@ -47,7 +45,6 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
 
     pub lmr_table: Box<[[Depth; value::MAX_PLY_SLOTS]; 64]>,
 
-    pub root_moves: Box<[RootMove; pos::BOARD_SIZE]>,
     pub root_pv: PrincipalVariation,
     pub singular_root: bool,
 
@@ -86,7 +83,6 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
             pvs: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
             killers: Box::new([[MaybePos::NONE; 2]; value::MAX_PLY_SLOTS]),
             lmr_table: Box::new(build_lmr_table(config)),
-            root_moves: Box::new([RootMove::default(); pos::BOARD_SIZE]),
             root_pv: PrincipalVariation::EMPTY,
             singular_root: false,
             vcf_stack: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
@@ -111,7 +107,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
             )
     }
 
-    pub fn set_aborted_mut(&self) {
+    pub fn set_aborted(&self) {
         self.aborted.store(true, Ordering::Relaxed);
     }
 
@@ -126,53 +122,36 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
         self.lmr_table[depth_clamped][moves_made_clamped]
     }
 
-    pub fn push_root_move_mut(&mut self, pos: Pos, score: Score, score_kind: ScoreKind, nodes_in_1k: usize) {
-        let score = match score_kind {
-            ScoreKind::UpperBound => RootScore::FailLow,
-            ScoreKind::LowerBound => RootScore::FailHigh,
-            ScoreKind::Exact => RootScore::Exact(score),
-        };
-
-        self.root_moves[pos.idx_usize()] = RootMove {
-            score,
-            nodes_in_1k
-        }
-    }
-
-    pub fn push_ply_mut(&mut self, pos: Pos) {
+    pub fn push_ply(&mut self, pos: Pos) {
         self.ply += 1;
-        self.batch_counter.increment_single_mut();
+        self.batch_counter.increment_single();
         self.ss[self.ply].pos = pos.into();
         self.ss[self.ply].cutoffs = 0;
     }
 
-    pub fn pop_ply_mut(&mut self) {
+    pub fn pop_ply(&mut self) {
         self.ply -= 1;
     }
 
-    pub fn push_killer_move_mut(&mut self, pos: Pos) {
+    pub fn push_killer(&mut self, pos: Pos) {
         self.killers[self.ply][1] = self.killers[self.ply][0];
         self.killers[self.ply][0] = pos.into();
     }
 
-    pub fn clear_killer_move_mut(&mut self) {
-        self.killers[self.ply] = [MaybePos::NONE; 2];
+    pub fn clear_killer(&mut self) {
+        self.killers[self.ply + 1] = [MaybePos::NONE; 2];
     }
 
-    pub fn update_history_table_mut(&mut self, pos: Pos) {
-        // TODO
-    }
-
-    pub fn clear_endgame_stack_mut(&mut self) {
+    pub fn clear_endgame_stack(&mut self) {
         self.endgame_stack_top = 0;
     }
 
-    pub fn push_endgame_frame_mut(&mut self, frame: EndgameFrame) {
+    pub fn push_endgame_frame(&mut self, frame: EndgameFrame) {
         self.vcf_stack[self.endgame_stack_top] = frame;
         self.endgame_stack_top += 1;
     }
 
-    pub fn pop_endgame_frame_mut(&mut self) -> Option<EndgameFrame> {
+    pub fn pop_endgame_frame(&mut self) -> Option<EndgameFrame> {
         if self.endgame_stack_top == 0 {
             return None;
         }

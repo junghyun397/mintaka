@@ -48,7 +48,7 @@ impl TranspositionTable {
             age: AtomicU8::new(0),
         };
 
-        new.resize_mut(size);
+        new.resize(size);
 
         new
     }

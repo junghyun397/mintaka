@@ -2,6 +2,7 @@
 #![feature(adt_const_params)]
 #![feature(portable_simd)]
 #![cfg_attr(target_arch = "aarch64", feature(stdarch_aarch64_prefetch))]
+extern crate core;
 
 pub mod batch_counter;
 pub mod config;

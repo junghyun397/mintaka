@@ -5,12 +5,10 @@ use mintaka::game_state::GameState;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::message::{Message, MessageSender, StatusCommand};
 use mintaka::protocol::response::{CallBackResponseSender, Response};
-use mintaka::thread_data::{RootMove, RootScore};
 use mintaka_interface::preference::{Mode, Preference};
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::notation::color::UnknownColorError;
-use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{Pos, PosError};
 use rusty_renju::utils::byte_size::ByteSize;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -356,24 +354,8 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
 
                 let result = game_agent.command(Command::Play(best_move.pos))?;
 
-                let root_score_heatmap = {
-                    let mut heatmap = [f32::NAN; pos::BOARD_SIZE];
-
-                    for (idx, &RootMove { score, .. }) in best_move.root_moves.iter().enumerate() {
-                        if let RootScore::Exact(score) = score {
-                            heatmap[idx] = score as f32;
-                        }
-                    }
-
-                    heatmap
-                };
-
                 println!("{}",
-                     game_agent.state.board.to_string_with_heatmap_and_last_moves(
-                         root_score_heatmap,
-                         false,
-                         game_agent.state.history.recent_action_pair()
-                     )
+                     game_agent.state.board.to_string_with_last_moves(game_agent.state.history.recent_action_pair())
                 );
 
                 println!(

@@ -44,20 +44,20 @@ impl Bitfield {
         !self.is_hot_idx(pos.idx_usize())
     }
 
-    pub const fn set_idx_mut(&mut self, idx: usize) {
+    pub const fn set_idx(&mut self, idx: usize) {
         self.0[idx / 8] |= 0b1 << (idx % 8);
     }
 
-    pub const fn set_mut(&mut self, pos: Pos) {
-        self.set_idx_mut(pos.idx_usize());
+    pub const fn set(&mut self, pos: Pos) {
+        self.set_idx(pos.idx_usize());
     }
 
-    pub const fn unset_idx_mut(&mut self, idx: usize) {
+    pub const fn unset_idx(&mut self, idx: usize) {
         self.0[idx / 8] &= !(0b1 << (idx % 8));
     }
 
-    pub const fn unset_mut(&mut self, pos: Pos) {
-        self.unset_idx_mut(pos.idx_usize());
+    pub const fn unset(&mut self, pos: Pos) {
+        self.unset_idx(pos.idx_usize());
     }
 
     pub fn count_ones(&self) -> u32 {

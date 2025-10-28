@@ -9,17 +9,15 @@ use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
 use crate::search_endgame::vcf_search;
 use crate::search_frame::SearchFrame;
-use crate::thread_data::{RootMove, ThreadData};
+use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use crate::value;
 use crate::value::Depth;
 use rusty_renju::const_for;
 use rusty_renju::notation::color::Color;
-use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{Score, Scores};
-use std::mem::MaybeUninit;
 
 trait NodeType {
 
@@ -56,13 +54,11 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     let mut best_move = MaybePos::NONE;
     let mut root_pv = PrincipalVariation::EMPTY;
 
-    let mut root_moves = Box::new(unsafe { MaybeUninit::uninit().assume_init() });
-
     'iterative_deepening: for depth in 1 ..= td.config.max_depth {
         td.depth = depth;
 
         let iter_score = if depth < 5 {
-            pvs::<R, TH, RootNode>(td, &mut state, depth, -Score::INF, Score::INF)
+            pvs::<R, TH, RootNode>(td, &mut state, depth, -Score::INF, Score::INF, false)
         } else {
             aspiration::<R, TH>(td, &mut state, depth, score)
         };
@@ -75,8 +71,6 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
         best_move = td.best_move;
         root_pv = td.pvs[0];
         td.depth_reached = depth;
-
-        root_moves = std::mem::replace(&mut td.root_moves, Box::new([RootMove::default(); pos::BOARD_SIZE]));
 
         if TH::IS_MAIN {
             td.thread_type.make_response(Response::Status {
@@ -93,7 +87,6 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
         }
     }
 
-    td.root_moves = root_moves;
     td.root_pv = root_pv;
 
     (score, best_move)
@@ -113,7 +106,7 @@ fn aspiration<const R: RuleKind, TH: ThreadType>(
     let mut beta = (prev_score + delta).min(Score::INF);
 
     loop {
-        let score = pvs::<R, TH, RootNode>(td, state, depth, alpha, beta);
+        let score = pvs::<R, TH, RootNode>(td, state, depth, alpha, beta, false);
 
         if td.is_aborted() {
             return 0;
@@ -140,12 +133,13 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     depth_left: Depth,
     mut alpha: Score,
     mut beta: Score,
+    cut_node: bool,
 ) -> Score {
     if TH::IS_MAIN
         && td.should_check_limit()
         && td.search_limit_exceeded()
     {
-        td.set_aborted_mut();
+        td.set_aborted();
         return Score::DRAW;
     }
 
@@ -193,13 +187,13 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             cutoffs: 0,
         };
 
-        td.push_ply_mut(pos);
+        td.push_ply(pos);
         state.set_mut(pos);
 
         // no depth reduction for forced defense
-        let score = -pvs::<R, TH, NT::NextType>(td, state, depth_left, -beta, -alpha);
+        let score = -pvs::<R, TH, NT::NextType>(td, state, depth_left, -beta, -alpha, cut_node);
 
-        td.pop_ply_mut();
+        td.pop_ply();
         state.undo_mut(td.ss[td.ply].recovery_state);
 
         if td.is_aborted() {
@@ -292,14 +286,16 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval)
     }
 
+    td.ss[td.ply].recovery_state = state.recovery_state();
+
+    td.clear_killer();
+
     let original_alpha = alpha;
     let mut best_score = -Score::INF;
     let mut best_move = MaybePos::NONE;
 
     let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
     let mut moves_made = 0;
-
-    td.ss[td.ply].recovery_state = state.recovery_state();
 
     'position_search: while let Some(MoveEntry { pos, policy_score }) = move_picker.next(td, state) {
         if !state.board.is_legal_move(pos) {
@@ -311,7 +307,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             && policy_score < move_picker::KILLER_MOVE_POLICY_SCORE
         {
             // move count pruning
-            let lmp_margin = lookup_lmp_table(depth_left, static_eval_improvement > 0);
+            let lmp_margin = lookup_lmp_mc_table(depth_left, static_eval_improvement > 0);
             if moves_made >= lmp_margin {
                 break;
             }
@@ -329,7 +325,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
-        td.push_ply_mut(pos);
+        td.push_ply(pos);
         state.set_mut(pos);
 
         moves_made += 1;
@@ -345,8 +341,11 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 // base reduction
                 reduction += td.lookup_lmr_table(depth_left, moves_made);
 
+                // cut node reduction
+                reduction += Depth::from(cut_node);
+
                 // reduction pv less
-                reduction -= NT::IS_PV as Depth;
+                reduction -= Depth::from(NT::IS_PV);
 
                 // reduction defense four less
                 // reduction -= state.board.patterns.counts.global.access(state.board.player_color)
@@ -364,18 +363,18 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         };
 
         let score = if moves_made == 1 { // full-window search
-            -pvs::<R, TH, NT::NextType>(td, state, reduced_depth_left, -beta, -alpha)
+            -pvs::<R, TH, NT::NextType>(td, state, reduced_depth_left, -beta, -alpha, false)
         } else { // zero-window search
-            let mut score = -pvs::<R, TH, OffPVNode>(td, state, reduced_depth_left, -alpha - 1, -alpha);
+            let mut score = -pvs::<R, TH, OffPVNode>(td, state, reduced_depth_left, -alpha - 1, -alpha, true);
 
             if score > alpha { // zero-window failed, full-window search
-                score = -pvs::<R, TH, NT::NextType>(td, state, reduced_depth_left, -beta, -alpha);
+                score = -pvs::<R, TH, NT::NextType>(td, state, reduced_depth_left, -beta, -alpha, false);
             }
 
             score
         };
 
-        td.pop_ply_mut();
+        td.pop_ply();
         state.undo_mut(td.ss[td.ply].recovery_state);
 
         if td.is_aborted() {
@@ -399,7 +398,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
             if alpha >= beta { // beta cutoff
                 td.ss[td.ply].cutoffs += 1;
-                td.push_killer_move_mut(pos);
+                td.push_killer(pos);
                 break 'position_search;
             }
         }
@@ -439,22 +438,22 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     best_score
 }
 
-fn lookup_lmp_table(depth: Depth, is_improving: bool) -> usize {
+fn lookup_lmp_mc_table(depth: Depth, is_improving: bool) -> usize {
     let clamped_depth = (depth - 1).min(11) as usize;
 
-    LMP_TABLE[if is_improving { 1 } else { 0 }][clamped_depth]
+    LMP_MC_TABLE[if is_improving { 1 } else { 0 }][clamped_depth]
 }
 
-const LMP_TABLE: [[usize; 12]; 2] = build_lmp_table();
+const LMP_MC_TABLE: [[usize; 12]; 2] = build_lmp_mc_table();
 
-const fn build_lmp_table() -> [[usize; 12]; 2] {
+const fn build_lmp_mc_table() -> [[usize; 12]; 2] {
     let mut lmp_table = [[0; 12]; 2];
 
     const_for!(depth in 0, 12; {
         let pow_depth = depth as f64 * depth as f64;
 
-        lmp_table[0][depth] = value::LMP_BASE + (pow_depth / value::LMP_DIV_STATIC) as usize;
-        lmp_table[1][depth] = value::LMP_BASE + (pow_depth / value::LMP_DIV_IMPROVE) as usize;
+        lmp_table[0][depth] = value::LMP_BASE + (pow_depth / value::LMP_DIV_NON_IMPROVING) as usize;
+        lmp_table[1][depth] = value::LMP_BASE + (pow_depth / value::LMP_DIV_IMPROVING) as usize;
     });
 
     lmp_table

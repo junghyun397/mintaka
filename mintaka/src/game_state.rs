@@ -51,7 +51,7 @@ impl GameState {
         self.board.set_mut(pos);
         self.history.set_mut(pos);
 
-        self.movegen_window.imprint_window_mut(pos);
+        self.movegen_window.imprint_window(pos);
     }
 
     pub fn pass_mut(&mut self) {

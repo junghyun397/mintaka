@@ -163,7 +163,7 @@ impl Slices {
         }
     };
 
-    pub fn set_mut(&mut self, color: Color, pos: Pos) {
+    pub fn set(&mut self, color: Color, pos: Pos) {
         self.horizontal_slices[pos.row_usize()].set_mut(color, pos.col());
         self.vertical_slices[pos.col_usize()].set_mut(color, pos.row());
 
@@ -246,7 +246,7 @@ impl Slices {
                           if let Some(color) = slice.stone_kind(col_idx) {
                               bitfield_container
                                   .access_mut(color)
-                                  .set_mut(Pos::from_cartesian(row_idx as u8, col_idx));
+                                  .set(Pos::from_cartesian(row_idx as u8, col_idx));
                           }
                       }
 

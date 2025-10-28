@@ -239,7 +239,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
     mut alpha: Score, beta: Score,
     acc: ACC
 ) -> ACC {
-    td.clear_endgame_stack_mut();
+    td.clear_endgame_stack();
 
     let mut vcf_ply = 0;
     let mut move_counter: usize = 0;
@@ -258,7 +258,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
 
         let opponent_color = !board.player_color;
 
-        while let Some(frame) = td.pop_endgame_frame_mut() {
+        while let Some(frame) = td.pop_endgame_frame() {
             hash_key = hash_key.set(opponent_color, frame.defend_pos);
             tt_store_vcf_lose(&td.tt, hash_key, frame.defend_pos, lose_score);
 
@@ -277,7 +277,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
                 && td.should_check_limit()
                 && td.search_limit_exceeded()
             {
-                td.set_aborted_mut();
+                td.set_aborted();
                 return ACC::ZERO;
             }
 
@@ -303,7 +303,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
             }
 
             state.board.set_mut(four_pos);
-            td.batch_counter.increment_single_mut();
+            td.batch_counter.increment_single();
             vcf_ply += 1;
             vcf_depth_left -= 1;
 
@@ -394,7 +394,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
             }
 
             state.board.set_mut(defend_pos);
-            td.batch_counter.increment_single_mut();
+            td.batch_counter.increment_single();
             vcf_ply += 1;
 
             if state.board.patterns.counts.global.get_ref::<C>().total_fours() == 0 { // cold branch pruning
@@ -405,7 +405,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
                 continue 'position_search;
             }
 
-            td.push_endgame_frame_mut(EndgameFrame {
+            td.push_endgame_frame(EndgameFrame {
                 moves: vcf_moves,
                 alpha,
                 four_pos,
@@ -456,7 +456,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
             );
         }
 
-        if let Some(frame) = td.pop_endgame_frame_mut() {
+        if let Some(frame) = td.pop_endgame_frame() {
             state.board.unset_mut(frame.defend_pos);
             state.board.unset_mut(frame.four_pos);
 

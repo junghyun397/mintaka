@@ -50,7 +50,7 @@ impl Board {
 
     pub fn set_mut(&mut self, pos: Pos) {
         self.stones += 1;
-        self.hot_field.set_mut(pos);
+        self.hot_field.set(pos);
         self.hash_key = self.hash_key.set(self.player_color, pos);
 
         self.incremental_update_mut::<{ MoveType::Set }>(pos);
@@ -62,7 +62,7 @@ impl Board {
         self.switch_player_mut();
 
         self.stones -= 1;
-        self.hot_field.unset_mut(pos);
+        self.hot_field.unset(pos);
         self.hash_key = self.hash_key.set(self.player_color, pos);
 
         self.incremental_update_mut::<{ MoveType::Unset }>(pos);
@@ -105,13 +105,13 @@ impl Board {
         self.stones += blacks.len() as u8 + whites.len() as u8;
 
         for pos in blacks {
-            self.slices.set_mut(Color::Black, pos);
-            self.hot_field.set_mut(pos);
+            self.slices.set(Color::Black, pos);
+            self.hot_field.set(pos);
         }
 
         for pos in whites {
-            self.slices.set_mut(Color::White, pos);
-            self.hot_field.set_mut(pos);
+            self.slices.set(Color::White, pos);
+            self.hot_field.set(pos);
         }
 
         self.player_color = player;
@@ -234,13 +234,13 @@ impl Board {
             }
 
             if mark_forbidden {
-                self.patterns.forbidden_field.set_mut(root_pos);
+                self.patterns.forbidden_field.set(root_pos);
             } else {
-                self.patterns.forbidden_field.unset_mut(root_pos);
+                self.patterns.forbidden_field.unset(root_pos);
             }
 
             if delete_forbidden {
-                self.patterns.candidate_forbidden_field.unset_mut(root_pos);
+                self.patterns.candidate_forbidden_field.unset(root_pos);
             }
         }
     }
@@ -344,7 +344,7 @@ impl Board {
         {
             let four_pos = overrides.next_four[next_four_idx];
             if four_pos.is_some() {
-                overrides.bitfield.set_mut(four_pos.unwrap());
+                overrides.bitfield.set(four_pos.unwrap());
             }
         }
 
@@ -358,7 +358,7 @@ impl Board {
             self.update_four_overrides_each_direction(overrides, direction, pos);
         }
 
-        overrides.bitfield.set_mut(pos);
+        overrides.bitfield.set(pos);
     }
 
     fn update_four_overrides_each_direction(&self, overrides: &mut SetOverrides, direction: Direction, pos: Pos) {
@@ -529,7 +529,7 @@ impl SetOverrides {
     fn new(root: Pos) -> Self {
         let mut bitfield = Bitfield::default();
 
-        bitfield.set_mut(root);
+        bitfield.set(root);
 
         Self {
             bitfield,

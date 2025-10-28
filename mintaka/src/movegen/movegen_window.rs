@@ -29,7 +29,7 @@ impl MovegenWindow {
 
     pub const DEFAULT: MovegenWindow = {
         let mut movegen_field = Bitfield::ZERO_FILLED;
-        movegen_field.set_mut(pos::CENTER);
+        movegen_field.set(pos::CENTER);
 
         MovegenWindow {
             start_row: pos::CENTER_ROW_COL,
@@ -48,7 +48,7 @@ impl MovegenWindow {
         movegen_field: Bitfield::ONE_FILLED,
     };
 
-    fn expand_bounds_mut(&mut self, pos: Pos) {
+    fn expand_bounds(&mut self, pos: Pos) {
         const MAX_BOUND: u8 = pos::BOARD_WIDTH - 1;
 
         let row = pos.row();
@@ -60,7 +60,7 @@ impl MovegenWindow {
         self.end_col = self.end_col.max((col + MOVEGEN_WINDOW_MARGIN).min(MAX_BOUND));
     }
 
-    fn fill_bounds_mut(&mut self) {
+    fn fill_bounds(&mut self) {
         for row in self.start_row ..= self.end_row {
             let row_idx = row as usize * pos::U_BOARD_WIDTH;
             let start_idx = row_idx + self.start_col as usize;
@@ -80,25 +80,17 @@ impl MovegenWindow {
         }
     }
 
-    pub fn expand_window_mut(&mut self, pos: Pos) {
-        self.expand_bounds_mut(pos);
+    pub fn expand_window(&mut self, pos: Pos) {
+        self.expand_bounds(pos);
 
-        self.fill_bounds_mut();
+        self.fill_bounds();
     }
 
-    pub fn batch_expand_window_mut(&mut self, moves: &[Pos]) {
-        for &pos in moves {
-            self.expand_bounds_mut(pos);
-        }
-
-        self.fill_bounds_mut();
-    }
-
-    pub fn imprint_window_mut(&mut self, pos: Pos) {
+    pub fn imprint_window(&mut self, pos: Pos) {
         self.movegen_field |= MOVEGEN_IMPRINT_MASK_LUT[pos.idx_usize()];
     }
 
-    pub fn batch_imprint_window_mut(&mut self, moves: &[Pos]) {
+    pub fn batch_imprint_window(&mut self, moves: &[Pos]) {
         for pos in moves {
             self.movegen_field |= MOVEGEN_IMPRINT_MASK_LUT[pos.idx_usize()];
         }
@@ -112,7 +104,7 @@ impl From<&Bitfield> for MovegenWindow {
         let mut acc = Self::default();
 
         for pos in value.iter_hot_pos() {
-            acc.imprint_window_mut(pos);
+            acc.imprint_window(pos);
         }
 
         acc

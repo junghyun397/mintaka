@@ -9,7 +9,7 @@ use crate::protocol::command::Command;
 use crate::protocol::message::GameResult;
 use crate::protocol::response::{Response, ResponseSender};
 use crate::search::iterative_deepening;
-use crate::thread_data::{RootMove, ThreadData};
+use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::time_manager::TimeManager;
 use crate::value::Depth;
@@ -38,11 +38,6 @@ pub struct BestMove {
     pub total_nodes_in_1k: usize,
     pub time_elapsed: Duration,
     pub pv: PrincipalVariation,
-    #[serde(
-        serialize_with = "crate::utils::serde::serialize_array",
-        deserialize_with = "crate::utils::serde::deserialize_array"
-    )]
-    pub root_moves: [RootMove; pos::BOARD_SIZE],
 }
 
 #[derive(Debug)]
@@ -117,7 +112,7 @@ impl GameAgent {
             state,
             evaluator: ActiveEvaluator::from_state(&state),
             tt,
-            ht: HistoryTable {},
+            ht: HistoryTable::new(),
             executed_moves: Bitfield::default(),
             time_management: config.initial_time_manager.map(TimeManagement::from),
         }
@@ -168,7 +163,7 @@ impl GameAgent {
                         }
 
                         if self.executed_moves.is_hot_idx(self.state.len()) {
-                            self.executed_moves.unset_idx_mut(self.state.len());
+                            self.executed_moves.unset_idx(self.state.len());
 
                             if let Some(time_management) = &mut self.time_management
                                 && let Some((pos, time)) = time_management.time_history.pop()
@@ -185,7 +180,7 @@ impl GameAgent {
                     return Err(GameError::StoneAlreadyExist);
                 }
 
-                self.state.movegen_window.imprint_window_mut(pos);
+                self.state.movegen_window.imprint_window(pos);
 
                 if self.state.board.player_color == color {
                     self.state.board.set_mut(pos);
@@ -252,7 +247,7 @@ impl GameAgent {
                 self.state = GameState::from_board_and_history(board, history);
                 self.evaluator = HeuristicEvaluator::from_state(&self.state);
 
-                self.tt.clear_mut(self.config.workers.into());
+                self.tt.clear(self.config.workers.into());
                 self.executed_moves = Bitfield::default();
             },
             Command::TurnTime(time) => {
@@ -300,7 +295,7 @@ impl GameAgent {
             Command::MaxMemory(size) => {
                 const HEAP_MEMORY_MARGIN_IN_KIB: usize = 1024 * 10;
 
-                self.tt.resize_mut(ByteSize::from_kib(size.kib() + HEAP_MEMORY_MARGIN_IN_KIB));
+                self.tt.resize(ByteSize::from_kib(size.kib() + HEAP_MEMORY_MARGIN_IN_KIB));
             },
             Command::Rule(kind) => {
                 self.config.rule_kind = kind;
@@ -362,7 +357,7 @@ impl GameAgent {
                 self.config,
                 self.evaluator.clone(),
                 tt_view,
-                HistoryTable {},
+                self.ht,
                 &aborted, &global_counter_in_1k,
             );
 
@@ -380,7 +375,7 @@ impl GameAgent {
                     self.config,
                     self.evaluator.clone(),
                     tt_view,
-                    HistoryTable {},
+                    self.ht,
                     &aborted, &global_counter_in_1k
                 );
 
@@ -396,8 +391,9 @@ impl GameAgent {
 
         self.tt.increase_age();
         self.ht = *main_td.ht;
+        self.ht.increase_age();
 
-        self.executed_moves.set_idx_mut(self.state.len());
+        self.executed_moves.set_idx(self.state.len());
 
         let time_elapsed = started_time.elapsed();
 
@@ -413,7 +409,6 @@ impl GameAgent {
             depth_reached: main_td.depth_reached,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed,
-            root_moves: *main_td.root_moves,
             pv: main_td.root_pv
         }
     }

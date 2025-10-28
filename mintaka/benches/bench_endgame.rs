@@ -54,7 +54,7 @@ mod bench_vcf {
             $bencher.iter(|| {
                 let result = search_endgame::vcf_search::<{ RuleKind::Renju }>(&mut td.clone(), Depth::MAX, &state, -Score::INF, Score::INF, 0);
 
-                tt.clear_mut(1);
+                tt.clear(1);
 
                 assert_eq!(Score::is_deterministic(result), $expect_vcf)
             })

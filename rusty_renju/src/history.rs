@@ -53,17 +53,28 @@ impl History {
         &self.entries[..self.top]
     }
 
-    pub fn pop_mut(&mut self) -> Option<MaybePos> {
-        if self.top == 0 {
-            return None;
-        }
-
-        self.top -= 1;
-        Some(self.entries[self.top])
-    }
-
     pub fn is_empty(&self) -> bool {
         self.top == 0
+    }
+
+    pub fn action(mut self, action: MaybePos) -> Self {
+        self.action_mut(action);
+        self
+    }
+
+    pub fn set(mut self, pos: Pos) -> Self {
+        self.action_mut(pos.into());
+        self
+    }
+
+    pub fn pass(mut self) -> Self {
+        self.action_mut(MaybePos::NONE);
+        self
+    }
+
+    pub fn pop(mut self) -> (Self, Option<MaybePos>) {
+        let result = self.pop_mut();
+        (self, result)
     }
 
     pub fn action_mut(&mut self, action: MaybePos) {
@@ -79,6 +90,15 @@ impl History {
 
     pub fn pass_mut(&mut self) {
         self.action_mut(MaybePos::NONE)
+    }
+
+    pub fn pop_mut(&mut self) -> Option<MaybePos> {
+        if self.top == 0 {
+            return None;
+        }
+
+        self.top -= 1;
+        Some(self.entries[self.top])
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &MaybePos> {

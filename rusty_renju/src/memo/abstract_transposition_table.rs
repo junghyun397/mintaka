@@ -32,7 +32,7 @@ pub trait AbstractTranspositionTable {
 
     fn clear_age(&self);
 
-    fn clear_mut(&self, threads: u32) {
+    fn clear(&self, threads: u32) {
         self.clear_age();
 
         if self.size().mib() < 32 {
@@ -52,7 +52,7 @@ pub trait AbstractTranspositionTable {
         }
     }
 
-    fn resize_mut(&mut self, size: ByteSize) {
+    fn resize(&mut self, size: ByteSize) {
         self.clear_age();
 
         let len = Self::calculate_table_len(size);

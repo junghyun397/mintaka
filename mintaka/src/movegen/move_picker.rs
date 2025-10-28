@@ -12,7 +12,6 @@ pub const KILLER_MOVE_SLOTS: usize = 2;
 
 pub const TT_MOVE_POLICY_SCORE: i16 = Score::INF as i16 - 500;
 pub const KILLER_MOVE_POLICY_SCORE: i16 = Score::INF as i16 - 1000;
-pub const HISTORY_MOVE_POLICY_SCORE: i16 = Score::INF as i16 - 10000;
 
 #[derive(Eq, PartialEq)]
 enum MoveStage {
