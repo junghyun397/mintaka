@@ -76,7 +76,7 @@ impl MovePicker {
                         generate_defend_open_four_moves(state, &mut self.moves_buffer);
                         self.stage = MoveStage::DefendFour;
                     } else {
-                        self.push_all_moves(td, state);
+                        self.score_and_push_all_moves(td, state);
                         self.stage = MoveStage::Neighbor;
                     }
                 },
@@ -87,36 +87,44 @@ impl MovePicker {
         }
     }
 
-    fn push_all_moves(
+    fn score_and_push_all_moves(
         &mut self,
         td: &mut ThreadData<impl ThreadType, impl Evaluator>,
         state: &GameState
     ) {
-        let mut field = !state.board.hot_field & state.movegen_window.movegen_field;
-
-        if state.board.player_color == Color::Black {
-            field &= !state.board.patterns.forbidden_field;
-        }
-
         let policy_buffer = td.evaluator.eval_policy(state);
 
+        let mut field = state.board.legal_field() & state.movegen_window.movegen_field;
+
+        let player_pattern = state.board.patterns.field[state.board.player_color];
+
         for idx in field.iter_hot_idx() {
-            self.moves_buffer.push(Pos::from_index(idx as u8), policy_buffer[idx]);
+            let player_pattern = player_pattern[idx];
+
+            let policy_score = policy_buffer[idx];
+
+            let history_score = if player_pattern.is_tactical() {
+                td.ht.tactical[state.board.player_color][idx] / 128
+            } else {
+                td.ht.quiet[state.board.player_color][idx] / 128
+            };
+
+            self.moves_buffer.push(Pos::from_index(idx as u8), policy_score + history_score);
         }
     }
 
     fn opponent_has_open_four(state: &GameState) -> bool {
         let total_fours = match !state.board.player_color {
             Color::Black => {
-                let mut total_fours = state.board.patterns.counts.global.black.open_fours as u32;
+                let mut total_fours = state.board.patterns.counts.global[Color::Black].open_fours as u32;
 
                 total_fours -= state.board.patterns.forbidden_field.iter_hot_idx()
-                    .map(|idx| state.board.patterns.field.black[idx].count_open_fours())
+                    .map(|idx| state.board.patterns.field[Color::Black][idx].count_open_fours())
                     .sum::<u32>();
 
                 total_fours
             },
-            Color::White => state.board.patterns.counts.global.white.open_fours as u32
+            Color::White => state.board.patterns.counts.global[Color::White].open_fours as u32
         };
 
         total_fours != 0

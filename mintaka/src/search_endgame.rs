@@ -176,7 +176,7 @@ pub fn vcf_search<const R: RuleKind>(
     beta: Score,
     static_eval: Score
 ) -> Score {
-    if state.board.patterns.counts.global.access(state.board.player_color).total_fours() == 0 {
+    if state.board.patterns.counts.global[state.board.player_color].total_fours() == 0 {
         return static_eval;
     }
 
@@ -367,20 +367,6 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
 
                         return backtrace_frames(td, state.board, vcf_ply, four_pos);
                     } else if vcf_depth_left.min(TTFlag::MAX_TT_ENDGAME_DEPTH) <= tt_vcf_depth {
-                        abort = true;
-                    }
-                } else { // tt-cutoff
-                    match entry.tt_flag.score_kind() {
-                        ScoreKind::LowerBound => {
-                            alpha = alpha.max(entry.score as Score);
-                        }
-                        ScoreKind::UpperBound => {
-                            beta = beta.min(entry.score as Score);
-                        }
-                        _ => {}
-                    }
-
-                    if alpha >= beta {
                         abort = true;
                     }
                 }

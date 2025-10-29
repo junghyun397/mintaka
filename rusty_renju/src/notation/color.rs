@@ -2,13 +2,14 @@ use crate::board_io::{SYMBOL_BLACK, SYMBOL_WHITE};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::Not;
+use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 
 #[derive(std::marker::ConstParamTy, PartialEq, Eq, Clone, Copy, Debug, Default, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Color {
-    #[default] Black,
-    White
+    #[default] Black = 0,
+    White = 1,
 }
 
 impl Color {
@@ -59,6 +60,12 @@ impl From<Color> for char {
     }
 }
 
+impl From<Color> for u8 {
+    fn from(value: Color) -> Self {
+        value as u8
+    }
+}
+
 impl Display for Color {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
@@ -94,102 +101,83 @@ macro_rules! impl_color_container {
         $name:ident
     ) => {
         $(#[$struct_attr])*
-        pub struct $name<T> {
-            pub black: T,
-            pub white: T,
-        }
+        pub struct $name<T>(pub [T; 2]);
 
         impl<T> $name<T> {
-            pub const fn new(black: T, white: T) -> Self {
-                Self { black, white }
-            }
-
             #[inline]
-            pub fn access(&self, color: Color) -> &T {
-                match color {
-                    Color::Black => &self.black,
-                    Color::White => &self.white,
-                }
+            pub const fn new(black: T, white: T) -> Self {
+                Self([black, white])
             }
 
             #[inline]
             pub fn access_pair(&self, color: Color) -> (&T, &T) {
-                match color {
-                    Color::Black => (&self.black, &self.white),
-                    Color::White => (&self.white, &self.black),
-                }
-            }
-
-            #[inline]
-            pub fn access_mut(&mut self, color: Color) -> &mut T {
-                match color {
-                    Color::Black => &mut self.black,
-                    Color::White => &mut self.white,
-                }
+                (&self.0[color as usize], &self.0[color.reversed() as usize])
             }
 
             #[inline]
             pub const fn get_ref<const C: Color>(&self) -> &T {
                 match C {
-                    Color::Black => &self.black,
-                    Color::White => &self.white,
+                    Color::Black => &self.0[0],
+                    Color::White => &self.0[1],
                 }
             }
 
             #[inline]
             pub const fn get_reversed_ref<const C: Color>(&self) -> &T {
                 match C {
-                    Color::Black => &self.white,
-                    Color::White => &self.black,
+                    Color::Black => &self.0[1],
+                    Color::White => &self.0[0],
                 }
             }
 
             #[inline]
             pub const fn get_ref_mut<const C: Color>(&mut self) -> &mut T {
                 match C {
-                    Color::Black => &mut self.black,
-                    Color::White => &mut self.white,
+                    Color::Black => &mut self.0[0],
+                    Color::White => &mut self.0[1],
                 }
             }
 
             #[inline]
             pub const fn get_reversed_ref_mut<const C: Color>(&mut self) -> &mut T {
                 match C {
-                    Color::Black => &mut self.white,
-                    Color::White => &mut self.black,
+                    Color::Black => &mut self.0[1],
+                    Color::White => &mut self.0[0],
                 }
             }
         }
 
-        impl<T> std::ops::Index<Color> for $name<T> {
+        impl<T> Index<Color> for $name<T> {
             type Output = T;
+
             #[inline]
             fn index(&self, index: Color) -> &Self::Output {
-                self.access(index)
+                &self.0[index as usize]
             }
         }
 
-        impl<T> std::ops::IndexMut<Color> for $name<T> {
+        impl<T> IndexMut<Color> for $name<T> {
             #[inline]
             fn index_mut(&mut self, index: Color) -> &mut Self::Output {
-                self.access_mut(index)
+                &mut self.0[index as usize]
             }
         }
 
         impl<T: Copy> $name<T> {
+
             #[inline]
             pub const fn get<const C: Color>(&self) -> T {
                 match C {
-                    Color::Black => self.black,
-                    Color::White => self.white,
+                    Color::Black => self.0[0],
+                    Color::White => self.0[1],
                 }
             }
 
             #[inline]
             pub const fn get_reversed<const C: Color>(&self) -> T {
                 match C {
-                    Color::Black => self.white,
-                    Color::White => self.black,
+                    Color::Black => self.0[1],
+                    Color::White => self.0[0],
                 }
             }
         }

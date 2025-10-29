@@ -33,6 +33,8 @@ pub const UNIT_CLOSE_THREE_MASK: u32        = repeat_4x(CLOSE_THREE);
 pub const UNIT_OVERLINE_MASK: u32           = repeat_4x(OVERLINE);
 pub const UNIT_POTENTIAL_MASK: u32          = repeat_4x(POTENTIAL);
 
+pub const UNIT_TACTICAL_MASK: u32           = repeat_4x(OPEN_THREE | ANY_FOUR);
+
 pub const SLICE_PATTERN_CLOSED_FOUR_MASK: u128  = repeat_16x(CLOSED_FOUR_DOUBLE);
 pub const SLICE_PATTERN_OPEN_FOUR_MASK: u128    = repeat_16x(OPEN_FOUR);
 pub const SLICE_PATTERN_FIVE_MASK: u128         = repeat_16x(FIVE);
@@ -79,6 +81,10 @@ impl Pattern {
 
     pub fn is_empty(&self) -> bool {
         u32::from(*self) == 0
+    }
+
+    pub fn is_tactical(&self) -> bool {
+        u32::from(*self) != 0
     }
 
     pub fn has_three(&self) -> bool {
@@ -208,10 +214,7 @@ impl Default for Patterns {
         Self {
             field: unsafe { std::mem::zeroed() },
             counts: SlicePatternCounts::EMPTY,
-            unchecked_five_pos: ColorContainer {
-                black: None,
-                white: None
-            },
+            unchecked_five_pos: ColorContainer::new(None, None),
             candidate_forbidden_field: Bitfield::ZERO_FILLED,
             forbidden_field: Bitfield::ZERO_FILLED,
         }
@@ -221,10 +224,7 @@ impl Default for Patterns {
 
 impl Patterns {
 
-    pub const EMPTY_UNCHECKED_FIVE_POS: ColorContainer<Option<Pos>> = ColorContainer {
-        black: None,
-        white: None
-    };
+    pub const EMPTY_UNCHECKED_FIVE_POS: ColorContainer<Option<Pos>> = ColorContainer::new(None, None);
 
     pub fn is_forbidden(&self, pos: Pos) -> bool {
         self.forbidden_field.is_hot(pos)
@@ -305,7 +305,7 @@ impl Patterns {
             let idx = step_idx!(D, start_idx, slice_idx);
             self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<D>(slice_patterns[slice_idx]);
 
-            if C == Color::Black && self.field.black[idx].is_forbidden_unchecked() {
+            if C == Color::Black && self.field[Color::Black][idx].is_forbidden_unchecked() {
                 self.candidate_forbidden_field.set_idx(idx);
             }
         }

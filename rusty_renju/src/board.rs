@@ -29,6 +29,13 @@ impl Board {
             && (self.player_color != Color::Black || !self.patterns.is_forbidden(pos))
     }
 
+    pub fn legal_field(&self) -> Bitfield {
+        match self.player_color {
+            Color::Black => !(self.hot_field | self.patterns.forbidden_field),
+            Color::White => !self.hot_field
+        }
+    }
+
     pub fn stone_kind(&self, pos: Pos) -> Option<Color> {
         self.slices.horizontal_slices[pos.row_usize()].stone_kind(pos.col())
     }
@@ -209,7 +216,7 @@ impl Board {
 
     fn validate_forbidden_moves_mut(&mut self) {
         for root_pos in self.patterns.candidate_forbidden_field.clone().iter_hot_pos() {
-            let pattern = self.patterns.field.black[root_pos.idx_usize()];
+            let pattern = self.patterns.field[Color::Black][root_pos.idx_usize()];
 
             let mark_forbidden: bool;
             let delete_forbidden: bool;
@@ -250,7 +257,7 @@ impl Board {
 
         let pos = context.parent_pos().directional_offset_unchecked(direction, offset);
 
-        let pattern = self.patterns.field.black[pos.idx_usize()];
+        let pattern = self.patterns.field[Color::Black][pos.idx_usize()];
 
         !pattern.has_three() // non-three
             || pattern.apply_mask(ANY_FOUR_OR_OVERLINE_MASK) != 0 // double-four or overline
@@ -274,7 +281,7 @@ impl Board {
 
     fn is_valid_double_three<C: ValidateThreeContext>(&self, context: C) -> bool {
         let pos = context.parent_pos();
-        let pattern_unit = self.patterns.field.black[pos.idx_usize()];
+        let pattern_unit = self.patterns.field[Color::Black][pos.idx_usize()];
 
         let mut total_threes = if C::IS_ROOT {
             pattern_unit.count_open_threes()
@@ -332,7 +339,7 @@ impl Board {
     }
 
     fn update_root_four_overrides(&self, overrides: &mut SetOverrides) {
-        for direction in self.patterns.field.black[overrides.root.idx_usize()].iter_three_directions() {
+        for direction in self.patterns.field[Color::Black][overrides.root.idx_usize()].iter_three_directions() {
             self.update_four_overrides_each_direction(overrides, direction, overrides.root);
         }
     }
@@ -350,7 +357,7 @@ impl Board {
 
         overrides.next_four = [MaybePos::NONE; 12];
 
-        for direction in self.patterns.field.black[pos.idx_usize()].iter_three_directions() {
+        for direction in self.patterns.field[Color::Black][pos.idx_usize()].iter_three_directions() {
             if direction == direction_from {
                 continue;
             }
@@ -416,8 +423,8 @@ impl Board {
         let slice_idx = slice.calculate_slice_idx(direction, pos);
 
         let stones = match C {
-            Color::Black => slice.stones.black,
-            Color::White => slice.stones.white
+            Color::Black => slice.stones[Color::Black],
+            Color::White => slice.stones[Color::White]
         } as u32;
 
         (((stones << 2) >> slice_idx) & 0b11111) as u8 // 0[00V00]0

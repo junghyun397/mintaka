@@ -8,7 +8,7 @@ use rusty_renju::notation::pos::Pos;
 use rusty_renju::pattern::Pattern;
 
 fn count_pattern<F>(board_ptr: jlong, pos: jint, is_black: jboolean, count: F) -> jint where F: FnOnce(&Pattern) -> u32 {
-    let pattern = &retrieve_ref::<Board>(board_ptr).patterns.field.access(Color::Black)[pos as usize];
+    let pattern = &retrieve_ref::<Board>(board_ptr).patterns.field[Color::Black][pos as usize];
 
     count(pattern) as jint
 }
@@ -20,7 +20,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_isForbidden(
     board_ptr: jlong,
     pos: jint,
 ) -> jboolean {
-    retrieve_ref::<Board>(board_ptr).patterns.field.black[pos as usize].is_forbidden_unchecked() as jboolean
+    retrieve_ref::<Board>(board_ptr).patterns.field[Color::Black][pos as usize].is_forbidden_unchecked() as jboolean
 }
 
 #[unsafe(no_mangle)]

@@ -49,24 +49,24 @@ impl Slice {
     }
 
     pub fn set_mut(&mut self, color: Color, idx: u8) {
-        *self.stones.access_mut(color) |= 0b1 << idx;
+        self.stones[color] |= 0b1 << idx;
     }
 
     pub fn unset_mut(&mut self, color: Color, idx: u8) {
-        *self.stones.access_mut(color) &= !(0b1 << idx);
+        self.stones[color] &= !(0b1 << idx);
     }
 
     pub fn is_empty(&self, idx: u8) -> bool {
         let mask = 0b1 << idx;
-        (self.stones.black | self.stones.white) & mask == 0
+        (self.stones[Color::Black] | self.stones[Color::White]) & mask == 0
     }
 
     pub fn stone_kind(&self, idx: u8) -> Option<Color> {
         let mask = 0b1 << idx;
 
-        if self.stones.black & mask == mask {
+        if self.stones[Color::Black] & mask == mask {
             Some(Color::Black)
-        } else if self.stones.white & mask == mask {
+        } else if self.stones[Color::White] & mask == mask {
             Some(Color::White)
         } else {
             None
@@ -91,9 +91,9 @@ impl Slice {
     }
 
     pub fn winner(&self) -> Option<Color> {
-        if slice_pattern::contains_five_in_a_row(self.stones.black) {
+        if slice_pattern::contains_five_in_a_row(self.stones[Color::Black]) {
             Some(Color::Black)
-        } else if slice_pattern::contains_five_in_a_row(self.stones.white) {
+        } else if slice_pattern::contains_five_in_a_row(self.stones[Color::White]) {
             Some(Color::White)
         } else {
             None
@@ -244,9 +244,7 @@ impl Slices {
                 |mut bitfield_container, (row_idx, slice)| {
                       for col_idx in 0..pos::BOARD_WIDTH {
                           if let Some(color) = slice.stone_kind(col_idx) {
-                              bitfield_container
-                                  .access_mut(color)
-                                  .set(Pos::from_cartesian(row_idx as u8, col_idx));
+                              bitfield_container[color].set(Pos::from_cartesian(row_idx as u8, col_idx));
                           }
                       }
 

@@ -19,7 +19,7 @@ pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Po
     let mut vcf_moves = [MaybePos::NONE; ENDGAME_MAX_MOVES];
     let mut vcf_moves_top = 0;
 
-    let field_ptr = board.patterns.field.access(board.player_color).as_ptr() as *const u32;
+    let field_ptr = board.patterns.field[board.player_color].as_ptr() as *const u32;
 
     let four_mask = Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
     let zero_mask = Simd::splat(0);
@@ -76,8 +76,8 @@ pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Po
 }
 
 pub fn generate_defend_open_four_moves(state: &GameState, moves: &mut MoveList) {
-    let player_ptr = state.board.patterns.field.access(state.board.player_color).as_ptr() as *const u32;
-    let opponent_ptr = state.board.patterns.field.access(!state.board.player_color).as_ptr() as *const u32;
+    let player_ptr = state.board.patterns.field[state.board.player_color].as_ptr() as *const u32;
+    let opponent_ptr = state.board.patterns.field[!state.board.player_color].as_ptr() as *const u32;
 
     let zero_mask = Simd::splat(0);
     let four_mask = Simd::splat(pattern::UNIT_ANY_FOUR_MASK);

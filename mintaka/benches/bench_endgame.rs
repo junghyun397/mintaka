@@ -44,7 +44,7 @@ mod bench_vcf {
             let evaluator = ActiveEvaluator::from_state(&state);
 
             let tt = TranspositionTable::new_with_size(ByteSize::from_kib(8));
-            let ht = HistoryTable {};
+            let ht = HistoryTable::new();
 
             let global_counter_in_1k = AtomicUsize::new(0);
             let aborted = AtomicBool::new(false);

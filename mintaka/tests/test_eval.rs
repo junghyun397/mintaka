@@ -19,7 +19,7 @@ mod test_eval {
     fn eval_distribution(state: &GameState) -> [f32; pos::BOARD_SIZE] {
         let mut evaluator = ActiveEvaluator::from_state(state);
 
-        let movegen_field = state.movegen_window.movegen_field & !state.board.hot_field;
+        let movegen_field = state.movegen_window.movegen_field & !state.board.legal_field();
 
         let mut scores = [f32::NAN; pos::BOARD_SIZE];
 

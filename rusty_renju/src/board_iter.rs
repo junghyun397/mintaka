@@ -25,8 +25,8 @@ impl Board {
                     )
                 } else {
                     BoardIterItem::Pattern(ColorContainer::new(
-                        self.patterns.field.black[idx],
-                        self.patterns.field.white[idx]
+                        self.patterns.field[Color::Black][idx],
+                        self.patterns.field[Color::White][idx]
                     ))
                 }
             )

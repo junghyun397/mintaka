@@ -1,25 +1,25 @@
 use crate::value;
 use crate::value::Depth;
 use core::f64;
-use rusty_renju::notation::color::Color;
+use rusty_renju::notation::color::{Color, ColorContainer};
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use serde::{Deserialize, Serialize, Serializer};
 
 #[derive(Copy, Clone)]
 pub struct HistoryTable {
-    pub quiet: [[i16; pos::BOARD_SIZE]; 2],
-    pub attack: [[i16; pos::BOARD_SIZE]; 2],
-    pub counter: [[[MaybePos; pos::BOARD_SIZE]; pos::BOARD_SIZE]; 2],
+    pub quiet: ColorContainer<[i16; pos::BOARD_SIZE]>,
+    pub tactical: ColorContainer<[i16; pos::BOARD_SIZE]>,
+    pub counter: ColorContainer<[[MaybePos; pos::BOARD_SIZE]; pos::BOARD_SIZE]>,
 }
 
 impl HistoryTable {
 
     pub fn new() -> Self {
         Self {
-            quiet: [[0; pos::BOARD_SIZE]; 2],
-            attack: [[0; pos::BOARD_SIZE]; 2],
-            counter: [[[MaybePos::NONE; pos::BOARD_SIZE]; pos::BOARD_SIZE]; 2],
+            quiet: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
+            tactical: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
+            counter: ColorContainer::new([[MaybePos::NONE; pos::BOARD_SIZE]; pos::BOARD_SIZE], [[MaybePos::NONE; pos::BOARD_SIZE]; pos::BOARD_SIZE]),
         }
     }
 
@@ -34,8 +34,11 @@ impl HistoryTable {
             *score = (*score as f64 * value::HISTORY_TABLE_AGEING_MUL) as i16;
         }
 
-        self.quiet.iter_mut().flatten().for_each(ageing_score);
-        self.attack.iter_mut().flatten().for_each(ageing_score);
+        self.quiet[Color::Black].iter_mut().for_each(ageing_score);
+        self.quiet[Color::White].iter_mut().for_each(ageing_score);
+
+        self.tactical[Color::Black].iter_mut().for_each(ageing_score);
+        self.tactical[Color::White].iter_mut().for_each(ageing_score);
     }
 
 }
@@ -63,7 +66,7 @@ impl Serialize for HistoryTable {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         let data = unsafe { HistoryTableData {
             quiet: std::mem::transmute(self.quiet),
-            attack: std::mem::transmute(self.attack),
+            attack: std::mem::transmute(self.tactical),
             counter: std::mem::transmute(self.counter),
         } };
 
@@ -77,7 +80,7 @@ impl<'de> Deserialize<'de> for HistoryTable {
 
         unsafe { Ok(Self {
             quiet: std::mem::transmute(data.quiet),
-            attack: std::mem::transmute(data.quiet),
+            tactical: std::mem::transmute(data.quiet),
             counter: std::mem::transmute(data.counter),
         }) }
     }

@@ -56,7 +56,6 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
 
     pub best_move: MaybePos,
     pub selective_depth: usize,
-    pub depth_reached: Depth,
 
     pub ply: usize,
 }
@@ -92,7 +91,6 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
             aborted,
             best_move: MaybePos::NONE,
             selective_depth: 0,
-            depth_reached: 0,
             ply: 0,
         }
     }

@@ -35,13 +35,13 @@ impl Evaluator for HeuristicEvaluator {
     fn eval_policy(&mut self, state: &GameState) -> PolicyDistribution {
         let mut policy = [0; pattern::PATTERN_SIZE];
 
-        let movegen_field = state.movegen_window.movegen_field & !state.board.hot_field;
+        let movegen_field = state.movegen_window.movegen_field & state.board.legal_field();
 
-        let player_pattern_field = state.board.patterns.field.access(state.board.player_color);
-        let player_policy_score_lut = POLICY_SCORE_LUT.access(state.board.player_color);
+        let player_pattern_field = &state.board.patterns.field[state.board.player_color];
+        let player_policy_score_lut = &POLICY_SCORE_LUT[state.board.player_color];
 
-        let opponent_pattern_field = state.board.patterns.field.access(!state.board.player_color);
-        let opponent_policy_score_lut = POLICY_SCORE_LUT.access(!state.board.player_color);
+        let opponent_pattern_field = &state.board.patterns.field[!state.board.player_color];
+        let opponent_policy_score_lut = &POLICY_SCORE_LUT[!state.board.player_color];
 
         for idx in movegen_field.iter_hot_idx() {
             let neighbor_score = self.move_scores.scores[idx] as i16;
@@ -106,14 +106,14 @@ impl HeuristicEvaluator {
         let mut tactical_white = 0;
 
         for idx in eval_window.iter_hot_idx() {
-            let black_pattern = board.patterns.field.black[idx];
-            let white_pattern = board.patterns.field.white[idx];
+            let black_pattern = board.patterns.field[Color::Black][idx];
+            let white_pattern = board.patterns.field[Color::White][idx];
 
             let black_pattern_key = encode_value_key(black_pattern);
             let white_pattern_key = encode_value_key(white_pattern);
 
-            let (value_local_black, tactical_local_black) = VALUE_SCORE_LUT.black[black_pattern_key];
-            let (value_local_white, tactical_local_white) = VALUE_SCORE_LUT.white[white_pattern_key];
+            let (value_local_black, tactical_local_black) = VALUE_SCORE_LUT[Color::Black][black_pattern_key];
+            let (value_local_white, tactical_local_white) = VALUE_SCORE_LUT[Color::White][white_pattern_key];
 
             value_black += value_local_black as Score;
             value_black -= value_local_white as Score;
@@ -133,8 +133,8 @@ impl HeuristicEvaluator {
     }
 
     fn eval_tactical_value(board: &Board, mut tactical_points: u16, mut opponent_tactical_points: u16) -> Score {
-        tactical_points += board.patterns.counts.slice.access(board.player_color).total_open_four_structs_unchecked() as u16;
-        opponent_tactical_points += board.patterns.counts.slice.access(!board.player_color).total_open_four_structs_unchecked() as u16;
+        tactical_points += board.patterns.counts.slice[board.player_color].total_open_four_structs_unchecked() as u16;
+        opponent_tactical_points += board.patterns.counts.slice[!board.player_color].total_open_four_structs_unchecked() as u16;
 
         if tactical_points > 0 {
             return 10000;
@@ -245,8 +245,8 @@ const fn build_value_score_lut() -> ColorContainer<ValueScoreLut> {
         });
     }
 
-    flash_score_variants(Color::Black, &mut acc.black);
-    flash_score_variants(Color::White, &mut acc.white);
+    flash_score_variants(Color::Black,  &mut acc.0[Color::Black as usize]);
+    flash_score_variants(Color::White, &mut acc.0[Color::White as usize]);
 
     acc
 }
@@ -356,8 +356,8 @@ const fn build_pattern_score_lut() -> ColorContainer<PolicyScoreLut> {
         });
     }
 
-    flash_score_variants(Color::Black, &mut acc.black);
-    flash_score_variants(Color::White, &mut acc.white);
+    flash_score_variants(Color::Black, &mut acc.0[Color::Black as usize]);
+    flash_score_variants(Color::White, &mut acc.0[Color::White as usize]);
 
     acc
 }

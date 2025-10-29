@@ -216,7 +216,7 @@ impl Board {
                     match item {
                         &BoardIterItem::Stone(color) => char::from(color).to_string(),
                         BoardIterItem::Pattern(pattern) => {
-                            let count = extract(pattern.access(color));
+                            let count = extract(&pattern[color]);
 
                             if count > 0 {
                                 count.to_string()
@@ -361,8 +361,8 @@ impl<'de> Deserialize<'de> for Board {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         let data = BoardData::deserialize(deserializer)?;
 
-        let black_moves = data.bitfield.black.iter_hot_pos().collect::<Box<_>>();
-        let white_moves = data.bitfield.white.iter_hot_pos().collect::<Box<_>>();
+        let black_moves = data.bitfield[Color::Black].iter_hot_pos().collect::<Box<_>>();
+        let white_moves = data.bitfield[Color::White].iter_hot_pos().collect::<Box<_>>();
 
         let mut board = Board::default();
 

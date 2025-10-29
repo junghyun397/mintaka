@@ -215,7 +215,7 @@ impl ImageBoardRenderer {
 
         pixmap.draw_pixmap(
             board_pos.0, board_pos.1,
-            self.pixmap_lut.stone.access(color).as_ref(),
+            self.pixmap_lut.stone[color].as_ref(),
             &paint,
             Transform::identity(),
             None
@@ -239,7 +239,7 @@ impl ImageBoardRenderer {
 
                 pixmap.draw_pixmap(
                     x, y,
-                    self.pixmap_lut.history.access(color)[idx].as_ref(),
+                    self.pixmap_lut.history[color][idx].as_ref(),
                     &PixmapPaint::default(),
                     Transform::identity(),
                     None,
@@ -306,7 +306,7 @@ impl ImageBoardRenderer {
                 .enumerate()
                 .filter(|(_, item)|
                     if let BoardIterItem::Pattern(container) = item {
-                        container.black.is_forbidden_unchecked()
+                        container[Color::Black].is_forbidden_unchecked()
                     } else {
                         false
                     }

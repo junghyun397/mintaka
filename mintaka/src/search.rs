@@ -71,7 +71,6 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
         score = iter_score;
         best_move = td.best_move;
         root_pv = td.pvs[0];
-        td.depth_reached = depth;
         selective_depth = td.selective_depth;
 
         if TH::IS_MAIN {
@@ -156,8 +155,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         td.selective_depth = td.ply;
     }
 
-    if let &Some(pos) = state.board.patterns.unchecked_five_pos
-        .access(state.board.player_color)
+    if let Some(pos) = state.board.patterns.unchecked_five_pos[state.board.player_color]
     { // immediate win
         if NT::IS_ROOT {
             td.singular_root = true;
@@ -167,8 +165,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         return Score::win_in(td.ply + 1)
     }
 
-    if let &Some(pos) = state.board.patterns.unchecked_five_pos
-        .access(!state.board.player_color)
+    if let Some(pos) = state.board.patterns.unchecked_five_pos[!state.board.player_color]
         && td.ply + 1 <= value::MAX_PLY
     { // defend immediate win
         if NT::IS_ROOT {
@@ -309,6 +306,9 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             continue;
         }
 
+        let player_pattern = state.board.patterns.field[state.board.player_color][pos.idx_usize()];
+        let is_tactical = player_pattern.is_tactical();
+
         if !NT::IS_PV
             && !Score::is_losing(best_score)
             && policy_score < move_picker::KILLER_MOVE_POLICY_SCORE
@@ -355,11 +355,14 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 reduction -= Depth::from(NT::IS_PV);
 
                 // reduction defense four less
-                // reduction -= state.board.patterns.counts.global.access(state.board.player_color)
-                //     .open_fours.max(1) as Depth;
+                if td.ply < 4
+                    && player_pattern.has_open_four()
+                {
+                    reduction -= 1;
+                }
 
                 // reduction sparse fail-highs
-                // reduction -= (td.ss[td.ply].cutoffs < 4) as Depth;
+                reduction -= (td.ss[td.ply].cutoffs < 4) as Depth;
 
                 reduction = reduction.max(1);
             }
@@ -405,7 +408,9 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
             if alpha >= beta { // beta cutoff
                 td.ss[td.ply].cutoffs += 1;
+
                 td.push_killer(pos);
+
                 break 'position_search;
             }
         }

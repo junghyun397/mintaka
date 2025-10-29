@@ -67,8 +67,8 @@ fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
                 launched.store(false, Ordering::Relaxed);
 
                 println!(
-                    "solution: pos={}, score={}, depth={}, seldepth={} nodes={}k, elapsed={:?}",
-                    best_move.pos, best_move.score, best_move.depth_reached, best_move.selective_depth, best_move.total_nodes_in_1k, best_move.time_elapsed
+                    "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}",
+                    best_move.pos, best_move.score, best_move.selective_depth, best_move.total_nodes_in_1k, best_move.time_elapsed
                 );
 
                 match game_agent.command(Command::Play(best_move.pos)) {
@@ -338,7 +338,7 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
 
     let mut game_agent = GameAgent::from_state(config, game_state);
 
-    game_agent.command(Command::Workers(num_cpus::get_physical() as u32))?; // todo: debug
+    game_agent.command(Command::Workers(num_cpus::get_physical() as u32))?;
 
     message_sender.launch();
 
@@ -359,8 +359,8 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
                 );
 
                 println!(
-                    "solution: pos={}, score={}, depth={}, seldepth={}, nodes={}k, elapsed={:?}, pv={:?}",
-                    best_move.pos, best_move.score, best_move.depth_reached, best_move.selective_depth, best_move.total_nodes_in_1k, best_move.time_elapsed, best_move.pv,
+                    "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}, pv={:?}",
+                    best_move.pos, best_move.score, best_move.selective_depth, best_move.total_nodes_in_1k, best_move.time_elapsed, best_move.pv,
                 );
 
                 overall_nodes_in_1k += best_move.total_nodes_in_1k;

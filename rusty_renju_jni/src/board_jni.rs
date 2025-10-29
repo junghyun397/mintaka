@@ -162,7 +162,7 @@ pub extern "system" fn Java_com_do1phin_rustyrenju_Board_getPattern(
     color: jlong,
     pos: jbyte,
 ) -> jint {
-    let pattern = retrieve_ref::<Board>(board_ptr).patterns.field.black[pos as u8 as usize].clone();
+    let pattern = retrieve_ref::<Board>(board_ptr).patterns.field[Color::Black][pos as u8 as usize].clone();
     0
 }
 

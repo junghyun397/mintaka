@@ -12,7 +12,6 @@ use crate::search::iterative_deepening;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::time_manager::TimeManager;
-use crate::value::Depth;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
@@ -34,7 +33,6 @@ pub struct BestMove {
     pub hash: HashKey,
     pub pos: MaybePos,
     pub score: Score,
-    pub depth_reached: Depth,
     pub selective_depth: usize,
     pub total_nodes_in_1k: usize,
     pub time_elapsed: Duration,
@@ -407,7 +405,6 @@ impl GameAgent {
             hash: self.state.board.hash_key,
             pos: best_move,
             score,
-            depth_reached: main_td.depth_reached,
             selective_depth: main_td.selective_depth,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed,
