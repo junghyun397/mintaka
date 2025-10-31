@@ -169,7 +169,8 @@ fn build_lmr_table(config: Config) -> [[Depth; value::MAX_PLY_SLOTS]; 64] {
 
     for depth in 0 .. 64 {
         for played in 0 .. 64 {
-            lmr_table[depth][played] = (value::LMR_BASE + (depth as f64).ln() * (played as f64).ln() / lmr_div) as Depth;
+            let ln_depth = (depth as f64).ln();
+            lmr_table[depth][played] = (value::LMR_BASE + ln_depth * ln_depth / lmr_div) as Depth;
         }
     }
 

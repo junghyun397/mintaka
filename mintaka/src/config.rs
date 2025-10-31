@@ -27,6 +27,8 @@ pub struct Config {
     pub workers: u32,
 
     pub initial_time_manager: Option<TimeManager>,
+
+    pub spawn_depth_specialist: bool,
 }
 
 impl Default for Config {
@@ -40,6 +42,7 @@ impl Default for Config {
             tt_size: ByteSize::from_mib(128),
             workers: 1,
             initial_time_manager: None,
+            spawn_depth_specialist: false,
         }
     }
 }

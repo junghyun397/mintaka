@@ -84,7 +84,7 @@ impl Pattern {
     }
 
     pub fn is_tactical(&self) -> bool {
-        u32::from(*self) != 0
+        self.apply_mask(UNIT_TACTICAL_MASK) != 0
     }
 
     pub fn has_three(&self) -> bool {

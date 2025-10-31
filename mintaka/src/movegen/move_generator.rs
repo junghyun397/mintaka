@@ -9,7 +9,7 @@ use rusty_renju::{cartesian_to_index, chebyshev_distance, index_to_col, index_to
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
 
-fn score_move(state: &GameState, pos: Pos) -> i16 {
+fn score_distance(state: &GameState, pos: Pos) -> i16 {
     let distance = (state.history.avg_distance_to_recent_actions(pos).max(8) + 4) as f32;
 
     16 - distance as i16
@@ -95,15 +95,23 @@ pub fn generate_defend_open_four_moves(state: &GameState, moves: &mut MoveList) 
         player_vector &= four_mask;
         opponent_vector &= close_three_mask;
 
-        let mut bitmask = (player_vector.simd_ne(zero_mask) | opponent_vector.simd_ne(zero_mask))
-            .to_bitmask();
+        let mut three_bitmask = player_vector.simd_ne(zero_mask).to_bitmask();
+        let mut four_bitmask = opponent_vector.simd_ne(zero_mask).to_bitmask();
 
-        while bitmask != 0 {
-            let lane_position = bitmask.trailing_zeros() as usize;
-            bitmask &= bitmask - 1;
+        while three_bitmask != 0 {
+            let lane_position = three_bitmask.trailing_zeros() as usize;
+            three_bitmask &= three_bitmask - 1;
 
             let pos = Pos::from_index((start_idx + lane_position) as u8);
-            moves.push(pos, score_move(state, pos));
+            moves.push(pos, 256);
+        }
+
+        while four_bitmask != 0 {
+            let lane_position = four_bitmask.trailing_zeros() as usize;
+            four_bitmask &= four_bitmask - 1;
+
+            let pos = Pos::from_index((start_idx + lane_position) as u8);
+            moves.push(pos, score_distance(state, pos));
         }
     }
 }

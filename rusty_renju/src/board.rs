@@ -450,6 +450,23 @@ impl Board {
             .find_map(Slice::winner)
     }
 
+    pub fn is_forced_defense(&self) -> bool {
+        let total_fours = match self.player_color {
+            Color::White => {
+                let mut total_fours = self.patterns.counts.global[Color::Black].open_fours as u32;
+
+                total_fours -= self.patterns.forbidden_field.iter_hot_idx()
+                    .map(|idx| self.patterns.field[Color::Black][idx].count_open_fours())
+                    .sum::<u32>();
+
+                total_fours
+            },
+            Color::Black => self.patterns.counts.global[Color::White].open_fours as u32
+        };
+
+        total_fours != 0
+    }
+
 }
 
 #[derive(std::marker::ConstParamTy, Eq, PartialEq,)]

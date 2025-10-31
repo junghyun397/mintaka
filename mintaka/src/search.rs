@@ -1,5 +1,6 @@
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
+use crate::memo::history_table::{QuietPlied, TacticalPlied};
 use crate::memo::transposition_table::TTHit;
 use crate::memo::tt_entry::ScoreKind;
 use crate::movegen::move_list::MoveEntry;
@@ -103,7 +104,7 @@ fn aspiration<const R: RuleKind, TH: ThreadType>(
     let min_depth = (max_depth / 2).max(1);
     let mut depth = max_depth;
 
-    let mut delta = value::ASPIRATION_INITIAL_DELTA + prev_score / 1024;
+    let mut delta = value::ASPIRATION_INITIAL_DELTA;
     let mut alpha = (prev_score - delta).max(-Score::INF);
     let mut beta = (prev_score + delta).min(Score::INF);
 
@@ -298,8 +299,12 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     let mut best_score = -Score::INF;
     let mut best_move = MaybePos::NONE;
 
-    let mut move_picker = MovePicker::new(tt_move, td.killers[td.ply]);
+    let mut move_picker = MovePicker::init_new(tt_move, td.killers[td.ply], state.board.is_forced_defense());
     let mut moves_made = 0;
+
+    let mut quiet_plied = QuietPlied::EMPTY;
+    let mut three_plied = TacticalPlied::EMPTY;
+    let mut four_plied = TacticalPlied::EMPTY;
 
     'position_search: while let Some(MoveEntry { pos, policy_score }) = move_picker.next(td, state) {
         if !state.board.is_legal_move(pos) {
@@ -307,7 +312,9 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         }
 
         let player_pattern = state.board.patterns.field[state.board.player_color][pos.idx_usize()];
-        let is_tactical = player_pattern.is_tactical();
+        let on_three = player_pattern.has_three();
+        let on_four = player_pattern.has_any_four();
+        let is_tactical = on_three | on_four;
 
         if !NT::IS_PV
             && !Score::is_losing(best_score)
@@ -336,6 +343,14 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         state.set_mut(pos);
 
         moves_made += 1;
+
+        if on_three {
+            three_plied.push(pos);
+        } if on_four {
+            four_plied.push(pos);
+        } else {
+            quiet_plied.push(pos);
+        }
 
         let reduced_depth_left = {
             let mut reduction = 1;
@@ -366,8 +381,6 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
                 reduction = reduction.max(1);
             }
-
-            // println!("{}", reduction);
 
             depth_left - reduction
         };
@@ -409,8 +422,6 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             if alpha >= beta { // beta cutoff
                 td.ss[td.ply].cutoffs += 1;
 
-                td.push_killer(pos);
-
                 break 'position_search;
             }
         }
@@ -435,6 +446,19 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     } else {
         ScoreKind::UpperBound
     };
+
+    if alpha > original_alpha {
+        let best_move = best_move.unwrap();
+        let best_move_pattern = state.board.patterns.field[state.board.player_color][best_move.idx_usize()];
+
+        td.push_killer(best_move);
+
+        if best_move_pattern.is_tactical() {
+            td.ht.update_tactical(three_plied, four_plied, state.board.player_color, best_move, depth_left);
+        } else {
+            td.ht.update_quiet(&state.history, quiet_plied, state.board.player_color, best_move, depth_left)
+        }
+    }
 
     td.tt.store(
         state.board.hash_key,
