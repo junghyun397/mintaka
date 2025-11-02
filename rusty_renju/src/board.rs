@@ -451,7 +451,11 @@ impl Board {
     }
 
     pub fn is_forced_defense(&self) -> bool {
-        let total_fours = match self.player_color {
+        self.effective_fours(self.player_color) != 0
+    }
+
+    fn effective_fours(&self, color: Color) -> u32 {
+        match color {
             Color::White => {
                 let mut total_fours = self.patterns.counts.global[Color::Black].open_fours as u32;
 
@@ -462,9 +466,7 @@ impl Board {
                 total_fours
             },
             Color::Black => self.patterns.counts.global[Color::White].open_fours as u32
-        };
-
-        total_fours != 0
+        }
     }
 
 }

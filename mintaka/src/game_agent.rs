@@ -168,7 +168,7 @@ impl GameAgent {
                                 && let Some((pos, time)) = time_management.time_history.pop()
                                 && pos == action
                             {
-                                time_management.time_manager.append_mut(time);
+                                time_management.time_manager.append(time);
                             }
                         }
                     }
@@ -208,7 +208,7 @@ impl GameAgent {
                                 )
                         {
                             time_management.time_history.remove(index);
-                            time_management.time_manager.append_mut(time);
+                            time_management.time_manager.append(time);
                         }
 
                     },
@@ -283,7 +283,7 @@ impl GameAgent {
                     return Err(GameError::NoTimeManagement);
                 };
 
-                time_management.time_manager.consume_mut(time);
+                time_management.time_manager.consume(time);
             }
             Command::MaxNodes { in_1k } => {
                 self.config.max_nodes_in_1k = Some(in_1k);
@@ -331,7 +331,7 @@ impl GameAgent {
         let computing_resource = self.next_computing_resource();
 
         if let Some(time_management) = &mut self.time_management {
-            time_management.time_manager.append_mut(time_management.time_manager.increment);
+            time_management.time_manager.append(time_management.time_manager.increment);
         }
 
         let started_time = std::time::Instant::now();
@@ -397,7 +397,7 @@ impl GameAgent {
         let time_elapsed = started_time.elapsed();
 
         if let Some(time_management) = &mut self.time_management {
-            time_management.time_manager.consume_mut(time_elapsed);
+            time_management.time_manager.consume(time_elapsed);
             time_management.time_history.push((best_move, time_elapsed));
         }
 

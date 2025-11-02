@@ -255,7 +255,7 @@ struct HeuristicValueScores; impl HeuristicValueScores {
     const POTENTIAL: [i16; 5]       = [0, 1, 8, 16, 40];
 
     const OPEN_THREE: i16           = 256;
-    const CLOSED_FOUR: i16          = 256;
+    const CLOSED_FOUR: i16          = 128;
     const OPEN_FOUR: i16            = 0;
 
     const OVERLINE_FORBID: i16      = -80;
@@ -363,10 +363,10 @@ const fn build_pattern_score_lut() -> ColorContainer<PolicyScoreLut> {
 }
 
 struct HeuristicPolicyScores; impl HeuristicPolicyScores {
-    const POTENTIAL: [i8; 5] = [0, 1, 8, 25, 50];
+    const POTENTIAL: [i8; 5] = [0, 1, 4, 12, 24];
 
-    const OPEN_THREE: i8 = 20;
-    const CLOSED_FOUR: i8 = 10;
+    const OPEN_THREE: i8 = 92;
+    const CLOSED_FOUR: i8 = 16;
     const OPEN_FOUR: i8 = i8::MAX;
 
     const DOUBLE_THREE_FORK: i8 = 70;

@@ -38,11 +38,11 @@ impl TimeManager {
         (self.total_remaining / 20 + self.increment).min(self.turn)
     }
 
-    pub fn consume_mut(&mut self, running_time: Duration) {
+    pub fn consume(&mut self, running_time: Duration) {
         self.total_remaining = self.total_remaining.saturating_sub(running_time);
     }
 
-    pub fn append_mut(&mut self, additional_time: Duration) {
+    pub fn append(&mut self, additional_time: Duration) {
         self.total_remaining += additional_time;
     }
 

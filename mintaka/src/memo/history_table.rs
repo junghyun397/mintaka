@@ -7,8 +7,8 @@ use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos, PosList};
 use serde::{Deserialize, Serialize, Serializer};
 
-pub type QuietPlied = PosList<{ 248 }>;
-pub type TacticalPlied = PosList<{ 56 }>;
+pub type QuietPlied = PosList<{ 256 - 8 }>;
+pub type TacticalPlied = PosList<{ 64 - 8 }>;
 
 pub const MAX_HISTORY_SCORE: i16 = i16::MAX / 2;
 

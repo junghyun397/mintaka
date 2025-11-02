@@ -54,7 +54,7 @@ fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
                 StatusCommand::Board =>
                     println!("{}", game_agent.state.board),
                 StatusCommand::History =>
-                    println!("history: {}", game_agent.state.history),
+                    println!("{}", game_agent.state.history),
             },
             Message::Finished(result) => {
                 println!("finished: {result}")
@@ -220,7 +220,7 @@ fn handle_command(
                         match *args.get(2)
                             .ok_or("data type not provided.")?
                         {
-                            "match" => {
+                            "total" => {
                                 message_sender.command(
                                     Command::TotalTime(parse_time_in_milliseconds(&args)?)
                                 );

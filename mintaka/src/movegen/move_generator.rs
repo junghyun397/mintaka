@@ -12,7 +12,7 @@ use std::simd::Simd;
 fn score_distance(state: &GameState, pos: Pos) -> i16 {
     let distance = (state.history.avg_distance_to_recent_actions(pos).max(8) + 4) as f32;
 
-    16 - distance as i16
+    (16 - distance as i16) / 2
 }
 
 pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Pos) -> EndgameMovesUnchecked {
