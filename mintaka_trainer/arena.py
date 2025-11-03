@@ -9,7 +9,7 @@ class Color(Enum):
     BLACK = 0
     WHITE = 1
 
-    def flip(self):
+    def flip(self) -> 'Color':
         return Color.BLACK if self == Color.WHITE else Color.WHITE
 
 class Config:
@@ -22,11 +22,11 @@ class TimeManager:
         self.increment = increment_time
         self.turn = turn_time
 
-    def increment(self):
+    def apply_increment(self):
         self.total_remaining += self.increment
 
     def consume(self, running_time):
-        self.total_remaining -= running_time
+        self.total_remaining = max(0, self.total_remaining - running_time)
 
 class GameResult:
     def __init__(self, a_color, b_color, winner, history, board_str):
@@ -37,7 +37,7 @@ class GameResult:
         self.history: List[str] = history
         self.board_str: str = board_str
 
-    def _win(self, color: Color):
+    def _win(self, color: Color) -> float:
         if self.winner is None:
             return 0.5
         elif self.winner == color:
@@ -45,27 +45,41 @@ class GameResult:
         else:
             return 0.0
 
-    def a_win_zero_to_one(self):
+    def a_win_zero_to_one(self) -> float:
         return self._win(self.a_color)
 
-    def b_win_zero_to_one(self):
+    def b_win_zero_to_one(self) -> float:
         return self._win(self.b_color)
 
 def spawn_process(path, params) -> subprocess.Popen:
-    return subprocess.Popen(
-        [path, params],
+    args = [path]
+    args.extend(params.split(" "))
+
+    process = subprocess.Popen(
+        [path],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        text=True
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1
     )
+
+    assert process.poll() is None
+    assert process.stdout.readline().strip().lower() == "ready"
+
+    return process
 
 def command_process(process, command):
     process.stdout.flush()
-    process.stdin.write(command + "\n")
+    process.stdin.write(f"{command}\n")
     process.stdin.flush()
 
+def communicate_process(process, command) -> str:
+    command_process(process, command)
+    return process.stdout.readline(1).strip()
+
 def play_game(config, game_no) -> GameResult:
-    time_manager = TimeManager(config.params.total_remaining, config.params.increment, config.params.turn)
+    time_manager = TimeManager(config.params.total_time, config.params.increment_time, config.params.turn_time)
     player = Color.BLACK
     winner = None
 
@@ -74,48 +88,48 @@ def play_game(config, game_no) -> GameResult:
     a_process = spawn_process(config.params.a_path, config.params.a_params)
     b_process = spawn_process(config.params.b_path, config.params.b_params)
 
-    command_process(a_process, f"limit time total {time_manager.total_remaining}")
-    command_process(a_process, f"limit time increment {time_manager.increment}")
-    command_process(a_process, f"limit time turn {time_manager.turn}")
+    for process in [a_process, b_process]:
+        command_process(process, f"limit time total {time_manager.total_remaining}")
+        command_process(process, f"limit time increment {time_manager.increment}")
+        command_process(process, f"limit time turn {time_manager.turn}")
 
-    command_process(b_process, f"limit time total {time_manager.total_remaining}")
-    command_process(b_process, f"limit time increment {time_manager.increment}")
-    command_process(b_process, f"limit time turn {time_manager.turn}")
+    player_process, opponent_process = (a_process, b_process) if player == a_color else (b_process, a_process)
 
     while True:
-        time_manager.increment()
+        time_manager.apply_increment()
         timer = time.perf_counter_ns()
 
-        command_process(a_process, "gen")
-        raw_response = a_process.stdout.readline(1)
+        command_process(player_process, "gen")
+
+        while True:
+            response = player_process.stdout.readline().strip()
+            if response.startswith("solution:"):
+                move = response.strip()
+                break
 
         time_elapsed = (time.perf_counter_ns() - timer) / 1_000_000
 
-        move = raw_response.strip()
+        command_process(player_process, f"limit time total {time_manager.total_remaining}")
 
-        # TODO: set(sync) time on player process
+        command_process(opponent_process, f"play {move}")
 
-        command_process(a_process, f"limit time total {time_manager.total_remaining}")
-        a_process.stdout.flush()
+        winner_response = communicate_process(player_process, "winner")
 
-        # TODO: play move on opponent process
+        if "black" in winner_response:
+            winner = Color.BLACK
+        elif "white" in winner_response:
+            winner = Color.WHITE
 
-        command_process(b_process, f"play {move}")
-        b_process.stdout.flush()
-
-        # TODO: lookup winner on player process
-
-        if winner:
+        if winner is not None:
             break
 
         player = player.flip()
+        player_process, opponent_process = opponent_process, player_process
+
         time_manager.consume(time_elapsed)
 
-    command_process(a_process, "history")
-    history = a_process.stdout.readline(1).strip().split(",")
-
-    command_process(a_process, "board")
-    board_str = a_process.stdout.readlines().strip()
+    history = communicate_process(a_process, "history").split(",")
+    board_str = communicate_process(a_process, "board")
 
     a_process.terminate()
     b_process.terminate()
@@ -127,16 +141,16 @@ def calculate_elo(original_elo, opponent_elo, result_zero_to_one, k_factor) -> f
 
     return original_elo + k_factor * (result_zero_to_one - elo_e)
 
-def log_prefix():
-    return f"[{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')}]"
+def log_prefix() -> str:
+    return f"[{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')}Z]"
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--a_path", type=str, required=True)
-    parser.add_argument("--a_params", type=str, required=True)
+    parser.add_argument("--a_params", type=str, default="")
 
     parser.add_argument("--b_path", type=str, required=True)
-    parser.add_argument("--b_params", type=str, required=True)
+    parser.add_argument("--b_params", type=str, default="")
 
     parser.add_argument("--num_games", type=int, default=100)
 

@@ -134,6 +134,8 @@ fn spawn_command_listener(launched: Arc<AtomicBool>, abort: Arc<AtomicBool>, mes
     std::thread::spawn(move || {
         let mut buf = String::new();
 
+        println!("ready");
+
         loop {
             buf.clear();
             std::io::stdin().read_line(&mut buf).unwrap();
