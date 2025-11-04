@@ -3,9 +3,9 @@ use mintaka::eval::evaluator::Evaluator;
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::game_state::GameState;
 use mintaka::protocol::command::Command;
-use mintaka::protocol::message::{Message, MessageSender, StatusCommand};
 use mintaka::protocol::response::{CallBackResponseSender, Response};
-use mintaka_interface::preference::{Mode, Preference};
+use mintaka_interface::message::{Message, MessageSender, StatusCommand};
+use mintaka_interface::preference::Preference;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::notation::color::UnknownColorError;
@@ -18,10 +18,7 @@ use std::time::Duration;
 fn main() -> Result<(), GameError> {
     let pref = Preference::parse();
 
-    match pref.mode {
-        Mode::TextProtocol => text_protocol(pref.default_config, pref.game_state.unwrap_or_default()),
-        Mode::SelfPlay => self_play(pref.default_config, pref.game_state.unwrap()),
-    }
+    text_protocol(pref.default_config, pref.game_state.unwrap_or_default())
 }
 
 fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
@@ -39,25 +36,28 @@ fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
 
     for message in message_receiver {
         match message {
+            Message::Ok => {
+                println!("=")
+            }
             Message::Command(command) => {
                 match game_agent.command(command) {
                     Ok(result) => message_sender.result(result),
                     Err(err) => {
-                        println!("error: {err}");
+                        println!("? {err}");
                         continue;
                     }
                 }
             },
             Message::Status(command) => match command {
                 StatusCommand::Version =>
-                    println!("version: renju=rusty-renju-{}, engine=mintaka-{}, model=unknown", rusty_renju::VERSION, mintaka::VERSION),
+                    println!("= rusty-renju-{}, mintaka-{}, unknown", rusty_renju::VERSION, mintaka::VERSION),
                 StatusCommand::Board =>
-                    println!("{}", game_agent.state.board),
+                    println!("=\x02\n{}\x03", game_agent.state.board),
                 StatusCommand::History =>
-                    println!("{}", game_agent.state.history),
+                    println!("= {}", game_agent.state.history),
             },
             Message::Finished(result) => {
-                println!("finished: {result}")
+                println!("= {result}")
             }
             Message::Launch => {
                 launched.store(true, Ordering::Relaxed);
@@ -71,44 +71,12 @@ fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
                     best_move.pos, best_move.score, best_move.selective_depth, best_move.total_nodes_in_1k, best_move.time_elapsed
                 );
 
-                match game_agent.command(Command::Play(best_move.pos)) {
-                    Ok(result) => message_sender.result(result),
-                    Err(err) => {
-                        println!("error: {err}");
-                        continue;
-                    }
-                }
+                println!("= {}", best_move.pos);
             },
         }
     }
 
     Ok(())
-}
-
-fn response_printer_with_pv(state: GameState) -> impl Fn(Response) -> () {
-    move |response| match response {
-        Response::Begins(ComputingResource { workers, time, nodes_in_1k, tt_size }) =>
-            println!("begins: workers={workers}, \
-                running-time={time:?}, \
-                nodes={nodes_in_1k:?}, \
-                tt-size={tt_size}"
-            ),
-        Response::Status { best_move, score, pv, total_nodes_in_1k, depth } => {
-            let mut board = state.board;
-
-            board.batch_set_mut(pv.moves());
-
-            println!("{}", board);
-            println!(
-                "status: depth={depth}, \
-                score={score}, \
-                best_move={best_move}, \
-                total_nodes_in_1k={total_nodes_in_1k}, \
-                pv={pv:?}"
-            )
-        }
-        _ => {}
-    }
 }
 
 fn response_printer(response: Response) {
@@ -134,8 +102,6 @@ fn spawn_command_listener(launched: Arc<AtomicBool>, abort: Arc<AtomicBool>, mes
     std::thread::spawn(move || {
         let mut buf = String::new();
 
-        println!("ready");
-
         loop {
             buf.clear();
             std::io::stdin().read_line(&mut buf).unwrap();
@@ -145,10 +111,9 @@ fn spawn_command_listener(launched: Arc<AtomicBool>, abort: Arc<AtomicBool>, mes
                 continue;
             }
 
-            let result = handle_command(&launched, &abort, &message_sender, &buf, args);
-
-            if let Err(err) = result {
-                println!("error: {err}");
+            match handle_command(&launched, &abort, &message_sender, &buf, args) {
+                Err(err) => println!("? {err}"),
+                _ => {}
             }
         }
     });
@@ -271,7 +236,7 @@ fn handle_command(
 
                         message_sender.command(Command::Load(
                             Box::new((board, history))
-                        ))
+                        ));
                     },
                     &_ => return Err("unknown data type.".to_string()),
                 }
@@ -281,7 +246,7 @@ fn handle_command(
                     Box::new((Board::default(), History::default()))
                 ));
             },
-            "b" | "board" => {
+            "board" => {
                 message_sender.status(StatusCommand::Board);
             },
             "history" => {
@@ -310,76 +275,22 @@ fn handle_command(
 
                 message_sender.command(Command::Unset { pos, color });
             },
-            "p" | "play" => {
+            "play" => {
                 let pos: Pos = args.get(1).ok_or("position not provided.")?
                     .parse()
                     .map_err(|e: PosError| e.to_string())?;
 
                 message_sender.command(Command::Play(pos.into()));
             },
-            "u" | "undo" => {
+            "undo" => {
                 message_sender.command(Command::Undo);
             },
-            "g" | "gen" => {
+            "gen" => {
                 message_sender.launch();
             },
             &_ => return Err("unknown command.".to_string()),
         }
     }
-
-    Ok(())
-}
-
-fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
-    let aborted = Arc::new(AtomicBool::new(false));
-
-    let (message_sender, message_receiver) = {
-        let (tx, rx) = mpsc::channel();
-        (MessageSender::new(tx), rx)
-    };
-
-    let mut game_agent = GameAgent::from_state(config, game_state);
-
-    game_agent.command(Command::Workers(num_cpus::get_physical() as u32))?;
-
-    message_sender.launch();
-
-    let mut overall_nodes_in_1k = 0;
-    let mut game_result = None;
-    for message in message_receiver {
-        match message {
-            Message::Launch => {
-                let best_move = game_agent.launch(
-                    CallBackResponseSender::new(response_printer),
-                    aborted.clone()
-                );
-
-                let result = game_agent.command(Command::Play(best_move.pos))?;
-
-                println!("{}",
-                     game_agent.state.board.to_string_with_last_moves(game_agent.state.history.recent_action_pair())
-                );
-
-                println!(
-                    "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}, pv={:?}",
-                    best_move.pos, best_move.score, best_move.selective_depth, best_move.total_nodes_in_1k, best_move.time_elapsed, best_move.pv,
-                );
-
-                overall_nodes_in_1k += best_move.total_nodes_in_1k;
-
-                message_sender.result(result);
-                message_sender.launch();
-            },
-            Message::Finished(result) => {
-                game_result = Some(result);
-                break;
-            },
-            _ => {}
-        }
-    }
-
-    println!("{}", game_result.unwrap());
-    println!("total {}k nodes", overall_nodes_in_1k);
 
     Ok(())
 }

@@ -11,6 +11,10 @@ path = "src/piskvork.rs"
 name = "mintaka_text_protocol"
 path = "src/text_protocol.rs"
 
+[[bin]]
+name = "mintaka_selfplay"
+path = "src/self_play.rs"
+
 [dependencies]
 rusty_renju = { path = "../rusty_renju" }
 mintaka = { path = "../mintaka" }

@@ -25,6 +25,7 @@ pub struct Config {
 
     pub tt_size: ByteSize,
     pub workers: u32,
+    pub pondering: bool,
 
     pub initial_time_manager: Option<TimeManager>,
 
@@ -41,6 +42,7 @@ impl Default for Config {
             max_vcf_depth: 24,
             tt_size: ByteSize::from_mib(128),
             workers: 1,
+            pondering: false,
             initial_time_manager: None,
             spawn_depth_specialist: false,
         }

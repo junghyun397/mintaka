@@ -1,45 +1,23 @@
-use crate::protocol::command::Command;
-use rusty_renju::impl_debug_from_display;
-use rusty_renju::notation::color::Color;
-use serde::{Deserialize, Serialize};
+use mintaka::protocol::command::Command;
+use mintaka::protocol::game_result::GameResult;
 use std::fmt::Display;
 use std::sync::mpsc;
 
 pub const CHANNEL_CLOSED_MESSAGE: &str = "sender channel closed.";
 
-#[derive(Deserialize, Serialize)]
 pub enum Message {
+    Ok,
     Command(Command),
     Status(StatusCommand),
     Finished(GameResult),
     Launch,
 }
 
-#[derive(Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum StatusCommand {
     Version,
     Board,
     History,
 }
-
-#[derive(Eq, PartialEq, Serialize, Deserialize)]
-pub enum GameResult {
-    Win(Color),
-    Draw,
-    Full
-}
-
-impl Display for GameResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GameResult::Win(color) => write!(f, "{color:?} win", ),
-            GameResult::Draw => write!(f, "draw"),
-            GameResult::Full => write!(f, "full"),
-        }
-    }
-}
-
-impl_debug_from_display!(GameResult);
 
 #[derive(Clone)]
 pub struct MessageSender {
@@ -65,8 +43,9 @@ impl MessageSender {
     }
 
     pub fn result(&self, result: Option<GameResult>) {
-        if let Some(result) = result {
-            self.sender.send(Message::Finished(result)).expect(CHANNEL_CLOSED_MESSAGE);
+        match result {
+            Some(result) => self.sender.send(Message::Finished(result)).expect(CHANNEL_CLOSED_MESSAGE),
+            None => self.sender.send(Message::Ok).expect(CHANNEL_CLOSED_MESSAGE),
         }
     }
 

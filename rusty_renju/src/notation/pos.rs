@@ -172,7 +172,7 @@ impl FromStr for Pos {
             .and_then(|row| {
                 let col = source.chars().next().unwrap() as u8 - b'a';
 
-                (col < BOARD_WIDTH && row < BOARD_WIDTH)
+                (col < BOARD_WIDTH && row <= BOARD_WIDTH)
                     .then(|| Pos::from_cartesian(row - 1 , col))
                     .ok_or(PosError::ColumnOrRowOutOfRange)
             })

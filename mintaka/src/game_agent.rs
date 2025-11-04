@@ -6,7 +6,7 @@ use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::command::Command;
-use crate::protocol::message::GameResult;
+use crate::protocol::game_result::GameResult;
 use crate::protocol::response::{Response, ResponseSender};
 use crate::search::iterative_deepening;
 use crate::thread_data::ThreadData;

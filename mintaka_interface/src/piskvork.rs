@@ -1,8 +1,8 @@
 use mintaka::config::Config;
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::protocol::command::Command;
-use mintaka::protocol::message::{Message, MessageSender};
 use mintaka::protocol::response::{CallBackResponseSender, Response};
+use mintaka_interface::message::{Message, MessageSender};
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;

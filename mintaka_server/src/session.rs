@@ -5,7 +5,7 @@ use mintaka::game_agent::{BestMove, GameAgent};
 use mintaka::game_state::GameState;
 use mintaka::movegen::movegen_window::MovegenWindow;
 use mintaka::protocol::command::Command;
-use mintaka::protocol::message::GameResult;
+use mintaka::protocol::game_result::GameResult;
 use mintaka::protocol::response::{Response, ResponseSender};
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
