@@ -24,6 +24,8 @@ pub struct Preference {
     pub memory_in_mib: Option<usize>,
     #[arg(short, long)]
     pub workers: Option<usize>,
+    #[arg(short, long)]
+    pub pondering: Option<bool>,
     #[clap(skip)]
     pub game_state: Option<GameState>,
     #[clap(skip)]
@@ -50,6 +52,7 @@ impl Preference {
 
         if let Some(time_in_millis) = self.turn_time_in_millis {
             self.default_config.initial_time_manager = Some(TimeManager {
+                dynamic_time: false,
                 total_remaining: Duration::MAX,
                 increment: Duration::ZERO,
                 turn: Duration::from_millis(time_in_millis),
@@ -64,6 +67,8 @@ impl Preference {
             Some(workers) => self.default_config.workers = workers as u32,
             None => self.default_config.workers = num_cpus::get() as u32,
         }
+
+        self.default_config.pondering = self.pondering.unwrap_or(false);
 
         self.default_config.max_nodes_in_1k = self.nodes_in_1k;
 

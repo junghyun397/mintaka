@@ -3,6 +3,7 @@ use std::time::Duration;
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct TimeManager {
+    pub dynamic_time: bool,
     pub total_remaining: Duration,
     pub increment: Duration,
     pub turn: Duration,
@@ -12,9 +13,10 @@ impl Default for TimeManager {
 
     fn default() -> Self {
         Self {
-            total_remaining: Duration::from_secs(60 * 10),
-            increment: Duration::from_secs(30),
-            turn: Duration::from_secs(60),
+            dynamic_time: false,
+            total_remaining: Duration::from_secs(60 * 5),
+            increment: Duration::from_secs(0),
+            turn: Duration::from_secs(30),
         }
     }
 
@@ -28,6 +30,7 @@ impl TimeManager {
         overhead: Duration,
     ) -> Self {
         Self {
+            dynamic_time: false,
             total_remaining: total_time,
             increment,
             turn: overhead,
