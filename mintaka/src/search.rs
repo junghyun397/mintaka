@@ -89,6 +89,10 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
         }
     }
 
+    if TH::IS_MAIN {
+        td.set_aborted();
+    }
+
     td.selective_depth = selective_depth;
     td.root_pv = root_pv;
 
@@ -104,7 +108,7 @@ fn aspiration<const R: RuleKind, TH: ThreadType>(
     let min_depth = (max_depth / 2).max(1);
     let mut depth = max_depth;
 
-    let mut delta = value::ASPIRATION_INITIAL_DELTA;
+    let mut delta = 8 + prev_score.pow(2) / 8192;
     let mut alpha = (prev_score - delta).max(-Score::INF);
     let mut beta = (prev_score + delta).min(Score::INF);
 
@@ -112,7 +116,7 @@ fn aspiration<const R: RuleKind, TH: ThreadType>(
         let score = pvs::<R, TH, RootNode>(td, state, depth, alpha, beta, false);
 
         if td.is_aborted() {
-            return 0;
+            return Score::DRAW;
         }
 
         if score <= alpha { // fail-low
@@ -346,7 +350,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         if on_three {
             three_plied.push(pos);
-        } if on_four {
+        } else if on_four {
             four_plied.push(pos);
         } else {
             quiet_plied.push(pos);
