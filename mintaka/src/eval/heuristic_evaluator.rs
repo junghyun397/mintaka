@@ -64,7 +64,7 @@ impl Evaluator for HeuristicEvaluator {
     }
 
     fn eval_value(&mut self, state: &GameState) -> Score {
-        if state.len() == 0 {
+        if state.is_empty() {
             return 0;
         }
 

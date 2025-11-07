@@ -171,7 +171,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     }
 
     if let Some(pos) = state.board.patterns.unchecked_five_pos[!state.board.player_color]
-        && td.ply + 1 <= value::MAX_PLY
+        && td.ply < value::MAX_PLY
     { // defend immediate win
         if NT::IS_ROOT {
             td.singular_root = true;
@@ -229,10 +229,10 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         }
     }
 
-    let mut static_eval: Score;
-    let mut tt_move: MaybePos;
-    let mut tt_pv: bool;
-    let mut tt_vcf_depth: Depth;
+    let static_eval: Score;
+    let tt_move: MaybePos;
+    let tt_pv: bool;
+    let tt_vcf_depth: Depth;
 
     match td.tt.probe(state.board.hash_key) {
         TTHit::Eval(tt_eval) => {
@@ -472,7 +472,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         depth_left,
         static_eval,
         best_score,
-        NT::IS_PV,
+        tt_pv | NT::IS_PV,
     );
 
     best_score

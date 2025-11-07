@@ -155,7 +155,7 @@ impl Board {
                     let r: u8 = normalized;
                     let b: u8 = u8::MAX - normalized;
 
-                    format!("\x1b[48;2;{};0;{}m{}\x1b[0m", r, b, cell)
+                    format!("\x1b[48;2;{r};0;{b}m{cell}\x1b[0m")
                 } else {
                     cell
                 }
@@ -183,10 +183,10 @@ impl Board {
                     })
                     .fold(" ".to_string(), |acc, (pos, item, cell)| {
                         if let Some((overwrite, [left, right])) = marker(pos, item) {
-                            if overwrite || acc.chars().last().unwrap() == ' ' {
+                            if overwrite || acc.ends_with(' ') {
                                 format!("{}{left}{cell}{right}", &acc[..acc.len() - 1]).to_string()
                             } else {
-                                format!("{}{cell}{right}", acc).to_string()
+                                format!("{acc}{cell}{right}").to_string()
                             }
                         } else {
                             format!("{acc}{cell} ").to_string()

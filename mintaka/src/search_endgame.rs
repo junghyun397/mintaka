@@ -242,7 +242,6 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
     td.clear_endgame_stack();
 
     let mut vcf_ply = 0;
-    let mut move_counter: usize = 0;
 
     fn backtrace_frames<ACC: EndgameAccumulator>(
         td: &mut ThreadData<impl ThreadType, impl Evaluator>,
@@ -341,7 +340,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
             }
 
             let mut alpha = alpha.max(Score::lose_in(td.ply + vcf_ply));
-            let mut beta = beta.min(Score::win_in(td.ply + vcf_ply));
+            let beta = beta.min(Score::win_in(td.ply + vcf_ply));
 
             if alpha >= beta // mate distance pruning
                 || state.board.stones + 2 >= pos::U8_BOARD_SIZE
@@ -418,7 +417,6 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
             }
 
             vcf_moves.init();
-            move_counter = 0;
 
             continue 'vcf_search;
         }

@@ -20,9 +20,8 @@ pub struct HistoryTable {
     pub counter: ColorContainer<[MaybePos; pos::BOARD_SIZE]>,
 }
 
-impl HistoryTable {
-
-    pub fn new() -> Self {
+impl Default for HistoryTable {
+    fn default() -> Self {
         Self {
             quiet: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
             three: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
@@ -30,6 +29,9 @@ impl HistoryTable {
             counter: ColorContainer::new([MaybePos::NONE; pos::BOARD_SIZE], [MaybePos::NONE; pos::BOARD_SIZE]),
         }
     }
+}
+
+impl HistoryTable {
 
     pub fn update_quiet(&mut self, history: &History, quiet_plied: QuietPlied, color: Color, best_move: Pos, depth: Depth) {
         for &pos in quiet_plied.iter() {
@@ -38,7 +40,7 @@ impl HistoryTable {
             let updated_score = self.quiet[color][pos.idx_usize()] + bonus;
             self.quiet[color][pos.idx_usize()] = updated_score.clamp(-MAX_HISTORY_SCORE, MAX_HISTORY_SCORE);
 
-            if history.len() != 0
+            if !history.is_empty()
                 && let Some(prev_move) = history.recent_action().ok()
             {
                 self.counter[color][prev_move.idx_usize()] = best_move.into();

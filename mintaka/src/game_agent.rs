@@ -64,21 +64,6 @@ impl Display for GameError {
 
 impl std::error::Error for GameError {}
 
-#[derive(Serialize, Deserialize)]
-pub struct TimeManagement {
-    time_manager: TimeManager,
-    time_history: Vec<(MaybePos, Duration)>,
-}
-
-impl From<TimeManager> for TimeManagement {
-    fn from(time_manager: TimeManager) -> Self {
-        Self {
-            time_manager,
-            time_history: Vec::new(),
-        }
-    }
-}
-
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct ComputingResource {
     pub workers: u32,
@@ -94,7 +79,7 @@ pub struct GameAgent {
     tt: TranspositionTable,
     ht: HistoryTable,
     executed_moves: Bitfield,
-    pub time_management: Option<TimeManagement>,
+    pub time_manager: TimeManager,
 }
 
 impl GameAgent {
@@ -111,9 +96,9 @@ impl GameAgent {
             state,
             evaluator: ActiveEvaluator::from_state(&state),
             tt,
-            ht: HistoryTable::new(),
+            ht: HistoryTable::default(),
             executed_moves: Bitfield::default(),
-            time_management: config.initial_time_manager.map(TimeManagement::from),
+            time_manager: config.initial_timer.into(),
         }
     }
 
@@ -164,11 +149,10 @@ impl GameAgent {
                         if self.executed_moves.is_hot_idx(self.state.len()) {
                             self.executed_moves.unset_idx(self.state.len());
 
-                            if let Some(time_management) = &mut self.time_management
-                                && let Some((pos, time)) = time_management.time_history.pop()
+                            if let Some((pos, time)) = self.time_manager.time_history.pop()
                                 && pos == action
                             {
-                                time_management.time_manager.append(time);
+                                self.time_manager.timer.append(time);
                             }
                         }
                     }
@@ -200,15 +184,14 @@ impl GameAgent {
                             self.state.board.switch_player_mut();
                         }
 
-                        if let Some(time_management) = &mut self.time_management
-                            && let Some((index, time)) = time_management.time_history.iter()
-                                .enumerate()
-                                .find_map(|(index, &(action, time))|
-                                    (action == pos.into()).then_some((index, time))
-                                )
+                        if let Some((index, time)) = self.time_manager.time_history.iter()
+                            .enumerate()
+                            .find_map(|(index, &(action, time))|
+                                (action == pos.into()).then_some((index, time))
+                            )
                         {
-                            time_management.time_history.remove(index);
-                            time_management.time_manager.append(time);
+                            self.time_manager.time_history.remove(index);
+                            self.time_manager.timer.append(time);
                         }
 
                     },
@@ -246,44 +229,22 @@ impl GameAgent {
                 self.state = GameState::from_board_and_history(board, history);
                 self.evaluator = HeuristicEvaluator::from_state(&self.state);
 
-                self.tt.clear(self.config.workers.into());
+                self.tt.clear(self.config.workers);
                 self.executed_moves = Bitfield::default();
+
+                self.time_manager = TimeManager::from(self.config.initial_timer);
             },
             Command::TurnTime(time) => {
-                if let Some(time_management) = &mut self.time_management {
-                    time_management.time_manager.turn = time;
-                } else {
-                    self.time_management = Some(TimeManagement::from(TimeManager::new(
-                        Duration::MAX,
-                        Duration::ZERO,
-                        time
-                    )))
-                }
+                self.time_manager.timer.turn = time;
             },
             Command::IncrementTime(time) => {
-                let Some(time_management) = &mut self.time_management else {
-                    return Err(GameError::NoTimeManagement);
-                };
-
-                time_management.time_manager.increment = time;
+                self.time_manager.timer.increment = time;
             },
             Command::TotalTime(time) => {
-                if let Some(time_management) = &mut self.time_management {
-                    time_management.time_manager.total_remaining = time;
-                } else {
-                    self.time_management = Some(TimeManagement::from(TimeManager::new(
-                        time,
-                        Duration::ZERO,
-                        Duration::MAX
-                    )))
-                }
+                self.time_manager.timer.total_remaining = time;
             },
             Command::ConsumeTime(time) => {
-                let Some(time_management) = &mut self.time_management else {
-                    return Err(GameError::NoTimeManagement);
-                };
-
-                time_management.time_manager.consume(time);
+                self.time_manager.timer.consume(time);
             }
             Command::MaxNodes { in_1k } => {
                 self.config.max_nodes_in_1k = Some(in_1k);
@@ -320,19 +281,13 @@ impl GameAgent {
         ComputingResource {
             workers: self.config.workers,
             tt_size: self.config.tt_size,
-            time: self.time_management.as_ref().map(|time_management|
-                time_management.time_manager.next_running_time()
-            ),
+            time: self.time_manager.next_running_time(),
             nodes_in_1k: self.config.max_nodes_in_1k,
         }
     }
 
     pub fn launch(&mut self, response_sender: impl ResponseSender, aborted: Arc<AtomicBool>) -> BestMove {
         let computing_resource = self.next_computing_resource();
-
-        if let Some(time_management) = &mut self.time_management {
-            time_management.time_manager.append(time_management.time_manager.increment);
-        }
 
         let started_time = std::time::Instant::now();
 
@@ -396,10 +351,9 @@ impl GameAgent {
 
         let time_elapsed = started_time.elapsed();
 
-        if let Some(time_management) = &mut self.time_management {
-            time_management.time_manager.consume(time_elapsed);
-            time_management.time_history.push((best_move, time_elapsed));
-        }
+        self.time_manager.timer.consume(time_elapsed);
+        self.time_manager.timer.apply_increment();
+        self.time_manager.time_history.push((best_move, time_elapsed));
 
         BestMove {
             hash: self.state.board.hash_key,
@@ -422,7 +376,7 @@ impl Serialize for GameAgent {
         state.serialize_field("tt", &self.tt)?;
         state.serialize_field("ht", &self.ht)?;
         state.serialize_field("executed_moves", &self.executed_moves)?;
-        state.serialize_field("time_management", &self.time_management)?;
+        state.serialize_field("time_management", &self.time_manager)?;
         state.end()
     }
 }
@@ -435,7 +389,7 @@ impl<'de> Deserialize<'de> for GameAgent {
             state: GameState,
             tt: TranspositionTable,
             ht: HistoryTable,
-            time_management: Option<TimeManagement>,
+            time_management: TimeManager,
             executed_moves: Bitfield,
             overall_nodes_in_1k: usize,
         }
@@ -451,7 +405,7 @@ impl<'de> Deserialize<'de> for GameAgent {
             tt: data.tt,
             ht: data.ht,
             executed_moves: data.executed_moves,
-            time_management: data.time_management,
+            time_manager: data.time_management,
         })
     }
 }

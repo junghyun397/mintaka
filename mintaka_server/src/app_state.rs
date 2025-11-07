@@ -167,7 +167,7 @@ impl AppState {
 
         tokio::spawn(async move {
             match result_rx.await {
-                Ok(SessionResultResponse { game_agent, best_move }) => {
+                Ok(SessionResultResponse { game_agent, best_move, .. }) => {
                     if let Some(mut session) = sessions.get_mut(&session_key) {
                         session.store_best_move(best_move);
                         session.restore(game_agent).unwrap();

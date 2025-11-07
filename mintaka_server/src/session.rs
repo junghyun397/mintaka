@@ -65,6 +65,7 @@ pub enum SessionResponse {
 pub struct SessionResultResponse {
     pub game_agent: GameAgent,
     pub best_move: BestMove,
+    pub game_result: Option<GameResult>,
 }
 
 impl Debug for SessionResultResponse {
@@ -148,8 +149,10 @@ impl Session {
         tokio::task::spawn_blocking(async move || {
             let best_move = game_agent.launch(response_sender, abort_flag);
 
+            let game_result = game_agent.command(Command::Play(best_move.pos)).unwrap();
+
             result_sender
-                .send(SessionResultResponse { game_agent, best_move })
+                .send(SessionResultResponse { game_agent, best_move, game_result })
                 .unwrap();
         });
 

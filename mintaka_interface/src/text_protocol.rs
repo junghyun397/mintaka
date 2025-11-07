@@ -107,7 +107,7 @@ fn spawn_command_listener(launched: Arc<AtomicBool>, abort: Arc<AtomicBool>, mes
             std::io::stdin().read_line(&mut buf).unwrap();
             let args = buf.trim().split(' ').collect::<Vec<&str>>();
 
-            if args.len() == 0 {
+            if args.is_empty() {
                 continue;
             }
 
@@ -127,7 +127,9 @@ fn handle_command(
             "abort" => {
                 abort.store(true, Ordering::Relaxed);
             },
-            "quite" => std::process::exit(0),
+            "quite" => {
+                std::process::exit(0);
+            },
             &_ => return Err("unknown command.".to_string())
         }
     } else {
@@ -287,6 +289,9 @@ fn handle_command(
             },
             "gen" => {
                 message_sender.launch();
+            },
+            "quit" => {
+                std::process::exit(0);
             },
             &_ => return Err("unknown command.".to_string()),
         }

@@ -84,7 +84,7 @@ fn spawn_command_listener(launched: Arc<AtomicBool>, aborted: Arc<AtomicBool>, m
             std::io::stdin().read_line(&mut buf).expect("failed to read line");
             let args = buf.trim().split(' ').collect::<Vec<&str>>();
 
-            if args.len() == 0 {
+            if args.is_empty() {
                 continue;
             }
 

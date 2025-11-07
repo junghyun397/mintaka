@@ -1,4 +1,4 @@
-use crate::time_manager::TimeManager;
+use crate::time_manager::Timer;
 use crate::value::{Depth, Depths};
 use rusty_renju::history;
 use rusty_renju::notation::pos;
@@ -27,7 +27,8 @@ pub struct Config {
     pub workers: u32,
     pub pondering: bool,
 
-    pub initial_time_manager: Option<TimeManager>,
+    pub dynamic_time: bool,
+    pub initial_timer: Timer,
 
     pub spawn_depth_specialist: bool,
 }
@@ -40,10 +41,11 @@ impl Default for Config {
             max_nodes_in_1k: None,
             max_depth: Depth::PLY_LIMIT,
             max_vcf_depth: 24,
-            tt_size: ByteSize::from_mib(128),
+            tt_size: ByteSize::from_mib(512),
             workers: 1,
             pondering: false,
-            initial_time_manager: None,
+            dynamic_time: false,
+            initial_timer: Timer::default(),
             spawn_depth_specialist: false,
         }
     }
@@ -58,7 +60,7 @@ pub enum ConfigValidationError {
 
 impl Display for ConfigValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 

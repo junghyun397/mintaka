@@ -20,7 +20,7 @@ pub fn join_str_horizontally(sources: &[&str]) -> String {
             split.iter()
                 .map(|rows| {
                     let mut row = rows[row_idx].to_string();
-                    row.extend(std::iter::repeat(' ').take(max_len - row.len()));
+                    row.extend(std::iter::repeat_n(' ', max_len - row.len()));
                     row
                 })
                 .collect::<Vec<_>>()

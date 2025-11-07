@@ -80,7 +80,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             spawn_tls_watcher(ruslts_config.clone(), tls_config.clone());
         }
 
-        info!("listening on https://{addr}, wss://{addr}/ws");
+        info!("listening on https://{addr}");
 
         axum_server::bind_rustls(addr, ruslts_config)
             .serve(app.into_make_service_with_connect_info::<SocketAddr>())
@@ -89,7 +89,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let listener = tokio::net::TcpListener::bind(addr)
             .await?;
 
-        info!("listening on http://{addr}, ws://{addr}/ws");
+        info!("listening on http://{addr}");
 
         axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
             .await?;

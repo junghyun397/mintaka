@@ -23,8 +23,8 @@ enum MoveStage {
 }
 
 pub struct MovePicker {
-    pub stage: MoveStage,
-    pub forced: bool,
+    stage: MoveStage,
+    forced: bool,
     moves_buffer: MoveList,
     tt_move: MaybePos,
     killer_moves: [MaybePos; KILLER_MOVE_SLOTS],
@@ -127,7 +127,7 @@ impl MovePicker {
     ) {
         let policy_buffer = td.evaluator.eval_policy(state);
 
-        let mut field = state.board.legal_field() & state.movegen_window.movegen_field;
+        let field = state.board.legal_field() & state.movegen_window.movegen_field;
 
         let player_pattern = state.board.patterns.field[state.board.player_color];
 

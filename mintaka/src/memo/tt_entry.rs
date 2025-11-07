@@ -7,7 +7,6 @@ use rusty_renju::notation::score::{Score, Scores};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const KEY_SIZE: usize = 21;
-const KEY_SHIFT: usize = 64 - KEY_SIZE;
 const KEY_MASK: u64 = !(u64::MAX << KEY_SIZE as u64);
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -18,9 +17,9 @@ pub enum ScoreKind {
     Exact = 3,
 }
 
-impl Into<u8> for ScoreKind {
-    fn into(self) -> u8 {
-        self as u8
+impl From<ScoreKind> for u8 {
+    fn from(score_kind: ScoreKind) -> Self {
+        score_kind as u8
     }
 }
 

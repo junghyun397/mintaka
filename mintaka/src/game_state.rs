@@ -78,26 +78,31 @@ impl GameState {
         self.history.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.board.hot_field.is_empty()
+    }
+
 }
 
-impl Into<GameState> for Board {
-    fn into(self) -> GameState {
-        let history = (&self).try_into().unwrap_or(History::default());
+impl From<Board> for GameState {
+    fn from(board: Board) -> Self {
+        let history = (&board).try_into().unwrap_or(History::default());
 
         GameState {
-            board: self,
+            board,
             history,
-            movegen_window: MovegenWindow::from(&self.hot_field),
+            movegen_window: MovegenWindow::from(&board.hot_field),
         }
     }
 }
 
-impl Into<GameState> for History {
-    fn into(self) -> GameState {
-        let board = self.into();
+impl From<History> for GameState {
+    fn from(history: History) -> Self {
+        let board = history.into();
+
         GameState {
             board,
-            history: self,
+            history,
             movegen_window: MovegenWindow::from(&board.hot_field),
         }
     }
