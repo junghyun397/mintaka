@@ -27,11 +27,19 @@ const MOVEGEN_IMPRINT_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_movegen_impr
 
 impl MovegenWindow {
 
-    pub const DEFAULT: MovegenWindow = {
+    pub const EMPTY: Self = Self {
+        start_row: 0,
+        start_col: 0,
+        end_row: 0,
+        end_col: 0,
+        movegen_field: Bitfield::ZERO_FILLED,
+    };
+
+    pub const DEFAULT: Self = {
         let mut movegen_field = Bitfield::ZERO_FILLED;
         movegen_field.set(pos::CENTER);
 
-        MovegenWindow {
+        Self {
             start_row: pos::CENTER_ROW_COL,
             start_col: pos::CENTER_ROW_COL,
             end_row: pos::CENTER_ROW_COL,
@@ -40,7 +48,7 @@ impl MovegenWindow {
         }
     };
 
-    pub const FULL: MovegenWindow = MovegenWindow {
+    pub const FULL: Self = Self {
         start_row: 0,
         start_col: 0,
         end_row: pos::BOARD_WIDTH,

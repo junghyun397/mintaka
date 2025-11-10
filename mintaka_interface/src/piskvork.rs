@@ -1,4 +1,4 @@
-use mintaka::config::Config;
+use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::response::{CallBackResponseSender, Response};
@@ -58,10 +58,14 @@ fn main() -> Result<(), impl Error> {
                 let result = game_agent.command(command)?;
                 message_sender.result(result);
             },
-            Message::Launch => {
+            Message::Launch(search_objective) => {
                 launched.store(true, Ordering::Relaxed);
 
-                let best_move = game_agent.launch(CallBackResponseSender::new(response_receiver), aborted.clone());
+                let best_move = game_agent.launch(
+                    search_objective,
+                    CallBackResponseSender::new(response_receiver),
+                    aborted.clone()
+                );
 
                 let result = game_agent.command(Command::Play(best_move.pos))?;
                 message_sender.result(result);
@@ -152,12 +156,12 @@ fn match_command(
                 )?;
 
                 message_sender.command(Command::Play(pos.into()));
-                message_sender.launch();
+                message_sender.launch(SearchObjective::Best);
 
                 PiskvorkResponse::None
             },
             "BEGIN" => {
-                message_sender.launch();
+                message_sender.launch(SearchObjective::Best);
 
                 PiskvorkResponse::None
             },
@@ -208,7 +212,7 @@ fn match_command(
                 message_sender.command(Command::BatchSet { player_moves, opponent_moves });
 
                 if args[0] == "BOARD" {
-                    message_sender.launch();
+                    message_sender.launch(SearchObjective::Best);
                 }
 
                 PiskvorkResponse::None

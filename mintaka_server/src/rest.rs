@@ -53,7 +53,7 @@ pub async fn new_session(
     let board = Board::default();
     let history = History::default();
 
-    let session_key = state.new_session(config, board, history);
+    let session_key = state.new_session(config, board, history).await;
 
     (StatusCode::CREATED, Json(session_key))
 }
@@ -142,7 +142,7 @@ pub async fn hibernate_session(
     Path(sid): Path<SessionKey>,
     State(state): State<Arc<AppState>>
 ) -> impl IntoResponse {
-    state.hibernate_session(sid, &state.preference.sessions_directory).await
+    state.hibernate_session(sid).await
         .map(|_| StatusCode::NO_CONTENT)
 }
 
@@ -150,6 +150,6 @@ pub async fn wakeup_session(
     Path(sid): Path<SessionKey>,
     State(state): State<Arc<AppState>>
 ) -> impl IntoResponse {
-    state.wakeup_session(sid, &state.preference.sessions_directory).await
+    state.wakeup_session(sid).await
         .map(|_| StatusCode::NO_CONTENT)
 }

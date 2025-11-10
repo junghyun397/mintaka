@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test_vcf {
     use indoc::indoc;
-    use mintaka::config::Config;
+    use mintaka::config::{Config, SearchObjective};
     use mintaka::eval::evaluator::ActiveEvaluator;
     use mintaka::eval::evaluator::Evaluator;
     use mintaka::memo::history_table::HistoryTable;
@@ -25,12 +25,12 @@ mod test_vcf {
             let evaluator = ActiveEvaluator::from_state(&state);
 
             let tt = TranspositionTable::new_with_size(ByteSize::from_kib(32));
-            let ht = HistoryTable::new();
+            let ht = HistoryTable::EMPTY;
 
             let global_counter_in_1k = AtomicUsize::new(0);
             let aborted = AtomicBool::new(false);
 
-            let mut td = ThreadData::new(WorkerThread, 0, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
+            let mut td = ThreadData::new(WorkerThread, 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
             let time = std::time::Instant::now();
             let vcf_result = search_endgame::vcf_sequence::<{ RuleKind::Renju }>(&mut td, &state).unwrap();
             let time = time.elapsed();

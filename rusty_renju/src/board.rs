@@ -135,7 +135,7 @@ impl Board {
         macro_rules! update_by_slice_each_color {
             ($color:expr,$direction:expr,$slice:expr,$slice_idx:expr) => {
                 match (
-                    $slice.pattern_bitmap.get::<{ $color }>() != 0,
+                    $slice.pattern_bitmap[$color] != 0,
                     $slice.has_potential_pattern::<{ $color }>()
                 ) {
                     (_, true) => {

@@ -1,4 +1,4 @@
-use mintaka::config::Config;
+use mintaka::config::{Config, SearchObjective};
 use mintaka::eval::evaluator::Evaluator;
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::game_state::GameState;
@@ -59,10 +59,14 @@ fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
             Message::Finished(result) => {
                 println!("= {result}")
             }
-            Message::Launch => {
+            Message::Launch(search_objective) => {
                 launched.store(true, Ordering::Relaxed);
 
-                let best_move = game_agent.launch(CallBackResponseSender::new(response_printer), aborted.clone());
+                let best_move = game_agent.launch(
+                    search_objective,
+                    CallBackResponseSender::new(response_printer),
+                    aborted.clone(),
+                );
 
                 launched.store(false, Ordering::Relaxed);
 
@@ -288,7 +292,10 @@ fn handle_command(
                 message_sender.command(Command::Undo);
             },
             "gen" => {
-                message_sender.launch();
+                message_sender.launch(SearchObjective::Best);
+            },
+            "zero" => {
+                message_sender.launch(SearchObjective::Zeroing);
             },
             "quit" => {
                 std::process::exit(0);

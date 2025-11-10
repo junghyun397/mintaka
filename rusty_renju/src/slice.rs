@@ -82,7 +82,7 @@ impl Slice {
     }
 
     pub fn has_potential_pattern<const C: Color>(&self) -> bool {
-        let stones = self.stones.get::<C>();
+        let stones = self.stones[C];
         let blocks = self.blocks::<C>();
 
         // filter O X . . O X .
@@ -101,7 +101,7 @@ impl Slice {
     }
 
     pub fn blocks<const C: Color>(&self) -> u16 {
-        u16::MAX << self.length | self.stones.get_reversed::<C>()
+        u16::MAX << self.length | self.stones[!C]
     }
 
 }

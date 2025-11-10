@@ -28,6 +28,7 @@ pub enum Command {
     IncrementTime(Duration),
     TotalTime(Duration),
     ConsumeTime(Duration),
+    Pondering(bool),
     MaxNodes { in_1k: usize },
     Workers(u32),
     MaxMemory(ByteSize),

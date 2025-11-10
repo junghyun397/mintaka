@@ -1,3 +1,4 @@
+use mintaka::config::SearchObjective;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::game_result::GameResult;
 use std::fmt::Display;
@@ -10,7 +11,7 @@ pub enum Message {
     Command(Command),
     Status(StatusCommand),
     Finished(GameResult),
-    Launch,
+    Launch(SearchObjective),
 }
 
 pub enum StatusCommand {
@@ -38,8 +39,8 @@ impl MessageSender {
         self.sender.send(Message::Status(command)).expect(CHANNEL_CLOSED_MESSAGE);
     }
 
-    pub fn launch(&self) {
-        self.sender.send(Message::Launch).expect(CHANNEL_CLOSED_MESSAGE);
+    pub fn launch(&self, search_objective: SearchObjective) {
+        self.sender.send(Message::Launch(search_objective)).expect(CHANNEL_CLOSED_MESSAGE);
     }
 
     pub fn result(&self, result: Option<GameResult>) {

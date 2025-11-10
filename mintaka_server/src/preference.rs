@@ -43,7 +43,7 @@ pub struct Preference {
     #[arg(long, env = "MINTAKA_API_PASSWORD", default_value = None)]
     pub api_password: Option<String>,
     #[clap(skip)]
-    pub memory_limit: Option<ByteSize>,
+    pub memory_limit: ByteSize,
     #[clap(skip)]
     pub tls_config: Option<TlsConfig>,
 }
@@ -59,9 +59,9 @@ impl Preference {
     }
 
     fn init(&mut self) {
-        if let Some(limit_mib) = self.memory_limit_mib {
-            self.memory_limit = Some(ByteSize::from_mib(limit_mib));
-        }
+        self.memory_limit = self.memory_limit_mib
+            .map(ByteSize::from_mib)
+            .unwrap_or(ByteSize::from_mib(4096));
 
         if &self.address == "default" {
             if self.tls_cert.is_some() {

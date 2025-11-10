@@ -232,7 +232,7 @@ impl Patterns {
 
     pub fn forbidden_kind(&self, pos: Pos) -> Option<ForbiddenKind> {
         self.is_forbidden(pos).then(|| {
-            let pattern = self.field.get::<{ Color::Black }>()[pos.idx_usize()];
+            let pattern = self.field[Color::Black][pos.idx_usize()];
 
             if pattern.has_threes() {
                 ForbiddenKind::DoubleThree
@@ -247,7 +247,7 @@ impl Patterns {
     pub fn update_with_slice_mut<const R: RuleKind, const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
         let slice_pattern = slice.calculate_slice_pattern::<R, C>();
 
-        match (slice.pattern_bitmap.get::<C>() == 0, slice_pattern.is_empty()) {
+        match (slice.pattern_bitmap[C] == 0, slice_pattern.is_empty()) {
             (false, true) =>
                 self.clear_with_slice_mut::<C, D>(slice),
             (_, false) =>
@@ -261,26 +261,26 @@ impl Patterns {
 
         let start_idx = slice.start_pos.idx_usize();
 
-        let mut clear_mask = std::mem::take(slice.pattern_bitmap.get_ref_mut::<C>());
+        let mut clear_mask = std::mem::take(&mut slice.pattern_bitmap[C]);
 
         while clear_mask != 0 {
             let slice_idx = clear_mask.trailing_zeros() as usize;
             clear_mask &= clear_mask - 1;
 
             let idx = step_idx!(D, start_idx, slice_idx);
-            self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<D>(0);
+            self.field[C][idx].apply_mask_mut::<D>(0);
         }
     }
 
     fn update_with_slice_pattern_mut<const C: Color, const D: Direction>(
         &mut self, slice: &mut Slice, slice_pattern: SlicePattern
     ) {
-        *self.unchecked_five_pos.get_ref_mut::<C>() = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK != 0)
+        self.unchecked_five_pos[C] = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK != 0)
             .then(|| {
                 let slice_idx = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8;
                 Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8))
             })
-            .or(self.unchecked_five_pos.get::<C>());
+            .or(self.unchecked_five_pos[C]);
 
         self.counts.update_slice_mut::<C, D>(
             slice.idx as usize,
@@ -290,20 +290,20 @@ impl Patterns {
         );
 
         let pattern_bitmap = std::mem::replace(
-            slice.pattern_bitmap.get_ref_mut::<C>(),
+            &mut slice.pattern_bitmap[C],
             encode_u128_into_u16(slice_pattern.patterns)
         );
 
         let slice_patterns = slice_pattern.patterns.to_le_bytes();
 
         let start_idx = slice.start_pos.idx_usize();
-        let mut update_mask = slice.pattern_bitmap.get::<C>() | pattern_bitmap;
+        let mut update_mask = slice.pattern_bitmap[C] | pattern_bitmap;
         while update_mask != 0 {
             let slice_idx = update_mask.trailing_zeros() as usize;
             update_mask &= update_mask - 1;
 
             let idx = step_idx!(D, start_idx, slice_idx);
-            self.field.get_ref_mut::<C>()[idx].apply_mask_mut::<D>(slice_patterns[slice_idx]);
+            self.field[C][idx].apply_mask_mut::<D>(slice_patterns[slice_idx]);
 
             if C == Color::Black && self.field[Color::Black][idx].is_forbidden_unchecked() {
                 self.candidate_forbidden_field.set_idx(idx);

@@ -1,5 +1,5 @@
 use crate::batch_counter::BatchCounter;
-use crate::config::Config;
+use crate::config::{Config, SearchObjective};
 use crate::eval::evaluator::Evaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
@@ -9,7 +9,7 @@ use crate::search_endgame::EndgameFrame;
 use crate::search_frame::SearchFrame;
 use crate::thread_type::ThreadType;
 use crate::value;
-use crate::value::{Depth, MAX_PLY};
+use crate::value::Depth;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::Score;
 use serde::{Deserialize, Serialize};
@@ -32,6 +32,7 @@ pub enum RootScore {
 #[derive(Clone)]
 pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub thread_type: TH,
+    pub search_objective: SearchObjective,
     pub tid: u32,
     pub config: Config,
 
@@ -48,7 +49,7 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub root_pv: PrincipalVariation,
     pub singular_root: bool,
 
-    pub vcf_stack: Box<[EndgameFrame; MAX_PLY + 1]>,
+    pub endgame_stack: Box<[EndgameFrame; value::MAX_PLY_SLOTS]>,
     pub endgame_stack_top: usize,
 
     pub batch_counter: BatchCounter<'a>,
@@ -65,6 +66,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
     #[allow(clippy::uninit_assumed_init)]
     pub fn new(
         thread_type: TH, tid: u32,
+        search_objective: SearchObjective,
         config: Config,
         evaluator: E,
         tt: TTView<'a>,
@@ -74,18 +76,19 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
     ) -> Self {
         Self {
             thread_type,
+            search_objective,
             tid,
             config,
             tt,
             evaluator,
             ht: Box::new(ht),
-            ss: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
-            pvs: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
+            ss: Box::new([SearchFrame::EMPTY; value::MAX_PLY_SLOTS]),
+            pvs: Box::new([PrincipalVariation::EMPTY; value::MAX_PLY_SLOTS]),
             killers: Box::new([[MaybePos::NONE; 2]; value::MAX_PLY_SLOTS]),
             lmr_table: Box::new(build_lmr_table(config)),
             root_pv: PrincipalVariation::EMPTY,
             singular_root: false,
-            vcf_stack: Box::new(unsafe { std::mem::MaybeUninit::uninit().assume_init() }),
+            endgame_stack: Box::new([EndgameFrame::EMPTY; value::MAX_PLY_SLOTS]),
             endgame_stack_top: 0,
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
@@ -146,7 +149,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
     }
 
     pub fn push_endgame_frame(&mut self, frame: EndgameFrame) {
-        self.vcf_stack[self.endgame_stack_top] = frame;
+        self.endgame_stack[self.endgame_stack_top] = frame;
         self.endgame_stack_top += 1;
     }
 
@@ -156,7 +159,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
         }
 
         self.endgame_stack_top -= 1;
-        Some(self.vcf_stack[self.endgame_stack_top])
+        Some(self.endgame_stack[self.endgame_stack_top])
     }
 
 }

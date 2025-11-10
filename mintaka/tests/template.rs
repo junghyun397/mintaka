@@ -1,5 +1,5 @@
 mod template {
-    use mintaka::config::Config;
+    use mintaka::config::{Config, SearchObjective};
     use mintaka::eval::evaluator::{ActiveEvaluator, Evaluator};
     use mintaka::game_agent::GameAgent;
     use mintaka::memo::history_table::HistoryTable;
@@ -20,14 +20,14 @@ mod template {
         let evaluator = ActiveEvaluator::from_state(&state);
 
         let tt = TranspositionTable::new_with_size(config.tt_size);
-        let ht = HistoryTable::new();
+        let ht = HistoryTable::EMPTY;
 
         let global_counter_in_1k = AtomicUsize::new(0);
         let aborted = AtomicBool::new(false);
 
-        let mut td = ThreadData::new(
-            WorkerThread,
-            0,
+        let _ = ThreadData::new(
+            WorkerThread, 0,
+            SearchObjective::Best,
             config,
             evaluator,
             tt.view(),
@@ -49,7 +49,11 @@ mod template {
             GameAgent::from_state(config, state)
         };
 
-        let best_move = agent.launch(NullResponseSender, Arc::new(AtomicBool::new(false)));
+        let best_move = agent.launch(
+            SearchObjective::Best,
+            NullResponseSender,
+            Arc::new(AtomicBool::new(false))
+        );
 
         println!("{:?}", best_move);
     }

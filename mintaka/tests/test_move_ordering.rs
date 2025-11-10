@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test_movegen {
-    use mintaka::config::Config;
+    use mintaka::config::{Config, SearchObjective};
     use mintaka::eval::evaluator::{ActiveEvaluator, Evaluator};
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
@@ -23,14 +23,14 @@ mod test_movegen {
             let mut evaluator = ActiveEvaluator::from_state(&state);
 
             let tt = TranspositionTable::new_with_size(config.tt_size);
-            let ht = HistoryTable::new();
+            let ht = HistoryTable::EMPTY;
 
             let global_counter_in_1k = AtomicUsize::new(0);
             let aborted = AtomicBool::new(false);
 
             let mut td = ThreadData::new(
-                WorkerThread,
-                0,
+                WorkerThread, 0,
+                SearchObjective::Best,
                 config,
                 evaluator,
                 tt.view(),

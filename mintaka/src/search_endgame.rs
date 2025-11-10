@@ -86,6 +86,11 @@ pub struct EndgameMovesUnchecked {
 
 impl EndgameMovesUnchecked {
 
+    pub const EMPTY: Self = Self {
+        moves: [MaybePos::NONE; ENDGAME_MAX_MOVES],
+        top: 0,
+    };
+
     pub fn unit(pos: Pos) -> Self {
         Self {
             moves: {
@@ -134,6 +139,15 @@ pub struct EndgameFrame {
     pub alpha: Score,
     pub four_pos: Pos,
     pub defend_pos: Pos,
+}
+
+impl EndgameFrame {
+    pub const EMPTY: Self = Self {
+        moves: EndgameMovesUnchecked::EMPTY,
+        alpha: Score::NAN,
+        four_pos: MaybePos::INVALID_POS,
+        defend_pos: MaybePos::INVALID_POS,
+    };
 }
 
 pub trait VcfDestination {
@@ -286,7 +300,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
 
             let idx = four_pos.idx_usize();
 
-            let player_pattern = state.board.patterns.field.get_ref::<C>()[idx];
+            let player_pattern = state.board.patterns.field[C][idx];
 
             if C == Color::Black && state.board.patterns.is_forbidden(four_pos) {
                 continue 'position_search;
@@ -306,11 +320,11 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
             vcf_ply += 1;
             vcf_depth_left -= 1;
 
-            let defend_pos = state.board.patterns.unchecked_five_pos.get_ref::<C>().unwrap();
+            let defend_pos = state.board.patterns.unchecked_five_pos[C].unwrap();
             let tt_key = state.board.hash_key.set(C.reversed(), defend_pos);
             td.tt.prefetch(tt_key);
 
-            let defend_pattern = state.board.patterns.field.get_reversed::<C>()[defend_pos.idx_usize()];
+            let defend_pattern = state.board.patterns.field[!C][defend_pos.idx_usize()];
             let defend_four_count = defend_pattern.count_fours();
             let defend_is_forbidden = R == RuleKind::Renju
                 && C == Color::White
@@ -382,7 +396,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
             td.batch_counter.increment_single();
             vcf_ply += 1;
 
-            if state.board.patterns.counts.global.get_ref::<C>().total_fours() == 0 { // cold branch pruning
+            if state.board.patterns.counts.global[C].total_fours() == 0 { // cold branch pruning
                 state.board.unset_mut(defend_pos);
                 state.board.unset_mut(four_pos);
                 vcf_ply -= 2;
@@ -398,9 +412,9 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
             });
 
             if defend_four_count != PatternCount::Cold {
-                let defend_move = state.board.patterns.unchecked_five_pos.get_reversed_ref::<C>().unwrap();
+                let defend_move = state.board.patterns.unchecked_five_pos[!C].unwrap();
 
-                if !state.board.patterns.field.get_ref::<C>()[defend_move.idx_usize()].has_any_four()
+                if !state.board.patterns.field[C][defend_move.idx_usize()].has_any_four()
                     || (C == Color::Black && state.board.patterns.is_forbidden(defend_move))
                 {
                     td.endgame_stack_top -= 1;

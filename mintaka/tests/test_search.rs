@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test_search {
     use indoc::indoc;
-    use mintaka::config::Config;
+    use mintaka::config::{Config, SearchObjective};
     use mintaka::game_agent::GameAgent;
     use mintaka::game_state::GameState;
     use mintaka::protocol::response::NullResponseSender;
@@ -21,11 +21,9 @@ mod test_search {
                 GameAgent::from_state(config, state)
             };
 
-            let best_move = agent.launch(NullResponseSender, Arc::new(AtomicBool::new(false)));
+            let best_move = agent.launch(SearchObjective::Best, NullResponseSender, Arc::new(AtomicBool::new(false)));
 
             println!("{:?}", best_move);
-
-            best_move
         }};
     }
 
@@ -38,11 +36,11 @@ mod test_search {
         13 . . . . . . . . . . . . . . . 13
         12 . . . . . . . . . . . . . . . 12
         11 . . . . . . . . . . . . . . . 11
-        10 . . . . . . . . . X . . . . . 10
-         9 . . . . . . . O . O . . . . . 9
-         8 . . . . . . . X X X O . . . . 8
-         7 . . . . . . X O X . . . . . . 7
-         6 . . . . . . . . O . . . . . . 6
+        10 . . . . . . . . . . . . . . . 10
+         9 . . . . . . . . . . . . . . . 9
+         8 . . . . . . . X . . . . . . . 8
+         7 . . . . . . . . . . . . . . . 7
+         6 . . . . . . . . . . . . . . . 6
          5 . . . . . . . . . . . . . . . 5
          4 . . . . . . . . . . . . . . . 4
          3 . . . . . . . . . . . . . . . 3
@@ -51,6 +49,6 @@ mod test_search {
            A B C D E F G H I J K L M N O
        "});
 
-        let best_move = test_search!(source);
+        test_search!(source);
     }
 }

@@ -1,41 +1,64 @@
 use crate::impl_debug_from_display;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialOrd, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct ByteSize(usize);
 
 impl ByteSize {
 
-    pub fn from_bytes(size_in_bytes: usize) -> Self {
+    pub const ZERO: Self = Self(0);
+
+    pub const fn from_bytes(size_in_bytes: usize) -> Self {
         Self(size_in_bytes)
     }
 
-    pub fn from_kib(size_in_kib: usize) -> Self {
+    pub const fn from_kib(size_in_kib: usize) -> Self {
         Self(size_in_kib * 1024)
     }
 
-    pub fn from_mib(size_in_mib: usize) -> Self {
+    pub const fn from_mib(size_in_mib: usize) -> Self {
         Self(size_in_mib * 1024 * 1024)
     }
 
-    pub fn bytes(&self) -> usize {
+    pub const fn bytes(&self) -> usize {
         self.0
     }
 
-    pub fn kib(&self) -> usize {
+    pub const fn kib(&self) -> usize {
         self.0 / 1024
     }
 
-    pub fn mib(&self) -> usize {
+    pub const fn mib(&self) -> usize {
         self.0 / (1024 * 1024)
     }
 
 }
 
-impl From<usize> for ByteSize {
-    fn from(size_in_bytes: usize) -> Self {
-        Self(size_in_bytes)
+impl Add for ByteSize {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl AddAssign for ByteSize {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+    }
+}
+
+impl Sub for ByteSize {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
+impl SubAssign for ByteSize {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.0 -= rhs.0;
     }
 }
 

@@ -16,6 +16,12 @@ pub struct RecoveryState {
     pub movegen_window: MovegenWindow
 }
 
+impl RecoveryState {
+    pub const EMPTY: Self = Self {
+        movegen_window: MovegenWindow::EMPTY
+    };
+}
+
 impl GameState {
 
     pub fn from_board_and_history(board: Board, history: History) -> Self {

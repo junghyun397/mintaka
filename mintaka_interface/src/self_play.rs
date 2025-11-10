@@ -1,4 +1,4 @@
-use mintaka::config::Config;
+use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::game_state::GameState;
 use mintaka::protocol::command::Command;
@@ -45,14 +45,15 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
 
     game_agent.command(Command::Workers(num_cpus::get_physical() as u32))?;
 
-    message_sender.launch();
+    message_sender.launch(SearchObjective::Best);
 
     let mut overall_nodes_in_1k = 0;
     let mut game_result = None;
     for message in message_receiver {
         match message {
-            Message::Launch => {
+            Message::Launch(search_objective) => {
                 let best_move = game_agent.launch(
+                    search_objective,
                     CallBackResponseSender::new(response_printer),
                     aborted.clone()
                 );
@@ -71,7 +72,7 @@ fn self_play(config: Config, game_state: GameState) -> Result<(), GameError> {
                 overall_nodes_in_1k += best_move.total_nodes_in_1k;
 
                 message_sender.result(result);
-                message_sender.launch();
+                message_sender.launch(SearchObjective::Best);
             },
             Message::Finished(result) => {
                 game_result = Some(result);

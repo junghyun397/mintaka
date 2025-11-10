@@ -54,9 +54,9 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     let mut score: Score = 0;
     let mut best_move = MaybePos::NONE;
     let mut root_pv = PrincipalVariation::EMPTY;
+    let mut selective_depth = 0;
 
     let starting_depth = (td.tid % 10 + 1) as Depth;
-    let mut selective_depth = 0;
 
     'iterative_deepening: for depth in starting_depth ..= td.config.max_depth {
         let iter_score = if depth < 5 {
@@ -375,7 +375,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
                 // reduction defense four less
                 if td.ply < 4
-                    && player_pattern.has_open_four()
+                    && is_tactical
                 {
                     reduction -= 1;
                 }

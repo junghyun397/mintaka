@@ -113,38 +113,6 @@ macro_rules! impl_color_container {
             pub fn access_pair(&self, color: Color) -> (&T, &T) {
                 (&self.0[color as usize], &self.0[color.reversed() as usize])
             }
-
-            #[inline]
-            pub const fn get_ref<const C: Color>(&self) -> &T {
-                match C {
-                    Color::Black => &self.0[0],
-                    Color::White => &self.0[1],
-                }
-            }
-
-            #[inline]
-            pub const fn get_reversed_ref<const C: Color>(&self) -> &T {
-                match C {
-                    Color::Black => &self.0[1],
-                    Color::White => &self.0[0],
-                }
-            }
-
-            #[inline]
-            pub const fn get_ref_mut<const C: Color>(&mut self) -> &mut T {
-                match C {
-                    Color::Black => &mut self.0[0],
-                    Color::White => &mut self.0[1],
-                }
-            }
-
-            #[inline]
-            pub const fn get_reversed_ref_mut<const C: Color>(&mut self) -> &mut T {
-                match C {
-                    Color::Black => &mut self.0[1],
-                    Color::White => &mut self.0[0],
-                }
-            }
         }
 
         impl<T> Index<Color> for $name<T> {
@@ -160,25 +128,6 @@ macro_rules! impl_color_container {
             #[inline]
             fn index_mut(&mut self, index: Color) -> &mut Self::Output {
                 &mut self.0[index as usize]
-            }
-        }
-
-        impl<T: Copy> $name<T> {
-
-            #[inline]
-            pub const fn get<const C: Color>(&self) -> T {
-                match C {
-                    Color::Black => self.0[0],
-                    Color::White => self.0[1],
-                }
-            }
-
-            #[inline]
-            pub const fn get_reversed<const C: Color>(&self) -> T {
-                match C {
-                    Color::Black => self.0[1],
-                    Color::White => self.0[0],
-                }
             }
         }
     };

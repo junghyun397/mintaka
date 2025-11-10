@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, SearchObjective};
 use crate::eval::evaluator::{ActiveEvaluator, Evaluator};
 use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::game_state::GameState;
@@ -96,7 +96,7 @@ impl GameAgent {
             state,
             evaluator: ActiveEvaluator::from_state(&state),
             tt,
-            ht: HistoryTable::default(),
+            ht: HistoryTable::EMPTY,
             executed_moves: Bitfield::default(),
             time_manager: config.initial_timer.into(),
         }
@@ -245,6 +245,9 @@ impl GameAgent {
             },
             Command::ConsumeTime(time) => {
                 self.time_manager.timer.consume(time);
+            },
+            Command::Pondering(enable) => {
+                self.config.pondering = enable;
             }
             Command::MaxNodes { in_1k } => {
                 self.config.max_nodes_in_1k = Some(in_1k);
@@ -253,9 +256,9 @@ impl GameAgent {
                 self.config.workers = workers;
             },
             Command::MaxMemory(size) => {
-                const HEAP_MEMORY_MARGIN_IN_KIB: usize = 1024 * 10;
+                const HEAP_MEMORY_MARGIN_IN_KIB: ByteSize = ByteSize::from_mib(10);
 
-                self.tt.resize(ByteSize::from_kib(size.kib() + HEAP_MEMORY_MARGIN_IN_KIB));
+                self.tt.resize(size - HEAP_MEMORY_MARGIN_IN_KIB);
             },
             Command::Rule(kind) => {
                 self.config.rule_kind = kind;
@@ -286,7 +289,7 @@ impl GameAgent {
         }
     }
 
-    pub fn launch(&mut self, response_sender: impl ResponseSender, aborted: Arc<AtomicBool>) -> BestMove {
+    pub fn launch(&mut self, search_objective: SearchObjective, response_sender: impl ResponseSender, aborted: Arc<AtomicBool>) -> BestMove {
         let computing_resource = self.next_computing_resource();
 
         let started_time = std::time::Instant::now();
@@ -308,6 +311,7 @@ impl GameAgent {
                     computing_resource.time,
                 ),
                 0,
+                search_objective,
                 self.config,
                 self.evaluator.clone(),
                 tt_view,
@@ -326,6 +330,7 @@ impl GameAgent {
             for tid in 1 .. self.config.workers {
                 let mut worker_td = ThreadData::new(
                     WorkerThread, tid,
+                    search_objective,
                     self.config,
                     self.evaluator.clone(),
                     tt_view,

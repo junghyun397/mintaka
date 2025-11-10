@@ -1,17 +1,20 @@
 pub(crate) use crate::app_error::AppError;
 use crate::preference::Preference;
-use crate::session::{Session, SessionCommandResponse, SessionKey, SessionResponse, SessionResultResponse};
+use crate::session::{Session, SessionCommandResponse, SessionData, SessionKey, SessionResponse, SessionResultResponse};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use dashmap::DashMap;
 use mintaka::config::Config;
 use mintaka::game_agent::{BestMove, ComputingResource};
 use mintaka::protocol::command::Command;
+use mintaka::protocol::command::Command::Workers;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
+use rusty_renju::utils::byte_size::ByteSize;
 use serde_json::json;
+use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU32;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::UnboundedSender;
@@ -22,12 +25,12 @@ use tracing::info;
 pub struct WorkerPermit(OwnedSemaphorePermit);
 
 impl WorkerPermit {
-
     pub fn release(self) {
-        drop(self.0)
+        drop(self.0);
     }
-
 }
+
+pub struct MemoryPermit(OwnedSemaphorePermit);
 
 pub struct SessionResource {
     workers: NonZeroU32,
@@ -36,8 +39,10 @@ pub struct SessionResource {
 
 pub struct AppState {
     sessions: Arc<DashMap<SessionKey, Session>>,
+    session_index: RwLock<BTreeMap<Instant, BTreeSet<SessionKey>>>,
     session_streams: Arc<DashMap<SessionKey, (UnboundedSender<SessionResponse>, Option<UnboundedReceiverStream<SessionResponse>>)>>,
-    sem: Arc<Semaphore>,
+    worker_resource: Arc<Semaphore>,
+    memory_resource: Arc<Semaphore>,
     pub preference: Preference,
     session_cleanup_task: Option<tokio::task::AbortHandle>,
 }
@@ -45,29 +50,47 @@ pub struct AppState {
 impl AppState {
 
     pub fn new(preference: Preference) -> Self {
-        let sem = Arc::new(Semaphore::new(preference.cores));
-
         Self {
             sessions: Arc::new(DashMap::new()),
+            session_index: RwLock::new(BTreeMap::new()),
             session_streams: Arc::new(DashMap::new()),
-            sem,
+            worker_resource: Arc::new(Semaphore::new(preference.cores)),
+            memory_resource: Arc::new(Semaphore::new(preference.memory_limit.mib())),
             preference,
             session_cleanup_task: None,
         }
     }
 
     pub fn available_workers(&self) -> usize {
-        self.sem.available_permits()
+        self.worker_resource.available_permits()
     }
 
     pub async fn acquire_workers(&self, workers: u32) -> WorkerPermit {
-        WorkerPermit(self.sem.clone().acquire_many_owned(workers).await.unwrap())
+        WorkerPermit(self.worker_resource.clone().acquire_many_owned(workers).await.unwrap())
     }
 
-    pub fn new_session(&self, config: Config, board: Board, history: History) -> SessionKey {
+    pub async fn acquire_memory(&self, memory_size: ByteSize, force_acquire: bool) -> MemoryPermit {
+        let available = ByteSize::from_mib(self.memory_resource.available_permits());
+
+        if memory_size > available && force_acquire {
+            let mut acquired_memory = ByteSize::ZERO;
+
+            while acquired_memory >= memory_size {
+                // get the oldest key from session_index
+                // hibernates the oldest session and append acquired_memory
+                acquired_memory += ByteSize::ZERO;
+            }
+        }
+
+        MemoryPermit(self.memory_resource.clone().acquire_many_owned(memory_size.mib() as u32).await.unwrap())
+    }
+
+    pub async fn new_session(&self, config: Config, board: Board, history: History) -> SessionKey {
         let session_key = SessionKey::new_random();
 
-        let session = Session::new(config, board, history, None);
+        let memory_permit = self.acquire_memory(config.tt_size, true).await;
+
+        let session = Session::new(config, board, history, None, memory_permit);
 
         self.sessions.insert(session_key, session);
 
@@ -83,7 +106,7 @@ impl AppState {
         session_key
     }
 
-    pub async fn hibernate_session(&self, session_key: SessionKey, sessions_directory: &str) -> Result<(), AppError> {
+    pub async fn hibernate_session(&self, session_key: SessionKey) -> Result<(), AppError> {
         let (_, session) = self.sessions.remove(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
@@ -92,7 +115,7 @@ impl AppState {
             .map_err(AppError::from_general_error)?
             .map_err(AppError::from_general_error)?;
 
-        let mut file = tokio::fs::File::create(format!("{sessions_directory}/{session_key}"))
+        let mut file = tokio::fs::File::create(format!("{}/{session_key}", self.preference.sessions_directory))
             .await
             .map_err(|_| AppError::SessionFileAlreadyExists)?;
 
@@ -106,14 +129,18 @@ impl AppState {
         Ok(())
     }
 
-    pub async fn wakeup_session(&self, session_key: SessionKey, session_directory: &str) -> Result<(), AppError> {
-        let buf = tokio::fs::read(format!("{session_directory}/{session_key}"))
+    pub async fn wakeup_session(&self, session_key: SessionKey) -> Result<(), AppError> {
+        let buf = tokio::fs::read(format!("{}/{session_key}", self.preference.sessions_directory))
             .await
             .map_err(|_| AppError::SessionFileNotFound)?;
 
-        let session = tokio::task::spawn_blocking(move || rmp_serde::from_slice(&buf))
+        let session_data: SessionData = rmp_serde::from_slice(&buf)
+            .map_err(AppError::from_general_error)?;
+
+        let memory_permit = self.acquire_memory(session_data.agent.config.tt_size, true).await;
+
+        let session = tokio::task::spawn_blocking(move || Session::from_data(session_data, memory_permit))
             .await
-            .map_err(AppError::from_general_error)?
             .map_err(AppError::from_general_error)?;
 
         self.sessions.insert(session_key, session);
@@ -235,14 +262,12 @@ impl AppState {
     }
 
     pub async fn hibernate_all_sessions(&self) -> Result<(), AppError> {
-        let sessions_directory = &self.preference.sessions_directory;
-
         let session_keys: Vec<_> = self.sessions.iter()
             .map(|session| *session.key())
             .collect();
 
         let tasks = session_keys.into_iter()
-            .map(|session_key| self.hibernate_session(session_key, sessions_directory));
+            .map(|session_key| self.hibernate_session(session_key));
 
         futures_util::future::try_join_all(tasks).await?;
 
@@ -263,7 +288,7 @@ impl AppState {
         }
 
         let tasks = session_keys.into_iter()
-            .map(|session_key| self.wakeup_session(session_key, sessions_directory));
+            .map(|session_key| self.wakeup_session(session_key));
 
         futures_util::future::try_join_all(tasks).await?;
 

@@ -22,16 +22,18 @@ pub struct HistoryTable {
 
 impl Default for HistoryTable {
     fn default() -> Self {
-        Self {
-            quiet: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
-            three: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
-            four: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
-            counter: ColorContainer::new([MaybePos::NONE; pos::BOARD_SIZE], [MaybePos::NONE; pos::BOARD_SIZE]),
-        }
+        Self::EMPTY
     }
 }
 
 impl HistoryTable {
+
+    pub const EMPTY: Self = Self {
+        quiet: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
+        three: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
+        four: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
+        counter: ColorContainer::new([MaybePos::NONE; pos::BOARD_SIZE], [MaybePos::NONE; pos::BOARD_SIZE]),
+    };
 
     pub fn update_quiet(&mut self, history: &History, quiet_plied: QuietPlied, color: Color, best_move: Pos, depth: Depth) {
         for &pos in quiet_plied.iter() {

@@ -284,7 +284,9 @@ impl TryFrom<&Board> for History {
 
         let mut history = History::default();
 
-        while let Some(black_pos) = black_history.pop() && let Some(white_pos) = white_history.pop() {
+        while let Some(white_pos) = white_history.pop()
+            && let Some(black_pos) = black_history.pop()
+        {
             history.set_mut(black_pos);
             history.set_mut(white_pos);
         }

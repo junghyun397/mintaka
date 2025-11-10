@@ -1,6 +1,6 @@
-use crate::app_state::{AppError, WorkerPermit};
+use crate::app_state::{AppError, MemoryPermit, WorkerPermit};
 use crate::stream_response_sender::StreamSessionResponseSender;
-use mintaka::config::Config;
+use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{BestMove, GameAgent};
 use mintaka::game_state::GameState;
 use mintaka::movegen::movegen_window::MovegenWindow;
@@ -87,15 +87,23 @@ pub enum AgentState {
 
 pub struct Session {
     state: AgentState,
+    memory_permit: MemoryPermit,
     best_move: Option<BestMove>,
     abort_handle: Arc<AtomicBool>,
     time_to_live: Option<Duration>,
     last_active: Instant,
 }
 
+#[derive(Deserialize)]
+pub struct SessionData {
+    pub agent: GameAgent,
+    pub best_move: Option<BestMove>,
+    pub time_to_live: Option<Duration>,
+}
+
 impl Session {
 
-    pub fn new(config: Config, board: Board, history: History, time_to_live: Option<Duration>) -> Self {
+    pub fn new(config: Config, board: Board, history: History, time_to_live: Option<Duration>, memory_permit: MemoryPermit) -> Self {
         let game_state = GameState {
             movegen_window: MovegenWindow::from(&board.hot_field),
             board,
@@ -104,9 +112,21 @@ impl Session {
 
         Self {
             state: AgentState::Agent(GameAgent::from_state(config, game_state)),
+            memory_permit,
             best_move: None,
             abort_handle: Arc::new(AtomicBool::new(false)),
             time_to_live,
+            last_active: Instant::now(),
+        }
+    }
+
+    pub fn from_data(data: SessionData, memory_permit: MemoryPermit) -> Self {
+        Self {
+            state: AgentState::Agent(data.agent),
+            memory_permit,
+            best_move: data.best_move,
+            abort_handle: Arc::new(AtomicBool::new(false)),
+            time_to_live: data.time_to_live,
             last_active: Instant::now(),
         }
     }
@@ -147,7 +167,7 @@ impl Session {
         let abort_flag = self.abort_handle.clone();
 
         tokio::task::spawn_blocking(async move || {
-            let best_move = game_agent.launch(response_sender, abort_flag);
+            let best_move = game_agent.launch(SearchObjective::Best, response_sender, abort_flag);
 
             let game_result = game_agent.command(Command::Play(best_move.pos)).unwrap();
 
@@ -240,26 +260,5 @@ impl Serialize for Session {
         state.serialize_field("best_move", &self.best_move)?;
         state.serialize_field("time_to_live", &self.time_to_live)?;
         state.end()
-    }
-}
-
-impl<'de> Deserialize<'de> for Session {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        #[derive(Deserialize)]
-        struct SessionData {
-            agent: GameAgent,
-            best_move: Option<BestMove>,
-            time_to_live: Option<Duration>,
-        }
-
-        let data = SessionData::deserialize(deserializer)?;
-
-        Ok(Self {
-            state: AgentState::Agent(data.agent),
-            best_move: data.best_move,
-            abort_handle: Arc::new(AtomicBool::new(false)),
-            time_to_live: data.time_to_live,
-            last_active: Instant::now(),
-        })
     }
 }

@@ -4,7 +4,7 @@ extern crate test;
 
 mod bench_vcf {
     use indoc::indoc;
-    use mintaka::config::Config;
+    use mintaka::config::{Config, SearchObjective};
     use mintaka::eval::evaluator::ActiveEvaluator;
     use mintaka::eval::evaluator::Evaluator;
     use mintaka::game_state::GameState;
@@ -44,12 +44,12 @@ mod bench_vcf {
             let evaluator = ActiveEvaluator::from_state(&state);
 
             let tt = TranspositionTable::new_with_size(ByteSize::from_kib(8));
-            let ht = HistoryTable::new();
+            let ht = HistoryTable::EMPTY;
 
             let global_counter_in_1k = AtomicUsize::new(0);
             let aborted = AtomicBool::new(false);
 
-            let td = ThreadData::new(WorkerThread, 0, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
+            let td = ThreadData::new(WorkerThread, 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
                 let result = search_endgame::vcf_search::<{ RuleKind::Renju }>(&mut td.clone(), Depth::MAX, &state, -Score::INF, Score::INF, 0);

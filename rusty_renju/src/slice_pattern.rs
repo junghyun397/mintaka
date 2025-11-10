@@ -32,7 +32,7 @@ impl Slice {
 
     pub fn calculate_slice_pattern<const R: RuleKind, const C: Color>(&self) -> SlicePattern {
         // padding = 3
-        let extended_stones: usize = (self.stones.get::<C>() as usize) << 3;
+        let extended_stones: usize = (self.stones[C] as usize) << 3;
         let extended_blocks: usize = (self.blocks::<C>() as usize) << 3 | 0b111;
 
         let mut acc: SlicePattern = SlicePattern::EMPTY;
