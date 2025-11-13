@@ -84,7 +84,8 @@ def spawn_process(path, params) -> subprocess.Popen:
         bufsize=-1
     )
 
-def command_process(process, command, println=False, filter_prefix: list[str] | None=None, println_prefix: str="") -> str | None:
+def command_process(process, command,
+                    println=False, filter_prefix: list[str] | None = None, println_prefix: str = "") -> str | None:
     process.stdin.write(f"{command}\n")
     process.stdin.flush()
 
@@ -130,12 +131,12 @@ def play_game(config, game_no) -> GameResult:
 
         a_engine = Engine(
             a_process,
-            TimeManager(config.params.a_total_time, config.params.a_increment_time, config.params.a_turn_time)
+            TimeManager(config.params.a_time[0], config.params.a_time[1], config.params.a_time[2])
         )
 
         b_engine = Engine(
             b_process,
-            TimeManager(config.params.b_total_time, config.params.b_increment_time, config.params.b_turn_time)
+            TimeManager(config.params.b_time[0], config.params.b_time[1], config.params.b_time[2])
         )
 
         for engine in [a_engine, b_engine]:
@@ -160,17 +161,16 @@ def play_game(config, game_no) -> GameResult:
 
             time_elapsed = int((time.perf_counter_ns() - timer) / 1_000_000)
 
-            if move == "none":
-                winner = player.flip()
-                break
-
             player_engine.time_manager.consume(time_elapsed)
 
-            winner_player = command_process(player_engine.process, f"play {move}")
-            winner_opponent = command_process(opponent_engine.process, f"play {move}")
+            if move == "none" or turn_no >= 225:
+                winner_player = None
+            else:
+                winner_player = command_process(player_engine.process, f"play {move}")
+                winner_opponent = command_process(opponent_engine.process, f"play {move}")
 
-            if winner_player != winner_opponent:
-                raise Exception(f"a_winner={winner_player}, b_winner={winner_opponent} ")
+                if winner_player != winner_opponent:
+                    raise Exception(f"a_winner={winner_player}, b_winner={winner_opponent} ")
 
             if winner_player is not None:
                 if "black" in winner_player.lower():
@@ -181,7 +181,8 @@ def play_game(config, game_no) -> GameResult:
                 break
 
             player_engine.time_manager.apply_increment()
-            command_process(player_engine.process, f"limit time total {int(player_engine.time_manager.total_remaining)}")
+            command_process(player_engine.process,
+                            f"limit time total {int(player_engine.time_manager.total_remaining)}")
 
             player = player.flip()
             player_engine, opponent_engine = opponent_engine, player_engine
@@ -197,9 +198,7 @@ def play_game(config, game_no) -> GameResult:
 def main():
     parser = argparse.ArgumentParser()
 
-    default_total_time = 300_000
-    default_increment_time = 0
-    default_turn_time = 30_00
+    default_total_increment_time = [300_000, 0, 30_00]
 
     parser.add_argument("--a-path", type=str, required=True)
     parser.add_argument("--a-params", type=str, default="")
@@ -209,13 +208,10 @@ def main():
 
     parser.add_argument("--num-games", type=int, default=17)
 
-    parser.add_argument("--a-total-time", type=int, default=default_total_time)
-    parser.add_argument("--a-increment-time", type=int, default=default_increment_time)
-    parser.add_argument("--a-turn-time", type=int, default=default_turn_time)
-
-    parser.add_argument("--b-total-time", type=int, default=default_total_time)
-    parser.add_argument("--b-increment-time", type=int, default=default_increment_time)
-    parser.add_argument("--b-turn-time", type=int, default=default_turn_time)
+    parser.add_argument("--a-time", type=int, nargs=3, default=default_total_increment_time,
+                        help="total(ms) increment(ms) turn(ms)")
+    parser.add_argument("--b-time", type=int, nargs=3, default=default_total_increment_time,
+                        help="total(ms) increment(ms) turn(ms)")
 
     parser.add_argument("--a-elo", type=float, default=1000.0)
     parser.add_argument("--b-elo", type=float, default=1000.0)

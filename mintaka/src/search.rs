@@ -9,8 +9,7 @@ use crate::movegen::move_picker::MovePicker;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
 use crate::search_endgame::vcf_search;
-use crate::search_frame::SearchFrame;
-use crate::thread_data::ThreadData;
+use crate::thread_data::{SearchFrame, ThreadData};
 use crate::thread_type::ThreadType;
 use crate::value;
 use crate::value::Depth;
@@ -292,7 +291,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     };
 
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
-        return vcf_search::<R>(td, td.config.max_vcf_depth, state, alpha, beta, static_eval)
+        return vcf_search::<R>(td, td.config.max_vcf_depth, state, static_eval, alpha, beta);
     }
 
     td.ss[td.ply].recovery_state = state.recovery_state();
@@ -310,7 +309,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     let mut three_plied = TacticalPlied::EMPTY;
     let mut four_plied = TacticalPlied::EMPTY;
 
-    'position_search: while let Some(MoveEntry { pos, policy_score }) = move_picker.next(td, state) {
+    'position_search: while let Some(MoveEntry { pos, move_score }) = move_picker.next(td, state) {
         if !state.board.is_legal_move(pos) {
             continue;
         }
@@ -322,7 +321,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         if !NT::IS_PV
             && !Score::is_losing(best_score)
-            && policy_score < move_picker::KILLER_MOVE_POLICY_SCORE
+            && move_score < move_picker::KILLER_MOVE_SCORE
         {
             // move count pruning
             let lmp_margin = lookup_lmp_mc_table(depth_left, static_eval_improvement > 0);
@@ -337,8 +336,6 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             {
                 break;
             }
-
-            // history pruning
         }
 
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
@@ -361,7 +358,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
             // late move reduction
             if !NT::IS_ROOT
-                && policy_score < move_picker::KILLER_MOVE_POLICY_SCORE
+                && move_score < move_picker::KILLER_MOVE_SCORE
                 && depth_left > 1
             {
                 // base reduction

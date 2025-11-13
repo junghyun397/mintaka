@@ -42,7 +42,7 @@ mod test_movegen {
             let mut move_picker = MovePicker::init_new(MaybePos::NONE, [MaybePos::NONE; 2], state.board.is_forced_defense());
 
             let mut heatmap = [f32::NAN; pos::BOARD_SIZE];
-            while let Some(MoveEntry { pos, policy_score: score }) = move_picker.next(&mut td, &state) {
+            while let Some(MoveEntry { pos, move_score: score }) = move_picker.next(&mut td, &state) {
                 heatmap[pos.idx_usize()] = score as f32;
 
                 print!("{:?}, ", (pos, score));

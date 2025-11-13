@@ -9,9 +9,10 @@ use rusty_renju::notation::score::{Score, Scores};
 
 pub const KILLER_MOVE_SLOTS: usize = 2;
 
-pub const TT_MOVE_POLICY_SCORE: i16 = Score::INF as i16 - 500;
-pub const KILLER_MOVE_POLICY_SCORE: i16 = Score::INF as i16 - 1000;
-pub const COUNTER_MOVE_POLICY_SCORE: i16 = Score::INF as i16 - 2000;
+pub const TT_MOVE_SCORE: i16 = Score::INF as i16 - 500;
+pub const KILLER_MOVE_SCORE: i16 = Score::INF as i16 - 1000;
+pub const COUNTER_MOVE_SCORE: i16 = Score::INF as i16 - 2000;
+pub const MAX_HISTORY_MOVE_SCORE: i16 = 10000;
 
 #[derive(Eq, PartialEq)]
 enum MoveStage {
@@ -28,6 +29,8 @@ pub struct MovePicker {
     moves_buffer: MoveList,
     tt_move: MaybePos,
     killer_moves: [MaybePos; KILLER_MOVE_SLOTS],
+    counter_move: MaybePos,
+    neural_scored: bool,
 }
 
 impl MovePicker {
@@ -43,6 +46,8 @@ impl MovePicker {
             moves_buffer: MoveList::default(),
             tt_move,
             killer_moves,
+            counter_move: MaybePos::NONE,
+            neural_scored: false,
         }
     }
 
@@ -57,7 +62,7 @@ impl MovePicker {
             if self.tt_move.is_some() {
                 return Some(MoveEntry {
                     pos: self.tt_move.unwrap(),
-                    policy_score: TT_MOVE_POLICY_SCORE
+                    move_score: TT_MOVE_SCORE
                 });
             }
         }
@@ -69,16 +74,18 @@ impl MovePicker {
                     break;
                 }
 
-                let killer_move = self.killer_moves[0].unwrap();
+                let killer_move = self.killer_moves[0];
                 self.killer_moves[0] = self.killer_moves[1];
                 self.killer_moves[1] = MaybePos::NONE;
 
-                if !self.forced
-                    || state.board.patterns.field[state.board.player_color][killer_move.idx_usize()].has_close_three()
+                if killer_move != self.tt_move
+                    && (!self.forced
+                        || state.board.patterns.field[state.board.player_color][killer_move.unwrap().idx_usize()].has_close_three()
+                    )
                 {
                     return Some(MoveEntry {
-                        pos: killer_move,
-                        policy_score: KILLER_MOVE_POLICY_SCORE
+                        pos: killer_move.unwrap(),
+                        move_score: KILLER_MOVE_SCORE
                     });
                 }
             }
@@ -96,9 +103,11 @@ impl MovePicker {
                 && maybe_counter_move != self.killer_moves[0]
                 && maybe_counter_move != self.killer_moves[1]
             {
+                self.counter_move = maybe_counter_move;
+
                 return Some(MoveEntry {
                     pos: maybe_counter_move.unwrap(),
-                    policy_score: COUNTER_MOVE_POLICY_SCORE
+                    move_score: COUNTER_MOVE_SCORE
                 });
             }
         }
@@ -114,7 +123,18 @@ impl MovePicker {
         }
 
         if self.stage == MoveStage::AllMoves {
-            return self.moves_buffer.consume_best();
+            while let Some(next_move) = self.moves_buffer.consume_best() {
+                if let maybe_next_move = next_move.pos.into() && (
+                    maybe_next_move == self.tt_move
+                        || maybe_next_move == self.killer_moves[0]
+                        || maybe_next_move == self.killer_moves[1]
+                        || maybe_next_move == self.counter_move
+                ) {
+                    continue;
+                }
+
+                return Some(next_move);
+            }
         }
 
         None
@@ -126,6 +146,8 @@ impl MovePicker {
         state: &GameState
     ) {
         let policy_buffer = td.evaluator.eval_policy(state);
+
+        self.neural_scored = false;
 
         let field = state.board.legal_field() & state.movegen_window.movegen_field;
 
@@ -140,7 +162,7 @@ impl MovePicker {
                 td.ht.four[state.board.player_color][idx]
             } else {
                 td.ht.quiet[state.board.player_color][idx]
-            };
+            }.clamp(-MAX_HISTORY_MOVE_SCORE, MAX_HISTORY_MOVE_SCORE);
 
             self.moves_buffer.push(Pos::from_index(idx as u8), policy_buffer[idx] + history_score);
         }

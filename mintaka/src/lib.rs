@@ -14,7 +14,6 @@ pub mod movegen;
 pub mod principal_variation;
 pub mod protocol;
 pub mod search;
-pub mod search_frame;
 pub mod tablebase;
 pub mod thread_data;
 pub mod thread_type;

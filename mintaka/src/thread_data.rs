@@ -1,17 +1,17 @@
 use crate::batch_counter::BatchCounter;
 use crate::config::{Config, SearchObjective};
 use crate::eval::evaluator::Evaluator;
+use crate::game_state::RecoveryState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::movegen::move_picker;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_endgame::EndgameFrame;
-use crate::search_frame::SearchFrame;
 use crate::thread_type::ThreadType;
 use crate::value;
 use crate::value::Depth;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::score::Score;
+use rusty_renju::notation::score::{Score, Scores};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -27,6 +27,28 @@ pub enum RootScore {
     FailHigh,
     FailLow,
     #[default] Unknown,
+}
+
+
+#[derive(Debug, Copy, Clone)]
+pub struct SearchFrame {
+    pub pos: MaybePos,
+    pub static_eval: Score,
+    pub on_pv: bool,
+    pub recovery_state: RecoveryState,
+    pub searching: MaybePos,
+    pub cutoffs: usize,
+}
+
+impl SearchFrame {
+    pub const EMPTY: Self = Self {
+        pos: MaybePos::NONE,
+        static_eval: Score::DRAW,
+        on_pv: false,
+        recovery_state: RecoveryState::EMPTY,
+        searching: MaybePos::NONE,
+        cutoffs: 0,
+    };
 }
 
 #[derive(Clone)]

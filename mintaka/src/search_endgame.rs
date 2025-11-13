@@ -16,64 +16,59 @@ use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{Score, Scores};
 use rusty_renju::pattern::{Pattern, PatternCount};
 
-pub trait EndgameAccumulator {
+pub trait SequenceTracker {
+    type Output;
 
-    const DISTANCE_WINDOW: isize;
+    fn unit(four: Pos) -> Self;
 
-    const ZERO: Self;
+    fn push(&mut self, defend: Pos, attack: Pos);
 
-    fn unit(pos: Pos, score: Score) -> Self;
+    fn resolve(self, score: Score) -> Self::Output;
 
-    fn append_pos(self, defend: Pos, threat: Pos) -> Self;
-
-    fn score(&self) -> Score;
-
+    fn fallback(score: Score) -> Self::Output;
 }
 
-pub type SequenceEndgameAccumulator = Option<Vec<MaybePos>>;
+pub struct NullSequenceTracker; impl SequenceTracker for NullSequenceTracker {
+    type Output = Score;
 
-impl EndgameAccumulator for SequenceEndgameAccumulator {
+    fn unit(_four: Pos) -> Self { Self }
 
-    const DISTANCE_WINDOW: isize = 5;
+    fn push(&mut self, _defend: Pos, _attack: Pos) { }
 
-    const ZERO: Self = None;
-
-    fn unit(pos: Pos, _score: Score) -> Self {
-        Some(vec![pos.into()])
-    }
-
-    fn append_pos(self, defend: Pos, four: Pos) -> Self {
-        self.map(|mut sequence| {
-            sequence.push(defend.into());
-            sequence.push(four.into());
-            sequence
-        })
-    }
-
-    fn score(&self) -> Score {
-        0
-    }
-
-}
-
-impl EndgameAccumulator for Score {
-
-    const DISTANCE_WINDOW: isize = 5;
-
-    const ZERO: Self = 0;
-
-    fn unit(_pos: Pos, score: Score) -> Self {
+    fn resolve(self, score: Score) -> Self::Output {
         score
     }
 
-    fn append_pos(self, _defend: Pos, _four: Pos) -> Self {
-        self
+    fn fallback(score: Score) -> Self::Output {
+        score
+    }
+}
+
+pub struct VecSequenceTracker {
+    winning_sequence: Vec<Pos>,
+}
+
+impl SequenceTracker for VecSequenceTracker {
+    type Output = Option<Vec<Pos>>;
+
+    fn unit(four: Pos) -> Self {
+        Self {
+            winning_sequence: vec![four],
+        }
     }
 
-    fn score(&self) -> Score {
-        *self
+    fn push(&mut self, defend: Pos, attack: Pos) {
+        self.winning_sequence.push(defend);
+        self.winning_sequence.push(attack);
     }
 
+    fn resolve(self, _score: Score) -> Self::Output {
+        Some(self.winning_sequence)
+    }
+
+    fn fallback(_score: Score) -> Self::Output {
+        None
+    }
 }
 
 pub const ENDGAME_MAX_MOVES: usize = 31;
@@ -186,9 +181,9 @@ pub fn vcf_search<const R: RuleKind>(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     max_vcf_ply: Depth,
     state: &GameState,
+    static_eval: Score,
     alpha: Score,
     beta: Score,
-    static_eval: Score
 ) -> Score {
     if state.board.patterns.counts.global[state.board.player_color].total_fours() == 0 {
         return static_eval;
@@ -196,7 +191,7 @@ pub fn vcf_search<const R: RuleKind>(
 
     let mut vcf_moves = generate_vcf_moves(
         &state.board,
-        Score::DISTANCE_WINDOW,
+        8,
         state.history.recent_player_action().unwrap_or(pos::CENTER)
     );
 
@@ -207,13 +202,17 @@ pub fn vcf_search<const R: RuleKind>(
     vcf_moves.sort_moves(state.history.recent_player_action().unwrap_or(pos::CENTER));
     vcf_moves.init();
 
-    vcf::<R, Score>(td, VcfWin, max_vcf_ply, *state, vcf_moves, alpha, beta, static_eval)
+    vcf::<R, 5, NullSequenceTracker>(
+        td, VcfWin, max_vcf_ply,
+        *state, vcf_moves,
+        static_eval, alpha, beta
+    )
 }
 
 pub fn vcf_sequence<const R: RuleKind>(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     state: &GameState
-) -> Option<Vec<MaybePos>> {
+) -> Option<Vec<Pos>> {
     let mut vcf_moves = generate_vcf_moves(&state.board, 8, pos::CENTER);
 
     if vcf_moves.is_empty() {
@@ -222,51 +221,55 @@ pub fn vcf_sequence<const R: RuleKind>(
 
     vcf_moves.init();
 
-    vcf::<R, SequenceEndgameAccumulator>(td, VcfWin, Depth::MAX, *state, vcf_moves, Score::MIN, Score::MAX, None)
-        .map(|mut sequence| {
-            sequence.reverse();
-            sequence
+    vcf::<R, 5, VecSequenceTracker>(
+        td, VcfWin, Depth::MAX,
+        *state, vcf_moves,
+        0, Score::MIN, Score::MAX
+    )
+        .map(|mut sq| {
+            sq.reverse();
+            sq
         })
 }
 
-fn vcf<const R: RuleKind, ACC: EndgameAccumulator>(
+fn vcf<const R: RuleKind, const DW: isize, Sq: SequenceTracker>(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     dest: impl VcfDestination,
     vcf_max_depth: Depth,
     state: GameState,
     vcf_moves: EndgameMovesUnchecked,
+    static_eval: Score,
     alpha: Score, beta: Score,
-    acc: ACC
-) -> ACC {
+) -> Sq::Output {
     match state.board.player_color {
-        Color::Black => try_vcf::<R, { Color::Black }, _, ACC>(td, dest, vcf_max_depth, state, vcf_moves, alpha, beta, acc),
-        Color::White => try_vcf::<R, { Color::White }, _, ACC>(td, dest, vcf_max_depth, state, vcf_moves, alpha, beta, acc),
+        Color::Black => try_vcf::<R, { Color::Black }, DW, _, Sq>(td, dest, vcf_max_depth, state, vcf_moves, static_eval, alpha, beta),
+        Color::White => try_vcf::<R, { Color::White }, DW, _, Sq>(td, dest, vcf_max_depth, state, vcf_moves, static_eval, alpha, beta),
     }
 }
 
-fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumulator>(
+fn try_vcf<const R: RuleKind, const C: Color, const DW: isize, TH: ThreadType, Sq: SequenceTracker>(
     td: &mut ThreadData<TH, impl Evaluator>,
     dest: impl VcfDestination,
     mut vcf_depth_left: Depth,
     mut state: GameState,
     mut vcf_moves: EndgameMovesUnchecked,
+    static_eval: Score,
     mut alpha: Score, beta: Score,
-    acc: ACC
-) -> ACC {
+) -> Sq::Output {
     td.clear_endgame_stack();
 
     let mut vcf_ply = 0;
 
-    fn backtrace_frames<ACC: EndgameAccumulator>(
+    fn backtrace_frames<Sq: SequenceTracker>(
         td: &mut ThreadData<impl ThreadType, impl Evaluator>,
         board: Board,
         vcf_ply: usize,
         four_pos: Pos
-    ) -> ACC {
+    ) -> Sq {
         let win_score = Score::win_in(td.ply + vcf_ply);
         let lose_score = Score::lose_in(td.ply + vcf_ply);
 
-        let mut result = ACC::unit(four_pos, win_score);
+        let mut result = Sq::unit(four_pos);
         let mut hash_key = board.hash_key;
 
         let opponent_color = !board.player_color;
@@ -278,7 +281,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
             hash_key = hash_key.set(board.player_color, frame.four_pos);
             tt_store_vcf_win(&td.tt, hash_key, frame.four_pos, win_score);
 
-            result = result.append_pos(frame.defend_pos, frame.four_pos);
+            result.push(frame.defend_pos, frame.four_pos);
         }
 
         result
@@ -291,11 +294,11 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
                 && td.search_limit_exceeded()
             {
                 td.set_aborted();
-                return ACC::ZERO;
+                return Sq::fallback(static_eval);
             }
 
             if td.is_aborted() {
-                return ACC::ZERO;
+                return Sq::fallback(static_eval);
             }
 
             let idx = four_pos.idx_usize();
@@ -312,7 +315,9 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
 
                 tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, win_score);
 
-                return backtrace_frames(td, state.board, vcf_ply, four_pos);
+                let trace_result = backtrace_frames(td, state.board, vcf_ply, four_pos);
+
+                return Sq::resolve(trace_result, win_score);
             }
 
             state.board.set_mut(four_pos);
@@ -350,7 +355,9 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
 
                 tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, win_score);
 
-                return backtrace_frames(td, state.board, vcf_ply, four_pos);
+                let trace_result = backtrace_frames(td, state.board, vcf_ply, four_pos);
+
+                return Sq::resolve(trace_result, win_score);
             }
 
             let mut alpha = alpha.max(Score::lose_in(td.ply + vcf_ply));
@@ -378,7 +385,9 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
 
                         tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, win_score);
 
-                        return backtrace_frames(td, state.board, vcf_ply, four_pos);
+                        let trace_result = backtrace_frames(td, state.board, vcf_ply, four_pos);
+
+                        return Sq::resolve(trace_result, win_score);
                     } else if vcf_depth_left.min(TTFlag::MAX_TT_ENDGAME_DEPTH) <= tt_vcf_depth {
                         abort = true;
                     }
@@ -427,7 +436,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
 
                 vcf_moves = EndgameMovesUnchecked::unit(defend_move);
             } else {
-                vcf_moves = generate_vcf_moves(&state.board, ACC::DISTANCE_WINDOW, four_pos)
+                vcf_moves = generate_vcf_moves(&state.board, DW, four_pos)
             }
 
             vcf_moves.init();
@@ -468,7 +477,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, ACC: EndgameAccumu
         }
     }
 
-    acc
+    Sq::fallback(static_eval)
 }
 
 fn tt_store_vcf_win(

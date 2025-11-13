@@ -11,7 +11,7 @@ mod test_vcf {
     use mintaka::thread_type::WorkerThread;
     use rusty_renju::board;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
-    use rusty_renju::notation::pos::pos_unchecked;
+    use rusty_renju::notation::pos::{pos_unchecked, MaybePos, Pos};
     use rusty_renju::notation::rule::RuleKind;
     use rusty_renju::utils::byte_size::ByteSize;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
@@ -31,8 +31,13 @@ mod test_vcf {
             let aborted = AtomicBool::new(false);
 
             let mut td = ThreadData::new(WorkerThread, 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
+
             let time = std::time::Instant::now();
-            let vcf_result = search_endgame::vcf_sequence::<{ RuleKind::Renju }>(&mut td, &state).unwrap();
+
+            let vcf_result: Vec<MaybePos> = search_endgame::vcf_sequence::<{ RuleKind::Renju }>(&mut td, &state).unwrap().into_iter()
+                .map(Pos::into)
+                .collect();
+
             let time = time.elapsed();
 
             state.board.batch_set_mut(&vcf_result.clone().into_boxed_slice());
