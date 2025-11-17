@@ -8,7 +8,7 @@ use crate::movegen::move_picker;
 use crate::movegen::move_picker::MovePicker;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
-use crate::search_endgame::vcf_search;
+use crate::search_endgame::endgame_search;
 use crate::thread_data::{SearchFrame, ThreadData};
 use crate::thread_type::ThreadType;
 use crate::value;
@@ -291,7 +291,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     };
 
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
-        return vcf_search::<R>(td, td.config.max_vcf_depth, state, static_eval, alpha, beta);
+        return endgame_search::<R, false>(td, td.config.max_vcf_depth, state, static_eval, alpha, beta);
     }
 
     td.ss[td.ply].recovery_state = state.recovery_state();

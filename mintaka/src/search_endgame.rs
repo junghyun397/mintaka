@@ -2,7 +2,7 @@ use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::memo::transposition_table::TTView;
 use crate::memo::tt_entry::{ScoreKind, TTFlag};
-use crate::movegen::move_generator::generate_vcf_moves;
+use crate::movegen::move_generator::generate_endgame_moves;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use crate::value::Depth;
@@ -44,26 +44,20 @@ pub struct NullSequenceTracker; impl SequenceTracker for NullSequenceTracker {
     }
 }
 
-pub struct VecSequenceTracker {
-    winning_sequence: Vec<Pos>,
-}
-
-impl SequenceTracker for VecSequenceTracker {
+type VecSequenceTracker = Vec<Pos>; impl SequenceTracker for VecSequenceTracker {
     type Output = Option<Vec<Pos>>;
 
     fn unit(four: Pos) -> Self {
-        Self {
-            winning_sequence: vec![four],
-        }
+        vec![four]
     }
 
     fn push(&mut self, defend: Pos, attack: Pos) {
-        self.winning_sequence.push(defend);
-        self.winning_sequence.push(attack);
+        self.push(defend);
+        self.push(attack);
     }
 
     fn resolve(self, _score: Score) -> Self::Output {
-        Some(self.winning_sequence)
+        Some(self)
     }
 
     fn fallback(_score: Score) -> Self::Output {
@@ -71,7 +65,7 @@ impl SequenceTracker for VecSequenceTracker {
     }
 }
 
-pub const ENDGAME_MAX_MOVES: usize = 31;
+pub const ENDGAME_MAX_MOVES: usize = 30;
 
 #[derive(Debug, Copy, Clone)]
 pub struct EndgameMovesUnchecked {
@@ -177,73 +171,122 @@ impl VcfDestination for VcfDefend {
     }
 }
 
-pub fn vcf_search<const R: RuleKind>(
+pub fn endgame_search<const R: RuleKind, const VCT: bool>(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
-    max_vcf_ply: Depth,
+    max_ply: Depth,
     state: &GameState,
     static_eval: Score,
     alpha: Score,
     beta: Score,
 ) -> Score {
-    if state.board.patterns.counts.global[state.board.player_color].total_fours() == 0 {
+    let counts = state.board.patterns.counts.global[state.board.player_color];
+
+    let mut total_threats = counts.total_fours();
+
+    if VCT {
+        total_threats += counts.threes;
+    }
+
+    if total_threats == 0 {
         return static_eval;
     }
 
-    let mut vcf_moves = generate_vcf_moves(
-        &state.board,
-        8,
-        state.history.recent_player_action().unwrap_or(pos::CENTER)
-    );
+    let recent_player_action = state.history.recent_player_action().unwrap_or(pos::CENTER);
 
-    if vcf_moves.is_empty() {
+    let mut endgame_moves = generate_endgame_moves::<VCT>(&state.board, 8, recent_player_action);
+
+    if endgame_moves.is_empty() {
         return static_eval;
     }
 
-    vcf_moves.sort_moves(state.history.recent_player_action().unwrap_or(pos::CENTER));
-    vcf_moves.init();
+    endgame_moves.sort_moves(state.history.recent_player_action().unwrap_or(pos::CENTER));
+    endgame_moves.init();
 
-    vcf::<R, 5, NullSequenceTracker>(
-        td, VcfWin, max_vcf_ply,
-        *state, vcf_moves,
-        static_eval, alpha, beta
-    )
+    if VCT {
+        pns::<R, 5, NullSequenceTracker>(
+            td, max_ply,
+            *state, endgame_moves,
+            static_eval, alpha, beta
+        )
+    } else {
+        vcf::<R, 5, NullSequenceTracker>(
+            td, VcfWin, max_ply,
+            *state, endgame_moves,
+            static_eval, alpha, beta
+        )
+    }
 }
 
-pub fn vcf_sequence<const R: RuleKind>(
+pub fn endgame_sequence<const R: RuleKind, const VCT: bool>(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     state: &GameState
 ) -> Option<Vec<Pos>> {
-    let mut vcf_moves = generate_vcf_moves(&state.board, 8, pos::CENTER);
+    let mut endgame_moves = generate_endgame_moves::<VCT>(&state.board, 5, pos::CENTER);
 
-    if vcf_moves.is_empty() {
+    if endgame_moves.is_empty() {
         return None;
     }
 
-    vcf_moves.init();
+    endgame_moves.init();
 
-    vcf::<R, 5, VecSequenceTracker>(
-        td, VcfWin, Depth::MAX,
-        *state, vcf_moves,
-        0, Score::MIN, Score::MAX
-    )
-        .map(|mut sq| {
-            sq.reverse();
-            sq
-        })
+    let maybe_sequence = if VCT {
+        pns::<R, 5, VecSequenceTracker>(
+            td, Depth::MAX,
+            *state, endgame_moves,
+            0, Score::MIN, Score::MAX
+        )
+    } else {
+        vcf::<R, 5, VecSequenceTracker>(
+            td, VcfWin, Depth::MAX,
+            *state, endgame_moves,
+            0, Score::MIN, Score::MAX
+        )
+    };
+
+    maybe_sequence.map(|mut sq| {
+        sq.reverse();
+        sq
+    })
+}
+
+fn pns<const R: RuleKind, const DW: isize, Sq: SequenceTracker>(
+    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
+    max_depth: Depth,
+    state: GameState,
+    endgame_moves: EndgameMovesUnchecked,
+    static_eval: Score,
+    alpha: Score, beta: Score,
+) -> Sq::Output {
+    match state.board.player_color {
+        Color::Black => try_pns::<R, { Color::Black }, DW, _, Sq>(td, max_depth, max_depth, state, endgame_moves, static_eval, alpha, beta),
+        Color::White => try_pns::<R, { Color::White }, DW, _, Sq>(td, max_depth, max_depth, state, endgame_moves, static_eval, alpha, beta),
+    }
+}
+
+fn try_pns<const R: RuleKind, const C: Color, const DW: isize, TH: ThreadType, Sq: SequenceTracker>(
+    td: &mut ThreadData<TH, impl Evaluator>,
+    mut vcf_switch_depth: Depth,
+    mut depth_left: Depth,
+    mut state: GameState,
+    mut endgame_moves: EndgameMovesUnchecked,
+    static_eval: Score,
+    mut alpha: Score, beta: Score,
+) -> Sq::Output {
+    todo!()
 }
 
 fn vcf<const R: RuleKind, const DW: isize, Sq: SequenceTracker>(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     dest: impl VcfDestination,
-    vcf_max_depth: Depth,
+    max_depth: Depth,
     state: GameState,
     vcf_moves: EndgameMovesUnchecked,
     static_eval: Score,
     alpha: Score, beta: Score,
 ) -> Sq::Output {
     match state.board.player_color {
-        Color::Black => try_vcf::<R, { Color::Black }, DW, _, Sq>(td, dest, vcf_max_depth, state, vcf_moves, static_eval, alpha, beta),
-        Color::White => try_vcf::<R, { Color::White }, DW, _, Sq>(td, dest, vcf_max_depth, state, vcf_moves, static_eval, alpha, beta),
+        Color::Black => try_vcf::<R, { Color::Black }, DW, _, Sq>(td, dest, max_depth, state, vcf_moves, static_eval, alpha, beta),
+        Color::White => try_vcf::<R, { Color::White }, DW, _, Sq>(td, dest, max_depth, state, vcf_moves, static_eval, alpha, beta),
     }
 }
 
@@ -436,7 +479,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: isize, TH: ThreadType, S
 
                 vcf_moves = EndgameMovesUnchecked::unit(defend_move);
             } else {
-                vcf_moves = generate_vcf_moves(&state.board, DW, four_pos)
+                vcf_moves = generate_endgame_moves::<false>(&state.board, DW, four_pos);
             }
 
             vcf_moves.init();

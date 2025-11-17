@@ -39,8 +39,8 @@ pub struct SessionResource {
 
 pub struct AppState {
     sessions: Arc<DashMap<SessionKey, Session>>,
-    session_index: RwLock<BTreeMap<Instant, BTreeSet<SessionKey>>>,
     session_streams: Arc<DashMap<SessionKey, (UnboundedSender<SessionResponse>, Option<UnboundedReceiverStream<SessionResponse>>)>>,
+    hibernation_queue: Arc<RwLock<Vec<SessionKey>>>,
     worker_resource: Arc<Semaphore>,
     memory_resource: Arc<Semaphore>,
     pub preference: Preference,
@@ -52,8 +52,8 @@ impl AppState {
     pub fn new(preference: Preference) -> Self {
         Self {
             sessions: Arc::new(DashMap::new()),
-            session_index: RwLock::new(BTreeMap::new()),
             session_streams: Arc::new(DashMap::new()),
+            hibernation_queue: Arc::new(RwLock::new(vec![])),
             worker_resource: Arc::new(Semaphore::new(preference.cores)),
             memory_resource: Arc::new(Semaphore::new(preference.memory_limit.mib())),
             preference,
@@ -67,6 +67,10 @@ impl AppState {
 
     pub async fn acquire_workers(&self, workers: u32) -> WorkerPermit {
         WorkerPermit(self.worker_resource.clone().acquire_many_owned(workers).await.unwrap())
+    }
+
+    pub fn available_memory(&self) -> ByteSize {
+        ByteSize::from_mib(self.memory_resource.available_permits())
     }
 
     pub async fn acquire_memory(&self, memory_size: ByteSize, force_acquire: bool) -> MemoryPermit {

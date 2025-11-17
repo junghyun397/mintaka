@@ -30,11 +30,15 @@ mod test_vcf {
             let global_counter_in_1k = AtomicUsize::new(0);
             let aborted = AtomicBool::new(false);
 
-            let mut td = ThreadData::new(WorkerThread, 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
+            let mut td = ThreadData::new(
+                WorkerThread, 0, SearchObjective::Best, config, evaluator,
+                tt.view(), ht, &aborted, &global_counter_in_1k
+            );
 
             let time = std::time::Instant::now();
 
-            let vcf_result: Vec<MaybePos> = search_endgame::vcf_sequence::<{ RuleKind::Renju }>(&mut td, &state).unwrap().into_iter()
+            let vcf_result: Vec<MaybePos> = search_endgame::endgame_sequence::<{ RuleKind::Renju }, false>(&mut td, &state)
+                .unwrap().into_iter()
                 .map(Pos::into)
                 .collect();
 

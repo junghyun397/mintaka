@@ -15,14 +15,16 @@ fn score_distance(state: &GameState, pos: Pos) -> i16 {
     (16 - distance as i16) / 2
 }
 
-pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Pos) -> EndgameMovesUnchecked {
+pub fn generate_endgame_moves<const VCT: bool>(board: &Board, distance_window: isize, recent_move: Pos) -> EndgameMovesUnchecked {
     let mut vcf_moves = [MaybePos::NONE; ENDGAME_MAX_MOVES];
     let mut vcf_moves_top = 0;
 
     let field_ptr = board.patterns.field[board.player_color].as_ptr() as *const u32;
 
-    let four_mask = Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
     let zero_mask = Simd::splat(0);
+    let threat_mask =
+        if VCT { Simd::splat(pattern::UNIT_OPEN_THREE_MASK | pattern::UNIT_ANY_FOUR_MASK) }
+        else { Simd::splat(pattern::UNIT_ANY_FOUR_MASK) };
 
     let recent_move_row = recent_move.row_usize();
     let recent_move_col = recent_move.col_usize();
@@ -48,7 +50,7 @@ pub fn generate_vcf_moves(board: &Board, distance_window: isize, recent_move: Po
             unsafe { std::slice::from_raw_parts(field_ptr.add(start_idx), platform::U32_WIDE_LANE_N) }
         );
 
-        vector &= four_mask;
+        vector &= threat_mask;
         let mut bitmask = vector
             .simd_ne(zero_mask)
             .to_bitmask();

@@ -4,6 +4,7 @@ use crate::movegen::move_generator::generate_defend_open_four_moves;
 use crate::movegen::move_list::{MoveEntry, MoveList};
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
+use rusty_renju::bitfield::Bitfield;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::{Score, Scores};
 
@@ -29,7 +30,7 @@ pub struct MovePicker {
     moves_buffer: MoveList,
     tt_move: MaybePos,
     killer_moves: [MaybePos; KILLER_MOVE_SLOTS],
-    counter_move: MaybePos,
+    occupied_moves: Bitfield,
     neural_scored: bool,
 }
 
@@ -46,7 +47,7 @@ impl MovePicker {
             moves_buffer: MoveList::default(),
             tt_move,
             killer_moves,
-            counter_move: MaybePos::NONE,
+            occupied_moves: Bitfield::ZERO_FILLED,
             neural_scored: false,
         }
     }
@@ -60,6 +61,8 @@ impl MovePicker {
             self.stage = MoveStage::Killer;
 
             if self.tt_move.is_some() {
+                self.occupied_moves.set(self.tt_move.unwrap());
+
                 return Some(MoveEntry {
                     pos: self.tt_move.unwrap(),
                     move_score: TT_MOVE_SCORE
@@ -79,12 +82,15 @@ impl MovePicker {
                 self.killer_moves[1] = MaybePos::NONE;
 
                 if killer_move != self.tt_move
+                    && let killer_move = killer_move.unwrap()
                     && (!self.forced
-                        || state.board.patterns.field[state.board.player_color][killer_move.unwrap().idx_usize()].has_close_three()
+                        || state.board.patterns.field[state.board.player_color][killer_move.idx_usize()].has_close_three()
                     )
                 {
+                    self.occupied_moves.set(killer_move);
+
                     return Some(MoveEntry {
-                        pos: killer_move.unwrap(),
+                        pos: killer_move,
                         move_score: KILLER_MOVE_SCORE
                     });
                 }
@@ -99,14 +105,13 @@ impl MovePicker {
                 && let Some(prev_move) = state.history.recent_player_action().ok()
                 && let maybe_counter_move = td.ht.counter[state.board.player_color][prev_move.idx_usize()]
                 && maybe_counter_move.is_some()
-                && maybe_counter_move != self.tt_move
-                && maybe_counter_move != self.killer_moves[0]
-                && maybe_counter_move != self.killer_moves[1]
+                && let counter_move = maybe_counter_move.unwrap()
+                && self.occupied_moves.is_cold(counter_move)
             {
-                self.counter_move = maybe_counter_move;
+                self.occupied_moves.set(counter_move);
 
                 return Some(MoveEntry {
-                    pos: maybe_counter_move.unwrap(),
+                    pos: counter_move,
                     move_score: COUNTER_MOVE_SCORE
                 });
             }
@@ -124,12 +129,7 @@ impl MovePicker {
 
         if self.stage == MoveStage::AllMoves {
             while let Some(next_move) = self.moves_buffer.consume_best() {
-                if let maybe_next_move = next_move.pos.into() && (
-                    maybe_next_move == self.tt_move
-                        || maybe_next_move == self.killer_moves[0]
-                        || maybe_next_move == self.killer_moves[1]
-                        || maybe_next_move == self.counter_move
-                ) {
+                if self.occupied_moves.is_hot(next_move.pos) {
                     continue;
                 }
 
