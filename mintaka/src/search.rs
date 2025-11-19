@@ -11,8 +11,8 @@ use crate::protocol::response::Response;
 use crate::search_endgame::endgame_search;
 use crate::thread_data::{SearchFrame, ThreadData};
 use crate::thread_type::ThreadType;
-use crate::value;
 use crate::value::Depth;
+use crate::{params, value};
 use rusty_renju::const_for;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::MaybePos;
@@ -107,7 +107,7 @@ fn aspiration<const R: RuleKind, TH: ThreadType>(
     let min_depth = (max_depth / 2).max(1);
     let mut depth = max_depth;
 
-    let mut delta = 8 + prev_score.pow(2) / 8192;
+    let mut delta = params::ASPIRATION_DELTA_BASE + prev_score.pow(2) / params::ASPIRATION_DELTA_DIV;
     let mut alpha = (prev_score - delta).max(-Score::INF);
     let mut beta = (prev_score + delta).min(Score::INF);
 
@@ -186,9 +186,15 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             return Score::lose_in(td.ply + 2)
         }
 
+        let parent_eval = if td.ply > 0 {
+            -td.ss[td.ply - 1].static_eval
+        } else {
+            0
+        };
+
         td.ss[td.ply] = SearchFrame {
             pos: pos.into(),
-            static_eval: Score::lose_in(td.ply + 1),
+            static_eval: parent_eval,
             on_pv: NT::IS_PV,
             recovery_state: state.recovery_state(),
             searching: MaybePos::NONE,
@@ -298,11 +304,13 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
     td.clear_killer();
 
+    let forced_defense = state.board.is_forced_defense();
+
     let original_alpha = alpha;
     let mut best_score = -Score::INF;
     let mut best_move = MaybePos::NONE;
 
-    let mut move_picker = MovePicker::init_new(tt_move, td.killers[td.ply], state.board.is_forced_defense());
+    let mut move_picker = MovePicker::init_new(tt_move, td.killers[td.ply], forced_defense);
     let mut moves_made = 0;
 
     let mut quiet_plied = QuietPlied::EMPTY;
@@ -330,7 +338,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             }
 
             // futility pruning
-            let fp_margin = value::FP_BASE + value::FP_MUL * depth_left * depth_left;
+            let fp_margin = params::FP_BASE + params::FP_MUL * depth_left * depth_left;
             if !Score::is_winning(alpha)
                  && static_eval + fp_margin <= alpha
             {
@@ -370,9 +378,9 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 // reduction pv less
                 reduction -= Depth::from(NT::IS_PV);
 
-                // reduction defense four less
-                if td.ply < 4
-                    && is_tactical
+                // reduction tactical less
+                if is_tactical
+                    && td.ply < 4
                 {
                     reduction -= 1;
                 }
@@ -489,8 +497,8 @@ const fn build_lmp_mc_table() -> [[usize; 12]; 2] {
     const_for!(depth in 0, 12; {
         let pow_depth = depth as f64 * depth as f64;
 
-        lmp_table[0][depth] = value::LMP_BASE + (pow_depth / value::LMP_DIV_NON_IMPROVING) as usize;
-        lmp_table[1][depth] = value::LMP_BASE + (pow_depth / value::LMP_DIV_IMPROVING) as usize;
+        lmp_table[0][depth] = params::LMP_BASE + (pow_depth / params::LMP_DIV_NON_IMPROVING) as usize;
+        lmp_table[1][depth] = params::LMP_BASE + (pow_depth / params::LMP_DIV_IMPROVING) as usize;
     });
 
     lmp_table

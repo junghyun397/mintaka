@@ -21,5 +21,6 @@ pub mod time_manager;
 pub mod value;
 pub mod utils;
 pub mod search_endgame;
+pub mod params;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

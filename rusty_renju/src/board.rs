@@ -451,17 +451,19 @@ impl Board {
     }
 
     pub fn is_forced_defense(&self) -> bool {
-        self.effective_fours(self.player_color) != 0
+        self.effective_open_fours(self.player_color) != 0
     }
 
-    fn effective_fours(&self, color: Color) -> u32 {
+    fn effective_open_fours(&self, color: Color) -> u32 {
         match color {
             Color::White => {
                 let mut total_fours = self.patterns.counts.global[Color::Black].open_fours as u32;
 
-                total_fours -= self.patterns.forbidden_field.iter_hot_idx()
-                    .map(|idx| self.patterns.field[Color::Black][idx].count_open_fours())
-                    .sum::<u32>();
+                if !self.patterns.forbidden_field.is_empty() {
+                    total_fours -= self.patterns.forbidden_field.iter_hot_idx()
+                        .map(|idx| self.patterns.field[Color::Black][idx].count_open_fours())
+                        .sum::<u32>();
+                }
 
                 total_fours
             },

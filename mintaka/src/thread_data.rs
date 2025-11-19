@@ -8,8 +8,8 @@ use crate::movegen::move_picker;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_endgame::EndgameFrame;
 use crate::thread_type::ThreadType;
-use crate::value;
 use crate::value::Depth;
+use crate::{params, value};
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::{Score, Scores};
 use serde::{Deserialize, Serialize};
@@ -190,12 +190,12 @@ fn build_lmr_table(config: Config) -> [[Depth; value::MAX_PLY_SLOTS]; 64] {
     let mut lmr_table = [[0; value::MAX_PLY_SLOTS]; 64];
 
     let worker_factor = 1.0 + (config.workers.min(16) as f64) / 100.0;
-    let lmr_div = value::LMR_DIV * worker_factor;
+    let lmr_div = params::LMR_DIV * worker_factor;
 
     for depth in 0 .. 64 {
         for played in 0 .. 64 {
             let ln_depth = (depth as f64).ln();
-            lmr_table[depth][played] = (value::LMR_BASE + ln_depth * ln_depth / lmr_div) as Depth;
+            lmr_table[depth][played] = (params::LMR_BASE + ln_depth * ln_depth / lmr_div) as Depth;
         }
     }
 
