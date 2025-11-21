@@ -11,12 +11,16 @@ pub enum Message {
     Command(Command),
     Status(StatusCommand),
     Finished(GameResult),
-    Launch(SearchObjective),
+    Launch {
+        objective: SearchObjective,
+        apply: bool,
+        interactive: bool,
+    },
 }
 
 pub enum StatusCommand {
     Version,
-    Board,
+    Board { show_last_moves: bool },
     History,
 }
 
@@ -39,8 +43,8 @@ impl MessageSender {
         self.sender.send(Message::Status(command)).expect(CHANNEL_CLOSED_MESSAGE);
     }
 
-    pub fn launch(&self, search_objective: SearchObjective) {
-        self.sender.send(Message::Launch(search_objective)).expect(CHANNEL_CLOSED_MESSAGE);
+    pub fn launch(&self, objective: SearchObjective, apply: bool, interactive: bool) {
+        self.sender.send(Message::Launch { objective, apply, interactive }).expect(CHANNEL_CLOSED_MESSAGE);
     }
 
     pub fn result(&self, result: Option<GameResult>) {

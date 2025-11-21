@@ -86,7 +86,7 @@ def spawn_process(path, params) -> subprocess.Popen:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        bufsize=-1
+        bufsize=1
     )
 
 def command_process(process, command,
@@ -129,13 +129,6 @@ def play_game(config, game_no) -> GameResult:
         spawn_process(config.params.a_path, config.params.a_params) as a_process,
         spawn_process(config.params.b_path, config.params.b_params) as b_process,
     ):
-        player = Player.A if game_no % 2 == 0 else Player.B
-
-        color = {
-            player: Color.BLACK,
-            player.flip(): Color.WHITE
-        }
-
         engines = {
             Player.A: Engine(
                 a_process,
@@ -151,6 +144,13 @@ def play_game(config, game_no) -> GameResult:
             command_process(engine.process, f"limit time total {engine.time_manager.total_remaining}")
             command_process(engine.process, f"limit time increment {engine.time_manager.increment}")
             command_process(engine.process, f"limit time turn {engine.time_manager.turn}")
+
+        player = Player.A if game_no % 2 == 0 else Player.B
+
+        color = {
+            player: Color.BLACK,
+            player.flip(): Color.WHITE
+        }
 
         winner = None
         turn_no = 0
@@ -187,12 +187,12 @@ def play_game(config, game_no) -> GameResult:
 
                 break
 
-            if turn_no >= config.params.draw_in:
-                break
-
             engines[player].time_manager.apply_increment()
             command_process(engines[player].process,
                             f"limit time total {int(engines[player].time_manager.total_remaining)}")
+
+            if turn_no >= config.params.draw_in:
+                break
 
             player = player.flip()
 
@@ -205,9 +205,9 @@ def play_game(config, game_no) -> GameResult:
         return GameResult(color, winner, history, board_str)
 
 def main():
-    parser = argparse.ArgumentParser()
+    default_total_increment_turn = [300_000, 0, 30_00]
 
-    default_total_increment_time = [300_000, 0, 30_00]
+    parser = argparse.ArgumentParser()
 
     parser.add_argument("--a-path", type=str, required=True)
     parser.add_argument("--a-params", type=str, default="")
@@ -215,11 +215,11 @@ def main():
     parser.add_argument("--b-path", type=str, required=True)
     parser.add_argument("--b-params", type=str, default="")
 
-    parser.add_argument("--num-games", type=int, default=17)
+    parser.add_argument("--num-games", type=int, default=100)
 
-    parser.add_argument("--a-time", type=int, nargs=3, default=default_total_increment_time,
+    parser.add_argument("--a-time", type=int, nargs=3, default=default_total_increment_turn,
                         help="total(ms) increment(ms) turn(ms)")
-    parser.add_argument("--b-time", type=int, nargs=3, default=default_total_increment_time,
+    parser.add_argument("--b-time", type=int, nargs=3, default=default_total_increment_turn,
                         help="total(ms) increment(ms) turn(ms)")
 
     parser.add_argument("--draw-in", type=int, default=225)
@@ -230,43 +230,51 @@ def main():
 
     config = Config(parser.parse_args())
 
-    a_elo = config.params.a_elo
-    b_elo = config.params.b_elo
+    elo = {
+        Player.A: config.params.a_elo,
+        Player.B: config.params.b_elo,
+    }
 
-    a_wins = 0
-    b_wins = 0
-
-    black_wins = 0
-    white_wins = 0
+    wins = {
+        Player.A: 0,
+        Player.B: 0,
+        Color.BLACK: 0,
+        Color.WHITE: 0,
+    }
 
     draws = 0
 
     for game_no in range(config.params.num_games):
         result = play_game(config, game_no)
 
-        elo_delta = calculate_elo_delta(a_elo, b_elo, result.win_zero_to_one(Player.A), config.params.elo_k_factor)
+        elo_delta = calculate_elo_delta(
+            elo[Player.A], elo[Player.B],
+            result.win_zero_to_one(Player.A), config.params.elo_k_factor
+        )
 
-        a_elo += elo_delta
-        b_elo -= elo_delta
+        elo[Player.A] += elo_delta
+        elo[Player.B] -= elo_delta
 
-        a_wins += int(round(result.win_zero_to_one(Player.A)))
-        b_wins += int(round(result.win_zero_to_one(Player.B)))
-        draws = game_no + 1 - a_wins - b_wins
+        wins[Player.A] += int(round(result.win_zero_to_one(Player.A)))
+        wins[Player.B] += int(round(result.win_zero_to_one(Player.B)))
 
-        black_wins += 1 if result.winner == Color.BLACK else 0
-        white_wins = game_no + 1 - black_wins - draws
+        wins[Color.BLACK] += 1 if result.winner == Color.BLACK else 0
+        wins[Color.WHITE] = game_no + 1 - wins[Color.BLACK] - draws
+
+        draws = game_no + 1 - wins[Player.A] - wins[Player.B]
 
         prefix = f"{datetime_prefix()} {game_prefix(config, game_no)}"
 
         print(f"{prefix} Game State:\n{result.board_str}")
         print(f"{prefix} Game History: {result.history}")
         print(f"{prefix} Game Finished: a={result.color[Player.A]}, b={result.color[Player.B]}, win={result.winner}, "
-              f"abd={a_wins}-{b_wins}-{draws}, bwd={black_wins}-{white_wins}-{draws}")
-        print(f"{prefix} ELO Updated: a{elo_delta:+}, b{-elo_delta:+}, a={a_elo}, b={b_elo}")
+              f"abd={wins[Player.A]}-{wins[Player.B]}-{draws}, bwd={wins[Color.BLACK]}-{wins[Color.WHITE]}-{draws}")
+        print(f"{prefix} ELO Updated: a{elo_delta:+}, b{-elo_delta:+}, a={elo[Player.A]}, b={elo[Player.B]}")
 
-    print(f"{datetime_prefix()} Arena Finished: total={config.params.num_games}, abd={a_wins}-{b_wins}-{draws}, "
-          f"awr={a_wins / config.params.num_games * 100.0}%, bwr={b_wins / config.params.num_games * 100.0}%, "
-          f"bwd={black_wins}-{white_wins}-{draws}")
+    print(
+        f"{datetime_prefix()} Arena Finished: total={config.params.num_games}, abd={wins[Player.A]}-{wins[Player.B]}-{draws}, "
+        f"awr={wins[Player.A] / config.params.num_games * 100.0}%, bwr={wins[Player.B] / config.params.num_games * 100.0}%, "
+        f"bwd={wins[Color.BLACK]}-{wins[Color.WHITE]}-{draws}")
 
 if __name__ == "__main__":
     main()

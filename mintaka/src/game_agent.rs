@@ -223,16 +223,11 @@ impl GameAgent {
 
                 self.evaluator = HeuristicEvaluator::from_state(&self.state);
             },
+            Command::Clear => {
+                self.reinit_from_state(GameState::default());
+            },
             Command::Load(boxed) => {
-                let (board, history) = *boxed;
-
-                self.state = GameState::from_board_and_history(board, history);
-                self.evaluator = HeuristicEvaluator::from_state(&self.state);
-
-                self.tt.clear(self.config.workers);
-                self.executed_moves = Bitfield::default();
-
-                self.time_manager = TimeManager::from(self.config.initial_timer);
+                self.reinit_from_state(GameState::from_board_and_history(boxed.0, boxed.1));
             },
             Command::TurnTime(time) => {
                 self.time_manager.timer.turn = time;
@@ -349,8 +344,8 @@ impl GameAgent {
         });
 
         self.tt.increase_age();
-        self.ht = *main_td.ht;
         self.ht.increase_age();
+        self.ht = *main_td.ht;
 
         self.executed_moves.set_idx(self.state.len());
 
@@ -369,6 +364,17 @@ impl GameAgent {
             time_elapsed,
             pv: main_td.root_pv
         }
+    }
+
+    fn reinit_from_state(&mut self, state: GameState) {
+        self.state = state;
+
+        self.evaluator = HeuristicEvaluator::from_state(&self.state);
+
+        self.tt.clear(self.config.workers);
+        self.executed_moves = Bitfield::default();
+
+        self.time_manager = TimeManager::from(self.config.initial_timer);
     }
 
 }

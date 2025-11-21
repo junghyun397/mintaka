@@ -51,19 +51,21 @@ fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
             Message::Status(command) => match command {
                 StatusCommand::Version =>
                     println!("= rusty-renju-{}, mintaka-{}, unknown", rusty_renju::VERSION, mintaka::VERSION),
-                StatusCommand::Board =>
+                StatusCommand::Board { show_last_moves: false } =>
                     println!("=\x02\n{}\x03", game_agent.state.board),
+                StatusCommand::Board { show_last_moves: true } =>
+                    println!("=\x02\n{}\x03", game_agent.state.board.to_string_with_last_moves(game_agent.state.history.recent_action_pair())),
                 StatusCommand::History =>
                     println!("= {}", game_agent.state.history),
             },
             Message::Finished(result) => {
                 println!("= {result}")
             }
-            Message::Launch(search_objective) => {
+            Message::Launch { objective, apply, interactive } => {
                 launched.store(true, Ordering::Relaxed);
 
                 let best_move = game_agent.launch(
-                    search_objective,
+                    objective,
                     CallBackResponseSender::new(response_printer),
                     aborted.clone(),
                 );
@@ -76,7 +78,15 @@ fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
                 );
 
                 println!("= {}", best_move.pos);
-            },
+
+                if apply {
+                    message_sender.command(Command::Play(best_move.pos.into()));
+                }
+
+                if interactive {
+                    message_sender.status(StatusCommand::Board { show_last_moves: true });
+                }
+            }
         }
     }
 
@@ -248,12 +258,10 @@ fn handle_command(
                 }
             },
             "clear" => {
-                message_sender.command(Command::Load(
-                    Box::new((Board::default(), History::default()))
-                ));
+                message_sender.command(Command::Clear);
             },
             "board" => {
-                message_sender.status(StatusCommand::Board);
+                message_sender.status(StatusCommand::Board { show_last_moves: false });
             },
             "history" => {
                 message_sender.status(StatusCommand::History);
@@ -292,10 +300,13 @@ fn handle_command(
                 message_sender.command(Command::Undo);
             },
             "gen" => {
-                message_sender.launch(SearchObjective::Best);
+                message_sender.launch(SearchObjective::Best, false, false);
             },
+            "igen" => {
+                message_sender.launch(SearchObjective::Best, true, true);
+            }
             "zero" => {
-                message_sender.launch(SearchObjective::Zeroing);
+                message_sender.launch(SearchObjective::Zeroing, true, true);
             },
             "quit" => {
                 std::process::exit(0);

@@ -9,6 +9,7 @@ use std::time::Duration;
 
 #[derive(Serialize, Deserialize)]
 pub enum Command {
+    Clear,
     Load(Box<(Board, History)>),
     Play(MaybePos),
     Set {

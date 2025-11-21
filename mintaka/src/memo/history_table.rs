@@ -1,5 +1,5 @@
-use crate::value::Depth;
 use crate::params;
+use crate::value::Depth;
 use core::f64;
 use rusty_renju::history::History;
 use rusty_renju::notation::color::{Color, ColorContainer};
@@ -67,15 +67,12 @@ impl HistoryTable {
     }
 
     pub fn increase_age(&mut self) {
-        fn ageing_score(score: &mut i16) {
+        for score in self.quiet.iter_mut().flatten()
+            .chain(self.three.iter_mut().flatten())
+            .chain(self.four.iter_mut().flatten())
+        {
             *score = (*score as f64 * params::HISTORY_TABLE_AGEING_MUL) as i16;
         }
-
-        self.quiet[Color::Black].iter_mut().for_each(ageing_score);
-        self.quiet[Color::White].iter_mut().for_each(ageing_score);
-
-        self.three[Color::Black].iter_mut().for_each(ageing_score);
-        self.three[Color::White].iter_mut().for_each(ageing_score);
     }
 
 }

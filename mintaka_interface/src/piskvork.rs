@@ -58,17 +58,19 @@ fn main() -> Result<(), impl Error> {
                 let result = game_agent.command(command)?;
                 message_sender.result(result);
             },
-            Message::Launch(search_objective) => {
+            Message::Launch { objective, apply, .. } => {
                 launched.store(true, Ordering::Relaxed);
 
                 let best_move = game_agent.launch(
-                    search_objective,
+                    objective,
                     CallBackResponseSender::new(response_receiver),
                     aborted.clone()
                 );
 
-                let result = game_agent.command(Command::Play(best_move.pos))?;
-                message_sender.result(result);
+                if apply {
+                    let result = game_agent.command(Command::Play(best_move.pos))?;
+                    message_sender.result(result);
+                }
 
                 PiskvorkResponse::Pos(best_move.pos.unwrap());
             },
@@ -104,11 +106,11 @@ fn response_receiver(response: Response) {
     let piskvork_response = match response {
         Response::Begins(ComputingResource { workers, time, nodes_in_1k, tt_size }) =>
             PiskvorkResponse::Info(format!(
-                "begins: workers={workers}, running-time={time:?}, nodes={nodes_in_1k:?}k, tt-size={tt_size}"
+                "MESSAGE begins workers={workers}, running-time={time:?}, nodes={nodes_in_1k:?}k, tt-size={tt_size}"
             )),
         Response::Status { best_move, score, pv, total_nodes_in_1k, depth } =>
             PiskvorkResponse::Info(format!(
-                "status score={score}, \
+                "DEBUG status score={score}, \
                 best-move={best_move:?}, \
                 depth={depth}, \
                 total_nodes_in_1k={total_nodes_in_1k}, \
@@ -145,10 +147,10 @@ fn match_command(
                 if size == pos::U_BOARD_WIDTH {
                     PiskvorkResponse::Ok
                 } else {
-                    return Err("unsupported size or other error")
+                    return Err("unsupported size")
                 }
             },
-            "RECTSTART" => return Err("rectangular board is not supported or other error"),
+            "RECTSTART" => return Err("rectangular board is not supported"),
             "TURN" => {
                 let pos = parse_pos(
                     args.get(1).ok_or("missing row token.")?,
@@ -156,14 +158,19 @@ fn match_command(
                 )?;
 
                 message_sender.command(Command::Play(pos.into()));
-                message_sender.launch(SearchObjective::Best);
+                message_sender.launch(SearchObjective::Best, true, false);
 
                 PiskvorkResponse::None
             },
             "BEGIN" => {
-                message_sender.launch(SearchObjective::Best);
+                message_sender.command(Command::Clear);
+                message_sender.launch(SearchObjective::Best, true, false);
 
                 PiskvorkResponse::None
+            },
+            "RESTART" => {
+                message_sender.command(Command::Clear);
+                PiskvorkResponse::Ok
             },
             "TAKEBACK" => {
                 let pos = parse_pos(
@@ -212,7 +219,7 @@ fn match_command(
                 message_sender.command(Command::BatchSet { player_moves, opponent_moves });
 
                 if args[0] == "BOARD" {
-                    message_sender.launch(SearchObjective::Best);
+                    message_sender.launch(SearchObjective::Best, false, false);
                 }
 
                 PiskvorkResponse::None

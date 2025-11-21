@@ -113,6 +113,14 @@ macro_rules! impl_color_container {
             pub fn access_pair(&self, color: Color) -> (&T, &T) {
                 (&self.0[color as usize], &self.0[color.reversed() as usize])
             }
+
+            pub fn iter(&self) -> std::slice::Iter<'_, T> {
+                self.0.iter()
+            }
+
+            pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, T> {
+                self.0.iter_mut()
+            }
         }
 
         impl<T> Index<Color> for $name<T> {
