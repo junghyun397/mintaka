@@ -70,14 +70,17 @@ def calculate_elo_delta(original_elo, opponent_elo, result_zero_to_one, k_factor
 
     return k_factor * (result_zero_to_one - expected)
 
-def datetime_prefix() -> str:
-    return datetime.now(timezone.utc).strftime("[%Y-%m-%dT%H:%M:%SZ]")
+def datetime_prefix(config) -> str:
+    if config.params.no_datetime_prefix:
+        return ""
+    else:
+        return datetime.now(timezone.utc).strftime("[%Y-%m-%dT%H:%M:%SZ] ")
 
 def game_prefix(config, game_no) -> str:
-    return f"[{game_no + 1}/{config.params.num_games}]"
+    return f"[{game_no + 1}/{config.params.num_games}] "
 
 def turn_prefix(turn_no, player, color) -> str:
-    return f"[#{turn_no}:{player}:{color}]"
+    return f"[#{turn_no}:{player}:{color}] "
 
 def spawn_process(path, params) -> subprocess.Popen:
     return subprocess.Popen(
@@ -89,7 +92,7 @@ def spawn_process(path, params) -> subprocess.Popen:
         bufsize=1
     )
 
-def command_process(process, command,
+def command_process(config, process, command,
                     println=False, filter_prefix: list[str] | None = None, println_prefix: str = "") -> str | None:
     process.stdin.write(f"{command}\n")
     process.stdin.flush()
@@ -122,7 +125,7 @@ def command_process(process, command,
             return response[2:]
 
         if println and (filter_prefix is None or response.startswith(tuple(filter_prefix))):
-            print(f"{datetime_prefix()} {println_prefix}{response}")
+            print(f"{datetime_prefix(config)}{println_prefix}{response}")
 
 def play_game(config, game_no) -> GameResult:
     with (
@@ -141,9 +144,9 @@ def play_game(config, game_no) -> GameResult:
         }
 
         for engine in engines.values():
-            command_process(engine.process, f"limit time total {engine.time_manager.total_remaining}")
-            command_process(engine.process, f"limit time increment {engine.time_manager.increment}")
-            command_process(engine.process, f"limit time turn {engine.time_manager.turn}")
+            command_process(config, engine.process, f"limit time total {engine.time_manager.total_remaining}")
+            command_process(config, engine.process, f"limit time increment {engine.time_manager.increment}")
+            command_process(config, engine.process, f"limit time turn {engine.time_manager.turn}")
 
         player = Player.A if game_no % 2 == 0 else Player.B
 
@@ -160,10 +163,11 @@ def play_game(config, game_no) -> GameResult:
             timer = time.perf_counter_ns()
 
             move = command_process(
+                config,
                 engines[player].process, "gen",
                 println=True,
-                filter_prefix=["solution"],
-                println_prefix=f"{game_prefix(config, game_no)} {turn_prefix(turn_no, player, color[player])} "
+                filter_prefix=config.params.log_prefix_filter,
+                println_prefix=f"{game_prefix(config, game_no)}{turn_prefix(turn_no, player, color[player])}"
             )
 
             time_elapsed = int((time.perf_counter_ns() - timer) / 1_000_000)
@@ -173,11 +177,11 @@ def play_game(config, game_no) -> GameResult:
             if move == "none":
                 winner_player = None
             else:
-                winner_player = command_process(engines[player].process, f"play {move}")
-                winner_opponent = command_process(engines[player.flip()].process, f"play {move}")
+                winner_player = command_process(config, engines[player].process, f"play {move}")
+                winner_opponent = command_process(config, engines[player.flip()].process, f"play {move}")
 
                 if winner_player != winner_opponent:
-                    raise Exception(f"a_winner={winner_player}, b_winner={winner_opponent} ")
+                    raise Exception(f"player_winner={winner_player}, opponent_winner={winner_opponent} ")
 
             if winner_player is not None:
                 if "black" in winner_player.lower():
@@ -188,7 +192,7 @@ def play_game(config, game_no) -> GameResult:
                 break
 
             engines[player].time_manager.apply_increment()
-            command_process(engines[player].process,
+            command_process(config, engines[player].process,
                             f"limit time total {int(engines[player].time_manager.total_remaining)}")
 
             if turn_no >= config.params.draw_in:
@@ -196,8 +200,8 @@ def play_game(config, game_no) -> GameResult:
 
             player = player.flip()
 
-        history = command_process(engines[Player.A].process, "history")
-        board_str = command_process(engines[Player.B].process, "board", println=True)
+        history = command_process(config, engines[Player.A].process, "history")
+        board_str = command_process(config, engines[Player.B].process, "board", println=True)
 
         for engine in engines.values():
             engine.process.terminate()
@@ -205,7 +209,7 @@ def play_game(config, game_no) -> GameResult:
         return GameResult(color, winner, history, board_str)
 
 def main():
-    default_total_increment_turn = [300_000, 0, 30_00]
+    default_total_increment_turn = [300_000, 0, 30_000]
 
     parser = argparse.ArgumentParser()
 
@@ -227,6 +231,9 @@ def main():
     parser.add_argument("--a-elo", type=float, default=1000.0)
     parser.add_argument("--b-elo", type=float, default=1000.0)
     parser.add_argument("--elo-k-factor", type=float, default=32.0)
+
+    parser.add_argument("--no-datetime-prefix", action='store_true', default=False)
+    parser.add_argument("--log-prefix-filter", type=str, nargs="*", default=["solution"])
 
     config = Config(parser.parse_args())
 
@@ -263,16 +270,17 @@ def main():
 
         draws = game_no + 1 - wins[Player.A] - wins[Player.B]
 
-        prefix = f"{datetime_prefix()} {game_prefix(config, game_no)}"
+        prefix = f"{datetime_prefix(config)}{game_prefix(config, game_no)}"
 
-        print(f"{prefix} Game State:\n{result.board_str}")
-        print(f"{prefix} Game History: {result.history}")
-        print(f"{prefix} Game Finished: a={result.color[Player.A]}, b={result.color[Player.B]}, win={result.winner}, "
+        print(f"{prefix}Game State:\n{result.board_str}")
+        print(f"{prefix}Game History: {result.history}")
+        print(f"{prefix}Game Finished: a={result.color[Player.A]}, b={result.color[Player.B]}, win={result.winner}, "
               f"abd={wins[Player.A]}-{wins[Player.B]}-{draws}, bwd={wins[Color.BLACK]}-{wins[Color.WHITE]}-{draws}")
-        print(f"{prefix} ELO Updated: a{elo_delta:+}, b{-elo_delta:+}, a={elo[Player.A]}, b={elo[Player.B]}")
+        print(f"{prefix}ELO Updated: a{elo_delta:+}, b{-elo_delta:+}, a={elo[Player.A]}, b={elo[Player.B]}")
 
     print(
-        f"{datetime_prefix()} Arena Finished: total={config.params.num_games}, abd={wins[Player.A]}-{wins[Player.B]}-{draws}, "
+        f"{datetime_prefix(config)}Arena Finished: a-elo={elo[Player.A]}, b-elo={elo[Player.B]}, "
+        f"abd={wins[Player.A]}-{wins[Player.B]}-{draws}, "
         f"awr={wins[Player.A] / config.params.num_games * 100.0}%, bwr={wins[Player.B] / config.params.num_games * 100.0}%, "
         f"bwd={wins[Color.BLACK]}-{wins[Color.WHITE]}-{draws}")
 
