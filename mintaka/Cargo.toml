@@ -4,6 +4,7 @@ version = "0.1.0-pre-alpha"
 edition = "2024"
 
 [features]
+debug-statics = []
 heuristic-eval = []
 nnue-eval = []
 default = ["heuristic-eval"]

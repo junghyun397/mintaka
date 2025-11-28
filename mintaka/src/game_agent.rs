@@ -386,8 +386,8 @@ impl Serialize for GameAgent {
         state.serialize_field("state", &self.state)?;
         state.serialize_field("tt", &self.tt)?;
         state.serialize_field("ht", &self.ht)?;
-        state.serialize_field("executed_moves", &self.executed_moves)?;
         state.serialize_field("time_management", &self.time_manager)?;
+        state.serialize_field("executed_moves", &self.executed_moves)?;
         state.end()
     }
 }
@@ -400,9 +400,8 @@ impl<'de> Deserialize<'de> for GameAgent {
             state: GameState,
             tt: TranspositionTable,
             ht: HistoryTable,
-            time_management: TimeManager,
+            time_manager: TimeManager,
             executed_moves: Bitfield,
-            overall_nodes_in_1k: usize,
         }
 
         let data = GameAgentData::deserialize(deserializer)?;
@@ -415,8 +414,8 @@ impl<'de> Deserialize<'de> for GameAgent {
             evaluator,
             tt: data.tt,
             ht: data.ht,
+            time_manager: data.time_manager,
             executed_moves: data.executed_moves,
-            time_manager: data.time_management,
         })
     }
 }

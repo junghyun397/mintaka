@@ -27,8 +27,8 @@ class Player(Enum):
         return self.name
 
 class Config:
-    def __init__(self, params):
-        self.params = params
+    def __init__(self, args):
+        self.args = args
 
 @dataclass
 class TimeManager:
@@ -71,13 +71,13 @@ def calculate_elo_delta(original_elo, opponent_elo, result_zero_to_one, k_factor
     return k_factor * (result_zero_to_one - expected)
 
 def datetime_prefix(config) -> str:
-    if config.params.no_datetime_prefix:
+    if config.args.no_datetime_prefix:
         return ""
     else:
         return datetime.now(timezone.utc).strftime("[%Y-%m-%dT%H:%M:%SZ] ")
 
 def game_prefix(config, game_no) -> str:
-    return f"[{game_no + 1}/{config.params.num_games}] "
+    return f"[{game_no + 1}/{config.args.num_games}] "
 
 def turn_prefix(turn_no, player, color) -> str:
     return f"[#{turn_no}:{player}:{color}] "
@@ -129,17 +129,17 @@ def command_process(config, process, command,
 
 def play_game(config, game_no) -> GameResult:
     with (
-        spawn_process(config.params.a_path, config.params.a_params) as a_process,
-        spawn_process(config.params.b_path, config.params.b_params) as b_process,
+        spawn_process(config.args.a_path, config.args.a_params) as a_process,
+        spawn_process(config.args.b_path, config.args.b_params) as b_process,
     ):
         engines = {
             Player.A: Engine(
                 a_process,
-                TimeManager(config.params.a_time[0], config.params.a_time[1], config.params.a_time[2])
+                TimeManager(config.args.a_time[0], config.args.a_time[1], config.args.a_time[2])
             ),
             Player.B: Engine(
                 b_process,
-                TimeManager(config.params.b_time[0], config.params.b_time[1], config.params.b_time[2])
+                TimeManager(config.args.b_time[0], config.args.b_time[1], config.args.b_time[2])
             )
         }
 
@@ -166,7 +166,7 @@ def play_game(config, game_no) -> GameResult:
                 config,
                 engines[player].process, "gen",
                 println=True,
-                filter_prefix=config.params.log_prefix_filter,
+                filter_prefix=config.args.log_prefix_filter,
                 println_prefix=f"{game_prefix(config, game_no)}{turn_prefix(turn_no, player, color[player])}"
             )
 
@@ -195,7 +195,7 @@ def play_game(config, game_no) -> GameResult:
             command_process(config, engines[player].process,
                             f"limit time total {int(engines[player].time_manager.total_remaining)}")
 
-            if turn_no >= config.params.draw_in:
+            if turn_no >= config.args.draw_in:
                 break
 
             player = player.flip()
@@ -238,8 +238,8 @@ def main():
     config = Config(parser.parse_args())
 
     elo = {
-        Player.A: config.params.a_elo,
-        Player.B: config.params.b_elo,
+        Player.A: config.args.a_elo,
+        Player.B: config.args.b_elo,
     }
 
     wins = {
@@ -251,12 +251,12 @@ def main():
 
     draws = 0
 
-    for game_no in range(config.params.num_games):
+    for game_no in range(config.args.num_games):
         result = play_game(config, game_no)
 
         elo_delta = calculate_elo_delta(
             elo[Player.A], elo[Player.B],
-            result.win_zero_to_one(Player.A), config.params.elo_k_factor
+            result.win_zero_to_one(Player.A), config.args.elo_k_factor
         )
 
         elo[Player.A] += elo_delta
@@ -281,7 +281,7 @@ def main():
     print(
         f"{datetime_prefix(config)}Arena Finished: a-elo={elo[Player.A]}, b-elo={elo[Player.B]}, "
         f"abd={wins[Player.A]}-{wins[Player.B]}-{draws}, "
-        f"awr={wins[Player.A] / config.params.num_games * 100.0}%, bwr={wins[Player.B] / config.params.num_games * 100.0}%, "
+        f"awr={wins[Player.A] / config.args.num_games * 100.0}%, bwr={wins[Player.B] / config.args.num_games * 100.0}%, "
         f"bwd={wins[Color.BLACK]}-{wins[Color.WHITE]}-{draws}")
 
 if __name__ == "__main__":

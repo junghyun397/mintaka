@@ -51,6 +51,23 @@ impl SearchFrame {
     };
 }
 
+#[derive(Clone, Copy)]
+pub struct DebugStatics {
+    pub visited_nodes: u32,
+    pub sum_cutoff_distance: u32,
+    pub sum_tt_hit: u32,
+    pub sum_tt_cutoff: u32,
+}
+
+impl DebugStatics {
+    const EMPTY: Self = Self {
+        visited_nodes: 0,
+        sum_cutoff_distance: 0,
+        sum_tt_hit: 0,
+        sum_tt_cutoff: 0,
+    };
+}
+
 #[derive(Clone)]
 pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub thread_type: TH,
@@ -65,6 +82,7 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub ss: Box<[SearchFrame; value::MAX_PLY_SLOTS]>,
     pub pvs: Box<[PrincipalVariation; value::MAX_PLY_SLOTS]>,
     pub killers: Box<[[MaybePos; move_picker::KILLER_MOVE_SLOTS]; value::MAX_PLY_SLOTS]>,
+    pub debug_statics: Box<[DebugStatics; value::MAX_PLY_SLOTS]>,
 
     pub lmr_table: Box<[[Depth; value::MAX_PLY_SLOTS]; 64]>,
 
@@ -108,6 +126,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
             pvs: Box::new([PrincipalVariation::EMPTY; value::MAX_PLY_SLOTS]),
             killers: Box::new([[MaybePos::NONE; 2]; value::MAX_PLY_SLOTS]),
             lmr_table: Box::new(build_lmr_table(config)),
+            debug_statics: Box::new([DebugStatics::EMPTY; value::MAX_PLY_SLOTS]),
             root_pv: PrincipalVariation::EMPTY,
             singular_root: false,
             endgame_stack: Box::new([EndgameFrame::EMPTY; value::MAX_PLY_SLOTS]),

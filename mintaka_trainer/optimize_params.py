@@ -2,16 +2,17 @@ import argparse
 import os
 import re
 import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 class Config:
     def __init__(self, params, num_arenas):
-        self.params = params
+        self.args = params
         self.num_arenas = num_arenas
 
     def engine_name(self, target_value) -> str:
-        return f"mintaka_text_protocol_{self.params.target_param}_{target_value}"
+        return f"mintaka_text_protocol_{self.args.target_param}_{target_value}"
 
 @dataclass
 class ArenaResult:
@@ -22,15 +23,15 @@ def datetime_prefix() -> str:
     return datetime.now(timezone.utc).strftime("[%Y-%m-%dT%H:%M:%SZ] ")
 
 def arena_prefix(config, arena_no, optimal_value, current_value) -> str:
-    return f"[{arena_no + 1}/{config.num_arenas}] [{config.params.target_param}:{optimal_value}v{current_value}] "
+    return f"[{arena_no + 1}/{config.num_arenas}] [{config.args.target_param}:{optimal_value}v{current_value}] "
 
 def compile_engine(config, target_value):
     env = os.environ.copy()
-    env[config.params.target_param] = str(target_value)
+    env[config.args.target_param] = str(target_value)
 
     subprocess.run(
         ["cargo", "build",
-         "--profile", config.params.compile_profile,
+         "--profile", config.args.compile_profile,
          "--package", "mintaka_interface",
          "--bin", "mintaka_text_protocol"],
         env=env,
@@ -50,17 +51,17 @@ def compile_engine(config, target_value):
 
 def play_arena(config, arena_no, baseline_value, target_value, baseline_elo, target_elo) -> ArenaResult:
     with subprocess.Popen(
-        ["python3", "mintaka_trainer/arena.py",
+        [sys.executable, "mintaka_trainer/arena.py",
          "--no-datetime-prefix",
          "--log-prefix-filter",
-         "--a-time", str(config.params.time[0]), str(config.params.time[1]), str(config.params.time[2]),
-         "--b-time", str(config.params.time[0]), str(config.params.time[1]), str(config.params.time[2]),
+         "--a-time", str(config.args.time[0]), str(config.args.time[1]), str(config.args.time[2]),
+         "--b-time", str(config.args.time[0]), str(config.args.time[1]), str(config.args.time[2]),
          "--elo-k-factor", str(16.0),
-         "--num-games", str(config.params.num_games),
+         "--num-games", str(config.args.num_games),
          "--a-path", f"target/release/{config.engine_name(baseline_value)}",
          "--b-path", f"target/release/{config.engine_name(target_value)}",
-         "--a-params", config.params.engine_params,
-         "--b-params", config.params.engine_params,
+         "--a-params", config.args.engine_params,
+         "--b-params", config.args.engine_params,
          "--a-elo", str(baseline_elo),
          "--b-elo", str(target_elo)],
         stdin=None,
@@ -103,21 +104,21 @@ def main():
     parser.add_argument("--num-games", type=int, default=17)
     parser.add_argument("--num-concurrency", type=int, default=1)
 
-    params = parser.parse_args()
-    num_arenas = int((params.end - params.start) / params.step)
+    args = parser.parse_args()
+    num_arenas = int((args.end - args.start) / args.step)
 
-    config = Config(params, num_arenas)
+    config = Config(args, num_arenas)
 
-    elo = {
-        config.params.start: 1000.0
+    ratings = {
+        config.args.start: 1000.0
     }
 
-    optimal_value = config.params.start
-    compile_engine(config, config.params.start)
+    optimal_value = config.args.start
+    compile_engine(config, config.args.start)
 
-    arena_no = 0
-
-    for target_value in range(config.params.start + config.params.step, config.params.end + 1, config.params.step):
+    for arena_no, target_value in enumerate(
+            range(config.args.start + config.args.step, config.args.end + 1, config.args.step)
+    ):
         baseline_value = optimal_value
 
         compile_engine(config, target_value)
@@ -125,11 +126,11 @@ def main():
         result = play_arena(
             config, arena_no,
             baseline_value, target_value,
-            elo[baseline_value], elo.get(target_value, 1000.0)
+            ratings[baseline_value], ratings.get(target_value, 1000.0)
         )
 
-        elo[baseline_value] = result.baseline_elo
-        elo[target_value] = result.target_elo
+        ratings[baseline_value] = result.baseline_elo
+        ratings[target_value] = result.target_elo
 
         if result.target_elo > result.baseline_elo:
             optimal_value = target_value
@@ -137,11 +138,9 @@ def main():
         print(f"{datetime_prefix()}{arena_prefix(config, arena_no, optimal_value, target_value)}ELO Updated: "
               f"optimal={optimal_value}, "
               f"{baseline_value}-elo={result.baseline_elo}, {target_value}-elo={result.target_elo}, "
-              f"elo-table={elo}")
+              f"elo-table={ratings}")
 
-        arena_no += 1
-
-    print(f"{datetime_prefix()}Optimize Finished: optimal-value={optimal_value}, elo-table={elo}")
+    print(f"{datetime_prefix()}Optimize Finished: optimal-value={optimal_value}, elo-table={ratings}")
 
 if __name__ == "__main__":
     main()
