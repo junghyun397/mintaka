@@ -8,8 +8,10 @@ rusty_renju = { path = "../rusty_renju" }
 mintaka = { path = "../mintaka" }
 
 uuid = { version = "1.17", features = ["v4", "v7", "serde"] }
-num_cpus = "1.17"
 dashmap = "6.1"
+
+num_cpus = "1.17"
+core_affinity = "0.8.3"
 
 futures-util = "0.3"
 axum = { version = "0.8", features = ["ws"] }

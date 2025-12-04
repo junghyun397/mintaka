@@ -4,9 +4,9 @@ use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::score::Score;
 use rusty_renju::pattern;
 
-#[cfg(feature = "heuristic-eval")]
+#[cfg(not(feature = "neural-eval"))]
 pub type ActiveEvaluator = crate::eval::heuristic_evaluator::HeuristicEvaluator;
-#[cfg(feature = "nnue-eval")]
+#[cfg(feature = "neural-eval")]
 pub type ActiveEvaluator = crate::eval::nnue_evaluator::NnueEvaluator;
 
 pub type PolicyDistribution = [i16; pattern::PATTERN_SIZE];

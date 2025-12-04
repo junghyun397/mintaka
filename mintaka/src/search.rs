@@ -486,7 +486,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 fn lookup_lmp_mc_table(depth: Depth, is_improving: bool) -> usize {
     let clamped_depth = (depth - 1).min(11) as usize;
 
-    LMP_MC_TABLE[if is_improving { 1 } else { 0 }][clamped_depth]
+    LMP_MC_TABLE[is_improving as usize][clamped_depth]
 }
 
 const LMP_MC_TABLE: [[usize; 12]; 2] = build_lmp_mc_table();

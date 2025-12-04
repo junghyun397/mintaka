@@ -7,7 +7,6 @@ use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use crate::value::Depth;
 use rusty_renju::board::Board;
-use rusty_renju::chebyshev_distance;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
@@ -108,12 +107,9 @@ impl EndgameMovesUnchecked {
     }
 
     pub fn sort_moves(&mut self, ref_pos: Pos) {
-        let ref_row = ref_pos.row() as i16;
-        let ref_col = ref_pos.col() as i16;
-
-        self.moves[..self.top as usize].sort_by_key(|&pos| {
-            chebyshev_distance!(ref_row, ref_col, pos.unwrap_unchecked().row() as i16, pos.unwrap_unchecked().col() as i16)
-        });
+        self.moves[..self.top as usize].sort_by_key(|maybe_pos|
+            maybe_pos.unwrap().distance(ref_pos)
+        );
     }
 
     pub fn is_empty(&self) -> bool {
@@ -275,7 +271,7 @@ fn try_pns<const R: RuleKind, const C: Color, const DW: isize, TH: ThreadType, S
     todo!()
 }
 
-fn vcf<const R: RuleKind, const DW: isize, Sq: SequenceTracker>(
+fn vcf<const R: RuleKind, const DW: u8, Sq: SequenceTracker>(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     dest: impl VcfDestination,
     max_depth: Depth,
@@ -290,7 +286,7 @@ fn vcf<const R: RuleKind, const DW: isize, Sq: SequenceTracker>(
     }
 }
 
-fn try_vcf<const R: RuleKind, const C: Color, const DW: isize, TH: ThreadType, Sq: SequenceTracker>(
+fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: SequenceTracker>(
     td: &mut ThreadData<TH, impl Evaluator>,
     dest: impl VcfDestination,
     mut vcf_depth_left: Depth,

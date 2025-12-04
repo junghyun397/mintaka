@@ -434,6 +434,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "core_affinity"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a034b3a7b624016c6e13f5df875747cc25f884156aad2abd12b6c46797971342"
+dependencies = [
+ "libc",
+ "num_cpus",
+ "winapi",
+]
+
+[[package]]
 name = "cpufeatures"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1034,6 +1045,7 @@ dependencies = [
 name = "mintaka"
 version = "0.1.0-pre-alpha"
 dependencies = [
+ "core_affinity",
  "indoc",
  "lz4",
  "rusty_renju",
@@ -1058,6 +1070,7 @@ dependencies = [
  "axum",
  "axum-server",
  "clap",
+ "core_affinity",
  "dashmap",
  "futures-util",
  "mintaka",

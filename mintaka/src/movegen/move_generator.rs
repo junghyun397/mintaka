@@ -5,7 +5,7 @@ use rusty_renju::board::Board;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::utils::platform;
-use rusty_renju::{cartesian_to_index, chebyshev_distance, index_to_col, index_to_row, pattern};
+use rusty_renju::{cartesian_to_index, pattern};
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
 
@@ -15,7 +15,7 @@ fn score_distance(state: &GameState, pos: Pos) -> i16 {
     (16 - distance as i16) / 2
 }
 
-pub fn generate_endgame_moves<const VCT: bool>(board: &Board, distance_window: isize, recent_move: Pos) -> EndgameMovesUnchecked {
+pub fn generate_endgame_moves<const VCT: bool>(board: &Board, distance_window: u8, recent_move: Pos) -> EndgameMovesUnchecked {
     let mut vcf_moves = [MaybePos::NONE; ENDGAME_MAX_MOVES];
     let mut vcf_moves_top = 0;
 
@@ -59,17 +59,13 @@ pub fn generate_endgame_moves<const VCT: bool>(board: &Board, distance_window: i
             let lane_position = bitmask.trailing_zeros() as usize;
             bitmask &= bitmask - 1;
 
-            let pos_idx = start_idx + lane_position;
-            let distance = chebyshev_distance!(
-                recent_move_row as isize, recent_move_col as isize,
-                index_to_row!(pos_idx) as isize, index_to_col!(pos_idx) as isize
-            );
+            let pos = Pos::from_index((start_idx + lane_position) as u8);
 
-            if distance > distance_window {
+            if pos.distance(recent_move) > distance_window {
                 continue;
             }
 
-            vcf_moves[vcf_moves_top] = Pos::from_index(pos_idx as u8).into();
+            vcf_moves[vcf_moves_top] = pos.into();
             vcf_moves_top += 1;
         }
     }

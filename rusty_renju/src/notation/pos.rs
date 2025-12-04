@@ -1,6 +1,6 @@
-use crate::impl_debug_from_display;
 use crate::notation::direction::Direction;
 use crate::utils::str_utils::u8_from_str;
+use crate::{const_for, const_max, impl_debug_from_display};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
@@ -44,15 +44,6 @@ pub const CENTER_ROW_COL: u8 = CENTER.col();
             Direction::Descending => $idx - ((15 - 1) * $amount)
         }
      };
-}
-
-#[macro_export] macro_rules! chebyshev_distance {
-    ($ref_row:expr, $ref_col:expr, $row:expr, $col:expr) => {{
-        let row_diff = ($ref_row - $row).abs();
-        let col_diff = ($ref_col - $col).abs();
-
-        row_diff.max(col_diff)
-    }};
 }
 
 const STEP_TABLE: [isize; 4] = [1, I_BOARD_WIDTH, I_BOARD_WIDTH + 1, -(I_BOARD_WIDTH - 1)];
@@ -141,7 +132,7 @@ impl Pos {
     }
 
     pub fn distance(&self, other: Self) -> u8 {
-        chebyshev_distance!(self.row() as i16, self.col() as i16, other.row() as i16, other.col() as i16) as u8
+        CHEBYSHEV_DISTANCE_LUT[self.idx_usize()][other.idx_usize()]
     }
 
 }
@@ -231,10 +222,6 @@ impl MaybePos {
 
     pub const fn unwrap(self) -> Pos {
         debug_assert!(self.is_some());
-        self.0
-    }
-
-    pub const fn unwrap_unchecked(self) -> Pos {
         self.0
     }
 
@@ -383,4 +370,21 @@ impl<const N: usize> IndexMut<usize> for PosList<N> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.entries[index]
     }
+}
+
+const CHEBYSHEV_DISTANCE_LUT: [[u8; BOARD_SIZE]; BOARD_SIZE] = build_chebyshev_distance_lut();
+
+const fn build_chebyshev_distance_lut() -> [[u8; BOARD_SIZE]; BOARD_SIZE] {
+    let mut table = [[0; BOARD_SIZE]; BOARD_SIZE];
+    
+    const_for!(outer_idx in 0, BOARD_SIZE; {
+        const_for!(inner_idx in 0, BOARD_SIZE; {
+            let row_diff = (index_to_row!(outer_idx) as isize - index_to_row!(inner_idx) as isize).abs();
+            let col_diff = (index_to_col!(outer_idx) as isize - index_to_col!(inner_idx) as isize).abs();
+
+            table[outer_idx][inner_idx] = const_max!(row_diff, col_diff) as u8;
+        });
+    });
+
+    table
 }
