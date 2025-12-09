@@ -11,6 +11,7 @@ use rusty_renju::history::History;
 use rusty_renju::notation::color::UnknownColorError;
 use rusty_renju::notation::pos::{Pos, PosError};
 use rusty_renju::utils::byte_size::ByteSize;
+use std::io::BufRead;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
@@ -18,10 +19,20 @@ use std::time::Duration;
 fn main() -> Result<(), GameError> {
     let pref = Preference::parse();
 
-    text_protocol(pref.default_config, pref.game_state.unwrap_or_default())
+    let command_sequence: Vec<String> = pref.command_sequence
+        .map(|sequence|
+            sequence
+                .split('\n')
+                .filter(|&line| !line.is_empty())
+                .map(String::from)
+                .collect()
+        )
+        .unwrap_or_default();
+
+    text_protocol(pref.default_config, pref.game_state.unwrap_or_default(), command_sequence)
 }
 
-fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
+fn text_protocol(config: Config, state: GameState, command_sequence: Vec<String>) -> Result<(), GameError> {
     let launched = Arc::new(AtomicBool::new(false));
     let aborted = Arc::new(AtomicBool::new(false));
 
@@ -32,7 +43,7 @@ fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
         (MessageSender::new(tx), rx)
     };
 
-    spawn_command_listener(launched.clone(), aborted.clone(), message_sender.clone());
+    spawn_command_listener(launched.clone(), aborted.clone(), message_sender.clone(), command_sequence);
 
     for message in message_receiver {
         match message {
@@ -57,6 +68,8 @@ fn text_protocol(config: Config, state: GameState) -> Result<(), GameError> {
                     println!("=\x02\n{}\x03", game_agent.state.board.to_string_with_last_moves(game_agent.state.history.recent_action_pair())),
                 StatusCommand::History =>
                     println!("= {}", game_agent.state.history),
+                StatusCommand::Time =>
+                    println!("= {:?}", game_agent.time_manager.timer),
             },
             Message::Finished(result) => {
                 println!("= {result}")
@@ -112,20 +125,21 @@ fn response_printer(response: Response) {
     }
 }
 
-fn spawn_command_listener(launched: Arc<AtomicBool>, abort: Arc<AtomicBool>, message_sender: MessageSender) {
+fn spawn_command_listener(launched: Arc<AtomicBool>, abort: Arc<AtomicBool>, message_sender: MessageSender, initial_sequence: Vec<String>) {
     std::thread::spawn(move || {
-        let mut buf = String::new();
+        let stdin = std::io::stdin();
+        let stdin_lines = stdin.lock().lines();
 
-        loop {
-            buf.clear();
-            std::io::stdin().read_line(&mut buf).unwrap();
-            let args = buf.trim().split(' ').collect::<Vec<&str>>();
+        for line in initial_sequence.into_iter()
+            .chain(stdin_lines.map(Result::unwrap))
+        {
+            let args = line.trim().split(' ').collect::<Vec<&str>>();
 
             if args.is_empty() {
                 continue;
             }
 
-            match handle_command(&launched, &abort, &message_sender, &buf, args) {
+            match handle_command(&launched, &abort, &message_sender, &line, args) {
                 Err(err) => println!("? {err}"),
                 _ => {}
             }
@@ -141,7 +155,7 @@ fn handle_command(
             "abort" => {
                 abort.store(true, Ordering::Relaxed);
             },
-            "quite" => {
+            "quit" => {
                 std::process::exit(0);
             },
             &_ => return Err("unknown command.".to_string())
@@ -232,7 +246,7 @@ fn handle_command(
                     &_ => return Err("unknown limit type.".to_string()),
                 }
             }
-            "parse" => {
+            "load" => {
                 match *args.get(1)
                     .ok_or("data type not provided.")?
                 {
@@ -266,6 +280,9 @@ fn handle_command(
             "history" => {
                 message_sender.status(StatusCommand::History);
             },
+            "time" => {
+                message_sender.status(StatusCommand::Time);
+            }
             "version" => {
                 message_sender.status(StatusCommand::Version);
             },

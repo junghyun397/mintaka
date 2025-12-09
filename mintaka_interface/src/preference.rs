@@ -15,12 +15,8 @@ pub struct Preference {
     pub board: Option<Board>,
     #[arg(short, long)]
     pub history: Option<History>,
-    #[arg(long)]
-    pub total_time_in_millis: Option<u64>,
-    #[arg(long)]
-    pub increment_time_in_millis: Option<u64>,
-    #[arg(short, long)]
-    pub turn_time_in_millis: Option<u64>,
+    #[arg(short, long, num_args = 3)]
+    pub time: Option<Vec<u64>>,
     #[arg(long)]
     pub dynamic_time: bool,
     #[arg(short, long)]
@@ -31,6 +27,8 @@ pub struct Preference {
     pub workers: Option<usize>,
     #[arg(short, long)]
     pub pondering: bool,
+    #[arg(short, long)]
+    pub command_sequence: Option<String>,
     #[clap(skip)]
     pub game_state: Option<GameState>,
     #[clap(skip)]
@@ -55,16 +53,10 @@ impl Preference {
             self.game_state = Some(GameState::from_board_and_history(board, history));
         }
 
-        self.default_config.initial_timer.total_remaining = self.total_time_in_millis
-            .map(Duration::from_millis)
-            .unwrap_or(Duration::MAX);
-
-        if let Some(in_millis) = self.increment_time_in_millis {
-            self.default_config.initial_timer.increment = Duration::from_millis(in_millis);
-        }
-
-        if let Some(in_millis) = self.turn_time_in_millis {
-            self.default_config.initial_timer.turn = Duration::from_millis(in_millis);
+        if let Some(&[total_time_in_ms, increment_time_in_ms, turn_time_in_ms]) = self.time.as_deref() {
+            self.default_config.initial_timer.total_remaining = Duration::from_millis(total_time_in_ms);
+            self.default_config.initial_timer.increment = Duration::from_millis(increment_time_in_ms);
+            self.default_config.initial_timer.turn = Duration::from_millis(turn_time_in_ms);
         }
 
         self.default_config.dynamic_time = self.dynamic_time;

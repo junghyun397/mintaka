@@ -22,6 +22,7 @@ pub enum StatusCommand {
     Version,
     Board { show_last_moves: bool },
     History,
+    Time,
 }
 
 #[derive(Clone)]

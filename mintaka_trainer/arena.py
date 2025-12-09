@@ -1,10 +1,12 @@
 import argparse
+import random
 import shlex
 import subprocess
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
+
 
 class Color(Enum):
     BLACK = 0
@@ -82,9 +84,12 @@ def game_prefix(config, game_no) -> str:
 def turn_prefix(turn_no, player, color) -> str:
     return f"[#{turn_no}:{player}:{color}] "
 
-def spawn_process(path, params) -> subprocess.Popen:
+def spawn_process(path, params, time_manager, opening) -> subprocess.Popen:
     return subprocess.Popen(
-        [path] + shlex.split(params),
+        [path]
+            + shlex.split(params)
+            + ["--time", str(time_manager.total_remaining), str(time_manager.increment), str(time_manager.turn)]
+            + (["--opening", opening] if opening is not None else []),
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -127,26 +132,18 @@ def command_process(config, process, command,
         if println and (filter_prefix is None or response.startswith(tuple(filter_prefix))):
             print(f"{datetime_prefix(config)}{println_prefix}{response}")
 
-def play_game(config, game_no) -> GameResult:
+def play_game(config, game_no, opening) -> GameResult:
+    a_time_manager = TimeManager(config.args.a_time[0], config.args.a_time[1], config.args.a_time[2])
+    b_time_manager = TimeManager(config.args.b_time[0], config.args.b_time[1], config.args.b_time[2])
+
     with (
-        spawn_process(config.args.a_path, config.args.a_params) as a_process,
-        spawn_process(config.args.b_path, config.args.b_params) as b_process,
+        spawn_process(config.args.a_path, config.args.a_params, a_time_manager, opening) as a_process,
+        spawn_process(config.args.b_path, config.args.b_params, b_time_manager, opening) as b_process,
     ):
         engines = {
-            Player.A: Engine(
-                a_process,
-                TimeManager(config.args.a_time[0], config.args.a_time[1], config.args.a_time[2])
-            ),
-            Player.B: Engine(
-                b_process,
-                TimeManager(config.args.b_time[0], config.args.b_time[1], config.args.b_time[2])
-            )
+            Player.A: Engine(a_process, a_time_manager),
+            Player.B: Engine(b_process, b_time_manager)
         }
-
-        for engine in engines.values():
-            command_process(config, engine.process, f"limit time total {engine.time_manager.total_remaining}")
-            command_process(config, engine.process, f"limit time increment {engine.time_manager.increment}")
-            command_process(config, engine.process, f"limit time turn {engine.time_manager.turn}")
 
         player = Player.A if game_no % 2 == 0 else Player.B
 
@@ -209,6 +206,8 @@ def play_game(config, game_no) -> GameResult:
         return GameResult(color, winner, history, board_str)
 
 def main():
+    random.seed(42)
+
     default_total_increment_turn = [300_000, 0, 30_000]
 
     parser = argparse.ArgumentParser()
@@ -226,6 +225,8 @@ def main():
     parser.add_argument("--b-time", type=int, nargs=3, default=default_total_increment_turn,
                         help="total(ms) increment(ms) turn(ms)")
 
+    parser.add_argument("--openings", type=str, default=None, help="opening.csv, history on each line")
+
     parser.add_argument("--draw-in", type=int, default=225)
 
     parser.add_argument("--a-elo", type=float, default=1000.0)
@@ -236,6 +237,11 @@ def main():
     parser.add_argument("--log-prefix-filter", type=str, nargs="*", default=["solution"])
 
     config = Config(parser.parse_args())
+
+    openings = []
+    if config.args.openings is not None:
+        with open(config.args.openings, "r") as openings_file:
+            openings = openings_file.read().splitlines()
 
     elo = {
         Player.A: config.args.a_elo,
@@ -252,7 +258,7 @@ def main():
     draws = 0
 
     for game_no in range(config.args.num_games):
-        result = play_game(config, game_no)
+        result = play_game(config, game_no, random.choice(openings) if len(openings) != 0 else None)
 
         elo_delta = calculate_elo_delta(
             elo[Player.A], elo[Player.B],
