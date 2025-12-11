@@ -1,23 +1,25 @@
 {
   "name": "mintaka-webui",
-  "version": "1.0.0",
+  "version": "0.0.1",
+  "description": "",
   "type": "module",
   "scripts": {
-    "start": "parcel src/index.html --open",
-    "build": "parcel build src/Index.tsx"
-  },
-  "dependencies": {
-    "solid-js": "^1.8.16"
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview"
   },
   "devDependencies": {
-    "@babel/core": "7.22.10",
-    "autoprefixer": "^10.4.18",
-    "babel-preset-solid": "^1.8.15",
-    "buffer": "^6.0.3",
-    "parcel": "^2.11.0",
-    "postcss": "^8.4.35",
-    "solid-refresh": "^0.7.5",
-    "tailwindcss": "^3.4.1",
-    "typescript": "5.1.6"
+    "typescript": "^5.9.2",
+    "solid-devtools": "^0.34.3",
+
+    "vite": "^7.1.11",
+    "vite-plugin-solid": "^2.11.8",
+
+    "tailwindcss": "^4.1.13",
+    "@tailwindcss/vite": "^4.1.13",
+    "daisyui": "^5.5.11"
+  },
+  "dependencies": {
+    "solid-js": "^1.9.0"
   }
 }

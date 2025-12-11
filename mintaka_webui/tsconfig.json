@@ -1,14 +1,24 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    // General
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
-    "lib": ["ES6", "DOM"],
-    "rootDir": "src",
-    "strict": true,
+    "target": "ESNext",
+
+    // Modules
     "allowSyntheticDefaultImports": true,
-    "allowImportingTsExtensions": true
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+
+    // Type Checking & Safety
+    "strict": true,
+    "types": ["vite/client"]
   },
+  "include": [
+    "src",
+    "vite.config.ts"
+  ]
 }

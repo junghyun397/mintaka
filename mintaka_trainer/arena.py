@@ -6,13 +6,13 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-
+from typing import Self
 
 class Color(Enum):
     BLACK = 0
     WHITE = 1
 
-    def flip(self) -> 'Color':
+    def flip(self) -> Self:
         return Color.BLACK if self == Color.WHITE else Color.WHITE
 
     def __str__(self) -> str:
@@ -22,7 +22,7 @@ class Player(Enum):
     A = 0
     B = 1
 
-    def flip(self) -> 'Player':
+    def flip(self) -> Self:
         return Player.B if self == Player.A else Player.A
 
     def __str__(self) -> str:
