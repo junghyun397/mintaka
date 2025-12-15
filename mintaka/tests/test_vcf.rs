@@ -14,7 +14,7 @@ mod test_vcf {
     use rusty_renju::notation::pos::{pos_unchecked, MaybePos, Pos};
     use rusty_renju::notation::rule::RuleKind;
     use rusty_renju::utils::byte_size::ByteSize;
-    use std::sync::atomic::{AtomicBool, AtomicUsize};
+    use std::sync::atomic::{AtomicBool, AtomicU64};
 
     macro_rules! vcf {
         ($board:expr) => {{
@@ -27,7 +27,7 @@ mod test_vcf {
             let tt = TranspositionTable::new_with_size(ByteSize::from_kib(32));
             let ht = HistoryTable::EMPTY;
 
-            let global_counter_in_1k = AtomicUsize::new(0);
+            let global_counter_in_1k = AtomicU64::new(0);
             let aborted = AtomicBool::new(false);
 
             let mut td = ThreadData::new(

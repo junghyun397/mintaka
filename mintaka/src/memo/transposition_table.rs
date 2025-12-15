@@ -7,11 +7,11 @@ use rusty_renju::notation::score::{Score, Scores};
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize, Serializer};
 use std::io::{Read, Write};
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 pub struct TranspositionTable {
     table: Vec<TTEntryBucket>,
-    age: AtomicU8
+    age: AtomicU32
 }
 
 impl AbstractTranspositionTable for TranspositionTable {
@@ -26,7 +26,7 @@ impl AbstractTranspositionTable for TranspositionTable {
         &mut self.table
     }
 
-    fn fetch_age(&self) -> u8 {
+    fn fetch_age(&self) -> u32 {
         self.age.load(Ordering::Relaxed)
     }
 
@@ -45,7 +45,7 @@ impl TranspositionTable {
     pub fn new_with_size(size: ByteSize) -> Self {
         let mut new = Self {
             table: Vec::new(),
-            age: AtomicU8::new(0),
+            age: AtomicU32::new(0),
         };
 
         new.resize(size);
@@ -62,14 +62,14 @@ impl TranspositionTable {
 
     // compression level: 0-9
     pub fn export(&self, compression_level: u32) -> Vec<u8> {
-        let age = self.fetch_age();
+        let age = self.fetch_age().to_le_bytes();
         let byte_len = self.table.len() * size_of::<TTEntryBucket>();
         let byte_cap = self.table.capacity() * size_of::<TTEntryBucket>();
 
         let table_ptr = self.table.as_ptr() as *mut u8;
 
         let mut bytes = Vec::with_capacity(byte_cap + 1);
-        bytes.push(age);
+        bytes.extend(age);
         bytes.extend_from_slice(unsafe { std::slice::from_raw_parts(table_ptr, byte_len) });
 
         let mut encoder = lz4::EncoderBuilder::new()
@@ -92,8 +92,12 @@ impl TranspositionTable {
         decoder.read_to_end(&mut decompressed)
             .map_err(|_| "failed to decompress")?;
 
-        let age = decompressed[0];
-        let payload = &decompressed[1 ..];
+        let age: u32 = (&decompressed[0 .. 4])
+            .try_into()
+            .map(u32::from_be_bytes)
+            .unwrap_or_default();
+
+        let payload = &decompressed[4 ..];
 
         if !payload.len().is_multiple_of(size_of::<TTEntryBucket>()) {
             return Err("illegal payload size");
@@ -114,7 +118,7 @@ impl TranspositionTable {
 
         Ok(Self {
             table,
-            age: AtomicU8::new(age),
+            age: AtomicU32::new(age),
         })
     }
 
@@ -129,7 +133,7 @@ pub enum TTHit {
 #[derive(Debug, Copy, Clone)]
 pub struct TTView<'a> {
     table: &'a [TTEntryBucket],
-    pub age: u8,
+    pub age: u32,
 }
 
 impl TTView<'_> {
@@ -185,7 +189,7 @@ impl TTView<'_> {
             let replace_score = depth + score_kind_value + 5;
             let keep_score = entry.depth + entry_score_kind.map_or(0, ScoreKind::into);
 
-            if self.age > entry.age
+            if self.age > entry.age as u32
                 || (maybe_score_kind == Some(ScoreKind::Exact) && entry_score_kind != Some(ScoreKind::Exact))
                 || replace_score > keep_score
             {
@@ -194,7 +198,7 @@ impl TTView<'_> {
                 }
 
                 entry.tt_flag = TTFlag::new(maybe_score_kind, is_pv, vcf_depth);
-                entry.age = self.age;
+                entry.age = self.age as u8;
                 entry.depth = depth;
                 entry.eval = eval;
                 entry.score = score;
@@ -205,7 +209,7 @@ impl TTView<'_> {
             let entry = TTEntry {
                 best_move,
                 tt_flag: TTFlag::new(maybe_score_kind, is_pv, vcf_depth),
-                age: self.age,
+                age: self.age as u8,
                 depth,
                 eval,
                 score,

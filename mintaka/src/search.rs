@@ -149,7 +149,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         return Score::DRAW;
     }
 
-    if td.is_aborted() || state.board.stones as usize >= td.config.draw_condition {
+    if td.is_aborted() || state.board.stones >= td.config.draw_condition as u8 {
         return Score::DRAW;
     }
 

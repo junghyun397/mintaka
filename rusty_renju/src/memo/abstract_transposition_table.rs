@@ -26,7 +26,7 @@ pub trait AbstractTranspositionTable {
 
     fn internal_table_mut(&mut self) -> &mut Vec<Self::EntryType>;
 
-    fn fetch_age(&self) -> u8;
+    fn fetch_age(&self) -> u32;
 
     fn increase_age(&self);
 

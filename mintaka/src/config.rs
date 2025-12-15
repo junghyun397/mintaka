@@ -17,9 +17,9 @@ pub enum SearchObjective {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Config {
     pub rule_kind: RuleKind,
-    pub draw_condition: usize,
+    pub draw_condition: u64,
 
-    pub max_nodes_in_1k: Option<usize>,
+    pub max_nodes_in_1k: Option<u64>,
     pub max_depth: Depth,
     pub max_vcf_depth: Depth,
 
@@ -37,7 +37,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             rule_kind: RuleKind::Renju,
-            draw_condition: pos::BOARD_SIZE,
+            draw_condition: pos::BOARD_SIZE as u64,
             max_nodes_in_1k: None,
             max_depth: Depth::PLY_LIMIT,
             max_vcf_depth: 24,
@@ -69,7 +69,7 @@ impl std::error::Error for ConfigValidationError {}
 impl Config {
 
     pub fn validate(self) -> Result<Self, ConfigValidationError> {
-        if self.draw_condition > history::MAX_HISTORY_SIZE {
+        if self.draw_condition > history::MAX_HISTORY_SIZE as u64 {
             Err(ConfigValidationError::DrawConditionDeeperThenMaxHistory)
         } else if self.max_depth > Depth::PLY_LIMIT {
             Err(ConfigValidationError::DepthDeeperThanMaxPly)

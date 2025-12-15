@@ -13,7 +13,7 @@ use crate::{params, value};
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::{Score, Scores};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct RootMove {
@@ -112,7 +112,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
         tt: TTView<'a>,
         ht: HistoryTable,
         aborted: &'a AtomicBool,
-        global_counter_in_1k: &'a AtomicUsize
+        global_counter_in_1k: &'a AtomicU64
     ) -> Self {
         Self {
             thread_type,

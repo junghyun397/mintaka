@@ -12,7 +12,7 @@ pub enum Response {
         best_move: MaybePos,
         score: Score,
         pv: PrincipalVariation,
-        total_nodes_in_1k: usize,
+        total_nodes_in_1k: u64,
         depth: Depth,
     },
     Finished,

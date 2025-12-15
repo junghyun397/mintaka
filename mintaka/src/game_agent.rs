@@ -24,7 +24,7 @@ use rusty_renju::utils::byte_size::ByteSize;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -33,8 +33,8 @@ pub struct BestMove {
     pub hash: HashKey,
     pub pos: MaybePos,
     pub score: Score,
-    pub selective_depth: usize,
-    pub total_nodes_in_1k: usize,
+    pub selective_depth: u64,
+    pub total_nodes_in_1k: u64,
     pub time_elapsed: Duration,
     pub pv: PrincipalVariation,
 }
@@ -69,7 +69,7 @@ pub struct ComputingResource {
     pub workers: u32,
     pub tt_size: ByteSize,
     pub time: Option<Duration>,
-    pub nodes_in_1k: Option<usize>,
+    pub nodes_in_1k: Option<u64>,
 }
 
 pub struct GameAgent {
@@ -129,7 +129,7 @@ impl GameAgent {
 
                 if self.state.board.stones == pos::U8_BOARD_SIZE {
                     return Ok(Some(GameResult::Full));
-                } else if self.state.len() >= self.config.draw_condition {
+                } else if self.state.len() >= self.config.draw_condition as usize {
                     return Ok(Some(GameResult::Draw));
                 }
             },
@@ -290,7 +290,7 @@ impl GameAgent {
         let started_time = std::time::Instant::now();
 
         aborted.store(false, Ordering::Relaxed);
-        let global_counter_in_1k = Arc::new(AtomicUsize::new(0));
+        let global_counter_in_1k = Arc::new(AtomicU64::new(0));
 
         response_sender.response(Response::Begins(computing_resource));
 
@@ -359,7 +359,7 @@ impl GameAgent {
             hash: self.state.board.hash_key,
             pos: best_move,
             score,
-            selective_depth: main_td.selective_depth,
+            selective_depth: main_td.selective_depth as u64,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed,
             pv: main_td.root_pv

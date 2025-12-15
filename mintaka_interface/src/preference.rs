@@ -20,11 +20,11 @@ pub struct Preference {
     #[arg(long)]
     pub dynamic_time: bool,
     #[arg(short, long)]
-    pub nodes_in_1k: Option<usize>,
+    pub nodes_in_1k: Option<u64>,
     #[arg(short, long)]
-    pub memory_in_mib: Option<usize>,
+    pub memory_in_mib: Option<u64>,
     #[arg(short, long)]
-    pub workers: Option<usize>,
+    pub workers: Option<u32>,
     #[arg(short, long)]
     pub pondering: bool,
     #[arg(short, long)]
@@ -64,11 +64,11 @@ impl Preference {
         self.default_config.pondering = self.pondering;
 
         if let Some(memory_in_mib) = self.memory_in_mib {
-            self.default_config.tt_size = ByteSize::from_mib(memory_in_mib);
+            self.default_config.tt_size = ByteSize::from_mib(memory_in_mib as usize);
         }
 
         match self.workers {
-            Some(workers) => self.default_config.workers = workers as u32,
+            Some(workers) => self.default_config.workers = workers,
             None => self.default_config.workers = num_cpus::get() as u32,
         }
 

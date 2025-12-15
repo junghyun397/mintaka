@@ -1,15 +1,15 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(Clone)]
 pub struct BatchCounter<'a> {
-    buffer: usize,
-    global_counter_in_1k: &'a AtomicUsize,
-    local_counter_in_1k: usize,
+    buffer: u64,
+    global_counter_in_1k: &'a AtomicU64,
+    local_counter_in_1k: u64,
 }
 
 impl<'a> BatchCounter<'a> {
 
-    pub const fn new(global_counter_in_1k: &'a AtomicUsize) -> Self {
+    pub const fn new(global_counter_in_1k: &'a AtomicU64) -> Self {
         Self {
             buffer: 0,
             global_counter_in_1k,
@@ -25,7 +25,7 @@ impl<'a> BatchCounter<'a> {
         self.increment_amount(2);
     }
 
-    fn increment_amount(&mut self, amount: usize) {
+    fn increment_amount(&mut self, amount: u64) {
         self.buffer += amount;
         if self.buffer >= 1000 {
             self.global_counter_in_1k.fetch_add(1, Ordering::Relaxed);
@@ -34,11 +34,11 @@ impl<'a> BatchCounter<'a> {
         }
     }
 
-    pub fn count_global_in_1k(&self) -> usize {
+    pub fn count_global_in_1k(&self) -> u64 {
         self.global_counter_in_1k.load(Ordering::Relaxed)
     }
 
-    pub fn count_local_total(&self) -> usize {
+    pub fn count_local_total(&self) -> u64 {
         self.local_counter_in_1k * 1000 + self.buffer
     }
 
