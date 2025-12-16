@@ -8,6 +8,7 @@ mod test_search {
     use rusty_renju::board;
     use std::sync::atomic::AtomicBool;
     use std::sync::Arc;
+    use std::time::Instant;
 
     macro_rules! test_search {
         ($source:expr) => {{
@@ -21,7 +22,7 @@ mod test_search {
                 GameAgent::from_state(config, state)
             };
 
-            let best_move = agent.launch(SearchObjective::Best, NullResponseSender, Arc::new(AtomicBool::new(false)));
+            let best_move = agent.launch::<Instant>(SearchObjective::Best, NullResponseSender, Arc::new(AtomicBool::new(false)));
 
             println!("{:?}", best_move);
         }};

@@ -10,6 +10,7 @@ mod template {
     use rusty_renju::board::Board;
     use std::sync::atomic::{AtomicBool, AtomicU64};
     use std::sync::Arc;
+    use std::time::Instant;
 
     fn td() {
         let config = Config::default();
@@ -49,7 +50,7 @@ mod template {
             GameAgent::from_state(config, state)
         };
 
-        let best_move = agent.launch(
+        let best_move = agent.launch::<Instant>(
             SearchObjective::Best,
             NullResponseSender,
             Arc::new(AtomicBool::new(false))

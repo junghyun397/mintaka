@@ -11,7 +11,7 @@ use rusty_renju::utils::byte_size::ByteSize;
 use std::error::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 enum PiskvorkResponse {
     Info(String),
@@ -61,7 +61,7 @@ fn main() -> Result<(), impl Error> {
             Message::Launch { objective, apply, .. } => {
                 launched.store(true, Ordering::Relaxed);
 
-                let best_move = game_agent.launch(
+                let best_move = game_agent.launch::<Instant>(
                     objective,
                     CallBackResponseSender::new(response_receiver),
                     aborted.clone()

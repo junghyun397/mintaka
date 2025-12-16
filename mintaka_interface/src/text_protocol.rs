@@ -14,7 +14,7 @@ use rusty_renju::utils::byte_size::ByteSize;
 use std::io::BufRead;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 fn main() -> Result<(), GameError> {
     let pref = Preference::parse();
@@ -77,7 +77,7 @@ fn text_protocol(config: Config, state: GameState, command_sequence: Vec<String>
             Message::Launch { objective, apply, interactive } => {
                 launched.store(true, Ordering::Relaxed);
 
-                let best_move = game_agent.launch(
+                let best_move = game_agent.launch::<Instant>(
                     objective,
                     CallBackResponseSender::new(response_printer),
                     aborted.clone(),

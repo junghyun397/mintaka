@@ -12,6 +12,7 @@ use crate::search::iterative_deepening;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::time_manager::TimeManager;
+use crate::utils::time::MonotonicClock;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
@@ -284,10 +285,15 @@ impl GameAgent {
         }
     }
 
-    pub fn launch(&mut self, search_objective: SearchObjective, response_sender: impl ResponseSender, aborted: Arc<AtomicBool>) -> BestMove {
+    pub fn launch<CLK: MonotonicClock>(
+        &mut self,
+        search_objective: SearchObjective,
+        response_sender: impl ResponseSender,
+        aborted: Arc<AtomicBool>
+    ) -> BestMove {
         let computing_resource = self.next_computing_resource();
 
-        let started_time = std::time::Instant::now();
+        let started_time = CLK::now();
 
         aborted.store(false, Ordering::Relaxed);
         let global_counter_in_1k = Arc::new(AtomicU64::new(0));
@@ -300,7 +306,7 @@ impl GameAgent {
             let state = self.state;
 
             let mut main_td = ThreadData::new(
-                MainThread::new(
+                MainThread::<CLK, _>::new(
                     response_sender,
                     started_time,
                     computing_resource.time,
@@ -315,7 +321,7 @@ impl GameAgent {
             );
 
             let handle = s.spawn(move || {
-                let (score, best_move) = iterative_deepening::<{ RuleKind::Renju }, MainThread<_>>(
+                let (score, best_move) = iterative_deepening::<CLK, { RuleKind::Renju }, MainThread<_, _>>(
                     &mut main_td, state
                 );
 
@@ -334,7 +340,7 @@ impl GameAgent {
                 );
 
                 s.spawn(move || {
-                    iterative_deepening::<{ RuleKind::Renju }, WorkerThread>(
+                    iterative_deepening::<CLK, { RuleKind::Renju }, WorkerThread>(
                         &mut worker_td, state
                     );
                 });

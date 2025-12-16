@@ -9,6 +9,40 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU32, Ordering};
 
+#[cfg(not(target_arch = "wasm32"))]
+fn tt_compress(bytes: &[u8], compression_level: u32) -> Vec<u8> {
+    let mut encoder = lz4::EncoderBuilder::new()
+        .level(compression_level)
+        .build(Vec::new())
+        .unwrap();
+
+    encoder.write_all(bytes).unwrap();
+
+    let (compressed, _) = encoder.finish();
+    compressed
+}
+
+#[cfg(target_arch = "wasm32")]
+fn tt_compress(bytes: &[u8], _compression_level: u32) -> Vec<u8> {
+    bytes.to_vec()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn tt_decompress(source: Vec<u8>) -> Result<Vec<u8>, &'static str> {
+    let mut decoder = lz4::Decoder::new(std::io::Cursor::new(source))
+        .map_err(|_| "failed to build decoder")?;
+    let mut decompressed = Vec::new();
+    decoder
+        .read_to_end(&mut decompressed)
+        .map_err(|_| "failed to decompress")?;
+    Ok(decompressed)
+}
+
+#[cfg(target_arch = "wasm32")]
+fn tt_decompress(source: Vec<u8>) -> Result<Vec<u8>, &'static str> {
+    Ok(source)
+}
+
 pub struct TranspositionTable {
     table: Vec<TTEntryBucket>,
     age: AtomicU32
@@ -71,26 +105,12 @@ impl TranspositionTable {
         let mut bytes = Vec::with_capacity(byte_cap + 1);
         bytes.extend(age);
         bytes.extend_from_slice(unsafe { std::slice::from_raw_parts(table_ptr, byte_len) });
-
-        let mut encoder = lz4::EncoderBuilder::new()
-            .level(compression_level)
-            .build(Vec::new())
-            .unwrap();
-
-        encoder.write_all(&bytes)
-            .unwrap();
-
-        let (compressed, _) = encoder.finish();
-        compressed
+        tt_compress(&bytes, compression_level)
     }
 
     #[allow(clippy::uninit_vec)]
     pub fn import(source: Vec<u8>) -> Result<Self, &'static str> {
-        let mut decoder = lz4::Decoder::new(std::io::Cursor::new(source))
-            .map_err(|_| "failed to build decoder")?;
-        let mut decompressed = Vec::new();
-        decoder.read_to_end(&mut decompressed)
-            .map_err(|_| "failed to decompress")?;
+        let decompressed = tt_decompress(source)?;
 
         let age: u32 = (&decompressed[0 .. 4])
             .try_into()

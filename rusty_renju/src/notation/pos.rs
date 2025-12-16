@@ -271,6 +271,12 @@ impl From<Option<Pos>> for MaybePos {
     }
 }
 
+impl From<Option<MaybePos>> for MaybePos {
+    fn from(value: Option<MaybePos>) -> Self {
+        value.unwrap_or(Self::NONE)
+    }
+}
+
 impl FromStr for MaybePos {
     type Err = PosError;
 

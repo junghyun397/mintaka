@@ -1,4 +1,5 @@
 use crate::protocol::response::{Response, ResponseSender};
+use crate::utils::time::MonotonicClock;
 use std::time::Duration;
 
 pub trait ThreadType {
@@ -11,17 +12,17 @@ pub trait ThreadType {
 
 }
 
-pub struct MainThread<T: ResponseSender> {
+pub struct MainThread<CLK: MonotonicClock, T: ResponseSender> {
     response_sender: T,
-    start_time: std::time::Instant,
+    start_time: CLK,
     running_time: Option<Duration>,
 }
 
-impl<T: ResponseSender> MainThread<T> {
+impl<CLK: MonotonicClock, T: ResponseSender> MainThread<CLK, T> {
 
     pub fn new(
         response_sender: T,
-        start_time: std::time::Instant,
+        start_time: CLK,
         running_time: Option<Duration>,
     ) -> Self {
         Self {
@@ -33,7 +34,7 @@ impl<T: ResponseSender> MainThread<T> {
 
 }
 
-impl<T: ResponseSender> ThreadType for MainThread<T> {
+impl<CLK: MonotonicClock, T: ResponseSender> ThreadType for MainThread<CLK, T> {
     const IS_MAIN: bool = true;
 
     fn make_response(&self, response: Response) {

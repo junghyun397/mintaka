@@ -53,6 +53,11 @@ impl GameState {
         self
     }
 
+    pub fn undo_rebuild(mut self) -> Self {
+        self.undo_rebuild_mut();
+        self
+    }
+
     pub fn set_mut(&mut self, pos: Pos) {
         self.board.set_mut(pos);
         self.history.set_mut(pos);
@@ -68,7 +73,17 @@ impl GameState {
     pub fn undo_mut(&mut self, recovery_state: RecoveryState) {
         self.movegen_window = recovery_state.movegen_window;
 
-        match self.history.pop_mut().unwrap() {
+        self.undo_move();
+    }
+
+    pub fn undo_rebuild_mut(&mut self) {
+        self.undo_move();
+        self.movegen_window = MovegenWindow::from(&self.board.hot_field);
+    }
+
+    fn undo_move(&mut self) {
+        let last_action: MaybePos = self.history.pop_mut().into();
+        match last_action {
             MaybePos::NONE => {
                 self.board.unpass_mut();
             },
