@@ -2,6 +2,7 @@ use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::response::{CallBackResponseSender, Response};
+use mintaka::utils::thread::StdThreadProvider;
 use mintaka_interface::message::{Message, MessageSender};
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
@@ -61,7 +62,7 @@ fn main() -> Result<(), impl Error> {
             Message::Launch { objective, apply, .. } => {
                 launched.store(true, Ordering::Relaxed);
 
-                let best_move = game_agent.launch::<Instant>(
+                let best_move = game_agent.launch::<StdThreadProvider, Instant>(
                     objective,
                     CallBackResponseSender::new(response_receiver),
                     aborted.clone()

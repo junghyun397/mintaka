@@ -1,0 +1,9 @@
+[target.wasm32-unknown-unknown]
+rustflags = [
+    "--cfg", 'getrandom_backend="wasm_js"',
+    "-C", "link-arg=--shared-memory",
+    "-C", "target-feature=+atomics,+bulk-memory,+mutable-globals",
+]
+
+[alias]
+wasm-build = "build --target wasm32-unknown-unknown -Z build-std=std,panic_abort"

@@ -7,7 +7,7 @@ use crate::slice::Slice;
 use crate::slice_pattern::SlicePattern;
 use crate::slice_pattern_count::SlicePatternCounts;
 use crate::step_idx;
-use crate::utils::lang_utils::{repeat_16x, repeat_4x};
+use crate::utils::lang::{repeat_16x, repeat_4x};
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
 

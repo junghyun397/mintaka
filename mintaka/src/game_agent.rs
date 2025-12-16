@@ -12,6 +12,7 @@ use crate::search::iterative_deepening;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::time_manager::TimeManager;
+use crate::utils::thread::{ThreadProvider, ThreadScope};
 use crate::utils::time::MonotonicClock;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
@@ -285,7 +286,7 @@ impl GameAgent {
         }
     }
 
-    pub fn launch<CLK: MonotonicClock>(
+    pub fn launch<TP: ThreadProvider, CLK: MonotonicClock>(
         &mut self,
         search_objective: SearchObjective,
         response_sender: impl ResponseSender,
@@ -302,31 +303,8 @@ impl GameAgent {
 
         let tt_view = self.tt.view();
 
-        let (main_td, score, best_move) = std::thread::scope(|s| {
+        let (main_td, score, best_move) = TP::scope(|s| {
             let state = self.state;
-
-            let mut main_td = ThreadData::new(
-                MainThread::<CLK, _>::new(
-                    response_sender,
-                    started_time,
-                    computing_resource.time,
-                ),
-                0,
-                search_objective,
-                self.config,
-                self.evaluator.clone(),
-                tt_view,
-                self.ht,
-                &aborted, &global_counter_in_1k,
-            );
-
-            let handle = s.spawn(move || {
-                let (score, best_move) = iterative_deepening::<CLK, { RuleKind::Renju }, MainThread<_, _>>(
-                    &mut main_td, state
-                );
-
-                (main_td, score, best_move)
-            });
 
             for tid in 1 .. self.config.workers {
                 let mut worker_td = ThreadData::new(
@@ -346,7 +324,26 @@ impl GameAgent {
                 });
             }
 
-            handle.join().unwrap()
+            let mut main_td = ThreadData::new(
+                MainThread::<CLK, _>::new(
+                    response_sender,
+                    started_time,
+                    computing_resource.time,
+                ),
+                0,
+                search_objective,
+                self.config,
+                self.evaluator.clone(),
+                tt_view,
+                self.ht,
+                &aborted, &global_counter_in_1k,
+            );
+
+            let (score, best_move) = iterative_deepening::<CLK, { RuleKind::Renju }, MainThread<_, _>>(
+                &mut main_td, state
+            );
+
+            (main_td, score, best_move)
         });
 
         self.tt.increase_age();

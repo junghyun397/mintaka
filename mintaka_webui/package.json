@@ -4,9 +4,14 @@
   "description": "",
   "type": "module",
   "scripts": {
+    "wasm:build": "cargo wasm-build --manifest-path ../Cargo.toml --release -p mintaka_wasm",
+    "wasm:bindgen": "wasm-bindgen ../target/wasm32-unknown-unknown/release/mintaka_wasm.wasm --out-dir src/wasm/pkg --target web",
+    "wasm:init": "pnpm wasm:build && pnpm wasm:bindgen",
+
+    "dev:wasm": "pnpm wasm:init && vite",
     "dev": "vite",
-    "build": "vite build",
-    "serve": "vite preview"
+    "build": "pnpm wasm:init && vite build",
+    "serve": "pnpm wasm:init && vite preview"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

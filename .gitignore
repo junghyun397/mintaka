@@ -1,6 +1,4 @@
 /target
-/rusty_renju/tests/playground.rs
-/mintaka/tests/playground.rs
-/rusty_renju_image/output.png
 /sessions
 /.venv
+*/playground.rs

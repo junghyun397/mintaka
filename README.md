@@ -24,7 +24,7 @@ and plans to integrate an AlphaZero-based value and policy network.
 ## Project Structure
 
 ### rusty-renju
-Renju rule implementation with strict forbidden move detection
+Gomoku/Renju rule implementation with strict forbidden move detection
 
 ### mintaka
 Principal Variation Search (PVS) based engine core
@@ -36,10 +36,10 @@ Protocol adapters for [Piskvork(Gomocup)](https://plastovicka.github.io/protocl2
 REST API support with session-persistent reload and TLS
 
 ### mintaka-webui
-(TBD) Solid.js based web frontend
+(WIP) Solid.js based web frontend
 
 ### mintaka-wasm
-(TBD) WebAssembly bindings for JavaScript/TypeScript
+WebAssembly bindings for JavaScript/TypeScript (wasm-bindgen)
 
 ### rusty-renju-jni
 Java Native Interface (JNI) bindings
@@ -48,4 +48,4 @@ Java Native Interface (JNI) bindings
 Utility library for generating board visualizations
 
 ### mintaka-trainer
-(WIP) Machine learning pipeline for NNUE training
+(WIP) Parameter optimization and machine learning pipeline for NNUE training

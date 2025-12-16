@@ -5,6 +5,7 @@ mod test_search {
     use mintaka::game_agent::GameAgent;
     use mintaka::game_state::GameState;
     use mintaka::protocol::response::NullResponseSender;
+    use mintaka::utils::thread::StdThreadProvider;
     use rusty_renju::board;
     use std::sync::atomic::AtomicBool;
     use std::sync::Arc;
@@ -22,7 +23,11 @@ mod test_search {
                 GameAgent::from_state(config, state)
             };
 
-            let best_move = agent.launch::<Instant>(SearchObjective::Best, NullResponseSender, Arc::new(AtomicBool::new(false)));
+            let best_move = agent.launch::<StdThreadProvider, Instant>(
+                SearchObjective::Best,
+                NullResponseSender,
+                Arc::new(AtomicBool::new(false))
+            );
 
             println!("{:?}", best_move);
         }};
