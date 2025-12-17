@@ -3,6 +3,16 @@ name = "mintaka_wasm"
 version = "0.1.0"
 edition = "2024"
 
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = [
+    "-O3",
+    "--enable-simd",
+    "--enable-threads",
+    "--enable-bulk-memory",
+    "--enable-mutable-globals",
+    "--enable-nontrapping-float-to-int",
+]
+
 [lib]
 crate-type = ["cdylib"]
 
@@ -11,16 +21,17 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 rusty_renju = { path = "../rusty_renju" }
-mintaka = { path = "../mintaka" }
+mintaka = { path = "../mintaka", features = ["rayon"] }
 
 serde = { version = "1.0", features = ["derive"] }
 
 wasm-bindgen = "0.2"
+wasm-bindgen-rayon = "1.3"
 console_error_panic_hook = { version = "0.1", optional = true }
 serde-wasm-bindgen = "0.6"
 
 js-sys = "0.3"
-web-sys = { version = "0.3", features = ["DedicatedWorkerGlobalScope", "WorkerGlobalScope", "Performance"] }
+web-sys = { version = "0.3", features = ["BroadcastChannel", "DedicatedWorkerGlobalScope", "WorkerGlobalScope", "Performance"] }
 
 # .cargo/config.toml: --cfg getrandom_backend="wasm_js"
 getrandom = { version = "0.3", features = ["wasm_js"] }

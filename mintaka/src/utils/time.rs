@@ -1,4 +1,4 @@
-pub trait MonotonicClock : Send + Copy {
+pub trait MonotonicClock : Send + Sync + Copy {
 
     fn now() -> Self;
 

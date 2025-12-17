@@ -7,7 +7,6 @@ use mintaka::movegen::movegen_window::MovegenWindow;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::game_result::GameResult;
 use mintaka::protocol::response::Response;
-use mintaka::utils::thread::StdThreadProvider;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::memo::hash_key::HashKey;
@@ -168,7 +167,7 @@ impl Session {
         let abort_flag = self.abort_handle.clone();
 
         tokio::task::spawn_blocking(async move || {
-            let best_move = game_agent.launch::<StdThreadProvider, Instant>(
+            let best_move = game_agent.launch::<Instant>(
                 SearchObjective::Best,
                 response_sender,
                 abort_flag

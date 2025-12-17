@@ -167,6 +167,7 @@ impl ResponseSender for JsResponseSender {
 }
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct JsAbortHandle {
     inner: Arc<AtomicBool>
 }

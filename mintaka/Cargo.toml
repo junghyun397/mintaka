@@ -6,15 +6,18 @@ edition = "2024"
 [features]
 debug-statics = []
 neural-eval = []
+rayon = []
 default = []
 
 [dependencies]
 rusty_renju = {path = "../rusty_renju" }
 serde = { version = "1.0", features = ["derive"] }
+rayon = "1.11.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 lz4 = "1.28"
-core_affinity = "0.8.3"
+[target.'cfg(feature = "rayon")'.dependencies]
+rayon = "1.11"
 
 [dev-dependencies]
 indoc = "2.0"

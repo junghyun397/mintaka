@@ -7,7 +7,6 @@ mod template {
     use mintaka::protocol::response::NullResponseSender;
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
-    use mintaka::utils::thread::StdThreadProvider;
     use rusty_renju::board::Board;
     use std::sync::atomic::{AtomicBool, AtomicU64};
     use std::sync::Arc;
@@ -51,7 +50,7 @@ mod template {
             GameAgent::from_state(config, state)
         };
 
-        let best_move = agent.launch::<StdThreadProvider, Instant>(
+        let best_move = agent.launch::<Instant>(
             SearchObjective::Best,
             NullResponseSender,
             Arc::new(AtomicBool::new(false))

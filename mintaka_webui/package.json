@@ -4,14 +4,12 @@
   "description": "",
   "type": "module",
   "scripts": {
-    "wasm:build": "cargo wasm-build --manifest-path ../Cargo.toml --release -p mintaka_wasm",
-    "wasm:bindgen": "wasm-bindgen ../target/wasm32-unknown-unknown/release/mintaka_wasm.wasm --out-dir src/wasm/pkg --target web",
-    "wasm:init": "pnpm wasm:build && pnpm wasm:bindgen",
+    "wasm:build": "wasm-pack build ../mintaka_wasm --release --target web --out-name mintaka_wasm --out-dir ../mintaka_webui/src/wasm/pkg -- -Z build-std=std,panic_abort",
 
-    "dev:wasm": "pnpm wasm:init && vite",
+    "dev:wasm": "pnpm wasm:build && vite",
     "dev": "vite",
-    "build": "pnpm wasm:init && vite build",
-    "serve": "pnpm wasm:init && vite preview"
+    "build": "pnpm wasm:build && vite build",
+    "serve": "pnpm wasm:build && vite preview"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

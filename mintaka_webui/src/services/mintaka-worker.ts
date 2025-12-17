@@ -1,43 +1,45 @@
-import init, {GameAgent, GameState, JsAbortHandle, Pos, SearchObjective} from "../wasm/pkg/mintaka_wasm";
+import init, {GameAgent, GameState, initThreadPool, JsAbortHandle, Pos, SearchObjective} from "../wasm/pkg";
 
-await init();
+await init()
 
-type ConsoleDemoStartMessage = { type: "console_demo_start" };
+await initThreadPool(navigator.hardwareConcurrency)
 
-const ctx: any = self;
+const ctx = self
 
-ctx.addEventListener("message", (event: MessageEvent<ConsoleDemoStartMessage>) => {
-    if (event.data?.type !== "console_demo_start") return;
-
+ctx.addEventListener("message", async (_: MessageEvent<boolean>) => {
     try {
-        let state = new GameState();
-        state = state.play(new Pos("h8"));
-        state = state.play(new Pos("h9"));
+        let state = new GameState()
+        state = state.play(new Pos("h8"))
+        state = state.play(new Pos("h9"))
 
         const config = {
             rule_kind: "Renju",
             draw_condition: 225,
-            max_nodes_in_1k: 100,
+            max_nodes_in_1k: 100000000,
             max_depth: 20,
             max_vcf_depth: 12,
-            tt_size: 32 * 1024 * 1024,
-            workers: 1,
+            tt_size: 512 * 1024 * 1024,
+            workers: 8,
             pondering: false,
             dynamic_time: false,
             initial_timer: {
-                total_remaining: { secs: 5, nanos: 0 },
+                total_remaining: { secs: 600, nanos: 0 },
                 increment: { secs: 0, nanos: 0 },
                 turn: { secs: 1, nanos: 0 },
             },
             spawn_depth_specialist: false,
-        };
+        }
 
-        const agent = GameAgent.fromState(config, state);
-        const abort_handle = new JsAbortHandle();
+        const agent = GameAgent.fromState(config, state)
+        const abort_handle = new JsAbortHandle()
 
-        const best_move = agent.launch(SearchObjective.Best, abort_handle);
-        ctx.postMessage({ type: "console_demo_result", best_move });
+        const best_move = agent.launch(SearchObjective.Best, abort_handle)
+        ctx.postMessage({BestMove: best_move })
     } catch (error) {
-        ctx.postMessage({ type: "console_demo_error", error });
+        ctx.postMessage({Error: {
+                error: String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+            }
+        })
     }
-});
+})

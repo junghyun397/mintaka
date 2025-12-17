@@ -2,28 +2,28 @@
 
 WebAssembly (wasm-bindgen) bindings for `mintaka` (Renju engine) and related types.
 
-* `notation`
-    * `Pos`
-    * `Color`
-* `rusty_renju`
-    * `Board`
-* `mintaka`
-    * `GameState`
-    * `GameAgent`
+* `notation`::`Pos`
+* `notation`::`Color`
+
+* `rusty_renju`::`Board`
+
+* `mintaka`::`SearchObjective`
+* `mintaka`::`GameState`
+* `mintaka`::`GameAgent`
 
 ## Build
 
 ```shell
 rustup target add wasm32-unknown-unknown
-cargo install wasm-bindgen-cli
+cargo install wasm-pack
 ```
 
 ```shell
-cargo wasm-build --release -p mintaka_wasm
-wasm-bindgen \
-  target/wasm32-unknown-unknown/release/mintaka_wasm.wasm \
-  --out-dir target/wasm32-unknown-unknown/release/pkg \
-  --target web
+wasm-pack build mintaka_wasm \
+  --release \
+  --target web \
+  --out-name mintaka_wasm \
+  -- -Z build-std=std,panic_abort
 ```
 
 ## Before Run

@@ -2,6 +2,8 @@ pub mod notation;
 pub mod rusty_renju;
 pub mod mintaka;
 
+pub use wasm_bindgen_rayon::init_thread_pool;
+
 use ::mintaka::utils::time::MonotonicClock;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -33,16 +35,18 @@ pub struct WebClock(f64);
 
 impl MonotonicClock for WebClock {
     fn now() -> Self {
-        let global = js_sys::global().unchecked_into::<web_sys::WorkerGlobalScope>();
-        let performance = global.performance().unwrap();
+        let performance = js_sys::global()
+            .unchecked_into::<web_sys::WorkerGlobalScope>()
+            .performance()
+            .unwrap();
 
-        Self(performance.now())
+        Self(performance.time_origin() + performance.now())
     }
 
     fn elapsed_since(&self, start: Self) -> Duration {
-        let now = Self::now();
+        let delta_ms = (Self::now().0 - start.0).max(0.0);
 
-        Duration::from_secs_f64(now.0 - start.0)
+        Duration::from_secs_f64(delta_ms / 1000.0)
     }
 }
 

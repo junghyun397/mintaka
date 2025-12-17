@@ -1,9 +1,14 @@
 [target.wasm32-unknown-unknown]
 rustflags = [
     "--cfg", 'getrandom_backend="wasm_js"',
-    "-C", "link-arg=--shared-memory",
     "-C", "target-feature=+atomics,+bulk-memory,+mutable-globals",
+    "-C", "link-arg=--import-memory",
+    "-C", "link-arg=--shared-memory",
+    "-C", "link-arg=--export=__wasm_init_tls",
+    "-C", "link-arg=--export=__tls_base",
+    "-C", "link-arg=--export=__tls_size",
+    "-C", "link-arg=--export=__tls_align",
+    "-C", "link-arg=--initial-memory=16777216", # 16 MiB
+    "-C", "link-arg=--max-memory=4294967296", # 4096 MiB
+    "-C", "target-feature=+simd128",
 ]
-
-[alias]
-wasm-build = "build --target wasm32-unknown-unknown -Z build-std=std,panic_abort"
