@@ -64,7 +64,7 @@ impl Preference {
         self.default_config.pondering = self.pondering;
 
         if let Some(memory_in_mib) = self.memory_in_mib {
-            self.default_config.tt_size = ByteSize::from_mib(memory_in_mib as usize);
+            self.default_config.tt_size = ByteSize::from_mib(memory_in_mib);
         }
 
         match self.workers {

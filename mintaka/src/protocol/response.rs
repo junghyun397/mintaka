@@ -5,13 +5,16 @@ use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::score::Score;
 use serde::{Deserialize, Serialize};
 
+#[typeshare::typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "content")]
 pub enum Response {
     Begins(ComputingResource),
     Status {
         best_move: MaybePos,
         score: Score,
         pv: PrincipalVariation,
+        #[typeshare(serialized_as = "number")]
         total_nodes_in_1k: u64,
         depth: Depth,
     },

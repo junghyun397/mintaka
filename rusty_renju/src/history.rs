@@ -12,9 +12,12 @@ use std::str::FromStr;
 
 pub const MAX_HISTORY_SIZE: usize = 248;
 
+#[typeshare::typeshare]
 #[derive(Copy, Clone)]
 pub struct History {
+    #[typeshare(serialized_as = "Vec<MaybePos>")]
     pub entries: [MaybePos; MAX_HISTORY_SIZE],
+    #[typeshare(skip)]
     top: usize,
 }
 

@@ -29,12 +29,15 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+#[typeshare::typeshare]
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct BestMove {
     pub hash: HashKey,
     pub pos: MaybePos,
     pub score: Score,
+    #[typeshare(serialized_as = "number")]
     pub selective_depth: u64,
+    #[typeshare(serialized_as = "number")]
     pub total_nodes_in_1k: u64,
     pub time_elapsed: Duration,
     pub pv: PrincipalVariation,
@@ -65,11 +68,13 @@ impl Display for GameError {
 
 impl std::error::Error for GameError {}
 
+#[typeshare::typeshare]
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct ComputingResource {
     pub workers: u32,
     pub tt_size: ByteSize,
     pub time: Option<Duration>,
+    #[typeshare(serialized_as = "number")]
     pub nodes_in_1k: Option<u64>,
 }
 

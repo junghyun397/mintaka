@@ -192,7 +192,7 @@ fn handle_command(
                     "memory" => {
                         let memory_size_in_kib = args.get(2)
                             .ok_or("memory not provided.")?
-                            .parse::<usize>()
+                            .parse::<u64>()
                             .map_err(|_| "invalid memory size.")?;
 
                         message_sender.command(Command::MaxMemory(ByteSize::from_kib(memory_size_in_kib)));

@@ -7,8 +7,12 @@ use crate::{cartesian_to_index, impl_debug_from_display};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 
+#[typeshare::typeshare]
 #[derive(Eq, PartialEq, Copy, Clone)]
-pub struct HashKey(u64);
+pub struct HashKey(
+    #[typeshare(serialized_as = "String")]
+    u64
+);
 
 impl HashKey {
 

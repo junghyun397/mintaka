@@ -3,34 +3,38 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
+#[typeshare::typeshare]
 #[derive(Clone, Copy, PartialOrd, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub struct ByteSize(usize);
+pub struct ByteSize(
+    #[typeshare(serialized_as = "number")]
+    u64
+);
 
 impl ByteSize {
 
     pub const ZERO: Self = Self(0);
 
-    pub const fn from_bytes(size_in_bytes: usize) -> Self {
+    pub const fn from_bytes(size_in_bytes: u64) -> Self {
         Self(size_in_bytes)
     }
 
-    pub const fn from_kib(size_in_kib: usize) -> Self {
+    pub const fn from_kib(size_in_kib: u64) -> Self {
         Self(size_in_kib * 1024)
     }
 
-    pub const fn from_mib(size_in_mib: usize) -> Self {
+    pub const fn from_mib(size_in_mib: u64) -> Self {
         Self(size_in_mib * 1024 * 1024)
     }
 
-    pub const fn bytes(&self) -> usize {
+    pub const fn bytes(&self) -> u64 {
         self.0
     }
 
-    pub const fn kib(&self) -> usize {
+    pub const fn kib(&self) -> u64 {
         self.0 / 1024
     }
 
-    pub const fn mib(&self) -> usize {
+    pub const fn mib(&self) -> u64 {
         self.0 / (1024 * 1024)
     }
 

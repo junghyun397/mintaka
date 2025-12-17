@@ -15,11 +15,11 @@ pub trait AbstractTranspositionTable {
     type EntryType: AbstractTTEntry;
 
     fn size(&self) -> ByteSize {
-        ByteSize::from_bytes(self.internal_table().len() * size_of::<Self::EntryType>())
+        ByteSize::from_bytes((self.internal_table().len() * size_of::<Self::EntryType>()) as u64)
     }
 
     fn calculate_table_len(size: ByteSize) -> usize {
-        size.bytes() / size_of::<Self::EntryType>()
+        size.bytes() as usize / size_of::<Self::EntryType>()
     }
 
     fn internal_table(&self) -> &Vec<Self::EntryType>;

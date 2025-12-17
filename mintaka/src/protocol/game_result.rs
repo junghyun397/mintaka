@@ -3,7 +3,9 @@ use rusty_renju::notation::color::Color;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
+#[typeshare::typeshare]
 #[derive(Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", content = "content")]
 pub enum GameResult {
     Win(Color),
     Draw,

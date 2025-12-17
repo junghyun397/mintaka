@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+#[typeshare::typeshare]
 #[derive(std::marker::ConstParamTy, Default, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum RuleKind {
     Gomoku = 0,

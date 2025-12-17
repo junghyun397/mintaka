@@ -4,6 +4,7 @@ use crate::{from_js_value, impl_wrapper, to_js_result, WebClock};
 use mintaka::config::{Config, SearchObjective as RustSearchObjective};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::response::ResponseSender;
+use serde::Serialize;
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -157,12 +158,25 @@ impl GameAgent {
 
 }
 
+#[derive(Serialize)]
+struct JsOutputAdaptor {
+    #[serde(rename = "type")]
+    type_field: String,
+    payload: mintaka::protocol::response::Response,
+}
+
 pub struct JsResponseSender;
 
 impl ResponseSender for JsResponseSender {
     fn response(&self, response: mintaka::protocol::response::Response) {
         let global = js_sys::global().unchecked_into::<web_sys::DedicatedWorkerGlobalScope>();
-        global.post_message(&to_js_result(&response).unwrap()).unwrap();
+
+        let js_response = JsOutputAdaptor {
+            type_field: "response".to_string(),
+            payload: response,
+        };
+
+        global.post_message(&to_js_result(&js_response).unwrap()).unwrap();
     }
 }
 

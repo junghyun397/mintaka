@@ -17,5 +17,7 @@ rand = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 base64 = "0.22"
 
+typeshare = "1.0"
+
 [dev-dependencies]
 indoc = "2.0"

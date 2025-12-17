@@ -5,6 +5,7 @@ use std::ops::Not;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 
+#[typeshare::typeshare]
 #[derive(std::marker::ConstParamTy, PartialEq, Eq, Clone, Copy, Debug, Default, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Color {

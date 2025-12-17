@@ -55,8 +55,12 @@ pub const fn pos_unchecked(source: &str) -> Pos {
     Pos::from_cartesian(row, col)
 }
 
+#[typeshare::typeshare]
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
-pub struct Pos(u8);
+pub struct Pos(
+    #[typeshare(serialized_as = "String")]
+    u8
+);
 
 impl From<usize> for Pos {
     fn from(value: usize) -> Self {
@@ -198,9 +202,13 @@ impl<'de> Deserialize<'de> for Pos {
     }
 }
 
+#[typeshare::typeshare]
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 #[repr(transparent)]
-pub struct MaybePos(Pos);
+pub struct MaybePos(
+    #[typeshare(serialized_as = "Option<Pos>")]
+    Pos
+);
 
 impl MaybePos {
 
@@ -301,28 +309,16 @@ impl_debug_from_display!(MaybePos);
 
 impl Serialize for MaybePos {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        if serializer.is_human_readable() && self.is_none() {
-            serializer.serialize_str("none")
-        } else {
-            self.0.serialize(serializer)
+        match *self {
+            MaybePos::NONE => serializer.serialize_none(),
+            _ => Some(self.0).serialize(serializer)
         }
     }
 }
 
 impl<'de> Deserialize<'de> for MaybePos {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        if deserializer.is_human_readable() {
-            Self::from_str(&String::deserialize(deserializer)?)
-                .map_err(de::Error::custom)
-        } else {
-            let raw_pos = Pos::deserialize(deserializer)?;
-
-            Ok(if raw_pos == Self::INVALID_POS {
-                Self::NONE
-            } else {
-                Self(raw_pos)
-            })
-        }
+        Option::<Pos>::deserialize(deserializer).map(MaybePos::from)
     }
 }
 

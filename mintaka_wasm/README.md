@@ -13,11 +13,13 @@ WebAssembly (wasm-bindgen) bindings for `mintaka` (Renju engine) and related typ
 
 ## Build
 
+### Install Requirements
 ```shell
 rustup target add wasm32-unknown-unknown
-cargo install wasm-pack
+cargo install wasm-pack typeshare-cli
 ```
 
+### Build
 ```shell
 wasm-pack build mintaka_wasm \
   --release \

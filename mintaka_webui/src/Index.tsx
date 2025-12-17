@@ -4,6 +4,11 @@ import {render} from 'solid-js/web';
 import 'solid-devtools';
 import {App} from "./App";
 
+import {ready} from "./services/rusty-renju";
+import {MintakaWorkerMessage, MintakaWorkerResponse} from "./services/mintaka.worker.protocol";
+
+await ready
+
 const root = document.getElementById('root')
 
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
@@ -16,17 +21,12 @@ void console_demo()
 
 async function console_demo() {
     const worker = new Worker(
-        new URL("./services/mintaka-worker.ts", import.meta.url),
+        new URL("./services/mintaka.worker.ts", import.meta.url),
         {type: "module"},
     )
 
-    worker.onmessage = (event) => {
+    worker.onmessage = (event: MessageEvent<MintakaWorkerResponse>) => {
         console.log("[mintaka-worker]", event.data)
-
-        const data = event.data as unknown
-        if (data && typeof data === "object" && "type" in data && (data as any).type === "console_demo_result") {
-            worker.terminate()
-        }
     }
 
     worker.onerror = (event) => {
@@ -34,5 +34,10 @@ async function console_demo() {
         worker.terminate()
     }
 
-    worker.postMessage({type: "console_demo_start"})
+    function post(worker: Worker, data: MintakaWorkerMessage) {
+        worker.postMessage(data)
+    }
+
+    post(worker, {type: "init", payload: { config: undefined, state: undefined }})
+    post(worker, {type: "launch", payload: {}})
 }

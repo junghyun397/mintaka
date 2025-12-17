@@ -7,6 +7,7 @@ use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
+#[typeshare::typeshare]
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SearchObjective {
     #[default] Best,
@@ -14,11 +15,14 @@ pub enum SearchObjective {
     Pondering
 }
 
+#[typeshare::typeshare]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Config {
     pub rule_kind: RuleKind,
+    #[typeshare(serialized_as = "number")]
     pub draw_condition: u64,
 
+    #[typeshare(serialized_as = "number")]
     pub max_nodes_in_1k: Option<u64>,
     pub max_depth: Depth,
     pub max_vcf_depth: Depth,
