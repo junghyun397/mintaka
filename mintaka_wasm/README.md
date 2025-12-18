@@ -2,15 +2,6 @@
 
 WebAssembly (wasm-bindgen) bindings for `mintaka` (Renju engine) and related types.
 
-* `notation`::`Pos`
-* `notation`::`Color`
-
-* `rusty_renju`::`Board`
-
-* `mintaka`::`SearchObjective`
-* `mintaka`::`GameState`
-* `mintaka`::`GameAgent`
-
 ## Build
 
 ### Install Requirements
@@ -24,8 +15,11 @@ cargo install wasm-pack typeshare-cli
 wasm-pack build mintaka_wasm \
   --release \
   --target web \
-  --out-name mintaka_wasm \
+  --out-dir ./pkg \
   -- -Z build-std=std,panic_abort
+typeshare . \
+  --lang=typescript \
+  --output-folder=./mintaka_wasm/pkg
 ```
 
 ## Before Run

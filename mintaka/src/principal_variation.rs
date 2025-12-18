@@ -3,7 +3,9 @@ use rusty_renju::impl_debug_from_display;
 use rusty_renju::notation::pos::MaybePos;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::{Display, Formatter};
+use typeshare::typeshare;
 
+#[typeshare(serialized_as = "Vec<MaybePos>")]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct PrincipalVariation {
     pub line: [MaybePos; MAX_PLY],

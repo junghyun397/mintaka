@@ -97,13 +97,7 @@ impl FromStr for Color {
 }
 
 macro_rules! impl_color_container {
-    (
-        $(#[$struct_attr:meta])*
-        $name:ident
-    ) => {
-        $(#[$struct_attr])*
-        pub struct $name<T>(pub [T; 2]);
-
+    ($name:ident) => {
         impl<T> $name<T> {
             #[inline]
             pub const fn new(black: T, white: T) -> Self {
@@ -142,10 +136,11 @@ macro_rules! impl_color_container {
     };
 }
 
-impl_color_container!(
-    #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-    ColorContainer
-);
+#[typeshare::typeshare]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ColorContainer<T>(pub [T; 2]);
+
+impl_color_container!(ColorContainer);
 
 impl<T: Copy> Clone for ColorContainer<T> {
     fn clone(&self) -> Self {
@@ -155,8 +150,8 @@ impl<T: Copy> Clone for ColorContainer<T> {
 
 impl<T: Copy> Copy for ColorContainer<T> {}
 
-impl_color_container!(
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-    #[repr(align(64))]
-    AlignedColorContainer
-);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[repr(align(64))]
+pub struct AlignedColorContainer<T>(pub [T; 2]);
+
+impl_color_container!(AlignedColorContainer);

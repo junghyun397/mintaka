@@ -4,10 +4,10 @@ import {render} from 'solid-js/web';
 import 'solid-devtools';
 import {App} from "./App";
 
-import {ready} from "./services/rusty-renju";
+import init, {defaultConfig, GameStateWorker} from "./wasm/pkg";
 import {MintakaWorkerMessage, MintakaWorkerResponse} from "./services/mintaka.worker.protocol";
 
-await ready
+await init()
 
 const root = document.getElementById('root')
 
@@ -38,6 +38,11 @@ async function console_demo() {
         worker.postMessage(data)
     }
 
-    post(worker, {type: "init", payload: { config: undefined, state: undefined }})
+    const config = defaultConfig()
+    const gameState = GameStateWorker.default().toJs()
+
+    post(worker, {type: "init", payload: { config: config, state: gameState }})
+    post(worker, {type: "command", payload: { type: "Play", content: "h8"}})
+    post(worker, {type: "command", payload: { type: "TurnTime", content: {"secs": 1, "nanos": 0}}})
     post(worker, {type: "launch", payload: {}})
 }

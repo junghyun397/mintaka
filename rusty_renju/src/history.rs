@@ -9,15 +9,14 @@ use std::fmt::{Debug, Display, Formatter};
 use std::iter;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
+use typeshare::typeshare;
 
 pub const MAX_HISTORY_SIZE: usize = 248;
 
-#[typeshare::typeshare]
-#[derive(Copy, Clone)]
+#[typeshare(serialized_as = "Vec<MaybePos>")]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub struct History {
-    #[typeshare(serialized_as = "Vec<MaybePos>")]
     pub entries: [MaybePos; MAX_HISTORY_SIZE],
-    #[typeshare(skip)]
     top: usize,
 }
 

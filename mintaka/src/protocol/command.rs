@@ -7,6 +7,9 @@ use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+#[allow(unused_imports)]
+use rusty_renju::utils::lang::DurationSchema;
+
 #[typeshare::typeshare]
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type", content = "content")]
@@ -28,10 +31,22 @@ pub enum Command {
         player_moves: Vec<Pos>,
         opponent_moves: Vec<Pos>,
     },
-    TurnTime(Duration),
-    IncrementTime(Duration),
-    TotalTime(Duration),
-    ConsumeTime(Duration),
+    TurnTime(
+        #[typeshare(serialized_as = "DurationSchema")]
+        Duration
+    ),
+    IncrementTime(
+        #[typeshare(serialized_as = "DurationSchema")]
+        Duration
+    ),
+    TotalTime(
+        #[typeshare(serialized_as = "DurationSchema")]
+        Duration
+    ),
+    ConsumeTime(
+        #[typeshare(serialized_as = "DurationSchema")]
+        Duration
+    ),
     Pondering(bool),
     MaxNodes {
         #[typeshare(serialized_as = "number")]

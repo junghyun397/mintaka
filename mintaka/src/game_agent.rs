@@ -29,6 +29,9 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+#[allow(unused_imports)]
+use rusty_renju::utils::lang::DurationSchema;
+
 #[typeshare::typeshare]
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct BestMove {
@@ -39,6 +42,7 @@ pub struct BestMove {
     pub selective_depth: u64,
     #[typeshare(serialized_as = "number")]
     pub total_nodes_in_1k: u64,
+    #[typeshare(serialized_as = "DurationSchema")]
     pub time_elapsed: Duration,
     pub pv: PrincipalVariation,
 }
@@ -73,8 +77,9 @@ impl std::error::Error for GameError {}
 pub struct ComputingResource {
     pub workers: u32,
     pub tt_size: ByteSize,
+    #[typeshare(serialized_as = "DurationSchema")]
     pub time: Option<Duration>,
-    #[typeshare(serialized_as = "number")]
+    #[typeshare(serialized_as = "Option<number>")]
     pub nodes_in_1k: Option<u64>,
 }
 

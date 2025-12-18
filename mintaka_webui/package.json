@@ -4,12 +4,16 @@
   "description": "",
   "type": "module",
   "scripts": {
-    "wasm:build": "wasm-pack build ../mintaka_wasm --release --target web --out-name mintaka_wasm --out-dir ../mintaka_webui/src/wasm/pkg -- -Z build-std=std,panic_abort",
+    "requirements": "rustup target add wasm32-unknown-unknown && cargo install wasm-pack typeshare-cli",
 
-    "dev:wasm": "pnpm wasm:build && vite",
+    "typeshare:build": "typeshare ../ --lang=typescript --output-file=../mintaka_wasm/types.d.ts",
+    "wasm:build": "wasm-pack build ../mintaka_wasm --release --target web --out-name mintaka_wasm --out-dir ../mintaka_webui/src/wasm/pkg -- -Z build-std=std,panic_abort",
+    "wasm:package": "pnpm typeshare:build && pnpm wasm:build",
+
+    "dev:wasm": "pnpm wasm:package && vite",
     "dev": "vite",
-    "build": "pnpm wasm:build && vite build",
-    "serve": "pnpm wasm:build && vite preview"
+    "build": "pnpm wasm:package && vite build",
+    "serve": "pnpm wasm:package && vite preview"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

@@ -2,13 +2,11 @@ use crate::impl_debug_from_display;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
+use typeshare::typeshare;
 
-#[typeshare::typeshare]
 #[derive(Clone, Copy, PartialOrd, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub struct ByteSize(
-    #[typeshare(serialized_as = "number")]
-    u64
-);
+#[typeshare(serialized_as = "number")]
+pub struct ByteSize(u64);
 
 impl ByteSize {
 

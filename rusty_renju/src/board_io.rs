@@ -342,6 +342,7 @@ impl Display for Slice {
     };
 }
 
+#[typeshare::typeshare]
 #[derive(Serialize, Deserialize)]
 struct BoardData {
     player_color: Color,

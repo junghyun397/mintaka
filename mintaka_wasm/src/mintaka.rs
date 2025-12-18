@@ -1,52 +1,72 @@
-use crate::notation::Pos;
-use crate::rusty_renju::Board;
-use crate::{from_js_value, impl_wrapper, to_js_result, WebClock};
-use mintaka::config::{Config, SearchObjective as RustSearchObjective};
-use mintaka::protocol::command::Command;
+use crate::rusty_renju::{BoardWorker, History, PosWorker};
+use crate::{impl_wrapper, to_js_result, to_js_value, try_from_js_value, WebClock};
 use mintaka::protocol::response::ResponseSender;
-use serde::Serialize;
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsCast, JsError, JsValue};
+use wasm_bindgen::{JsCast, JsError};
 
 impl_wrapper! {
-    pub GameState { inner: mintaka::game_state::GameState }
+    pub GameStateWorker { inner: mintaka::game_state::GameState } impl Default
 }
 
 #[wasm_bindgen]
-impl GameState {
+extern "C" {
+    #[wasm_bindgen(typescript_type = "Config")]
+    pub type Config;
 
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
-        Self {
-            inner: mintaka::game_state::GameState::default(),
-        }
+    #[wasm_bindgen(typescript_type = "SearchObjective")]
+    pub type SearchObjective;
+
+    #[wasm_bindgen(typescript_type = "Command")]
+    pub type Command;
+
+    #[wasm_bindgen(typescript_type = "GameResult")]
+    pub type GameResult;
+
+    #[wasm_bindgen(typescript_type = "BestMove")]
+    pub type BestMove;
+
+    #[wasm_bindgen(typescript_type = "GameState")]
+    pub type GameState;
+}
+
+#[wasm_bindgen(js_name = defaultConfig)]
+pub fn default_config() -> Config {
+    to_js_value(&mintaka::config::Config::default())
+}
+
+#[wasm_bindgen]
+impl GameStateWorker {
+
+    #[wasm_bindgen(js_name = default)]
+    pub fn default_value() -> Self {
+        Self::default()
     }
 
     #[wasm_bindgen(js_name = fromBoard)]
-    pub fn from_board(board: &Board) -> Self {
+    pub fn from_board(board: &BoardWorker) -> Self {
         Self {
             inner: board.inner.into(),
         }
     }
 
     #[wasm_bindgen(js_name = fromHistory)]
-    pub fn from_history(history: JsValue) -> Self {
-        let history: rusty_renju::history::History = from_js_value(history).unwrap();
+    pub fn from_history(history: History) -> Self {
+        let history: rusty_renju::history::History = try_from_js_value(history.into()).unwrap();
 
         Self {
             inner: history.into(),
         }
     }
 
-    pub fn board(&self) -> Board {
-        Board { inner: self.inner.board }
+    pub fn board(&self) -> BoardWorker {
+        BoardWorker { inner: self.inner.board }
     }
 
-    pub fn history(&self) -> JsValue {
-        serde_wasm_bindgen::to_value(&self.inner.history).unwrap()
+    pub fn history(&self) -> History {
+        serde_wasm_bindgen::to_value(&self.inner.history).unwrap().into()
     }
 
     pub fn len(&self) -> usize {
@@ -58,7 +78,7 @@ impl GameState {
         self.inner.is_empty()
     }
 
-    pub fn play(self, pos: &Pos) -> Self {
+    pub fn play(self, pos: &PosWorker) -> Self {
         self.inner.play((*pos).into()).into()
     }
 
@@ -71,7 +91,7 @@ impl GameState {
     }
 
     #[wasm_bindgen(js_name = playMut)]
-    pub fn play_mut(&mut self, pos: &Pos) {
+    pub fn play_mut(&mut self, pos: &PosWorker) {
         self.inner.set_mut((*pos).into())
     }
 
@@ -81,19 +101,15 @@ impl GameState {
     }
 
     #[wasm_bindgen(js_name = toJs)]
-    pub fn to_js(&self) -> Result<JsValue, JsError> {
-        to_js_result(&self.inner)
+    pub fn to_js(&self) -> Result<GameState, JsError> {
+        to_js_result(&self.inner).into()
     }
 
     #[wasm_bindgen(js_name = fromJs)]
-    pub fn from_js(value: JsValue) -> Result<Self, JsError> {
-        Ok(Self { inner: from_js_value(value)? })
+    pub fn from_js(value: GameState) -> Result<Self, JsError> {
+        Ok(Self { inner: try_from_js_value(value.into())? })
     }
 
-}
-
-impl_wrapper! {
-    pub enum SearchObjective { inner: RustSearchObjective { Best, Zeroing, Pondering } }
 }
 
 #[wasm_bindgen]
@@ -105,36 +121,28 @@ pub struct GameAgent {
 impl GameAgent {
 
     #[wasm_bindgen(constructor)]
-    pub fn new(config: JsValue) -> Self {
-        let config: Config = from_js_value(config).unwrap_or_default();
-
-        Self {
-            inner: Arc::new(RefCell::new(mintaka::game_agent::GameAgent::new(config))),
-        }
-    }
-
-    #[wasm_bindgen(js_name = fromState)]
-    pub fn from_state(config: JsValue, state: GameState) -> Self {
-        let config: Config = from_js_value(config).unwrap_or_default();
+    pub fn new(config: Config, state: GameState) -> Self {
+        let config: mintaka::config::Config = try_from_js_value(config.into()).unwrap_or_default();
+        let state: GameStateWorker = GameStateWorker::from_js(state).unwrap_or_default();
 
         Self {
             inner: Arc::new(RefCell::new(mintaka::game_agent::GameAgent::from_state(config, state.inner))),
         }
     }
 
-    pub fn state(&self) -> GameState {
-        GameState {
+    pub fn state(&self) -> GameStateWorker {
+        GameStateWorker {
             inner: self.inner.borrow().state,
         }
     }
 
-    pub fn command(&mut self, command: JsValue) -> Result<JsValue, JsError> {
-        let command: Command = from_js_value(command)?;
+    pub fn command(&mut self, command: Command) -> Result<GameResult, JsError> {
+        let command: mintaka::protocol::command::Command = try_from_js_value(command.into())?;
 
         let maybe_result = self.inner.borrow_mut().command(command)
             .map_err(|e| JsError::new(&format!("{}", e)))?;
 
-        to_js_result(&maybe_result)
+        to_js_result(&maybe_result).into()
     }
 
     #[wasm_bindgen]
@@ -142,27 +150,20 @@ impl GameAgent {
         &mut self,
         search_objective: SearchObjective,
         abort_handle: JsAbortHandle,
-    ) -> Result<JsValue, JsError> {
+    ) -> Result<BestMove, JsError> {
         let inner = Arc::clone(&self.inner);
 
-        let search_objective: RustSearchObjective = search_objective.into();
+        // let search_objective = try_from_js_value(search_objective)?;
 
         let best_move = inner.borrow_mut().launch::<WebClock>(
-            search_objective,
+            mintaka::config::SearchObjective::Best,
             JsResponseSender,
             abort_handle.inner.clone(),
         );
 
-        to_js_result(&best_move)
+        to_js_result(&best_move).into()
     }
 
-}
-
-#[derive(Serialize)]
-struct JsOutputAdaptor {
-    #[serde(rename = "type")]
-    type_field: String,
-    payload: mintaka::protocol::response::Response,
 }
 
 pub struct JsResponseSender;
@@ -171,12 +172,7 @@ impl ResponseSender for JsResponseSender {
     fn response(&self, response: mintaka::protocol::response::Response) {
         let global = js_sys::global().unchecked_into::<web_sys::DedicatedWorkerGlobalScope>();
 
-        let js_response = JsOutputAdaptor {
-            type_field: "response".to_string(),
-            payload: response,
-        };
-
-        global.post_message(&to_js_result(&js_response).unwrap()).unwrap();
+        global.post_message(&to_js_result(&response).unwrap()).unwrap();
     }
 }
 

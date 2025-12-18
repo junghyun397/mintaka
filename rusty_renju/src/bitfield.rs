@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
 use std::simd::u8x32;
+use typeshare::typeshare;
 
+#[typeshare(serialized_as = "String")]
 #[derive(Copy, Clone, PartialEq, Eq)]
 #[repr(align(32))]
 pub struct Bitfield(pub [u8; 32]);

@@ -7,7 +7,9 @@ use crate::notation::rule::RuleKind;
 use crate::pattern;
 use crate::pattern::Patterns;
 use crate::slice::{Slice, Slices};
+use typeshare::typeshare;
 
+#[typeshare(serialized_as = "BoardData")]
 #[derive(Copy, Clone, Default)]
 pub struct Board {
     pub player_color: Color,

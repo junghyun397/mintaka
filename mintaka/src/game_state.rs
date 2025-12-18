@@ -3,7 +3,9 @@ use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use serde::{Deserialize, Serialize, Serializer};
+use typeshare::typeshare;
 
+#[typeshare(serialized_as = "GameStateData")]
 #[derive(Default, Debug, Copy, Clone)]
 pub struct GameState {
     pub board: Board,
@@ -129,6 +131,7 @@ impl From<History> for GameState {
     }
 }
 
+#[typeshare::typeshare]
 #[derive(Serialize, Deserialize)]
 struct GameStateData {
     board: Board,

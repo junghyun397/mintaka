@@ -2,10 +2,17 @@ use rusty_renju::notation::pos::MaybePos;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+#[allow(unused_imports)]
+use rusty_renju::utils::lang::DurationSchema;
+
+#[typeshare::typeshare]
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Timer {
+    #[typeshare(serialized_as = "DurationSchema")]
     pub total_remaining: Duration,
+    #[typeshare(serialized_as = "DurationSchema")]
     pub increment: Duration,
+    #[typeshare(serialized_as = "DurationSchema")]
     pub turn: Duration,
 }
 

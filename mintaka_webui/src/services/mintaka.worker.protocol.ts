@@ -1,9 +1,11 @@
+import {BestMove, Command, Config, GameState} from "../wasm/pkg";
+
 export type MintakaWorkerMessage =
-    | { type: "init", payload: { config: any, state: any } }
-    | { type: "command", payload: any }
+    | { type: "init", payload: { config: Config, state: GameState } }
+    | { type: "command", payload: Command }
     | { type: "launch", payload: { }}
 
 export type MintakaWorkerResponse =
-    | { type: "response", payload: any }
-    | { type: "best-move", payload: any }
-    | { type: "error", payload: any }
+    | { type: "Ready" }
+    | { type: "BestMove", content: BestMove }
+    | { type: "Error", error: any }

@@ -9,6 +9,9 @@ export default defineConfig({
     devtools(),
     tailwindcss()
   ],
+  worker: {
+    format: 'es',
+  },
   server: {
     port: 3000,
     headers: {
