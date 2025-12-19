@@ -6,13 +6,14 @@ use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
+use typeshare::typeshare;
 
-#[typeshare::typeshare]
+#[typeshare(serialized_as = "String")] // using string to avoid ts enum
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SearchObjective {
-    #[default] Best,
-    Zeroing,
-    Pondering
+    #[default] Best = 0,
+    Zeroing = 1,
+    Pondering = 2
 }
 
 #[typeshare::typeshare]

@@ -240,7 +240,7 @@ fn match_command(
                         PiskvorkResponse::Ok
                     },
                     "max_memory" => {
-                        let max_memory_in_bytes: usize = args.get(1)
+                        let max_memory_in_bytes: u64 = args.get(1)
                             .ok_or("missing info value.")?
                             .parse()
                             .map_err(|_| "memory parsing failed.")?;

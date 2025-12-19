@@ -1,5 +1,4 @@
 use mintaka::config::{Config, SearchObjective};
-use mintaka::eval::evaluator::Evaluator;
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::game_state::GameState;
 use mintaka::protocol::command::Command;

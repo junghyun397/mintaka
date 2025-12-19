@@ -1,14 +1,16 @@
-use crate::{impl_wrapper, to_js_err, to_js_result, to_js_value, try_from_js_value};
+use crate::{impl_wrapper, to_js_value, try_from_js_value};
 use std::str::FromStr;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
 
-impl_wrapper! {
-    pub PosWorker { inner: rusty_renju::notation::pos::Pos }
-}
-
 #[wasm_bindgen]
 extern "C" {
+    #[wasm_bindgen(typescript_type = "Pos")]
+    pub type Pos;
+
+    #[wasm_bindgen(typescript_type = "MaybePos")]
+    pub type MaybePos;
+
     #[wasm_bindgen(typescript_type = "History")]
     pub type History;
 
@@ -19,19 +21,12 @@ extern "C" {
     pub type Board;
 }
 
+impl_wrapper! {
+    pub PosWorker { inner: rusty_renju::notation::pos::Pos } <-> Pos
+}
+
 #[wasm_bindgen]
 impl PosWorker {
-
-    #[wasm_bindgen(constructor)]
-    pub fn new(value: JsValue) -> Result<Self, JsError> {
-        if value.is_string() {
-            let pos: rusty_renju::notation::pos::Pos = value.as_string().unwrap().parse().map_err(to_js_err)?;
-
-            Ok(pos.into())
-        } else {
-            Err(JsError::new("invalid argument"))
-        }
-    }
 
     #[wasm_bindgen(js_name = fromIndex)]
     pub fn from_index(idx: u8) -> Self {
@@ -69,18 +64,11 @@ impl PosWorker {
 }
 
 impl_wrapper! {
-    pub BoardWorker { inner: rusty_renju::board::Board }
+    pub BoardWorker { inner: rusty_renju::board::Board } <-> Board
 }
 
 #[wasm_bindgen]
 impl BoardWorker {
-
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
-        Self {
-            inner: rusty_renju::board::Board::default(),
-        }
-    }
 
     #[wasm_bindgen(js_name = fromString)]
     pub fn from_string(source: &str) -> Result<Self, JsError> {
@@ -94,7 +82,7 @@ impl BoardWorker {
     }
 
     #[wasm_bindgen(js_name = playerColor)]
-    pub fn player_color(&self) -> JsValue {
+    pub fn player_color(&self) -> Color {
         to_js_value(&self.inner.player_color)
     }
 
@@ -103,28 +91,28 @@ impl BoardWorker {
     }
 
     #[wasm_bindgen(js_name = isPosEmpty)]
-    pub fn is_pos_empty(&self, pos: &PosWorker) -> bool {
-        self.inner.is_pos_empty((*pos).into())
+    pub fn is_pos_empty(&self, pos: Pos) -> bool {
+        self.inner.is_pos_empty(try_from_js_value(pos).unwrap())
     }
 
     #[wasm_bindgen(js_name = isLegalMove)]
-    pub fn is_legal_move(&self, pos: &PosWorker) -> bool {
-        self.inner.is_legal_move((*pos).into())
+    pub fn is_legal_move(&self, pos: Pos) -> bool {
+        self.inner.is_legal_move(try_from_js_value(pos).unwrap())
     }
 
     #[wasm_bindgen(js_name = stoneKind)]
-    pub fn stone_kind(&self, pos: &PosWorker) -> Option<JsValue> {
-        self.inner.stone_kind((*pos).into())
+    pub fn stone_kind(&self, pos: Pos) -> Option<Color> {
+        self.inner.stone_kind(try_from_js_value(pos).unwrap())
             .as_ref()
             .map(to_js_value)
     }
 
-    pub fn set(self, pos: &PosWorker) -> Self {
-        self.inner.set((*pos).into()).into()
+    pub fn set(self, pos: Pos) -> Self {
+        self.inner.set(try_from_js_value(pos).unwrap()).into()
     }
 
-    pub fn unset(self, pos: &PosWorker) -> Self {
-        self.inner.unset((*pos).into()).into()
+    pub fn unset(self, pos: Pos) -> Self {
+        self.inner.unset(try_from_js_value(pos).unwrap()).into()
     }
 
     pub fn pass(&self) -> Self {
@@ -132,28 +120,18 @@ impl BoardWorker {
     }
 
     #[wasm_bindgen(js_name = setMut)]
-    pub fn set_mut(&mut self, pos: &PosWorker) {
-        self.inner.set_mut((*pos).into())
+    pub fn set_mut(&mut self, pos: Pos) {
+        self.inner.set_mut(try_from_js_value(pos).unwrap())
     }
 
     #[wasm_bindgen(js_name = unsetMut)]
-    pub fn unset_mut(&mut self, pos: &PosWorker) {
-        self.inner.unset_mut((*pos).into())
+    pub fn unset_mut(&mut self, pos: Pos) {
+        self.inner.unset_mut(try_from_js_value(pos).unwrap())
     }
 
     #[wasm_bindgen(js_name = passMut)]
     pub fn pass_mut(&mut self) {
         self.inner.pass_mut()
-    }
-
-    #[wasm_bindgen(js_name = toJs)]
-    pub fn to_js(&self) -> Result<JsValue, JsError> {
-        to_js_result(&self.inner)
-    }
-
-    #[wasm_bindgen(js_name = fromJs)]
-    pub fn from_js(value: JsValue) -> Result<Self, JsError> {
-        Ok(Self { inner: try_from_js_value(value)? })
     }
 
 }

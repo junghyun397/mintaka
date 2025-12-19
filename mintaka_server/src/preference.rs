@@ -31,7 +31,7 @@ pub struct Preference {
     #[arg(short, long, default_value_t = num_cpus::get_physical())]
     pub cores: usize,
     #[arg(short, long, help = "Total memory limit in MiB")]
-    memory_limit_mib: Option<usize>,
+    memory_limit_mib: Option<u64>,
     #[arg(long, requires = "tls_key", help = "TLS certificate file path")]
     tls_cert: Option<String>,
     #[arg(long, requires = "tls_cert", help = "TLS key file path")]

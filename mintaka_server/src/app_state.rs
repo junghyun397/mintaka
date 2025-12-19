@@ -55,7 +55,7 @@ impl AppState {
             session_streams: Arc::new(DashMap::new()),
             hibernation_queue: Arc::new(RwLock::new(vec![])),
             worker_resource: Arc::new(Semaphore::new(preference.cores)),
-            memory_resource: Arc::new(Semaphore::new(preference.memory_limit.mib())),
+            memory_resource: Arc::new(Semaphore::new(preference.memory_limit.mib() as usize)),
             preference,
             session_cleanup_task: None,
         }
@@ -70,11 +70,11 @@ impl AppState {
     }
 
     pub fn available_memory(&self) -> ByteSize {
-        ByteSize::from_mib(self.memory_resource.available_permits())
+        ByteSize::from_mib(self.memory_resource.available_permits() as u64)
     }
 
     pub async fn acquire_memory(&self, memory_size: ByteSize, force_acquire: bool) -> MemoryPermit {
-        let available = ByteSize::from_mib(self.memory_resource.available_permits());
+        let available = ByteSize::from_mib(self.memory_resource.available_permits() as u64);
 
         if memory_size > available && force_acquire {
             let mut acquired_memory = ByteSize::ZERO;

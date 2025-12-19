@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
-#[typeshare::typeshare]
+#[typeshare(serialized_as = "String")] // using string to avoid ts enum
 #[derive(std::marker::ConstParamTy, Default, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum RuleKind {
     Gomoku = 0,

@@ -1,7 +1,6 @@
 use mintaka::config::SearchObjective;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::game_result::GameResult;
-use std::fmt::Display;
 use std::sync::mpsc;
 
 pub const CHANNEL_CLOSED_MESSAGE: &str = "sender channel closed.";

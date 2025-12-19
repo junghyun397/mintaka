@@ -4,10 +4,7 @@
 
 export type Bitfield = string;
 
-export enum Color {
-	Black = "Black",
-	White = "White",
-}
+export type Color = string;
 
 export type ColorContainer<T> = [T, T];
 
@@ -39,7 +36,11 @@ export type HashKey = string;
 
 export type PrincipalVariation = MaybePos[];
 
+export type RuleKind = string;
+
 export type Score = number;
+
+export type SearchObjective = string;
 
 export interface DurationSchema {
 	secs: number;
@@ -61,11 +62,6 @@ export interface ComputingResource {
 	tt_size: ByteSize;
 	time: DurationSchema;
 	nodes_in_1k?: number;
-}
-
-export enum RuleKind {
-	Gomoku = "Gomoku",
-	Renju = "Renju",
 }
 
 export interface Timer {
@@ -131,10 +127,4 @@ export type Response =
 	depth: Depth;
 }}
 	| { type: "Finished", content?: undefined };
-
-export enum SearchObjective {
-	Best = "Best",
-	Zeroing = "Zeroing",
-	Pondering = "Pondering",
-}
 

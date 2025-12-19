@@ -7,10 +7,6 @@ use std::sync::Arc;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsError};
 
-impl_wrapper! {
-    pub GameStateWorker { inner: mintaka::game_state::GameState } impl Default
-}
-
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(typescript_type = "Config")]
@@ -32,6 +28,10 @@ extern "C" {
     pub type GameState;
 }
 
+impl_wrapper! {
+    pub GameStateWorker { inner: mintaka::game_state::GameState } <-> GameState
+}
+
 #[wasm_bindgen(js_name = defaultConfig)]
 pub fn default_config() -> Config {
     to_js_value(&mintaka::config::Config::default())
@@ -42,7 +42,7 @@ impl GameStateWorker {
 
     #[wasm_bindgen(js_name = default)]
     pub fn default_value() -> Self {
-        Self::default()
+        mintaka::game_state::GameState::default().into()
     }
 
     #[wasm_bindgen(js_name = fromBoard)]
@@ -54,7 +54,7 @@ impl GameStateWorker {
 
     #[wasm_bindgen(js_name = fromHistory)]
     pub fn from_history(history: History) -> Self {
-        let history: rusty_renju::history::History = try_from_js_value(history.into()).unwrap();
+        let history: rusty_renju::history::History = try_from_js_value(history).unwrap();
 
         Self {
             inner: history.into(),
@@ -107,7 +107,7 @@ impl GameStateWorker {
 
     #[wasm_bindgen(js_name = fromJs)]
     pub fn from_js(value: GameState) -> Result<Self, JsError> {
-        Ok(Self { inner: try_from_js_value(value.into())? })
+        Ok(Self { inner: try_from_js_value(value)? })
     }
 
 }
@@ -122,11 +122,11 @@ impl GameAgent {
 
     #[wasm_bindgen(constructor)]
     pub fn new(config: Config, state: GameState) -> Self {
-        let config: mintaka::config::Config = try_from_js_value(config.into()).unwrap_or_default();
-        let state: GameStateWorker = GameStateWorker::from_js(state).unwrap_or_default();
+        let config: mintaka::config::Config = try_from_js_value(config).unwrap_or_default();
+        let state: mintaka::game_state::GameState = try_from_js_value(state).unwrap_or_default();
 
         Self {
-            inner: Arc::new(RefCell::new(mintaka::game_agent::GameAgent::from_state(config, state.inner))),
+            inner: Arc::new(RefCell::new(mintaka::game_agent::GameAgent::from_state(config, state))),
         }
     }
 
@@ -137,7 +137,7 @@ impl GameAgent {
     }
 
     pub fn command(&mut self, command: Command) -> Result<GameResult, JsError> {
-        let command: mintaka::protocol::command::Command = try_from_js_value(command.into())?;
+        let command: mintaka::protocol::command::Command = try_from_js_value(command)?;
 
         let maybe_result = self.inner.borrow_mut().command(command)
             .map_err(|e| JsError::new(&format!("{}", e)))?;
@@ -152,11 +152,10 @@ impl GameAgent {
         abort_handle: JsAbortHandle,
     ) -> Result<BestMove, JsError> {
         let inner = Arc::clone(&self.inner);
-
-        // let search_objective = try_from_js_value(search_objective)?;
+        let search_objective = try_from_js_value(search_objective)?;
 
         let best_move = inner.borrow_mut().launch::<WebClock>(
-            mintaka::config::SearchObjective::Best,
+            search_objective,
             JsResponseSender,
             abort_handle.inner.clone(),
         );
@@ -188,6 +187,10 @@ impl JsAbortHandle {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self { inner: Arc::new(AtomicBool::new(false)) }
+    }
+
+    pub fn ptr(&self) -> u32 {
+        Arc::as_ptr(&self.inner) as usize as u32
     }
 
     pub fn abort(&self) {

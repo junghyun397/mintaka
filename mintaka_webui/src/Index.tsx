@@ -5,7 +5,7 @@ import 'solid-devtools';
 import {App} from "./App";
 
 import init, {defaultConfig, GameStateWorker} from "./wasm/pkg";
-import {MintakaWorkerMessage, MintakaWorkerResponse} from "./services/mintaka.worker.protocol";
+import {MintakaWorkerControl, MintakaWorkerMessage, MintakaWorkerResponse} from "./services/mintaka.worker.protocol";
 
 await init()
 
@@ -17,15 +17,21 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
 
 render(() => <App />, root!)
 
-void console_demo()
+void consoleDemo()
 
-async function console_demo() {
+async function consoleDemo() {
+    let workerControl: MintakaWorkerControl | undefined = undefined
+
     const worker = new Worker(
         new URL("./services/mintaka.worker.ts", import.meta.url),
         {type: "module"},
     )
 
     worker.onmessage = (event: MessageEvent<MintakaWorkerResponse>) => {
+        if (event.data.type == "Ready") {
+            workerControl = event.data.content
+        }
+
         console.log("[mintaka-worker]", event.data)
     }
 
@@ -42,7 +48,7 @@ async function console_demo() {
     const gameState = GameStateWorker.default().toJs()
 
     post(worker, {type: "init", payload: { config: config, state: gameState }})
-    post(worker, {type: "command", payload: { type: "Play", content: "h8"}})
+    post(worker, {type: "command", payload: { type: "Workers", content: 4}})
     post(worker, {type: "command", payload: { type: "TurnTime", content: {"secs": 1, "nanos": 0}}})
     post(worker, {type: "launch", payload: {}})
 }

@@ -4,8 +4,9 @@ use std::fmt::{Display, Formatter};
 use std::ops::Not;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
+use typeshare::typeshare;
 
-#[typeshare::typeshare]
+#[typeshare(serialized_as = "String")] // using string to avoid ts enum
 #[derive(std::marker::ConstParamTy, PartialEq, Eq, Clone, Copy, Debug, Default, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Color {

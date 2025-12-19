@@ -19,8 +19,8 @@ pub fn start() {
     console_error_panic_hook::set_once();
 }
 
-fn to_js_err(msg: impl ToString) -> JsError {
-    JsError::new(&msg.to_string()).into()
+fn to_js_err(err: impl ToString) -> JsError {
+    JsError::new(&err.to_string()).into()
 }
 
 fn to_js_value<R: From<JsValue>>(value: &impl Serialize) -> R {
@@ -33,16 +33,12 @@ fn to_js_result<R: From<JsValue>>(value: &impl Serialize) -> Result<R, JsError> 
         .map_err(to_js_err)
 }
 
-fn try_from_js_value<T: DeserializeOwned>(value: JsValue) -> Result<T, JsError> {
-    serde_wasm_bindgen::from_value(value).map_err(to_js_err)
+fn try_from_js_value<R: DeserializeOwned>(value: impl Into<JsValue>) -> Result<R, JsError> {
+    serde_wasm_bindgen::from_value(value.into()).map_err(to_js_err)
 }
 
 #[macro_export] macro_rules! impl_wrapper {
-    (pub $wrapper:ident { inner: $inner:path } impl Default) => {
-        impl_wrapper! { pub $wrapper { inner: $inner } }
-        impl_wrapper!(impl Default $wrapper, $inner);
-    };
-    (pub $wrapper:ident { inner: $inner:path }) => {
+    (pub $wrapper:ident { inner: $inner:path } <-> $ts_type:ty) => {
         #[wasm_bindgen]
         #[derive(Clone, Copy)]
         pub struct $wrapper {
@@ -60,37 +56,21 @@ fn try_from_js_value<T: DeserializeOwned>(value: JsValue) -> Result<T, JsError> 
                 wrapper.inner
             }
         }
-    };
-    (pub enum $wrapper:ident { inner: $inner:path {$($variant:ident),* $(,)?} }) => {
+
         #[wasm_bindgen]
-        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-        pub enum $wrapper {
-            $($variant),*
-        }
+        impl $wrapper {
 
-        impl From<$inner> for $wrapper {
-            fn from(value: $inner) -> Self {
-                match value {
-                    $(<$inner>::$variant => $wrapper::$variant,)*
-                }
+            #[wasm_bindgen(constructor)]
+            pub fn new(value: $ts_type) -> Result<Self, JsError> {
+                Ok(Self { inner: try_from_js_value(value)? })
             }
-        }
 
-        impl From<$wrapper> for $inner {
-            fn from(value: $wrapper) -> Self {
-                match value {
-                    $($wrapper::$variant => <$inner>::$variant,)*
-                }
+            pub fn value(&self) -> $ts_type {
+                to_js_value(&self.inner)
             }
+
         }
     };
-    (impl Default $wrapper:ident, $inner:path) => (
-        impl Default for $wrapper {
-            fn default() -> Self {
-                Self { inner: <$inner>::default() }
-            }
-        }
-    );
 }
 
 #[derive(Clone, Copy)]
