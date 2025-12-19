@@ -4,7 +4,7 @@
   "description": "",
   "type": "module",
   "scripts": {
-    "requirements": "rustup target add wasm32-unknown-unknown && cargo install wasm-pack typeshare-cli",
+    "requirements": "rustup component add rust-src && rustup target add wasm32-unknown-unknown && cargo install wasm-pack typeshare-cli",
 
     "typeshare:build": "typeshare ../ --lang=typescript --output-file=../mintaka_wasm/types.d.ts",
     "wasm:build": "wasm-pack build ../mintaka_wasm --release --target web --out-name mintaka_wasm --out-dir ../mintaka_webui/src/wasm/pkg -- -Z build-std=std,panic_abort",
