@@ -19,6 +19,8 @@ export type ByteSize = number;
 
 export type Depth = number;
 
+export type ForbiddenKind = string;
+
 export type Pos = string;
 
 export type MaybePos = Pos | undefined;
@@ -41,6 +43,8 @@ export type RuleKind = string;
 export type Score = number;
 
 export type SearchObjective = string;
+
+export type SessionStatus = string;
 
 export interface DurationSchema {
 	secs: number;
@@ -84,6 +88,11 @@ export interface Config {
 	spawn_depth_specialist: boolean;
 }
 
+export type BoardExportItem = 
+	| { type: "Stone", content: Color }
+	| { type: "Empty", content?: undefined }
+	| { type: "Forbidden", content: ForbiddenKind };
+
 export type Command = 
 	| { type: "Clear", content?: undefined }
 	| { type: "Play", content: MaybePos }
@@ -110,7 +119,8 @@ export type Command =
 }}
 	| { type: "Workers", content: number }
 	| { type: "MaxMemory", content: ByteSize }
-	| { type: "Rule", content: RuleKind };
+	| { type: "Rule", content: RuleKind }
+	| { type: "Config", content: Config };
 
 export type GameResult = 
 	| { type: "Win", content: Color }

@@ -14,6 +14,6 @@ impl StreamSessionResponseSender {
 
 impl ResponseSender for StreamSessionResponseSender {
     fn response(&self, response: Response) {
-        self.tx.send(SessionResponse::Response(response)).unwrap();
+        let _ = self.tx.send(SessionResponse::Response(response));
     }
 }

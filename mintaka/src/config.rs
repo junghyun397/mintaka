@@ -1,4 +1,5 @@
-use crate::time_manager::Timer;
+use std::cmp::Ordering;
+use crate::time::Timer;
 use crate::value::{Depth, Depths};
 use rusty_renju::history;
 use rusty_renju::notation::pos;
@@ -17,7 +18,8 @@ pub enum SearchObjective {
 }
 
 #[typeshare::typeshare]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Config {
     pub rule_kind: RuleKind,
     #[typeshare(serialized_as = "number")]
@@ -53,6 +55,35 @@ impl Default for Config {
             initial_timer: Timer::default(),
             spawn_depth_specialist: false,
         }
+    }
+}
+
+impl PartialOrd<Self> for Config {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Config {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (
+            self.max_nodes_in_1k,
+            self.max_depth,
+            self.max_vcf_depth,
+            self.tt_size,
+            self.workers,
+            self.pondering,
+            self.initial_timer,
+        )
+            .cmp(&(
+                other.max_nodes_in_1k,
+                other.max_depth,
+                other.max_vcf_depth,
+                other.tt_size,
+                other.workers,
+                other.pondering,
+                other.initial_timer,
+            ))
     }
 }
 

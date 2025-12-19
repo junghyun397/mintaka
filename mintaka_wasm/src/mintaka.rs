@@ -1,8 +1,9 @@
-use crate::rusty_renju::{BoardWorker, History, PosWorker};
+use crate::rusty_renju::{Board, History, Pos};
 use crate::{impl_wrapper, to_js_result, to_js_value, try_from_js_value, WebClock};
 use mintaka::protocol::response::ResponseSender;
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::cmp::Ordering;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsError};
@@ -28,13 +29,30 @@ extern "C" {
     pub type GameState;
 }
 
-impl_wrapper! {
-    pub GameStateWorker { inner: mintaka::game_state::GameState } <-> GameState
-}
-
 #[wasm_bindgen(js_name = defaultConfig)]
 pub fn default_config() -> Config {
     to_js_value(&mintaka::config::Config::default())
+}
+
+#[wasm_bindgen(js_name = defaultGameState)]
+pub fn default_game_state() -> GameState {
+    to_js_value(&mintaka::state::GameState::default())
+}
+
+#[wasm_bindgen(js_name = de)]
+pub fn compare_config(a: Config, b: Config) -> isize {
+    let a_config: mintaka::config::Config = try_from_js_value(a).unwrap();
+    let b_config: mintaka::config::Config = try_from_js_value(b).unwrap();
+
+    match a_config.cmp(&b_config) {
+        Ordering::Less => -1,
+        Ordering::Equal => 0,
+        Ordering::Greater => 1
+    }
+}
+
+impl_wrapper! {
+    pub GameStateWorker { inner: mintaka::state::GameState } <-> GameState
 }
 
 #[wasm_bindgen]
@@ -42,13 +60,15 @@ impl GameStateWorker {
 
     #[wasm_bindgen(js_name = default)]
     pub fn default_value() -> Self {
-        mintaka::game_state::GameState::default().into()
+        mintaka::state::GameState::default().into()
     }
 
     #[wasm_bindgen(js_name = fromBoard)]
-    pub fn from_board(board: &BoardWorker) -> Self {
+    pub fn from_board(board: Board) -> Self {
+        let board: rusty_renju::board::Board = try_from_js_value(board).unwrap();
+
         Self {
-            inner: board.inner.into(),
+            inner: board.into(),
         }
     }
 
@@ -61,12 +81,12 @@ impl GameStateWorker {
         }
     }
 
-    pub fn board(&self) -> BoardWorker {
-        BoardWorker { inner: self.inner.board }
+    pub fn board(&self) -> Board {
+        to_js_value(&self.inner.board)
     }
 
     pub fn history(&self) -> History {
-        serde_wasm_bindgen::to_value(&self.inner.history).unwrap().into()
+        to_js_value(&self.inner.history)
     }
 
     pub fn len(&self) -> usize {
@@ -78,26 +98,33 @@ impl GameStateWorker {
         self.inner.is_empty()
     }
 
-    pub fn play(self, pos: &PosWorker) -> Self {
-        self.inner.play((*pos).into()).into()
+    pub fn play(mut self, pos: Pos) -> Self {
+        self.play_mut(pos);
+        self
     }
 
-    pub fn pass(self) -> Self {
-        self.inner.pass().into()
+    pub fn pass(mut self) -> Self {
+        self.pass_mut();
+        self
     }
 
-    pub fn undo(self) -> Self {
-        self.inner.undo_rebuild().into()
+    pub fn undo(mut self) -> Self {
+        self.undo_mut();
+        self
     }
 
     #[wasm_bindgen(js_name = playMut)]
-    pub fn play_mut(&mut self, pos: &PosWorker) {
-        self.inner.set_mut((*pos).into())
+    pub fn play_mut(&mut self, pos: Pos) {
+        self.inner.set_mut(try_from_js_value(pos).unwrap());
     }
 
     #[wasm_bindgen(js_name = passMut)]
     pub fn pass_mut(&mut self) {
         self.inner.pass_mut()
+    }
+
+    pub fn undo_mut(&mut self) {
+        self.inner.undo_rebuild_mut()
     }
 
     #[wasm_bindgen(js_name = toJs)]
@@ -123,7 +150,7 @@ impl GameAgent {
     #[wasm_bindgen(constructor)]
     pub fn new(config: Config, state: GameState) -> Self {
         let config: mintaka::config::Config = try_from_js_value(config).unwrap_or_default();
-        let state: mintaka::game_state::GameState = try_from_js_value(state).unwrap_or_default();
+        let state: mintaka::state::GameState = try_from_js_value(state).unwrap_or_default();
 
         Self {
             inner: Arc::new(RefCell::new(mintaka::game_agent::GameAgent::from_state(config, state))),
@@ -191,10 +218,6 @@ impl JsAbortHandle {
 
     pub fn ptr(&self) -> u32 {
         Arc::as_ptr(&self.inner) as usize as u32
-    }
-
-    pub fn abort(&self) {
-        self.inner.store(true, Ordering::Relaxed);
     }
 
 }

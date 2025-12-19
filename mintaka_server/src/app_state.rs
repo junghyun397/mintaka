@@ -1,26 +1,25 @@
 pub(crate) use crate::app_error::AppError;
 use crate::preference::Preference;
-use crate::session::{Session, SessionCommandResponse, SessionData, SessionKey, SessionResponse, SessionResultResponse};
+use crate::session::{Session, SessionCommandResponse, SessionData, SessionKey, SessionResponse, SessionResultResponse, SessionStatus};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use dashmap::DashMap;
 use mintaka::config::Config;
-use mintaka::game_agent::{BestMove, ComputingResource};
+use mintaka::game_agent::BestMove;
 use mintaka::protocol::command::Command;
-use mintaka::protocol::command::Command::Workers;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::utils::byte_size::ByteSize;
-use serde_json::json;
-use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU32;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
+use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use tracing::info;
+use tower_http::cors::{Any, CorsLayer};
+use mintaka::state::GameState;
 
 pub struct WorkerPermit(OwnedSemaphorePermit);
 
@@ -89,12 +88,26 @@ impl AppState {
         MemoryPermit(self.memory_resource.clone().acquire_many_owned(memory_size.mib() as u32).await.unwrap())
     }
 
-    pub async fn new_session(&self, config: Config, board: Board, history: History) -> SessionKey {
+    pub async fn check_session(&self, session_key: SessionKey) -> Result<SessionStatus, AppError> {
+        match self.sessions.get(&session_key) {
+            Some(session) => Ok(session.status()),
+            None => self.check_hibernated_session(session_key)
+                .await
+                .then_some(SessionStatus::Hibernating)
+                .ok_or(AppError::SessionNotFound),
+        }
+    }
+
+    pub async fn new_session(&self, config: Config, game_state: GameState) -> Result<SessionKey, AppError> {
+        if Some(config) > self.preference.max_config {
+            return Err(AppError::InvalidConfig);
+        }
+
         let session_key = SessionKey::new_random();
 
         let memory_permit = self.acquire_memory(config.tt_size, true).await;
 
-        let session = Session::new(config, board, history, None, memory_permit);
+        let session = Session::new(config, game_state, None, memory_permit, false);
 
         self.sessions.insert(session_key, session);
 
@@ -105,9 +118,15 @@ impl AppState {
 
         self.session_streams.insert(session_key, (session_stream_sender, Some(session_stream)));
 
-        info!("new session created: sid={session_key}");
+        tracing::info!("new session created: sid={session_key}");
 
-        session_key
+        Ok(session_key)
+    }
+
+    pub async fn state_session(&self, session_key: SessionKey) -> Result<GameState, AppError> {
+        self.sessions.get(&session_key)
+            .ok_or(AppError::SessionNotFound)
+            ?.game_state()
     }
 
     pub async fn hibernate_session(&self, session_key: SessionKey) -> Result<(), AppError> {
@@ -123,14 +142,23 @@ impl AppState {
             .await
             .map_err(|_| AppError::SessionFileAlreadyExists)?;
 
-        file.write_all(&encoded).await
-            .map_err(AppError::from_general_error)?;
-        file.flush().await
+        file.write_all(&encoded)
+            .await
             .map_err(AppError::from_general_error)?;
 
-        info!("session hibernated: sid={session_key}");
+        file.flush()
+            .await
+            .map_err(AppError::from_general_error)?;
+
+        tracing::info!("session hibernated: sid={session_key}");
 
         Ok(())
+    }
+
+    pub async fn check_hibernated_session(&self, session_key: SessionKey) -> bool {
+        tokio::fs::try_exists(format!("{}/{session_key}", self.preference.sessions_directory))
+            .await
+            .unwrap_or(false)
     }
 
     pub async fn wakeup_session(&self, session_key: SessionKey) -> Result<(), AppError> {
@@ -156,7 +184,7 @@ impl AppState {
 
         self.session_streams.insert(session_key, (session_stream_sender, Some(session_stream)));
 
-        info!("session woken up: sid={session_key}");
+        tracing::info!("session woken up: sid={session_key}");
 
         Ok(())
     }
@@ -168,6 +196,7 @@ impl AppState {
     ) -> Result<SessionCommandResponse, AppError> {
         let mut session = self.sessions.get_mut(&session_key)
             .ok_or(AppError::SessionNotFound)?;
+        tracing::info!("command received");
 
         session.command(command)
     }
@@ -204,13 +233,13 @@ impl AppState {
                         session.restore(game_agent).unwrap();
                     }
 
-                    session_response_sender.send(SessionResponse::BestMove(best_move)).unwrap();
+                    let _ = session_response_sender.send(SessionResponse::BestMove(best_move));
                 }
-                Err(_) => {}
+                Err(err) => {
+                    eprintln!("{err}")
+                }
             }
         });
-
-        info!("session launched: sid={session_key}");
 
         Ok(())
     }
@@ -219,7 +248,7 @@ impl AppState {
         let session = self.sessions.get(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
-        if !session.is_computing() {
+        if session.status() == SessionStatus::Idle {
             return Err(AppError::SessionIdle);
         }
 
@@ -243,7 +272,7 @@ impl AppState {
 
         session.abort()?;
 
-        info!("session destroyed: sid={session_key}");
+        tracing::info!("session destroyed: sid={session_key}");
 
         Ok(())
     }
@@ -285,7 +314,10 @@ impl AppState {
             .map_err(AppError::from_general_error)?;
         let mut session_keys = vec![];
 
-        while let Some(entry) = read_dir.next_entry().await.map_err(AppError::from_general_error)? {
+        while let Some(entry) = read_dir.next_entry()
+            .await
+            .map_err(AppError::from_general_error)?
+        {
             if let Ok(session_key) = SessionKey::from_str(&entry.file_name().to_string_lossy()) {
                 session_keys.push(session_key);
             }

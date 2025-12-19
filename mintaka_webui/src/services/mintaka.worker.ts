@@ -1,5 +1,5 @@
 import init, {BestMove, GameAgent, initThreadPool, JsAbortHandle} from "../wasm/pkg";
-import {MintakaWorkerMessage, MintakaWorkerResponse} from "./mintaka.worker.protocol";
+import {MintakaWorkerControl, MintakaWorkerMessage, MintakaWorkerResponse} from "./mintaka.worker.provider";
 
 let readyPromise: Promise<void> | undefined
 let memory: SharedArrayBuffer | undefined
@@ -11,8 +11,8 @@ export function initWorker() {
             await initThreadPool(navigator.hardwareConcurrency)
 
             const buffer = initOut.memory.buffer
-            if (typeof SharedArrayBuffer === "undefined" || !(buffer instanceof SharedArrayBuffer)) {
-                throw new Error("WASM memory is not SharedArrayBuffer; abort via Atomics is unavailable (check COOP/COEP + threads build).")
+            if (!(buffer instanceof SharedArrayBuffer)) {
+                throw new Error("check COOP/COEP")
             }
             memory = buffer
         })();
@@ -24,10 +24,10 @@ export function initWorker() {
 const ctx = {
     state: undefined as {
         agent: GameAgent,
-        control: JsAbortHandle
+        abort: JsAbortHandle
     } | undefined,
     post: (data: MintakaWorkerResponse) => self.postMessage(data),
-    postError: (error: any) => ctx.post({type: "Error", error: error})
+    postError: (error: any) => self.postMessage({type: "Error", error: error})
 }
 
 self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage>) => {
@@ -38,15 +38,17 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
             case "init": {
                 const { config, state } = event.data.payload
 
-                const control = new JsAbortHandle()
-                const ptr = control.ptr()
+                const abortHandle = new JsAbortHandle()
+                const ptr = abortHandle.ptr()
+
+                const control = new MintakaWorkerControl(memory!, ptr)
 
                 ctx.state = {
-                    control: control,
+                    abort: abortHandle,
                     agent: new GameAgent(config, state)
                 }
 
-                ctx.post({type: "Ready", content: { sab: memory!, control_ptr: ptr }})
+                ctx.post({type: "Ready", control: control })
                 break
             }
             case "command": {
@@ -54,7 +56,7 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
                 break
             }
             case "launch": {
-                const bestMove: BestMove = ctx.state!.agent.launch("Best", ctx.state!.control)
+                const bestMove: BestMove = ctx.state!.agent.launch("Best", ctx.state!.abort)
 
                 ctx.post({type: "BestMove", content: bestMove })
                 break

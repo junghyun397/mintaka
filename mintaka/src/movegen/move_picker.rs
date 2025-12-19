@@ -1,5 +1,5 @@
 use crate::eval::evaluator::Evaluator;
-use crate::game_state::GameState;
+use crate::state::GameState;
 use crate::movegen::move_generator::generate_defend_open_four_moves;
 use crate::movegen::move_list::{MoveEntry, MoveList};
 use crate::thread_data::ThreadData;

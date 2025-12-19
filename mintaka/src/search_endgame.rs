@@ -1,5 +1,5 @@
 use crate::eval::evaluator::Evaluator;
-use crate::game_state::GameState;
+use crate::state::GameState;
 use crate::memo::transposition_table::TTView;
 use crate::memo::tt_entry::{ScoreKind, TTFlag};
 use crate::movegen::move_generator::generate_endgame_moves;

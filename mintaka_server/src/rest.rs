@@ -7,10 +7,9 @@ use axum::response::{sse, IntoResponse, Sse};
 use axum::Json;
 use futures_util::Stream;
 use mintaka::config::Config;
+use mintaka::state::GameState;
 use mintaka::protocol::command::Command;
-use rusty_renju::board::Board;
-use rusty_renju::history::History;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::sync::Arc;
 use tokio_stream::StreamExt;
@@ -20,21 +19,31 @@ pub struct Health {
     available_workers: usize,
 }
 
+impl From<&AppError> for StatusCode {
+    fn from(error: &AppError) -> Self {
+        match error {
+            AppError::InvalidSessionId => StatusCode::BAD_REQUEST,
+            AppError::InvalidConfig => StatusCode::INSUFFICIENT_STORAGE,
+            AppError::SessionNotFound => StatusCode::NOT_FOUND,
+            AppError::SessionInComputing => StatusCode::CONFLICT,
+            AppError::SessionIdle => StatusCode::CONFLICT,
+            AppError::StreamAcquired => StatusCode::CONFLICT,
+            AppError::StreamNotAcquired => StatusCode::CONFLICT,
+            AppError::SessionNeverLaunched => StatusCode::NO_CONTENT,
+            AppError::SessionFileAlreadyExists => StatusCode::CONFLICT,
+            AppError::SessionFileNotFound => StatusCode::NOT_FOUND,
+            AppError::GameError(_) => StatusCode::CONFLICT,
+            AppError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
-        match self {
-            AppError::InvalidSessionId => (StatusCode::BAD_REQUEST, "invalid session id".to_string()),
-            AppError::SessionNotFound => (StatusCode::NOT_FOUND, "session not found".to_string()),
-            AppError::SessionInComputing => (StatusCode::CONFLICT, "session in computing".to_string()),
-            AppError::SessionIdle => (StatusCode::CONFLICT, "session idle".to_string()),
-            AppError::StreamAcquired => (StatusCode::CONFLICT, "response stream acquired".to_string()),
-            AppError::StreamNotAcquired => (StatusCode::CONFLICT, "response stream not acquired".to_string()),
-            AppError::SessionNeverLaunched => (StatusCode::NO_CONTENT, "session never launched".to_string()),
-            AppError::SessionFileAlreadyExists => (StatusCode::CONFLICT, "internal session data already exists".to_string()),
-            AppError::SessionFileNotFound => (StatusCode::NOT_FOUND, "internal session data does not exist".to_string()),
-            AppError::GameError(game_error) => (StatusCode::CONFLICT, game_error.to_string()),
-            AppError::InternalError(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
-        }.into_response()
+        let status_code = StatusCode::from(&self);
+        let message = self.to_string();
+
+        (status_code, message).into_response()
     }
 }
 
@@ -46,16 +55,27 @@ pub async fn status(
     })
 }
 
-pub async fn new_session(
+#[derive(Deserialize)]
+pub struct CreateSessionRequest {
+    config: Config,
+    state: GameState,
+}
+
+pub async fn check_session(
+    Path(sid): Path<SessionKey>,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
-    let config = Config::default();
-    let board = Board::default();
-    let history = History::default();
+    state.check_session(sid).await
+        .map(|status| (StatusCode::OK, Json(status)))
+}
 
-    let session_key = state.new_session(config, board, history).await;
-
-    (StatusCode::CREATED, Json(session_key))
+pub async fn new_session(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<CreateSessionRequest>
+) -> impl IntoResponse {
+    state.new_session(payload.config, payload.state)
+        .await
+        .map(|session_key| (StatusCode::CREATED, Json(session_key)))
 }
 
 pub async fn command_session(
@@ -71,7 +91,8 @@ pub async fn launch_session(
     Path(sid): Path<SessionKey>,
     State(state): State<Arc<AppState>>
 ) -> impl IntoResponse {
-    state.launch_session(sid).await
+    state.launch_session(sid)
+        .await
         .map(|computing_resource| (StatusCode::OK, Json(computing_resource)))
 }
 
@@ -89,22 +110,16 @@ pub async fn subscribe_session_response(
             match session_response {
                 SessionResponse::Response(response) => {
                     yield Ok(sse::Event::default()
-                        .event("response")
+                        .event("Response")
                         .json_data(response)
                         .unwrap());
                 },
                 SessionResponse::BestMove(best_move) => {
                     yield Ok(sse::Event::default()
-                        .event("best-move")
+                        .event("BestMove")
                         .json_data(best_move)
                         .unwrap());
                 },
-                SessionResponse::Terminate => {
-                    yield Ok(sse::Event::default()
-                        .event("terminate"));
-
-                    break;
-                }
             }
         }
 
@@ -142,7 +157,8 @@ pub async fn hibernate_session(
     Path(sid): Path<SessionKey>,
     State(state): State<Arc<AppState>>
 ) -> impl IntoResponse {
-    state.hibernate_session(sid).await
+    state.hibernate_session(sid)
+        .await
         .map(|_| StatusCode::NO_CONTENT)
 }
 
@@ -150,6 +166,7 @@ pub async fn wakeup_session(
     Path(sid): Path<SessionKey>,
     State(state): State<Arc<AppState>>
 ) -> impl IntoResponse {
-    state.wakeup_session(sid).await
+    state.wakeup_session(sid)
+        .await
         .map(|_| StatusCode::NO_CONTENT)
 }

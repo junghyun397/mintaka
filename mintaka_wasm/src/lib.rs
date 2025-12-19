@@ -24,7 +24,9 @@ fn to_js_err(err: impl ToString) -> JsError {
 }
 
 fn to_js_value<R: From<JsValue>>(value: &impl Serialize) -> R {
-    serde_wasm_bindgen::to_value(value).unwrap().into()
+    serde_wasm_bindgen::to_value(value)
+        .unwrap()
+        .into()
 }
 
 fn to_js_result<R: From<JsValue>>(value: &impl Serialize) -> Result<R, JsError> {
@@ -34,7 +36,8 @@ fn to_js_result<R: From<JsValue>>(value: &impl Serialize) -> Result<R, JsError> 
 }
 
 fn try_from_js_value<R: DeserializeOwned>(value: impl Into<JsValue>) -> Result<R, JsError> {
-    serde_wasm_bindgen::from_value(value.into()).map_err(to_js_err)
+    serde_wasm_bindgen::from_value(value.into())
+        .map_err(to_js_err)
 }
 
 #[macro_export] macro_rules! impl_wrapper {

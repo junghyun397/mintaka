@@ -1,5 +1,5 @@
 use crate::eval::evaluator::Evaluator;
-use crate::game_state::GameState;
+use crate::state::GameState;
 use crate::memo::history_table::{QuietPlied, TacticalPlied};
 use crate::memo::transposition_table::TTHit;
 use crate::memo::tt_entry::ScoreKind;

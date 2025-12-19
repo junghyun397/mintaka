@@ -1,7 +1,7 @@
 use axum::extract::{ConnectInfo, State};
-use axum::http::StatusCode;
+use axum::http::{Method, StatusCode};
 use axum::response::IntoResponse;
-use axum::routing::{delete, get, on_service, post};
+use axum::routing::{delete, get, post};
 use axum::{middleware, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use mintaka_server::app_state::AppState;
@@ -11,15 +11,13 @@ use std::error::Error;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
-use tokio::fs;
 use tokio::signal::unix::SignalKind;
-use tower_http::trace::TraceLayer;
-use tracing::log::warn;
-use tracing::{error, info};
+use tower_http::cors::{Any, CorsLayer};
+use tower_http::trace::{DefaultOnFailure, TraceLayer};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let pref = Preference::parse();
+    let mut pref = Preference::parse();
 
     tracing_subscriber::fmt()
         .with_target(false)
@@ -38,6 +36,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let app = Router::new()
         .route("/status", get(rest::status))
         .route("/sessions", post(rest::new_session))
+        .route("/sessions/{sid}", get(rest::check_session))
         .route("/sessions/{sid}", delete(rest::destroy_session))
         .route("/sessions/{sid}/commands", post(rest::command_session))
         .route("/sessions/{sid}/launch", post(rest::launch_session))
@@ -47,7 +46,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .route("/sessions/{sid}/hibernate", post(rest::hibernate_session))
         .route("/sessions/{sid}/wakeup", post(rest::wakeup_session))
         .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(Any)
+                .allow_headers(Any)
+        )
+        .layer(
             TraceLayer::new_for_http()
+                .on_failure(DefaultOnFailure::new().level(tracing::Level::DEBUG))
                 .make_span_with(|req: &axum::extract::Request| {
                     if let Some(ConnectInfo(socket_addr)) = req
                         .extensions()
@@ -63,10 +69,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_state(shared_state.clone());
 
     if pref.api_password.is_some() {
-        info!("password protected; use Api-Password header to authenticate");
+        tracing::info!("password protected; use Api-Password header to authenticate");
     } else {
-        warn!("API is not password protected; set MINTAKA_API_PASSWORD environment variable to enable protection");
+        tracing::warn!("API is not password protected; set MINTAKA_API_PASSWORD environment variable to enable protection");
     }
+
+    shared_state.wakeup_all_sessions().await?;
 
     spawn_hibernation_watcher(shared_state);
 
@@ -80,7 +88,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             spawn_tls_watcher(ruslts_config.clone(), tls_config.clone());
         }
 
-        info!("listening on https://{addr}");
+        tracing::info!("listening on https://{addr}");
 
         axum_server::bind_rustls(addr, ruslts_config)
             .serve(app.into_make_service_with_connect_info::<SocketAddr>())
@@ -89,7 +97,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let listener = tokio::net::TcpListener::bind(addr)
             .await?;
 
-        info!("listening on http://{addr}");
+        tracing::info!("listening on http://{addr}");
 
         axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
             .await?;
@@ -102,12 +110,12 @@ fn check_session_directory(session_directory: &str) {
     if !Path::new(session_directory).exists() {
         std::fs::create_dir_all(session_directory).unwrap();
 
-        info!("created session directory: {}", session_directory);
+        tracing::info!("created session directory: {}", session_directory);
     }
 }
 
 fn spawn_tls_watcher(shared_rustls_config: RustlsConfig, tls_config: TlsConfig) {
-    info!("watching SIGHUP for renew TLS certs: {}, {}", tls_config.cert_path, tls_config.key_path);
+    tracing::info!("watching SIGHUP for renew TLS certs: {}, {}", tls_config.cert_path, tls_config.key_path);
 
     let alt_tls_config = tls_config.clone();
 
@@ -115,28 +123,28 @@ fn spawn_tls_watcher(shared_rustls_config: RustlsConfig, tls_config: TlsConfig) 
         let mut signal_stream = tokio::signal::unix::signal(SignalKind::hangup()).unwrap();
 
         while signal_stream.recv().await.is_some() {
-            info!("received SIGHUP signal; reload TLS certs");
+            tracing::info!("received SIGHUP signal; reload TLS certs");
 
             if let Err(e) = shared_rustls_config
                 .reload_from_pem_file(&alt_tls_config.cert_path, &alt_tls_config.key_path)
                 .await
             {
-                error!("failed to reload TLS certs: {}", e);
+                tracing::error!("failed to reload TLS certs: {}", e);
             }
 
-            info!("reloaded TLS certs")
+            tracing::info!("reloaded TLS certs")
         }
     });
 }
 
 fn spawn_hibernation_watcher(shared_state: Arc<AppState>) {
-    info!("watching SIGUSR1 for hibernate all sessions and exit");
+    tracing::info!("watching SIGUSR1 for hibernate all sessions and exit");
 
     tokio::spawn(async move {
         let mut signal_stream = tokio::signal::unix::signal(SignalKind::user_defined1()).unwrap();
 
         if let Some(_) = signal_stream.recv().await {
-            info!("received SIGUSR1 signal; hibernate all sessions and exit");
+            tracing::info!("received SIGUSR1 signal; hibernate all sessions and exit");
 
             shared_state.hibernate_all_sessions().await.unwrap();
 
@@ -150,6 +158,10 @@ async fn auth(
     request: axum::extract::Request,
     next: middleware::Next
 ) -> impl IntoResponse {
+    if request.method() == Method::OPTIONS {
+        return Ok(next.run(request).await);
+    }
+
     if let Some(expected_password) = &state.preference.api_password {
         let password = request.headers()
             .get("Api-Password")

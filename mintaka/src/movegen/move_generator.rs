@@ -1,4 +1,4 @@
-use crate::game_state::GameState;
+use crate::state::GameState;
 use crate::movegen::move_list::MoveList;
 use crate::search_endgame::{EndgameMovesUnchecked, ENDGAME_MAX_MOVES};
 use rusty_renju::board::Board;

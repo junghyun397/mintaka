@@ -19,6 +19,14 @@ extern "C" {
 
     #[wasm_bindgen(typescript_type = "Board")]
     pub type Board;
+
+    #[wasm_bindgen(typescript_type = "BoardExportItem")]
+    pub type BoardExportItem;
+}
+
+#[wasm_bindgen(js_name = defaultBoard)]
+pub fn default_board() -> Board {
+    to_js_value(&rusty_renju::board::Board::default())
 }
 
 impl_wrapper! {
@@ -88,6 +96,14 @@ impl BoardWorker {
 
     pub fn stones(&self) -> u8 {
         self.inner.stones
+    }
+
+    pub fn field(&self) -> Vec<BoardExportItem> {
+        let field: Vec<BoardExportItem> = self.inner.iter_export_items()
+            .map(|item| to_js_value(&item))
+            .collect();
+
+        field
     }
 
     #[wasm_bindgen(js_name = isPosEmpty)]

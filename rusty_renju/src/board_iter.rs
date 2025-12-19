@@ -1,7 +1,11 @@
 use crate::board::Board;
 use crate::notation::color::{Color, ColorContainer};
+use crate::notation::pos;
+use crate::notation::pos::Pos;
+use crate::notation::rule::ForbiddenKind;
 use crate::pattern::Pattern;
 use crate::{index_to_col, index_to_row};
+use serde::{Deserialize, Serialize};
 
 #[repr(u64)]
 #[derive(Copy, Clone)]
@@ -10,6 +14,14 @@ pub enum BoardIterItem {
     Pattern(ColorContainer<Pattern>),
 }
 
+#[typeshare::typeshare]
+#[derive(Copy, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "content")]
+pub enum BoardExportItem {
+    Stone(Color),
+    Empty,
+    Forbidden(ForbiddenKind)
+}
 
 impl Board {
 
@@ -30,6 +42,20 @@ impl Board {
                     ))
                 }
             )
+    }
+
+    pub fn iter_export_items(&self) -> impl Iterator<Item = BoardExportItem> + '_ {
+        (0..pos::U8_BOARD_SIZE).map(|idx| {
+            let pos = Pos::from_index(idx);
+
+            self.stone_kind(pos)
+                .map(BoardExportItem::Stone)
+                .or_else(||
+                    self.patterns.forbidden_kind(pos)
+                        .map(BoardExportItem::Forbidden)
+                )
+                .unwrap_or(BoardExportItem::Empty)
+        })
     }
 
 }

@@ -2,7 +2,7 @@
 mod test_eval {
     use indoc::indoc;
     use mintaka::eval::evaluator::{ActiveEvaluator, Evaluator};
-    use mintaka::game_state::GameState;
+    use mintaka::state::GameState;
     use rusty_renju::board;
     use rusty_renju::notation::pos;
 

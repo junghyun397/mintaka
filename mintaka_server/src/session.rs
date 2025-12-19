@@ -2,13 +2,10 @@ use crate::app_state::{AppError, MemoryPermit, WorkerPermit};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{BestMove, GameAgent};
-use mintaka::game_state::GameState;
-use mintaka::movegen::movegen_window::MovegenWindow;
+use mintaka::state::GameState;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::game_result::GameResult;
 use mintaka::protocol::response::Response;
-use rusty_renju::board::Board;
-use rusty_renju::history::History;
 use rusty_renju::memo::hash_key::HashKey;
 use serde::ser::SerializeStruct;
 use serde::{ser, Deserialize, Serialize, Serializer};
@@ -18,6 +15,7 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use typeshare::typeshare;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -55,11 +53,18 @@ impl SessionKey {
     }
 }
 
+#[typeshare(serialized_as = "String")]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum SessionStatus {
+    Idle,
+    InComputing,
+    Hibernating
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SessionResponse {
     Response(Response),
     BestMove(BestMove),
-    Terminate,
 }
 
 pub struct SessionResultResponse {
@@ -91,6 +96,7 @@ pub struct Session {
     best_move: Option<BestMove>,
     abort_handle: Arc<AtomicBool>,
     time_to_live: Option<Duration>,
+    pub persistence: bool,
     last_active: Instant,
 }
 
@@ -103,19 +109,14 @@ pub struct SessionData {
 
 impl Session {
 
-    pub fn new(config: Config, board: Board, history: History, time_to_live: Option<Duration>, memory_permit: MemoryPermit) -> Self {
-        let game_state = GameState {
-            movegen_window: MovegenWindow::from(&board.hot_field),
-            board,
-            history,
-        };
-
+    pub fn new(config: Config, game_state: GameState, time_to_live: Option<Duration>, memory_permit: MemoryPermit, persistence: bool) -> Self {
         Self {
             state: AgentState::Agent(GameAgent::from_state(config, game_state)),
             memory_permit,
             best_move: None,
             abort_handle: Arc::new(AtomicBool::new(false)),
             time_to_live,
+            persistence,
             last_active: Instant::now(),
         }
     }
@@ -127,7 +128,15 @@ impl Session {
             best_move: data.best_move,
             abort_handle: Arc::new(AtomicBool::new(false)),
             time_to_live: data.time_to_live,
+            persistence: true,
             last_active: Instant::now(),
+        }
+    }
+
+    pub fn game_state(&self) -> Result<GameState, AppError> {
+        match &self.state {
+            AgentState::Agent(agent) => Ok(agent.state.clone()),
+            AgentState::Permit(_) => Err(AppError::SessionInComputing),
         }
     }
 
@@ -166,7 +175,7 @@ impl Session {
         self.abort_handle.store(false, Ordering::Relaxed);
         let abort_flag = self.abort_handle.clone();
 
-        tokio::task::spawn_blocking(async move || {
+        tokio::task::spawn_blocking(move || {
             let best_move = game_agent.launch::<Instant>(
                 SearchObjective::Best,
                 response_sender,
@@ -175,18 +184,16 @@ impl Session {
 
             let game_result = game_agent.command(Command::Play(best_move.pos)).unwrap();
 
-            result_sender
-                .send(SessionResultResponse { game_agent, best_move, game_result })
-                .unwrap();
+            let _ = result_sender.send(SessionResultResponse { game_agent, best_move, game_result });
         });
 
         Ok(())
     }
 
-    pub fn is_computing(&self) -> bool {
+    pub fn status(&self) -> SessionStatus {
         match &self.state {
-            AgentState::Agent(_) => false,
-            AgentState::Permit(_) => true,
+            AgentState::Agent(_) => SessionStatus::Idle,
+            AgentState::Permit(_) => SessionStatus::InComputing,
         }
     }
 

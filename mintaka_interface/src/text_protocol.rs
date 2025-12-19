@@ -1,6 +1,6 @@
 use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
-use mintaka::game_state::GameState;
+use mintaka::state::GameState;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::response::{CallBackResponseSender, Response};
 use mintaka_interface::message::{Message, MessageSender, StatusCommand};

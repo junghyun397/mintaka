@@ -6,7 +6,7 @@ use std::time::Duration;
 use rusty_renju::utils::lang::DurationSchema;
 
 #[typeshare::typeshare]
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Timer {
     #[typeshare(serialized_as = "DurationSchema")]
     pub total_remaining: Duration,

@@ -3,7 +3,7 @@ mod test_search {
     use indoc::indoc;
     use mintaka::config::{Config, SearchObjective};
     use mintaka::game_agent::GameAgent;
-    use mintaka::game_state::GameState;
+    use mintaka::state::GameState;
     use mintaka::protocol::response::NullResponseSender;
     use rusty_renju::board;
     use std::sync::atomic::AtomicBool;

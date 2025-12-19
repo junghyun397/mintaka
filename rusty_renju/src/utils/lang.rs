@@ -68,6 +68,7 @@ pub const fn repeat_16x(source: u8) -> u128 {
     u128::from_le_bytes([source, source, source, source, source, source, source, source, source, source, source, source, source, source, source, source])
 }
 
+#[allow(dead_code)]
 #[typeshare::typeshare]
 pub struct DurationSchema {
     #[typeshare(serialized_as = "number")]

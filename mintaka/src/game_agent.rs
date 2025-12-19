@@ -1,7 +1,7 @@
 use crate::config::{Config, SearchObjective};
 use crate::eval::evaluator::{ActiveEvaluator, Evaluator};
 use crate::eval::heuristic_evaluator::HeuristicEvaluator;
-use crate::game_state::GameState;
+use crate::state::GameState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::principal_variation::PrincipalVariation;
@@ -11,7 +11,7 @@ use crate::protocol::response::{Response, ResponseSender};
 use crate::search::iterative_deepening;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
-use crate::time_manager::TimeManager;
+use crate::time::TimeManager;
 use crate::utils::time::MonotonicClock;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
@@ -262,28 +262,22 @@ impl GameAgent {
                 self.config.workers = workers;
             },
             Command::MaxMemory(size) => {
-                const HEAP_MEMORY_MARGIN_IN_KIB: ByteSize = ByteSize::from_mib(10);
-
-                self.tt.resize(size - HEAP_MEMORY_MARGIN_IN_KIB);
+                self.resize_tt(size);
             },
             Command::Rule(kind) => {
                 self.config.rule_kind = kind;
             },
+            Command::Config(config) => {
+                let old_config = self.config;
+                self.config = config;
+
+                if old_config.tt_size != self.config.tt_size {
+                    self.resize_tt(self.config.tt_size);
+                }
+            }
         };
 
         Ok(None)
-    }
-
-    pub fn commands(&mut self, commands: Vec<Command>) -> Result<Option<GameResult>, GameError> {
-        let mut result = None;
-
-        for command in commands.into_iter() {
-            let local_result = self.command(command)?;
-
-            result = result.or(local_result);
-        }
-
-        Ok(result)
     }
 
     fn next_computing_resource(&self) -> ComputingResource {
@@ -432,6 +426,12 @@ impl GameAgent {
         self.executed_moves = Bitfield::default();
 
         self.time_manager = TimeManager::from(self.config.initial_timer);
+    }
+
+    fn resize_tt(&mut self, size: ByteSize) {
+        const HEAP_MEMORY_MARGIN: ByteSize = ByteSize::from_mib(10);
+
+        self.tt.resize(size - HEAP_MEMORY_MARGIN);
     }
 
 }

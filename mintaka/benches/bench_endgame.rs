@@ -7,7 +7,7 @@ mod bench_vcf {
     use mintaka::config::{Config, SearchObjective};
     use mintaka::eval::evaluator::ActiveEvaluator;
     use mintaka::eval::evaluator::Evaluator;
-    use mintaka::game_state::GameState;
+    use mintaka::state::GameState;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
     use mintaka::search_endgame;

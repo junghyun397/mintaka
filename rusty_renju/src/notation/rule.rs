@@ -26,6 +26,7 @@ impl RuleKind {
 
 }
 
+#[typeshare(serialized_as = "String")] // using string to avoid ts enum
 #[derive(PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum ForbiddenKind {
     DoubleThree = 1,

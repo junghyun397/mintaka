@@ -1,6 +1,6 @@
 use crate::eval::evaluator::{Evaluator, PolicyDistribution};
 use crate::eval::nnue::network_params::NnueNetworkParams;
-use crate::game_state::GameState;
+use crate::state::GameState;
 use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;

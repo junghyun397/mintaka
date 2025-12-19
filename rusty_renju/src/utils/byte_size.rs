@@ -4,7 +4,7 @@ use std::fmt::Display;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 use typeshare::typeshare;
 
-#[derive(Clone, Copy, PartialOrd, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[typeshare(serialized_as = "number")]
 pub struct ByteSize(u64);
 

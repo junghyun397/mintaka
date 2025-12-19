@@ -1,6 +1,6 @@
 use clap::Parser;
 use mintaka::config::Config;
-use mintaka::game_state::GameState;
+use mintaka::state::GameState;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::utils::byte_size::ByteSize;

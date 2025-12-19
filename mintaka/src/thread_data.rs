@@ -1,7 +1,7 @@
 use crate::batch_counter::BatchCounter;
 use crate::config::{Config, SearchObjective};
 use crate::eval::evaluator::Evaluator;
-use crate::game_state::RecoveryState;
+use crate::state::RecoveryState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::movegen::move_picker;

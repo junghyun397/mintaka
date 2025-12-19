@@ -7,6 +7,7 @@ use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+use crate::config::Config;
 #[allow(unused_imports)]
 use rusty_renju::utils::lang::DurationSchema;
 
@@ -55,4 +56,5 @@ pub enum Command {
     Workers(u32),
     MaxMemory(ByteSize),
     Rule(RuleKind),
+    Config(Config)
 }

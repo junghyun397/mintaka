@@ -1,4 +1,5 @@
 use clap::Parser;
+use mintaka::config::Config;
 use rusty_renju::utils::byte_size::ByteSize;
 
 #[derive(Default, Clone)]
@@ -46,6 +47,8 @@ pub struct Preference {
     pub memory_limit: ByteSize,
     #[clap(skip)]
     pub tls_config: Option<TlsConfig>,
+    #[clap(skip)]
+    pub max_config: Option<Config>
 }
 
 impl Preference {
@@ -78,6 +81,10 @@ impl Preference {
                 observe_sighup: self.tls_renew,
             });
         }
+
+        self.max_config = std::fs::read_to_string("max_config.toml")
+            .ok()
+            .and_then(|str| toml::from_str(&str).ok());
     }
 
 }

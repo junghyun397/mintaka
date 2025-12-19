@@ -4,8 +4,15 @@ import {render} from 'solid-js/web';
 import 'solid-devtools';
 import {App} from "./App";
 
-import init, {defaultConfig, GameStateWorker} from "./wasm/pkg";
-import {MintakaWorkerControl, MintakaWorkerMessage, MintakaWorkerResponse} from "./services/mintaka.worker.protocol";
+import init, {defaultConfig, defaultGameState} from "./wasm/pkg";
+import {MintakaWorkerProvider} from "./services/mintaka.worker.provider";
+import {MintakaProvider} from "./services/mintaka.provider";
+import {
+    checkHealth,
+    createSession,
+    MintakaServerConfig,
+    MintakaServerProvider
+} from "./services/mintaka.server.provider";
 
 await init()
 
@@ -19,36 +26,42 @@ render(() => <App />, root!)
 
 void consoleDemo()
 
-async function consoleDemo() {
-    let workerControl: MintakaWorkerControl | undefined = undefined
-
-    const worker = new Worker(
-        new URL("./services/mintaka.worker.ts", import.meta.url),
-        {type: "module"},
-    )
-
-    worker.onmessage = (event: MessageEvent<MintakaWorkerResponse>) => {
-        if (event.data.type == "Ready") {
-            workerControl = event.data.content
-        }
-
-        console.log("[mintaka-worker]", event.data)
-    }
-
-    worker.onerror = (event) => {
-        console.error("[mintaka-worker] error", event)
-        worker.terminate()
-    }
-
-    function post(worker: Worker, data: MintakaWorkerMessage) {
-        worker.postMessage(data)
-    }
-
+async function worker(): Promise<MintakaProvider> {
     const config = defaultConfig()
-    const gameState = GameStateWorker.default().toJs()
+    const gameState = defaultGameState()
 
-    post(worker, {type: "init", payload: { config: config, state: gameState }})
-    post(worker, {type: "command", payload: { type: "Workers", content: 4}})
-    post(worker, {type: "command", payload: { type: "TurnTime", content: {"secs": 1, "nanos": 0}}})
-    post(worker, {type: "launch", payload: {}})
+    return new MintakaWorkerProvider(config, gameState)
+}
+
+async function server(): Promise<MintakaProvider> {
+    const config = defaultConfig()
+    const gameState = defaultGameState()
+
+    const serverConfig = new MintakaServerConfig("http://localhost", 8080, "test")
+
+    const healthy = await checkHealth(serverConfig)
+
+    console.log("healthy: ", healthy)
+
+    const session = await createSession(serverConfig, config, gameState)
+
+    console.log("session: ", session)
+
+    return new MintakaServerProvider(serverConfig, session)
+}
+
+async function consoleDemo() {
+    const mintakaProvider = await server()
+
+    mintakaProvider.onResponse = (message) => {
+        console.log("response: ", message)
+    }
+
+    mintakaProvider.onError = (error) => {
+        console.error("worker error: ", error)
+    }
+
+    mintakaProvider.idleState!.message({type: "command", payload: { type: "TurnTime", content: { secs: 1, nanos: 0}}})
+    mintakaProvider.idleState!.message({type: "command", payload: { type: "Workers", content: 1}})
+    mintakaProvider.idleState!.message({type: "launch", payload: { objective: "Best" }})
 }

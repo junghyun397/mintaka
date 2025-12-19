@@ -1,4 +1,8 @@
+.idea
 /target
 /sessions
+max_config.toml
 /.venv
-*/playground.rs
+playground.rs
+patch
+diff

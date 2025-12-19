@@ -1,0 +1,12 @@
+rule_kind = "Renju"
+max_nodes_in_1k = 0
+max_depth = 225
+max_vcf_depth = 225
+tt_size = 536870912 # 512 MiB
+workers = 8
+pondering = false
+
+[initial_timer]
+total_remaining = "300s"
+increment = "0s"
+turn = "30s"
