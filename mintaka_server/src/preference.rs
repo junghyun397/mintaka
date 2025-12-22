@@ -27,6 +27,10 @@ fn version_str() -> &'static str {
     long_about = None)
 ]
 pub struct Preference {
+    #[arg(long, default_value = "false")]
+    pub webui: bool,
+    #[arg(long, default_value = "false")]
+    pub open_webui: bool,
     #[arg(short, long, default_value = "default")]
     pub address: String,
     #[arg(short, long, default_value_t = num_cpus::get_physical())]

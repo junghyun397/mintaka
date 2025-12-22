@@ -109,7 +109,7 @@ impl GameState {
 
 impl From<Board> for GameState {
     fn from(board: Board) -> Self {
-        let history = (&board).try_into().unwrap_or(History::default());
+        let history = (&board).try_into().unwrap_or_default();
 
         GameState {
             board,
@@ -121,7 +121,7 @@ impl From<Board> for GameState {
 
 impl From<History> for GameState {
     fn from(history: History) -> Self {
-        let board = history.into();
+        let board = (&history).into();
 
         GameState {
             board,

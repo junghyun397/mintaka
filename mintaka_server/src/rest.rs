@@ -7,8 +7,8 @@ use axum::response::{sse, IntoResponse, Sse};
 use axum::Json;
 use futures_util::Stream;
 use mintaka::config::Config;
-use mintaka::state::GameState;
 use mintaka::protocol::command::Command;
+use mintaka::state::GameState;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::sync::Arc;
@@ -55,18 +55,24 @@ pub async fn status(
     })
 }
 
-#[derive(Deserialize)]
-pub struct CreateSessionRequest {
-    config: Config,
-    state: GameState,
-}
-
 pub async fn check_session(
     Path(sid): Path<SessionKey>,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
     state.check_session(sid).await
         .map(|status| (StatusCode::OK, Json(status)))
+}
+
+pub async fn get_max_config(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    (StatusCode::OK, Json(state.max_config()))
+}
+
+#[derive(Deserialize)]
+pub struct CreateSessionRequest {
+    config: Config,
+    state: GameState,
 }
 
 pub async fn new_session(

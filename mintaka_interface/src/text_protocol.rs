@@ -1,8 +1,8 @@
 use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
-use mintaka::state::GameState;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::response::{CallBackResponseSender, Response};
+use mintaka::state::GameState;
 use mintaka_interface::message::{Message, MessageSender, StatusCommand};
 use mintaka_interface::preference::Preference;
 use rusty_renju::board::Board;
@@ -250,22 +250,24 @@ fn handle_command(
                     .ok_or("data type not provided.")?
                 {
                     "board" => {
-                        message_sender.command(Command::Load(
-                            Box::new((buf.parse()?, History::default()))
-                        ));
+                        let board: Board = buf.parse()?;
+
+                        let history = (&board).try_into().unwrap_or_default();
+
+                        let state = GameState::from_board_and_history(board, history);
+
+                        message_sender.command(Command::Load(Box::new(state)));
                     },
                     "history" => {
                         let history: History = args.get(2)
                             .ok_or("history not provided.")?
                             .parse()?;
 
-                        let mut board = Board::default();
+                        let board: Board = (&history).into();
 
-                        board.batch_set_mut(history.actions());
+                        let state = GameState::from_board_and_history(board, history);
 
-                        message_sender.command(Command::Load(
-                            Box::new((board, history))
-                        ));
+                        message_sender.command(Command::Load(Box::new(state)));
                     },
                     &_ => return Err("unknown data type.".to_string()),
                 }

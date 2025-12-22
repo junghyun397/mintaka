@@ -40,7 +40,10 @@ impl std::error::Error for AppError {}
 
 impl From<GameError> for AppError {
     fn from(err: GameError) -> Self {
-        Self::GameError(err)
+        match err {
+            GameError::InvalidConfig => Self::InvalidConfig,
+            _ => Self::GameError(err),
+        }
     }
 }
 

@@ -1,7 +1,6 @@
 use crate::config::{Config, SearchObjective};
 use crate::eval::evaluator::{ActiveEvaluator, Evaluator};
 use crate::eval::heuristic_evaluator::HeuristicEvaluator;
-use crate::state::GameState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::principal_variation::PrincipalVariation;
@@ -9,6 +8,7 @@ use crate::protocol::command::Command;
 use crate::protocol::game_result::GameResult;
 use crate::protocol::response::{Response, ResponseSender};
 use crate::search::iterative_deepening;
+use crate::state::GameState;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::time::TimeManager;
@@ -29,9 +29,6 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-#[allow(unused_imports)]
-use rusty_renju::utils::lang::DurationSchema;
-
 #[typeshare::typeshare]
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct BestMove {
@@ -49,6 +46,7 @@ pub struct BestMove {
 
 #[derive(Debug)]
 pub enum GameError {
+    InvalidConfig,
     StoneAlreadyExist,
     StoneDoesNotExist,
     StoneColorMismatch,
@@ -60,6 +58,7 @@ pub enum GameError {
 impl Display for GameError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            GameError::InvalidConfig => write!(f, "invalid config"),
             GameError::StoneAlreadyExist => write!(f, "stone already exist"),
             GameError::StoneDoesNotExist => write!(f, "stone does not exist"),
             GameError::StoneColorMismatch => write!(f, "stone color mismatch"),
@@ -237,8 +236,8 @@ impl GameAgent {
             Command::Clear => {
                 self.reinit_from_state(GameState::default());
             },
-            Command::Load(boxed) => {
-                self.reinit_from_state(GameState::from_board_and_history(boxed.0, boxed.1));
+            Command::Load(state) => {
+                self.reinit_from_state(*state);
             },
             Command::TurnTime(time) => {
                 self.time_manager.timer.turn = time;

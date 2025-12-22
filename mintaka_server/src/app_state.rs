@@ -1,25 +1,19 @@
 pub(crate) use crate::app_error::AppError;
 use crate::preference::Preference;
-use crate::session::{Session, SessionCommandResponse, SessionData, SessionKey, SessionResponse, SessionResultResponse, SessionStatus};
+use crate::session::{EvictionEntry, Session, SessionCommandResponse, SessionData, SessionKey, SessionResponse, SessionResultResponse, SessionStatus, Sessions};
 use crate::stream_response_sender::StreamSessionResponseSender;
-use dashmap::DashMap;
 use mintaka::config::Config;
 use mintaka::game_agent::BestMove;
 use mintaka::protocol::command::Command;
-use rusty_renju::board::Board;
-use rusty_renju::history::History;
+use mintaka::state::GameState;
 use rusty_renju::utils::byte_size::ByteSize;
-use std::num::NonZeroU32;
 use std::str::FromStr;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
-use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
-use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use tower_http::cors::{Any, CorsLayer};
-use mintaka::state::GameState;
+use tower_http::cors::Any;
 
 pub struct WorkerPermit(OwnedSemaphorePermit);
 
@@ -31,15 +25,23 @@ impl WorkerPermit {
 
 pub struct MemoryPermit(OwnedSemaphorePermit);
 
+#[derive(Debug)]
 pub struct SessionResource {
-    workers: NonZeroU32,
-    running_time: Duration,
+    pub memory: ByteSize,
+    pub workers: u32
+}
+
+impl From<&Config> for SessionResource {
+    fn from(config: &Config) -> Self {
+        Self {
+            memory: config.tt_size,
+            workers: config.workers,
+        }
+    }
 }
 
 pub struct AppState {
-    sessions: Arc<DashMap<SessionKey, Session>>,
-    session_streams: Arc<DashMap<SessionKey, (UnboundedSender<SessionResponse>, Option<UnboundedReceiverStream<SessionResponse>>)>>,
-    hibernation_queue: Arc<RwLock<Vec<SessionKey>>>,
+    sessions: Arc<Sessions>,
     worker_resource: Arc<Semaphore>,
     memory_resource: Arc<Semaphore>,
     pub preference: Preference,
@@ -50,14 +52,16 @@ impl AppState {
 
     pub fn new(preference: Preference) -> Self {
         Self {
-            sessions: Arc::new(DashMap::new()),
-            session_streams: Arc::new(DashMap::new()),
-            hibernation_queue: Arc::new(RwLock::new(vec![])),
+            sessions: Arc::new(Sessions::default()),
             worker_resource: Arc::new(Semaphore::new(preference.cores)),
             memory_resource: Arc::new(Semaphore::new(preference.memory_limit.mib() as usize)),
             preference,
             session_cleanup_task: None,
         }
+    }
+
+    pub fn max_config(&self) -> Option<Config> {
+        self.preference.max_config
     }
 
     pub fn available_workers(&self) -> usize {
@@ -72,20 +76,35 @@ impl AppState {
         ByteSize::from_mib(self.memory_resource.available_permits() as u64)
     }
 
-    pub async fn acquire_memory(&self, memory_size: ByteSize, force_acquire: bool) -> MemoryPermit {
+    pub async fn acquire_memory(&self, memory_size: ByteSize, force_acquire: bool) -> Result<MemoryPermit, AppError> {
         let available = ByteSize::from_mib(self.memory_resource.available_permits() as u64);
 
         if memory_size > available && force_acquire {
             let mut acquired_memory = ByteSize::ZERO;
 
+            let mut eviction_queue = self.sessions.eviction_queue.lock().unwrap();
+
             while acquired_memory >= memory_size {
-                // get the oldest key from session_index
-                // hibernates the oldest session and append acquired_memory
-                acquired_memory += ByteSize::ZERO;
+                while let Some(EvictionEntry { last_active, last_active_seq, key }) = eviction_queue.pop()
+                    && let Some(session) = self.sessions.get_mut(&key)
+                {
+                    if session.last_active_seq < last_active_seq {
+                        continue;
+                    }
+
+                    let freed_resource = self.destroy_session(key)?;
+
+                    acquired_memory += freed_resource.memory;
+                }
             }
         }
 
-        MemoryPermit(self.memory_resource.clone().acquire_many_owned(memory_size.mib() as u32).await.unwrap())
+        let memory_permit = self.memory_resource.clone()
+            .acquire_many_owned(memory_size.mib() as u32)
+            .await
+            .unwrap();
+
+        Ok(MemoryPermit(memory_permit))
     }
 
     pub async fn check_session(&self, session_key: SessionKey) -> Result<SessionStatus, AppError> {
@@ -99,38 +118,42 @@ impl AppState {
     }
 
     pub async fn new_session(&self, config: Config, game_state: GameState) -> Result<SessionKey, AppError> {
-        if Some(config) > self.preference.max_config {
+        if let Some(max_config) = self.preference.max_config
+            && config > max_config
+        {
             return Err(AppError::InvalidConfig);
         }
 
         let session_key = SessionKey::new_random();
 
-        let memory_permit = self.acquire_memory(config.tt_size, true).await;
+        let memory_permit = self.acquire_memory(config.tt_size, true)
+            .await?;
 
-        let session = Session::new(config, game_state, None, memory_permit, false);
-
-        self.sessions.insert(session_key, session);
-
-        let (session_stream_sender, session_stream) = {
+        let (tx, rx) = {
             let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
             (tx, UnboundedReceiverStream::new(rx))
         };
 
-        self.session_streams.insert(session_key, (session_stream_sender, Some(session_stream)));
+        let session = Session::new(config, game_state, None, memory_permit, tx, rx, false);
 
-        tracing::info!("new session created: sid={session_key}");
+        self.sessions.insert(session_key, session);
+
+        tracing::info!("session created; sid={session_key}");
 
         Ok(session_key)
     }
 
     pub async fn state_session(&self, session_key: SessionKey) -> Result<GameState, AppError> {
-        self.sessions.get(&session_key)
-            .ok_or(AppError::SessionNotFound)
-            ?.game_state()
+        let game_state = self.sessions.get(&session_key)
+            .ok_or(AppError::SessionNotFound)?
+            .game_agent()?
+            .state;
+
+        Ok(game_state)
     }
 
     pub async fn hibernate_session(&self, session_key: SessionKey) -> Result<(), AppError> {
-        let (_, session) = self.sessions.remove(&session_key)
+        let session = self.sessions.remove(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
         let encoded = tokio::task::spawn_blocking(move || rmp_serde::to_vec(&session))
@@ -150,7 +173,7 @@ impl AppState {
             .await
             .map_err(AppError::from_general_error)?;
 
-        tracing::info!("session hibernated: sid={session_key}");
+        tracing::info!("session hibernated");
 
         Ok(())
     }
@@ -169,22 +192,21 @@ impl AppState {
         let session_data: SessionData = rmp_serde::from_slice(&buf)
             .map_err(AppError::from_general_error)?;
 
-        let memory_permit = self.acquire_memory(session_data.agent.config.tt_size, true).await;
+        let memory_permit = self.acquire_memory(session_data.agent.config.tt_size, true)
+            .await?;
 
-        let session = tokio::task::spawn_blocking(move || Session::from_data(session_data, memory_permit))
+        let (tx, rx) = {
+            let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+            (tx, UnboundedReceiverStream::new(rx))
+        };
+
+        let session = tokio::task::spawn_blocking(move || Session::from_data(session_data, memory_permit, tx, rx))
             .await
             .map_err(AppError::from_general_error)?;
 
         self.sessions.insert(session_key, session);
 
-        let (session_stream_sender, session_stream) = {
-            let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-            (tx, UnboundedReceiverStream::new(rx))
-        };
-
-        self.session_streams.insert(session_key, (session_stream_sender, Some(session_stream)));
-
-        tracing::info!("session woken up: sid={session_key}");
+        tracing::info!("session woken up");
 
         Ok(())
     }
@@ -196,9 +218,14 @@ impl AppState {
     ) -> Result<SessionCommandResponse, AppError> {
         let mut session = self.sessions.get_mut(&session_key)
             .ok_or(AppError::SessionNotFound)?;
-        tracing::info!("command received");
 
-        session.command(command)
+        let command_message = command.to_brief_debug();
+
+        let result = session.command(command);
+
+        tracing::info!("session command executed; command={command_message}");
+
+        result
     }
 
     pub async fn launch_session(
@@ -208,22 +235,19 @@ impl AppState {
         let mut session = self.sessions.get_mut(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
-        let session_stream_pair = self.session_streams.get(&session_key)
-            .ok_or(AppError::SessionInComputing)?;
+        let worker_permit = self.acquire_workers(session.game_agent()?.config.workers).await;
 
-        let worker_permit = self.acquire_workers(session.required_workers()?).await;
+        let response_sender = session.response_sender.clone();
 
         let (result_tx, result_rx) = tokio::sync::oneshot::channel();
-        let (session_response_sender, _) = session_stream_pair.value();
 
         session.launch(
-            StreamSessionResponseSender::new(session_response_sender.clone()),
+            StreamSessionResponseSender::new(response_sender.clone()),
             result_tx,
             worker_permit
         )?;
 
         let sessions = self.sessions.clone();
-        let session_response_sender = session_response_sender.clone();
 
         tokio::spawn(async move {
             match result_rx.await {
@@ -233,13 +257,15 @@ impl AppState {
                         session.restore(game_agent).unwrap();
                     }
 
-                    let _ = session_response_sender.send(SessionResponse::BestMove(best_move));
+                    let _ = response_sender.send(SessionResponse::BestMove(best_move));
                 }
                 Err(err) => {
                     eprintln!("{err}")
                 }
             }
         });
+
+        tracing::info!("session launched");
 
         Ok(())
     }
@@ -254,6 +280,8 @@ impl AppState {
 
         session.abort()?;
 
+        tracing::info!("session aborted");
+
         Ok(())
     }
 
@@ -264,46 +292,48 @@ impl AppState {
             .ok_or(AppError::SessionNeverLaunched)
     }
 
-    pub fn destroy_session(&self, session_key: SessionKey) -> Result<(), AppError> {
-        let (_, session) = self.sessions.remove(&session_key)
+    pub fn destroy_session(&self, session_key: SessionKey) -> Result<SessionResource, AppError> {
+        let session = self.sessions.remove(&session_key)
             .ok_or(AppError::SessionNotFound)?;
-
-        self.session_streams.remove(&session_key);
 
         session.abort()?;
 
-        tracing::info!("session destroyed: sid={session_key}");
+        let resource = (&session.game_agent()?.config).into();
 
-        Ok(())
+        tracing::info!("session destroyed; resource={resource:?}");
+
+        Ok(resource)
     }
 
     pub fn acquire_session_stream(&self, session_key: SessionKey) -> Result<UnboundedReceiverStream<SessionResponse>, AppError> {
-        let session_stream_receiver = self.session_streams.get_mut(&session_key)
+        let session_stream_receiver = self.sessions.get_mut(&session_key)
             .ok_or(AppError::SessionNotFound)?
-            .1.take()
+            .response_receiver
+            .take()
             .ok_or(AppError::StreamAcquired)?;
 
         Ok(session_stream_receiver)
     }
 
     pub fn restore_session_stream(&self, session_key: SessionKey, session_stream_receiver: UnboundedReceiverStream<SessionResponse>) -> Result<(), AppError> {
-        self.session_streams.get_mut(&session_key)
-            .ok_or(AppError::StreamNotAcquired)?.1
+        self.sessions.get_mut(&session_key)
+            .ok_or(AppError::StreamNotAcquired)?
+            .response_receiver
             = Some(session_stream_receiver);
 
         Ok(())
     }
 
     pub async fn hibernate_all_sessions(&self) -> Result<(), AppError> {
-        let session_keys: Vec<_> = self.sessions.iter()
-            .map(|session| *session.key())
-            .collect();
-
-        let tasks = session_keys.into_iter()
-            .map(|session_key| self.hibernate_session(session_key));
-
-        futures_util::future::try_join_all(tasks).await?;
-
+        // let session_keys: Vec<_> = self.sessions.iter(self)
+        //     .map(|session| *session.key())
+        //     .collect();
+        //
+        // let tasks = session_keys.into_iter()
+        //     .map(|session_key| self.hibernate_session(session_key));
+        //
+        // futures_util::future::try_join_all(tasks).await?;
+        //
         Ok(())
     }
 
@@ -323,10 +353,11 @@ impl AppState {
             }
         }
 
-        let tasks = session_keys.into_iter()
-            .map(|session_key| self.wakeup_session(session_key));
-
-        futures_util::future::try_join_all(tasks).await?;
+        for session_key in session_keys {
+            if let Err(err) = self.wakeup_session(session_key).await {
+                tracing::warn!("failed to wake session: sid={}, err={}; skipping",session_key,err);
+            }
+        }
 
         Ok(())
     }
@@ -343,7 +374,7 @@ impl AppState {
                 interval.tick().await;
                 let now = Instant::now();
 
-                sessions.retain(|_, session| !session.is_expired(now));
+                // sessions.retain(|_, session| !session.is_expired(now));
             }
         });
 

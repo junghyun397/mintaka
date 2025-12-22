@@ -248,8 +248,8 @@ impl Board {
 
 }
 
-impl From<History> for Board {
-    fn from(value: History) -> Self {
+impl From<&History> for Board {
+    fn from(value: &History) -> Self {
         let mut board = Board::default();
 
         board.batch_set_mut(value.actions());

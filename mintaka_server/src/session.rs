@@ -1,20 +1,24 @@
 use crate::app_state::{AppError, MemoryPermit, WorkerPermit};
 use crate::stream_response_sender::StreamSessionResponseSender;
+use dashmap::DashMap;
 use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{BestMove, GameAgent};
-use mintaka::state::GameState;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::game_result::GameResult;
 use mintaka::protocol::response::Response;
+use mintaka::state::GameState;
 use rusty_renju::memo::hash_key::HashKey;
 use serde::ser::SerializeStruct;
 use serde::{ser, Deserialize, Serialize, Serializer};
+use std::collections::BinaryHeap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use tokio::sync::mpsc::UnboundedSender;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use typeshare::typeshare;
 use uuid::Uuid;
 
@@ -90,14 +94,20 @@ pub enum AgentState {
     Permit(WorkerPermit)
 }
 
+pub type SessionResponseSender = UnboundedSender<SessionResponse>;
+pub type SessionResponseReceiver = UnboundedReceiverStream<SessionResponse>;
+
 pub struct Session {
     state: AgentState,
+    pub response_sender: SessionResponseSender,
+    pub response_receiver: Option<SessionResponseReceiver>,
     memory_permit: MemoryPermit,
     best_move: Option<BestMove>,
     abort_handle: Arc<AtomicBool>,
     time_to_live: Option<Duration>,
     pub persistence: bool,
-    last_active: Instant,
+    pub last_active: Instant,
+    pub last_active_seq: u32,
 }
 
 #[derive(Deserialize)]
@@ -109,42 +119,57 @@ pub struct SessionData {
 
 impl Session {
 
-    pub fn new(config: Config, game_state: GameState, time_to_live: Option<Duration>, memory_permit: MemoryPermit, persistence: bool) -> Self {
+    pub fn new(config: Config, game_state: GameState, time_to_live: Option<Duration>, memory_permit: MemoryPermit, response_sender: SessionResponseSender, response_receiver: SessionResponseReceiver, persistence: bool) -> Self {
         Self {
             state: AgentState::Agent(GameAgent::from_state(config, game_state)),
+            response_sender,
+            response_receiver: Some(response_receiver),
             memory_permit,
             best_move: None,
             abort_handle: Arc::new(AtomicBool::new(false)),
             time_to_live,
             persistence,
             last_active: Instant::now(),
+            last_active_seq: 0,
         }
     }
 
-    pub fn from_data(data: SessionData, memory_permit: MemoryPermit) -> Self {
+    pub fn from_data(data: SessionData, memory_permit: MemoryPermit, response_sender: SessionResponseSender, response_receiver: SessionResponseReceiver) -> Self {
         Self {
             state: AgentState::Agent(data.agent),
+            response_sender,
+            response_receiver: Some(response_receiver),
             memory_permit,
             best_move: data.best_move,
             abort_handle: Arc::new(AtomicBool::new(false)),
             time_to_live: data.time_to_live,
             persistence: true,
             last_active: Instant::now(),
+            last_active_seq: 0,
         }
     }
 
-    pub fn game_state(&self) -> Result<GameState, AppError> {
+    pub fn game_agent(&self) -> Result<&GameAgent, AppError> {
         match &self.state {
-            AgentState::Agent(agent) => Ok(agent.state.clone()),
+            AgentState::Agent(agent) => Ok(agent),
             AgentState::Permit(_) => Err(AppError::SessionInComputing),
         }
     }
 
+    pub fn game_agent_mut(&mut self) -> Result<&mut GameAgent, AppError> {
+        match &mut self.state {
+            AgentState::Agent(agent) => Ok(agent),
+            AgentState::Permit(_) => Err(AppError::SessionInComputing),
+        }
+    }
+
+    pub fn touch_last_active(&mut self) {
+        self.last_active = Instant::now();
+        self.last_active_seq += 1;
+    }
+
     pub fn command(&mut self, command: Command) -> Result<SessionCommandResponse, AppError> {
-        let game_agent = match &mut self.state {
-            AgentState::Agent(agent) => agent,
-            AgentState::Permit(_) => return Err(AppError::SessionInComputing),
-        };
+        let game_agent = self.game_agent_mut()?;
 
         let game_result = game_agent.command(command)
             .map_err(AppError::GameError)?;
@@ -153,13 +178,6 @@ impl Session {
             board_hash: game_agent.state.board.hash_key,
             game_result,
         })
-    }
-
-    pub fn required_workers(&self) -> Result<u32, AppError> {
-        match &self.state {
-            AgentState::Agent(agent) => Ok(agent.config.workers),
-            AgentState::Permit(_) => Err(AppError::SessionInComputing),
-        }
     }
 
     pub fn launch(
@@ -239,10 +257,6 @@ impl Session {
         Ok(hash_key)
     }
 
-    fn touch_last_active(&mut self) {
-        self.last_active = Instant::now();
-    }
-
     pub fn is_expired(&self, now: Instant) -> bool {
         match self.time_to_live {
             Some(time_to_live) => now.duration_since(self.last_active) > time_to_live,
@@ -272,4 +286,69 @@ impl Serialize for Session {
         state.serialize_field("time_to_live", &self.time_to_live)?;
         state.end()
     }
+}
+
+pub struct EvictionEntry {
+    pub last_active: Instant,
+    pub last_active_seq: u32,
+    pub key: SessionKey,
+}
+
+impl PartialEq<Self> for EvictionEntry {
+    fn eq(&self, other: &Self) -> bool {
+        self.last_active == other.last_active
+    }
+}
+
+impl Eq for EvictionEntry {}
+
+impl PartialOrd<Self> for EvictionEntry {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for EvictionEntry {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.last_active.cmp(&other.last_active)
+    }
+}
+
+pub struct Sessions {
+    pub map: Arc<DashMap<SessionKey, Session>>,
+    pub eviction_queue: Arc<Mutex<BinaryHeap<EvictionEntry>>>,
+}
+
+impl Default for Sessions {
+    fn default() -> Self {
+        Self {
+            map: Arc::new(DashMap::new()),
+            eviction_queue: Arc::new(Mutex::new(BinaryHeap::new())),
+        }
+    }
+}
+
+impl Sessions {
+
+    pub fn get(&self, key: &SessionKey) -> Option<dashmap::mapref::one::Ref<SessionKey, Session>> {
+        self.map.get(key)
+    }
+
+    pub fn get_mut(&self, key: &SessionKey) -> Option<dashmap::mapref::one::RefMut<SessionKey, Session>> {
+        if let Some(mut entry) = self.map.get_mut(key) {
+            entry.touch_last_active();
+            Some(entry)
+        } else {
+            None
+        }
+    }
+
+    pub fn remove(&self, key: &SessionKey) -> Option<Session> {
+        self.map.remove(&key).map(|(_, session)| session)
+    }
+
+    pub fn insert(&self, key: SessionKey, session: Session) {
+        self.map.insert(key, session);
+    }
+
 }

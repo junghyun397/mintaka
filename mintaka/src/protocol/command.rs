@@ -1,23 +1,22 @@
-use rusty_renju::board::Board;
-use rusty_renju::history::History;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::time::Duration;
 
 use crate::config::Config;
+use crate::state::GameState;
 #[allow(unused_imports)]
 use rusty_renju::utils::lang::DurationSchema;
 
 #[typeshare::typeshare]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "content")]
 pub enum Command {
     Clear,
-    #[typeshare(skip)]
-    Load(Box<(Board, History)>),
+    Load(Box<GameState>),
     Play(MaybePos),
     Set {
         pos: Pos,
@@ -57,4 +56,15 @@ pub enum Command {
     MaxMemory(ByteSize),
     Rule(RuleKind),
     Config(Config)
+}
+
+impl Command {
+
+    pub fn to_brief_debug(&self) -> String {
+        match self {
+            Self::Load(_) => "Load".to_string(),
+            _ => format!("{:?}", self)
+        }
+    }
+
 }

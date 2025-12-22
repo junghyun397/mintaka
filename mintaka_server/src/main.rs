@@ -1,19 +1,25 @@
-use axum::extract::{ConnectInfo, State};
-use axum::http::{Method, StatusCode};
+use axum::body::Body;
+use axum::extract::{ConnectInfo, FromRequestParts, Path, State};
+use axum::http::request::Parts;
+use axum::http::{HeaderName, HeaderValue, Method, Request, StatusCode};
+use axum::middleware::Next;
 use axum::response::IntoResponse;
 use axum::routing::{delete, get, post};
-use axum::{middleware, Router};
+use axum::{middleware, RequestExt, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use mintaka_server::app_state::AppState;
 use mintaka_server::preference::{Preference, TlsConfig};
 use mintaka_server::rest;
+use mintaka_server::session::SessionKey;
 use std::error::Error;
 use std::net::SocketAddr;
-use std::path::Path;
 use std::sync::Arc;
 use tokio::signal::unix::SignalKind;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::ServeDir;
+use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::{DefaultOnFailure, TraceLayer};
+use tracing::{field, Span};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -33,8 +39,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let shared_state = Arc::new(state);
 
-    let app = Router::new()
+    let mut api = Router::new()
         .route("/status", get(rest::status))
+        .route("/max-config", get(rest::get_max_config))
         .route("/sessions", post(rest::new_session))
         .route("/sessions/{sid}", get(rest::check_session))
         .route("/sessions/{sid}", delete(rest::destroy_session))
@@ -53,16 +60,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )
         .layer(
             TraceLayer::new_for_http()
-                .on_failure(DefaultOnFailure::new().level(tracing::Level::DEBUG))
                 .make_span_with(|req: &axum::extract::Request| {
-                    if let Some(ConnectInfo(socket_addr)) = req
-                        .extensions()
-                        .get::<ConnectInfo<SocketAddr>>()
-                    {
-                        tracing::info_span!("http", ip = &socket_addr.ip().to_string())
-                    } else {
-                        tracing::info_span!("http unknown")
+                    let span = tracing::info_span!(
+                        "http",
+                        ip = field::Empty,
+                        method = %req.method(),
+                        uri = %req.uri(),
+                    );
+
+                    if let Some(ConnectInfo(addr)) = req.extensions().get::<ConnectInfo<SocketAddr>>() {
+                        span.record("ip", &field::display(addr));
                     }
+
+                    span
                 })
         )
         .layer(middleware::from_fn_with_state(shared_state.clone(), auth))
@@ -78,36 +88,69 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     spawn_hibernation_watcher(shared_state);
 
-    if let Some(tls_config) = pref.tls_config {
+    let url = if pref.tls_config.is_some() {
+        format!("https://{}", pref.address)
+    } else {
+        format!("http://{}", pref.address)
+    };
+
+    if pref.webui {
+        let webui = Router::new()
+            .fallback_service(ServeDir::new("mintaka_webui/dist"))
+            .layer(SetResponseHeaderLayer::overriding(
+                HeaderName::from_static("cross-origin-opener-policy"),
+                HeaderValue::from_static("same-origin"),
+            ))
+            .layer(SetResponseHeaderLayer::overriding(
+                HeaderName::from_static("cross-origin-embedder-policy"),
+                HeaderValue::from_static("require-corp"),
+            ));
+
+        api = api.merge(webui);
+
+        tracing::info!("serving mintaka-webui on {url}");
+    }
+
+    if let Some(tls_config) = &pref.tls_config {
         let ruslts_config = RustlsConfig::from_pem_file(
-            Path::new(&tls_config.cert_path),
-            Path::new(&tls_config.key_path),
+            std::path::Path::new(&tls_config.cert_path),
+            std::path::Path::new(&tls_config.key_path),
         ).await?;
 
         if tls_config.observe_sighup {
             spawn_tls_watcher(ruslts_config.clone(), tls_config.clone());
         }
 
-        tracing::info!("listening on https://{addr}");
+        tracing::info!("api listening on {url}");
+
+        open_browser(&pref, &url);
 
         axum_server::bind_rustls(addr, ruslts_config)
-            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+            .serve(api.into_make_service_with_connect_info::<SocketAddr>())
             .await?;
     } else {
         let listener = tokio::net::TcpListener::bind(addr)
             .await?;
 
-        tracing::info!("listening on http://{addr}");
+        tracing::info!("api listening on {url}");
 
-        axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
+        open_browser(&pref, &url);
+
+        axum::serve(listener, api.into_make_service_with_connect_info::<SocketAddr>())
             .await?;
     }
 
     Ok(())
 }
 
+fn open_browser(pref: &Preference, url: &str) {
+    if pref.open_webui {
+        let _ = webbrowser::open(&url);
+    }
+}
+
 fn check_session_directory(session_directory: &str) {
-    if !Path::new(session_directory).exists() {
+    if !std::path::Path::new(session_directory).exists() {
         std::fs::create_dir_all(session_directory).unwrap();
 
         tracing::info!("created session directory: {}", session_directory);

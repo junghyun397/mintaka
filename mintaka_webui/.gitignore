@@ -2,4 +2,7 @@
 dist
 node_modules
 
+.vite_dev.log
+.vite_pid
+
 /src/wasm

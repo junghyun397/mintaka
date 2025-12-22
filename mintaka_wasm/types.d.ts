@@ -95,6 +95,7 @@ export type BoardExportItem =
 
 export type Command = 
 	| { type: "Clear", content?: undefined }
+	| { type: "Load", content: GameState }
 	| { type: "Play", content: MaybePos }
 	| { type: "Set", content: {
 	pos: Pos;
