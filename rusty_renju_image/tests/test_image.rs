@@ -1,49 +1,34 @@
 #[cfg(test)]
 mod test_image {
-    use indoc::indoc;
     use rusty_renju::board::Board;
-    use rusty_renju_image::image_renderer::{HistoryRenderType, ImageBoardRenderer, ImageFormat};
-    use std::fs::File;
-    use std::io::Write;
+    use rusty_renju::history::History;
+    use rusty_renju::notation::pos::pos_unchecked;
+    use rusty_renju_image::{render_png, HistoryRender, RenderPayloads};
 
+    #[test]
     fn default_image() {
-        let case = indoc! {"
-           A B C D E F G H I J K L M N O
-        15 . . . . . . . . . . . . . . . 15
-        14 . . . . . . . . . . . . . . . 14
-        13 . . . . . . . . . . . . . . . 13
-        12 . . . . . . . . . . . . . . . 12
-        11 . . . . . . . . . . . . . . . 11
-        10 . . . . . . . . . . . . . . . 10
-         9 . . . . . . . . . . . . . . . 9
-         8 . . . . . . . . . . . . . . . 8
-         7 . . . . . . . . . . . . . . . 7
-         6 . . . . . . . . . . . . . . . 6
-         5 . . . . . . . . . . . . . . . 5
-         4 . . . . . . . . . . . . . . . 4
-         3 . . . . . . . . . . . . . . . 3
-         2 . . . . . . . . . . . . . . . 2
-         1 . . . . . . . . . . . . . . . 1
-           A B C D E F G H I J K L M N O"};
+        let history = History::default()
+            .set(pos_unchecked("h8"))
+            .set(pos_unchecked("g7"))
+            ;
 
-        let board = case.parse::<Board>().unwrap();
+        let board = Board::from(&history);
+        let opts = RenderPayloads {
+            history: &history,
+            history_render: HistoryRender::Sequence,
+            offers: &[
+                pos_unchecked("a1"),
+                pos_unchecked("a2"),
+            ],
+            blinds: &[
+                pos_unchecked("a9"),
+            ],
+            enable_forbidden: true,
+        };
 
-        let renderer = ImageBoardRenderer::default();
+        let png = render_png(&board, opts);
 
-        let (bytes, _) = renderer.render(
-            &board,
-            None,
-            None,
-            None,
-            None,
-            HistoryRenderType::None,
-            ImageFormat::Png,
-            true
-        );
-
-        let mut file = File::create("output.png").unwrap();
-
-        file.write_all(&bytes).unwrap();
+        std::fs::write("test_output.png", &png).unwrap();
     }
 
 }

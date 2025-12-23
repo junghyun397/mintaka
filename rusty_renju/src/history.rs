@@ -59,6 +59,13 @@ impl History {
         self.top == 0
     }
 
+    pub fn player_color(&self) -> Color {
+        match self.top % 2 {
+            0 => Color::Black,
+            _ => Color::White,
+        }
+    }
+
     pub fn action(mut self, action: MaybePos) -> Self {
         self.action_mut(action);
         self
