@@ -7,19 +7,46 @@ use axum::response::IntoResponse;
 use axum::routing::{delete, get, post};
 use axum::{middleware, RequestExt, Router};
 use axum_server::tls_rustls::RustlsConfig;
+use mintaka_server::app_error::AppError;
 use mintaka_server::app_state::AppState;
 use mintaka_server::preference::{Preference, TlsConfig};
 use mintaka_server::rest;
-use mintaka_server::session::SessionKey;
+use mintaka_server::session::{SessionData, SessionKey, SessionStatus};
 use std::error::Error;
+use std::io::ErrorKind;
 use std::net::SocketAddr;
+use std::str::FromStr;
 use std::sync::Arc;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::signal::unix::SignalKind;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::{DefaultOnFailure, TraceLayer};
 use tracing::{field, Span};
+
+async fn auth(
+    State(state): State<Arc<AppState>>,
+    request: axum::extract::Request,
+    next: Next
+) -> impl IntoResponse {
+    if request.method() == Method::OPTIONS {
+        return Ok(next.run(request).await);
+    }
+
+    if let Some(expected_password) = &state.preference.api_password {
+        let password = request.headers()
+            .get("Api-Password")
+            .and_then(|h| h.to_str().ok())
+            .ok_or(StatusCode::UNAUTHORIZED)?;
+
+        if password != expected_password {
+            return Err(StatusCode::UNAUTHORIZED);
+        }
+    }
+
+    Ok(next.run(request).await)
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -33,11 +60,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let addr: SocketAddr = pref.address.parse()?;
 
-    let mut state = AppState::new(pref.clone());
-
-    state.spawn_session_cleanup();
-
-    let shared_state = Arc::new(state);
+    let state = Arc::new(AppState::new(pref.clone()));
 
     let mut api = Router::new()
         .route("/status", get(rest::status))
@@ -75,8 +98,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     span
                 })
         )
-        .layer(middleware::from_fn_with_state(shared_state.clone(), auth))
-        .with_state(shared_state.clone());
+        .layer(middleware::from_fn_with_state(state.clone(), auth))
+        .with_state(state.clone());
 
     if pref.api_password.is_some() {
         tracing::info!("password protected; use Api-Password header to authenticate");
@@ -84,9 +107,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tracing::warn!("API is not password protected; set MINTAKA_API_PASSWORD environment variable to enable protection");
     }
 
-    shared_state.wakeup_all_sessions().await?;
+    state.wakeup_all_sessions().await?;
 
-    spawn_hibernation_watcher(shared_state);
+    spawn_session_cleaner(&state);
+    spawn_hibernation_watcher(&state);
+    spawn_hibernation_cleaner(&pref.sessions_directory);
 
     let url = if pref.tls_config.is_some() {
         format!("https://{}", pref.address)
@@ -180,8 +205,10 @@ fn spawn_tls_watcher(shared_rustls_config: RustlsConfig, tls_config: TlsConfig) 
     });
 }
 
-fn spawn_hibernation_watcher(shared_state: Arc<AppState>) {
+fn spawn_hibernation_watcher(state: &Arc<AppState>) {
     tracing::info!("watching SIGUSR1 for hibernate all sessions and exit");
+
+    let state = state.clone();
 
     tokio::spawn(async move {
         let mut signal_stream = tokio::signal::unix::signal(SignalKind::user_defined1()).unwrap();
@@ -189,32 +216,87 @@ fn spawn_hibernation_watcher(shared_state: Arc<AppState>) {
         if let Some(_) = signal_stream.recv().await {
             tracing::info!("received SIGUSR1 signal; hibernate all sessions and exit");
 
-            shared_state.hibernate_all_sessions().await.unwrap();
+            state.hibernate_all_sessions().await.unwrap();
 
             std::process::exit(0);
         }
     });
 }
 
-async fn auth(
-    State(state): State<Arc<AppState>>,
-    request: axum::extract::Request,
-    next: middleware::Next
-) -> impl IntoResponse {
-    if request.method() == Method::OPTIONS {
-        return Ok(next.run(request).await);
-    }
+fn spawn_session_cleaner(state: &Arc<AppState>) {
+    let state = state.clone();
 
-    if let Some(expected_password) = &state.preference.api_password {
-        let password = request.headers()
-            .get("Api-Password")
-            .and_then(|h| h.to_str().ok())
-            .ok_or(StatusCode::UNAUTHORIZED)?;
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
 
-        if password != expected_password {
-            return Err(StatusCode::UNAUTHORIZED);
+        loop {
+            interval.tick().await;
+
+            let now = Instant::now();
+
+            let expired_keys: Vec<SessionKey> = state.sessions.map.iter()
+                .filter(|session|
+                    session.status() == SessionStatus::Idle && session.is_expired(now)
+                )
+                .map(|session| *session.key())
+                .collect();
+
+            for session_key in expired_keys {
+                let _ = state.destroy_session(session_key);
+            }
         }
-    }
+    });
+}
 
-    Ok(next.run(request).await)
+fn spawn_hibernation_cleaner(directory: &str) {
+    let directory = directory.to_string();
+
+    tracing::info!("watching hibernated sessions for expiry");
+
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+
+        loop {
+            interval.tick().await;
+
+            let now_epoch_secs = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+
+
+            let mut read_dir = tokio::fs::read_dir(&directory).await.unwrap();
+
+            while let Some(entry) = read_dir.next_entry().await.unwrap() {
+                let file_name = entry.file_name();
+                let file_name = file_name.to_string_lossy();
+
+                let Some((sid_str, expiry_str)) = file_name.split_once('_') else {
+                    continue;
+                };
+
+                let Ok(session_key) = SessionKey::from_str(sid_str) else {
+                    continue;
+                };
+
+                let Ok(expiry_epoch_secs) = expiry_str.parse::<u64>() else {
+                    continue;
+                };
+
+                if expiry_epoch_secs < now_epoch_secs {
+                    continue;
+                }
+
+                let file_path = entry.path();
+
+                if let Err(err) = tokio::fs::remove_file(&file_path).await {
+                    tracing::warn!("failed to remove expired hibernated session: path={}, err={err}",file_path.display());
+
+                    continue;
+                }
+
+                tracing::info!("removed expired hibernated session: sid={session_key}");
+            }
+        }
+    });
 }

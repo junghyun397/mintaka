@@ -98,6 +98,13 @@ impl BoardWorker {
         self.inner.stones
     }
 
+    pub fn pattern(&self, color: Color, pos: Pos) -> u32 {
+        let color: rusty_renju::notation::color::Color = try_from_js_value(color).unwrap();
+        let pos: rusty_renju::notation::pos::Pos = try_from_js_value(pos).unwrap();
+
+        self.inner.patterns.field[color][pos.idx_usize()].into()
+    }
+
     pub fn field(&self) -> Vec<BoardExportItem> {
         let field: Vec<BoardExportItem> = self.inner.iter_export_items()
             .map(|item| to_js_value(&item))

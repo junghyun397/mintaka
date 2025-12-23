@@ -1,19 +1,19 @@
 pub(crate) use crate::app_error::AppError;
 use crate::preference::Preference;
-use crate::session::{EvictionEntry, Session, SessionCommandResponse, SessionData, SessionKey, SessionResponse, SessionResultResponse, SessionStatus, Sessions};
+use crate::session::{Session, SessionCommandResponse, SessionData, SessionKey, SessionResponse, SessionResultResponse, SessionStatus, Sessions};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use mintaka::config::Config;
 use mintaka::game_agent::BestMove;
 use mintaka::protocol::command::Command;
 use mintaka::state::GameState;
 use rusty_renju::utils::byte_size::ByteSize;
+use std::cmp::Reverse;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use tower_http::cors::Any;
 
 pub struct WorkerPermit(OwnedSemaphorePermit);
 
@@ -41,11 +41,10 @@ impl From<&Config> for SessionResource {
 }
 
 pub struct AppState {
-    sessions: Arc<Sessions>,
+    pub sessions: Arc<Sessions>,
     worker_resource: Arc<Semaphore>,
     memory_resource: Arc<Semaphore>,
     pub preference: Preference,
-    session_cleanup_task: Option<tokio::task::AbortHandle>,
 }
 
 impl AppState {
@@ -56,7 +55,6 @@ impl AppState {
             worker_resource: Arc::new(Semaphore::new(preference.cores)),
             memory_resource: Arc::new(Semaphore::new(preference.memory_limit.mib() as usize)),
             preference,
-            session_cleanup_task: None,
         }
     }
 
@@ -68,8 +66,15 @@ impl AppState {
         self.worker_resource.available_permits()
     }
 
-    pub async fn acquire_workers(&self, workers: u32) -> WorkerPermit {
-        WorkerPermit(self.worker_resource.clone().acquire_many_owned(workers).await.unwrap())
+    pub async fn acquire_workers(&self, workers: u32, timeout: Duration) -> Result<WorkerPermit, AppError> {
+        let worker_permit = tokio::time::timeout(
+            timeout,
+            self.worker_resource.clone().acquire_many_owned(workers)
+        )
+            .await
+            .map_err(|_| AppError::WorkerAcquireTimeout)?;
+
+        Ok(WorkerPermit(worker_permit.unwrap()))
     }
 
     pub fn available_memory(&self) -> ByteSize {
@@ -84,17 +89,22 @@ impl AppState {
 
             let mut eviction_queue = self.sessions.eviction_queue.lock().unwrap();
 
-            while acquired_memory >= memory_size {
-                while let Some(EvictionEntry { last_active, last_active_seq, key }) = eviction_queue.pop()
-                    && let Some(session) = self.sessions.get_mut(&key)
+            while acquired_memory < memory_size
+                && let Some(Reverse(entry)) = eviction_queue.pop()
+            {
+                match self.sessions.get(&entry.key)
+                    .map(|session|
+                        (session.last_active_seq == entry.last_active_seq, session.status() == SessionStatus::Idle)
+                    )
+                    .unwrap_or((false, false))
                 {
-                    if session.last_active_seq < last_active_seq {
-                        continue;
+                    (true, false) => eviction_queue.push(Reverse(entry)),
+                    (true, true) => {
+                        let freed_resource = self.destroy_session(entry.key)?;
+
+                        acquired_memory += freed_resource.memory;
                     }
-
-                    let freed_resource = self.destroy_session(key)?;
-
-                    acquired_memory += freed_resource.memory;
+                    _ => {}
                 }
             }
         }
@@ -156,12 +166,18 @@ impl AppState {
         let session = self.sessions.remove(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
+        let file_path = format!(
+            "{}/{session_key}_{}",
+            self.preference.sessions_directory,
+            session.live_until_epoch_secs()
+        );
+
         let encoded = tokio::task::spawn_blocking(move || rmp_serde::to_vec(&session))
             .await
             .map_err(AppError::from_general_error)?
             .map_err(AppError::from_general_error)?;
 
-        let mut file = tokio::fs::File::create(format!("{}/{session_key}", self.preference.sessions_directory))
+        let mut file = tokio::fs::File::create(file_path)
             .await
             .map_err(|_| AppError::SessionFileAlreadyExists)?;
 
@@ -216,7 +232,7 @@ impl AppState {
         session_key: SessionKey,
         command: Command,
     ) -> Result<SessionCommandResponse, AppError> {
-        let mut session = self.sessions.get_mut(&session_key)
+        let mut session = self.sessions.get_mut_with_touch(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
         let command_message = command.to_brief_debug();
@@ -231,11 +247,12 @@ impl AppState {
     pub async fn launch_session(
         &self,
         session_key: SessionKey,
+        timeout: Duration,
     ) -> Result<(), AppError> {
-        let mut session = self.sessions.get_mut(&session_key)
+        let mut session = self.sessions.get_mut_with_touch(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
-        let worker_permit = self.acquire_workers(session.game_agent()?.config.workers).await;
+        let worker_permit = self.acquire_workers(session.game_agent()?.config.workers, timeout).await?;
 
         let response_sender = session.response_sender.clone();
 
@@ -252,7 +269,7 @@ impl AppState {
         tokio::spawn(async move {
             match result_rx.await {
                 Ok(SessionResultResponse { game_agent, best_move, .. }) => {
-                    if let Some(mut session) = sessions.get_mut(&session_key) {
+                    if let Some(mut session) = sessions.get_mut_with_touch(&session_key) {
                         session.store_best_move(best_move);
                         session.restore(game_agent).unwrap();
                     }
@@ -271,7 +288,7 @@ impl AppState {
     }
 
     pub fn abort_session(&self, session_key: SessionKey) -> Result<(), AppError> {
-        let session = self.sessions.get(&session_key)
+        let session = self.sessions.get_with_touch(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
         if session.status() == SessionStatus::Idle {
@@ -296,8 +313,6 @@ impl AppState {
         let session = self.sessions.remove(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 
-        session.abort()?;
-
         let resource = (&session.game_agent()?.config).into();
 
         tracing::info!("session destroyed; resource={resource:?}");
@@ -306,17 +321,17 @@ impl AppState {
     }
 
     pub fn acquire_session_stream(&self, session_key: SessionKey) -> Result<UnboundedReceiverStream<SessionResponse>, AppError> {
-        let session_stream_receiver = self.sessions.get_mut(&session_key)
+        let session_stream_receiver = self.sessions.get_mut_with_touch(&session_key)
             .ok_or(AppError::SessionNotFound)?
             .response_receiver
             .take()
-            .ok_or(AppError::StreamAcquired)?;
+            .ok_or(AppError::StreamAlreadyAcquired)?;
 
         Ok(session_stream_receiver)
     }
 
     pub fn restore_session_stream(&self, session_key: SessionKey, session_stream_receiver: UnboundedReceiverStream<SessionResponse>) -> Result<(), AppError> {
-        self.sessions.get_mut(&session_key)
+        self.sessions.get_mut_with_touch(&session_key)
             .ok_or(AppError::StreamNotAcquired)?
             .response_receiver
             = Some(session_stream_receiver);
@@ -325,15 +340,11 @@ impl AppState {
     }
 
     pub async fn hibernate_all_sessions(&self) -> Result<(), AppError> {
-        // let session_keys: Vec<_> = self.sessions.iter(self)
-        //     .map(|session| *session.key())
-        //     .collect();
-        //
-        // let tasks = session_keys.into_iter()
-        //     .map(|session_key| self.hibernate_session(session_key));
-        //
-        // futures_util::future::try_join_all(tasks).await?;
-        //
+        let tasks = self.sessions.keys().into_iter()
+            .map(|session_key| self.hibernate_session(session_key));
+
+        futures_util::future::try_join_all(tasks).await?;
+
         Ok(())
     }
 
@@ -348,9 +359,18 @@ impl AppState {
             .await
             .map_err(AppError::from_general_error)?
         {
-            if let Ok(session_key) = SessionKey::from_str(&entry.file_name().to_string_lossy()) {
-                session_keys.push(session_key);
-            }
+            let file_name = entry.file_name();
+            let file_name = file_name.to_string_lossy();
+
+            let Some((sid_str, _)) = file_name.split_once('_') else {
+                continue;
+            };
+
+            let Ok(session_key) = SessionKey::from_str(sid_str) else {
+                continue;
+            };
+
+            session_keys.push(session_key);
         }
 
         for session_key in session_keys {
@@ -362,31 +382,4 @@ impl AppState {
         Ok(())
     }
 
-    pub fn spawn_session_cleanup(&mut self) {
-        assert!(self.session_cleanup_task.is_none());
-
-        let sessions = self.sessions.clone();
-
-        let join_handle = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(60));
-
-            loop {
-                interval.tick().await;
-                let now = Instant::now();
-
-                // sessions.retain(|_, session| !session.is_expired(now));
-            }
-        });
-
-        self.session_cleanup_task = Some(join_handle.abort_handle());
-    }
-
-}
-
-impl Drop for AppState {
-    fn drop(&mut self) {
-        if let Some(abort_handle) = self.session_cleanup_task.take() {
-            abort_handle.abort();
-        }
-    }
 }

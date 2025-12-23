@@ -24,7 +24,7 @@ and plans to integrate an AlphaZero-based value and policy network.
 ## Project Structure
 
 ### rusty-renju
-Gomoku/Renju rule implementation with strict forbidden move detection
+High-throughput Gomoku/Renju implementation with strict forbidden move detection
 
 ### mintaka
 Principal Variation Search (PVS) based engine core
@@ -33,10 +33,10 @@ Principal Variation Search (PVS) based engine core
 Protocol adapters for [Piskvork(Gomocup)](https://plastovicka.github.io/protocl2en.htm), [Yixin-board](https://github.com/accreator/Yixin-Board) and [GTP](https://www.gnu.org/software/gnugo/gnugo_19.html)-like CLI
 
 ### mintaka-server
-REST API support with session-persistent reload and TLS
+REST API provider with resource management and TLS
 
 ### mintaka-webui
-(WIP) Solid.js based web frontend
+Solid.js-based web frontend
 
 ### mintaka-wasm
 WebAssembly bindings for JavaScript/TypeScript (wasm-bindgen)

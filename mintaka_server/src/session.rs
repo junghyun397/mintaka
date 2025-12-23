@@ -10,13 +10,14 @@ use mintaka::state::GameState;
 use rusty_renju::memo::hash_key::HashKey;
 use serde::ser::SerializeStruct;
 use serde::{ser, Deserialize, Serialize, Serializer};
+use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use typeshare::typeshare;
@@ -203,6 +204,8 @@ impl Session {
             let game_result = game_agent.command(Command::Play(best_move.pos)).unwrap();
 
             let _ = result_sender.send(SessionResultResponse { game_agent, best_move, game_result });
+
+            tracing::info!("session finished")
         });
 
         Ok(())
@@ -264,6 +267,14 @@ impl Session {
         }
     }
 
+    pub fn live_until_epoch_secs(&self) -> u64 {
+        let live_time = SystemTime::now()
+            - Instant::now().duration_since(self.last_active)
+            + self.time_to_live.unwrap();
+
+        live_time.duration_since(UNIX_EPOCH).unwrap().as_secs()
+    }
+
 }
 
 impl Drop for Session {
@@ -316,7 +327,7 @@ impl Ord for EvictionEntry {
 
 pub struct Sessions {
     pub map: Arc<DashMap<SessionKey, Session>>,
-    pub eviction_queue: Arc<Mutex<BinaryHeap<EvictionEntry>>>,
+    pub eviction_queue: Arc<Mutex<BinaryHeap<Reverse<EvictionEntry>>>>,
 }
 
 impl Default for Sessions {
@@ -334,10 +345,26 @@ impl Sessions {
         self.map.get(key)
     }
 
-    pub fn get_mut(&self, key: &SessionKey) -> Option<dashmap::mapref::one::RefMut<SessionKey, Session>> {
-        if let Some(mut entry) = self.map.get_mut(key) {
-            entry.touch_last_active();
-            Some(entry)
+    pub fn get_with_touch(&self, key: &SessionKey) -> Option<dashmap::mapref::one::Ref<SessionKey, Session>> {
+        if let Some(mut session) = self.map.get_mut(key) {
+            session.touch_last_active();
+        };
+
+        self.map.get(key)
+    }
+
+    pub fn get_mut_with_touch(&self, key: &SessionKey) -> Option<dashmap::mapref::one::RefMut<SessionKey, Session>> {
+        if let Some(mut session) = self.map.get_mut(key) {
+            session.touch_last_active();
+
+            let mut queue = self.eviction_queue.lock().unwrap();
+            queue.push(Reverse(EvictionEntry {
+                last_active: session.last_active,
+                last_active_seq: session.last_active_seq,
+                key: *session.key()
+            }));
+
+            Some(session)
         } else {
             None
         }
@@ -349,6 +376,12 @@ impl Sessions {
 
     pub fn insert(&self, key: SessionKey, session: Session) {
         self.map.insert(key, session);
+    }
+
+    pub fn keys(&self) -> Vec<SessionKey> {
+        self.map.iter()
+            .map(|entry| *entry.key())
+            .collect()
     }
 
 }

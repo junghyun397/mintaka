@@ -156,3 +156,9 @@ impl<T: Copy> Copy for ColorContainer<T> {}
 pub struct AlignedColorContainer<T>(pub [T; 2]);
 
 impl_color_container!(AlignedColorContainer);
+
+impl<T> From<AlignedColorContainer<T>> for ColorContainer<T> {
+    fn from(value: AlignedColorContainer<T>) -> Self {
+        Self(value.0)
+    }
+}

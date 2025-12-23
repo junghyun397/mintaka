@@ -2,7 +2,7 @@ use crate::app_state::{AppError, AppState};
 use crate::session::{SessionKey, SessionResponse};
 use async_stream::stream;
 use axum::extract::{Path, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{sse, IntoResponse, Sse};
 use axum::Json;
 use futures_util::Stream;
@@ -11,7 +11,9 @@ use mintaka::protocol::command::Command;
 use mintaka::state::GameState;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
+use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio_stream::StreamExt;
 
 #[derive(Serialize)]
@@ -27,11 +29,13 @@ impl From<&AppError> for StatusCode {
             AppError::SessionNotFound => StatusCode::NOT_FOUND,
             AppError::SessionInComputing => StatusCode::CONFLICT,
             AppError::SessionIdle => StatusCode::CONFLICT,
-            AppError::StreamAcquired => StatusCode::CONFLICT,
+            AppError::StreamAlreadyAcquired => StatusCode::CONFLICT,
             AppError::StreamNotAcquired => StatusCode::CONFLICT,
             AppError::SessionNeverLaunched => StatusCode::NO_CONTENT,
             AppError::SessionFileAlreadyExists => StatusCode::CONFLICT,
             AppError::SessionFileNotFound => StatusCode::NOT_FOUND,
+            AppError::MemoryAcquireTimeout => StatusCode::SERVICE_UNAVAILABLE,
+            AppError::WorkerAcquireTimeout => StatusCode::SERVICE_UNAVAILABLE,
             AppError::GameError(_) => StatusCode::CONFLICT,
             AppError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -94,10 +98,17 @@ pub async fn command_session(
 }
 
 pub async fn launch_session(
+    headers: HeaderMap,
     Path(sid): Path<SessionKey>,
     State(state): State<Arc<AppState>>
 ) -> impl IntoResponse {
-    state.launch_session(sid)
+    let timeout = headers.get("Timeout")
+        .and_then(|timeout| timeout.to_str().ok())
+        .and_then(|value| u64::from_str(value).ok())
+        .map(Duration::from_secs)
+        .unwrap_or(Duration::from_secs(3));
+
+    state.launch_session(sid, timeout)
         .await
         .map(|computing_resource| (StatusCode::OK, Json(computing_resource)))
 }
