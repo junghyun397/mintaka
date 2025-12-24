@@ -6,14 +6,14 @@
   "scripts": {
     "requirements": "rustup component add rust-src && rustup target add wasm32-unknown-unknown && cargo install wasm-pack typeshare-cli",
 
-    "typeshare:build": "typeshare ../ --lang=typescript --output-file=../mintaka_wasm/types.d.ts",
+    "typeshare:build": "typeshare ../ --lang=typescript --output-file=../mintaka_wasm/types_ts",
     "wasm:build": "wasm-pack build ../mintaka_wasm --release --target web --out-name mintaka_wasm --out-dir ../mintaka_webui/src/wasm/pkg -- -Z build-std=std,panic_abort",
     "wasm:package": "pnpm typeshare:build && pnpm wasm:build",
 
-    "dev:wasm": "pnpm wasm:package && vite",
-    "dev": "vite",
+    "dev:wasm": "pnpm wasm:package && vite --host",
+    "dev": "vite --host",
     "build": "pnpm wasm:package && vite build",
-    "serve": "pnpm wasm:package && vite preview"
+    "serve": "pnpm build && vite preview --host"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

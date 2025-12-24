@@ -1,4 +1,4 @@
-use crate::rusty_renju::{Board, History, Pos};
+use crate::rusty_renju::{Board, BoardWorker, History, Pos};
 use crate::{impl_wrapper, to_js_result, to_js_value, try_from_js_value, WebClock};
 use mintaka::protocol::response::ResponseSender;
 use std::cell::RefCell;
@@ -85,6 +85,11 @@ impl GameStateWorker {
         to_js_value(&self.inner.board)
     }
 
+    #[wasm_bindgen(js_name = boardWorker)]
+    pub fn board_worker(&self) -> BoardWorker {
+        BoardWorker { inner: self.inner.board.clone() }
+    }
+
     pub fn history(&self) -> History {
         to_js_value(&self.inner.history)
     }
@@ -127,16 +132,6 @@ impl GameStateWorker {
         self.inner.undo_rebuild_mut()
     }
 
-    #[wasm_bindgen(js_name = toJs)]
-    pub fn to_js(&self) -> Result<GameState, JsError> {
-        to_js_result(&self.inner).into()
-    }
-
-    #[wasm_bindgen(js_name = fromJs)]
-    pub fn from_js(value: GameState) -> Result<Self, JsError> {
-        Ok(Self { inner: try_from_js_value(value)? })
-    }
-
 }
 
 #[wasm_bindgen]
@@ -154,12 +149,6 @@ impl GameAgent {
 
         Self {
             inner: Arc::new(RefCell::new(mintaka::game_agent::GameAgent::from_state(config, state))),
-        }
-    }
-
-    pub fn state(&self) -> GameStateWorker {
-        GameStateWorker {
-            inner: self.inner.borrow().state,
         }
     }
 

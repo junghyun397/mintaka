@@ -1,7 +1,8 @@
 import {
     MintakaProviderBase,
     MintakaProviderMessage,
-    MintakaProviderResponse, MintakaProviderRuntimeMessage,
+    MintakaProviderResponse,
+    MintakaProviderRuntimeMessage,
     MintakaProviderState
 } from "./mintaka.provider";
 import {Command, Config, GameState} from "../wasm/pkg";
@@ -9,9 +10,9 @@ import {Command, Config, GameState} from "../wasm/pkg";
 export class MintakaServerConfig {
     readonly address: string
     readonly port: number
-    readonly apiPassword: string
+    readonly apiPassword?: string
 
-    constructor(address: string, port: number, apiPassword: string) {
+    constructor(address: string, port: number, apiPassword?: string) {
         this.address = address
         this.port = port
         this.apiPassword = apiPassword
@@ -23,11 +24,14 @@ export class MintakaServerConfig {
 
     headers = (extra?: HeadersInit) => {
         const headers = new Headers(extra)
-        headers.set("Api-Password", this.apiPassword)
+
+        if (this.apiPassword) headers.set("Api-Password", this.apiPassword)
+
         return headers
     }
-
 }
+
+export const localHostServerConfig = new MintakaServerConfig("http://localhost", 8080, "test")
 
 export type MintakaServerSession = {
     readonly sid: string

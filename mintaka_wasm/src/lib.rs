@@ -11,7 +11,10 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
 #[wasm_bindgen(typescript_custom_section)]
-const MINTAKA_TYPES: &'static str = include_str!("../../mintaka_wasm/types.d.ts");
+const MINTAKA_TYPES: &'static str = include_str!("../../mintaka_wasm/types_ts");
+
+#[wasm_bindgen(typescript_custom_section)]
+const UNION_TYPES: &'static str = include_str!("../../mintaka_wasm/union_types_ts");
 
 #[wasm_bindgen(start)]
 pub fn start() {

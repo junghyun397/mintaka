@@ -21,7 +21,7 @@ export type Depth = number;
 
 export type ForbiddenKind = string;
 
-export type Pos = string;
+export type Pos = PosSchema;
 
 export type MaybePos = Pos | undefined;
 

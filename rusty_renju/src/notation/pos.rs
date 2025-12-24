@@ -56,7 +56,7 @@ pub const fn pos_unchecked(source: &str) -> Pos {
     Pos::from_cartesian(row, col)
 }
 
-#[typeshare(serialized_as = "String")]
+#[typeshare(serialized_as = "PosSchema")]
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub struct Pos(u8);
 

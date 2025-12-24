@@ -1,5 +1,4 @@
 # mintaka-webui
-Requires rustup, cargo, pnpm
 
 ```shell
 pnpm run requirements

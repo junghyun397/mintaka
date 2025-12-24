@@ -30,48 +30,6 @@ pub fn default_board() -> Board {
 }
 
 impl_wrapper! {
-    pub PosWorker { inner: rusty_renju::notation::pos::Pos } <-> Pos
-}
-
-#[wasm_bindgen]
-impl PosWorker {
-
-    #[wasm_bindgen(js_name = fromIndex)]
-    pub fn from_index(idx: u8) -> Self {
-        rusty_renju::notation::pos::Pos::from_index(idx).into()
-    }
-
-    #[wasm_bindgen(js_name = fromCartesian)]
-    pub fn from_cartesian(row: u8, col: u8) -> Self {
-        rusty_renju::notation::pos::Pos::from_cartesian(row, col).into()
-    }
-
-    pub fn idx(&self) -> u8 {
-        self.inner.idx()
-    }
-
-    pub fn row(&self) -> u8 {
-        self.inner.row()
-    }
-
-    pub fn col(&self) -> u8 {
-        self.inner.col()
-    }
-
-    #[wasm_bindgen(js_name = toCartesian)]
-    pub fn to_cartesian(&self) -> js_sys::Array {
-        let (r, c) = self.inner.to_cartesian();
-        [JsValue::from(r), JsValue::from(c)].into_iter().collect()
-    }
-
-    #[wasm_bindgen(js_name = toString)]
-    pub fn to_string(&self) -> String {
-        self.inner.to_string()
-    }
-
-}
-
-impl_wrapper! {
     pub BoardWorker { inner: rusty_renju::board::Board } <-> Board
 }
 
@@ -106,11 +64,9 @@ impl BoardWorker {
     }
 
     pub fn field(&self) -> Vec<BoardExportItem> {
-        let field: Vec<BoardExportItem> = self.inner.iter_export_items()
+        self.inner.iter_export_items()
             .map(|item| to_js_value(&item))
-            .collect();
-
-        field
+            .collect()
     }
 
     #[wasm_bindgen(js_name = isPosEmpty)]
