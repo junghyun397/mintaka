@@ -1,10 +1,11 @@
 import {
     MintakaProviderBase,
-    MintakaProviderMessage, MintakaProviderRuntimeMessage,
+    MintakaProviderMessage,
     MintakaProviderResponse,
+    MintakaProviderRuntimeMessage,
     MintakaProviderState
 } from "./mintaka.provider";
-import {Config, GameState} from "../wasm/pkg";
+import {Config, GameState} from "../wasm/pkg/mintaka_wasm_worker";
 
 export type MintakaWorkerMessage =
     | MintakaProviderMessage

@@ -1,11 +1,11 @@
-import {createContext, JSXElement, ParentProps} from "solid-js";
+import {createContext, ParentProps} from "solid-js";
 import {MintakaProvider} from "./domain/mintaka.provider";
 import {createStore, SetStoreFunction} from "solid-js/store";
 import {BoardStore, createBoardStore} from "./stores/board.store";
 import {createHistoryStore, HistoryStore} from "./stores/history.store";
 import {HistoryTree} from "./domain/history";
-import {BoardWorker, defaultBoard} from "./wasm/pkg";
-import {UiStore} from "./stores/ui.store";
+import {BoardWorker, defaultBoard, defaultConfig} from "./wasm/pkg/mintaka_wasm";
+import {AppConfig} from "./stores/config.store";
 
 type AppContext = {
     mintakaProvider: MintakaProvider | undefined,
@@ -13,8 +13,8 @@ type AppContext = {
     boardWorker: BoardWorker,
     historyTree: HistoryTree,
 
-    readonly uiStore: UiStore,
-    readonly setUiStore: SetStoreFunction<UiStore>,
+    readonly appConfigStore: AppConfig,
+    readonly setAppConfigStore: SetStoreFunction<AppConfig>,
 
     readonly boardStore: BoardStore,
     readonly setBoardStore: SetStoreFunction<BoardStore>,
@@ -25,17 +25,20 @@ type AppContext = {
 
 export const AppContext = createContext<AppContext>()
 
-export function AppContextProvider(props: ParentProps): JSXElement {
+export function AppContextProvider(props: ParentProps) {
     const board = defaultBoard()
     const boardWorker = new BoardWorker(board)
 
     const historyTree = new HistoryTree(undefined, [])
 
-    const [uiStore, setUiStore] = createStore<UiStore>({
+    const appConfig: AppConfig = {
+        serverConfig: undefined,
+        config: defaultConfig(),
         theme: "system",
-        historyOpen: false,
-        configOpen: false,
-    })
+        openHistory: false
+    }
+
+    const [appConfigStore, setAppConfigStore] = createStore(appConfig)
 
     const [boardStore, setBoardStore] = createBoardStore(boardWorker)
 
@@ -48,8 +51,8 @@ export function AppContextProvider(props: ParentProps): JSXElement {
             boardWorker,
             historyTree,
 
-            uiStore,
-            setUiStore,
+            appConfigStore,
+            setAppConfigStore,
 
             boardStore,
             setBoardStore,

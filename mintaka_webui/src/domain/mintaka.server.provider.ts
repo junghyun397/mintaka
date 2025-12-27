@@ -5,7 +5,7 @@ import {
     MintakaProviderRuntimeMessage,
     MintakaProviderState
 } from "./mintaka.provider";
-import {Command, Config, GameState} from "../wasm/pkg";
+import {Command, Config, GameState} from "../wasm/pkg/mintaka_wasm";
 
 export class MintakaServerConfig {
     readonly address: string

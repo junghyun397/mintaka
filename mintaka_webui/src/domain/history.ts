@@ -1,4 +1,4 @@
-import {MaybePos} from "../wasm/pkg";
+import {MaybePos} from "../wasm/pkg/mintaka_wasm";
 
 export type HistoryEntry = {
     pos: MaybePos,
@@ -21,7 +21,15 @@ export class HistoryTree {
         this.top = top ?? history.length
     }
 
-    get linear(): HistoryEntry[] {
+    get length(): number {
+        return (this.root?.length ?? 0) + this.top
+    }
+
+    get inBranchHead(): boolean {
+        return this.top === 0
+    }
+
+    linear(): HistoryEntry[] {
         const acc = [this.history.slice(0, this.top)]
 
         let current = this.root
@@ -33,16 +41,8 @@ export class HistoryTree {
         return acc.reverse().flat()
     }
 
-    get length(): number {
-        return (this.root?.length ?? 0) + this.top
-    }
-
-    get inBranchHead(): boolean {
-        return this.top === 0
-    }
-
     flatten(): HistoryTree {
-        return new HistoryTree(undefined, this.linear)
+        return new HistoryTree(undefined, this.linear())
     }
 
     push (entry: HistoryEntry): HistoryTree {

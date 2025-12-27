@@ -15,11 +15,13 @@ cargo install wasm-pack typeshare-cli
 wasm-pack build mintaka_wasm \
   --release \
   --target web \
-  --out-dir ./pkg \
+  --out-dir ./pkg/mintaka_wasm \
   -- -Z build-std=std,panic_abort
-typeshare . \
-  --lang=typescript \
-  --output-folder=./mintaka_wasm/pkg
+wasm-pack build mintaka_wasm_worker \
+  --release \
+  --target web \
+  --out-dir ./pkg/mintaka_wasm_worker \
+  -- -Z build-std=std,panic_abort
 ```
 
 ## Before Run

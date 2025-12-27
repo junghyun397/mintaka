@@ -1,4 +1,4 @@
-import {BoardExportItem, BoardWorker, Color, Pos} from "../wasm/pkg";
+import {BoardExportItem, BoardWorker, Color, Pos} from "../wasm/pkg/mintaka_wasm";
 import {createStore, SetStoreFunction} from "solid-js/store";
 import {INDEX_TO_POS} from "../domain/rusty-renju";
 

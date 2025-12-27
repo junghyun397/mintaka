@@ -4,6 +4,7 @@ members = [
     "mintaka",
     "mintaka_interface",
     "mintaka_wasm",
+    "mintaka_wasm_worker",
     "mintaka_trainer",
     "mintaka_server",
     "rusty_renju_jni",

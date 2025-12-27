@@ -1,4 +1,4 @@
-import init, {BestMove, GameAgent, initThreadPool, JsAbortHandle} from "../wasm/pkg";
+import init, {BestMove, GameAgent, initThreadPool, JsAbortHandle} from "../wasm/pkg/mintaka_wasm_worker";
 import {MintakaWorkerControl, MintakaWorkerMessage, MintakaWorkerResponse} from "./mintaka.worker.provider";
 
 let readyPromise: Promise<void> | undefined

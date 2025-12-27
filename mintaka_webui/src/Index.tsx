@@ -4,7 +4,7 @@ import {render} from 'solid-js/web';
 import 'solid-devtools';
 import {App} from "./App";
 
-import init, {defaultConfig, defaultGameState} from "./wasm/pkg";
+import init, {defaultConfig, defaultGameState} from "./wasm/pkg/mintaka_wasm";
 import {MintakaWorkerProvider} from "./domain/mintaka.worker.provider";
 import {MintakaProvider} from "./domain/mintaka.provider";
 import {checkHealth, createSession, MintakaServerConfig, MintakaServerProvider} from "./domain/mintaka.server.provider";

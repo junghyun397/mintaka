@@ -1,9 +1,9 @@
 import {createMemo, For, Match, Switch, useContext} from "solid-js";
-import {Pos} from "../wasm/pkg";
 import {AppContext} from "../context";
 import {chunk, range} from "../utils/array";
 import {LETTERS, NUMS} from "../domain/rusty-renju";
 import {BoardCellView} from "../stores/board.store";
+import {Pos} from "../wasm/pkg/mintaka_wasm";
 
 export function Board() {
     const { boardWorker, boardStore } = useContext(AppContext)!

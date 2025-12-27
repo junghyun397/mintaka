@@ -1,4 +1,4 @@
-import {BestMove, Command, SearchObjective} from "../wasm/pkg";
+import {BestMove, Command, SearchObjective} from "../wasm/pkg/mintaka_wasm";
 
 export type MintakaProviderMessage =
     | { type: "command", payload: Command }

@@ -1377,9 +1377,21 @@ version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "getrandom 0.3.3",
- "js-sys",
  "mintaka",
  "rusty_renju",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "mintaka_wasm_worker"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "getrandom 0.3.3",
+ "js-sys",
+ "mintaka",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",
