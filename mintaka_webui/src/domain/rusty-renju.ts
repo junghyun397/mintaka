@@ -1,4 +1,4 @@
-import {Pos} from "../wasm/pkg/mintaka_wasm";
+import {Color, Pos} from "../wasm/pkg/mintaka_wasm";
 
 export const NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as const;
 
@@ -18,3 +18,7 @@ export const INDEX_TO_POS: Pos[] =
             `${letter}${num}` as const
         )
     )
+
+export function flip(color: Color) {
+    return color === "Black" ? "White" : "Black"
+}

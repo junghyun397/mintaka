@@ -11,8 +11,14 @@ export type MintakaWorkerMessage =
     | MintakaProviderMessage
     | { type: "init", payload: { config: Config, state: GameState } }
 
+export type MintakaLoadingResponse =
+    | { step: "download", size: number }
+    | { step: "downloading", size: number, loaded: number }
+    | { step: "compile" }
+
 export type MintakaWorkerResponse =
     | MintakaProviderResponse
+    | { type: "Load", content: MintakaLoadingResponse }
     | { type: "Ready", control: MintakaWorkerControl }
 
 export class MintakaWorkerControl {
@@ -54,6 +60,10 @@ export class MintakaWorkerProvider extends MintakaProviderBase {
 
         this.worker.onmessage = (event: MessageEvent<MintakaWorkerResponse>) => {
             switch (event.data.type) {
+                case "Load": {
+                    console.log(event.data.content)
+                    return
+                }
                 case "Ready": {
                     this.workerControl = event.data.control
                     return

@@ -1,0 +1,18 @@
+import {useContext} from "solid-js";
+import {AppContext} from "../context";
+
+export function StatusMessage() {
+    const { computingStore } = useContext(AppContext)!
+
+    const statusMessage = () => {
+        switch (1+2) {
+            case 1: return "Downloading mintaka engine."
+            case 2: return "Compiling mintaka engine."
+            case 3: return "Mintaka engine is waiting for your move."
+        }
+    }
+
+    return <p class="m-0">
+        {statusMessage()}
+    </p>
+}

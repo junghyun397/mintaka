@@ -25,8 +25,16 @@ export class HistoryTree {
         return (this.root?.length ?? 0) + this.top
     }
 
+    get backwardable(): boolean {
+        return this.top > 0 || !!this.root
+    }
+
+    get forwardable(): boolean {
+        return this.top < this.history.length
+    }
+
     get inBranchHead(): boolean {
-        return this.top === 0
+        return this.root != undefined && this.top === 0
     }
 
     linear(): HistoryEntry[] {
@@ -45,7 +53,7 @@ export class HistoryTree {
         return new HistoryTree(undefined, this.linear())
     }
 
-    push (entry: HistoryEntry): HistoryTree {
+    push(entry: HistoryEntry): HistoryTree {
         if (this.top < this.history.length) {
             return new HistoryTree(this, [entry])
         } else {
@@ -53,7 +61,7 @@ export class HistoryTree {
         }
     }
 
-    backward (): [HistoryTree, HistoryEntry] | undefined {
+    backward(): [HistoryTree, HistoryEntry] | undefined {
         if (this.top === 0) {
             return this.root?.backward()
         } else if (this.top === 1 && this.root) {
@@ -63,16 +71,30 @@ export class HistoryTree {
         }
     }
 
-    forward (method: ForwardMethod): [HistoryTree, HistoryEntry] | undefined {
-        if (this.top < this.history.length) {
-            if (this.top === 0 && method === "return") {
-                return this.root?.forward("continue")
-            }
+    bulkBackward(): [HistoryTree, HistoryEntry[]] | undefined {
+        if (this.top === 0) {
+            return this.root?.bulkBackward()
+        } else {
+            return [new HistoryTree(this.root, this.history, 0), this.history.slice(0, this.top)]
+        }
+    }
 
-            return [new HistoryTree(this.root, this.history, this.top + 1), this.history[this.top]]
+    forward(method: ForwardMethod): [HistoryTree, HistoryEntry] | undefined {
+        if (this.top >= this.history.length) return undefined
+
+        if (this.top === 0 && method === "return") {
+            return this.root?.forward("continue")
         }
 
-        return undefined
+        return [new HistoryTree(this.root, this.history, this.top + 1), this.history[this.top]]
+    }
+
+    bulkForward(method: ForwardMethod): [HistoryTree, HistoryEntry[]] | undefined {
+        if (this.top >= this.history.length) return undefined
+
+        return [new HistoryTree(this.root, this.history), this.history.slice(this.top)]
     }
 
 }
+
+export const EmptyHistoryTree = new HistoryTree(undefined, [])

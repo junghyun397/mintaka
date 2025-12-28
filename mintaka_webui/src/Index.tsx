@@ -44,7 +44,7 @@ async function server(): Promise<MintakaProvider> {
 }
 
 async function consoleDemo() {
-    const mintakaProvider = await server()
+    const mintakaProvider = await worker()
 
     mintakaProvider.onResponse = (message) => {
         console.log("response: ", message)
