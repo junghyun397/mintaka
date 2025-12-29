@@ -1,13 +1,7 @@
 import {MaybePos} from "../wasm/pkg/mintaka_wasm";
 
-export type HistoryEntry = {
-    pos: MaybePos,
-}
-
-export type HistoryBranchMarker = {
-    readonly branched: boolean
-}
-
+export type HistoryEntry = {pos: MaybePos}
+export type HistoryBranchMarker = {readonly branched: boolean}
 export type ForwardMethod = "continue" | "return"
 
 export class HistoryTree {
@@ -26,11 +20,11 @@ export class HistoryTree {
     }
 
     get backwardable(): boolean {
-        return this.top > 0 || !!this.root
+        return this.top > 0 || !!this.root?.backwardable
     }
 
     get forwardable(): boolean {
-        return this.top < this.history.length
+        return this.top < this.history.length || (this.top === 0 && !!this.root?.forwardable)
     }
 
     get inBranchHead(): boolean {
@@ -54,47 +48,45 @@ export class HistoryTree {
     }
 
     push(entry: HistoryEntry): HistoryTree {
-        if (this.top < this.history.length) {
+        if (this.top < this.history.length)
             return new HistoryTree(this, [entry])
-        } else {
+        else
             return new HistoryTree(this.root, this.history.concat(entry))
-        }
     }
 
     backward(): [HistoryTree, HistoryEntry] | undefined {
-        if (this.top === 0) {
+        if (this.top === 0)
             return this.root?.backward()
-        } else if (this.top === 1 && this.root) {
-            return [this.root, this.history[0]]
-        } else {
+        else if (this.top === 1 && this.root)
+            return [new HistoryTree(this.root, this.history, 0), this.history[0]]
+        else
             return [new HistoryTree(this.root, this.history, this.top - 1), this.history[this.top - 1]]
-        }
     }
 
     bulkBackward(): [HistoryTree, HistoryEntry[]] | undefined {
-        if (this.top === 0) {
+        if (this.top === 0)
             return this.root?.bulkBackward()
-        } else {
+        else
             return [new HistoryTree(this.root, this.history, 0), this.history.slice(0, this.top)]
-        }
     }
 
     forward(method: ForwardMethod): [HistoryTree, HistoryEntry] | undefined {
-        if (this.top >= this.history.length) return undefined
-
-        if (this.top === 0 && method === "return") {
+        if (this.top === 0 && method === "return")
             return this.root?.forward("continue")
-        }
+
+        if (this.top >= this.history.length) return undefined
 
         return [new HistoryTree(this.root, this.history, this.top + 1), this.history[this.top]]
     }
 
     bulkForward(method: ForwardMethod): [HistoryTree, HistoryEntry[]] | undefined {
+        if (this.top === 0 && method === "return")
+            return this.root?.bulkForward("continue")
+
         if (this.top >= this.history.length) return undefined
 
         return [new HistoryTree(this.root, this.history), this.history.slice(this.top)]
     }
-
 }
 
 export const EmptyHistoryTree = new HistoryTree(undefined, [])

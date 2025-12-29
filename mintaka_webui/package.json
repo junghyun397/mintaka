@@ -28,6 +28,7 @@
     "daisyui": "^5.5.11"
   },
   "dependencies": {
-    "solid-js": "^1.9.0"
+    "solid-js": "^1.9.0",
+    "@solid-primitives/storage": "^4.3.3"
   }
 }

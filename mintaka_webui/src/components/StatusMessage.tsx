@@ -12,7 +12,7 @@ export function StatusMessage() {
         }
     }
 
-    return <p class="m-0">
+    return <p class="text-base-content/70">
         {statusMessage()}
     </p>
 }

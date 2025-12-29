@@ -1,12 +1,13 @@
-import {createContext, ParentProps} from "solid-js";
+import {createContext, createEffect, onCleanup, onMount, ParentProps} from "solid-js";
 import {MintakaProvider} from "./domain/mintaka.provider";
 import {createStore, reconcile, SetStoreFunction, unwrap} from "solid-js/store";
 import {buildGameStore, GameStore} from "./stores/game.store";
 import {EmptyHistoryTree, ForwardMethod, HistoryTree} from "./domain/history";
 import {BoardWorker, defaultBoard, Pos} from "./wasm/pkg/mintaka_wasm";
-import {AppConfig, defaultAppConfig} from "./stores/config.store";
+import {AppConfig, defaultAppConfig, Theme} from "./stores/app.config.store";
 import {flip} from "./domain/rusty-renju";
 import {ComputingStore} from "./stores/computing.store";
+import {makePersisted} from "@solid-primitives/storage";
 
 type AppState = {
     boardWorker: BoardWorker,
@@ -38,14 +39,9 @@ type AppContext = {
 export const AppContext = createContext<AppContext>()
 
 export function AppContextProvider(props: ParentProps) {
-    const appState = {
-        boardWorker: new BoardWorker(defaultBoard()),
-        historyTree: EmptyHistoryTree,
-    }
+    const appState = createAppState()
 
-    const appConfig = defaultAppConfig()
-
-    const [appConfigStore, setAppConfigStore] = createStore(appConfig)
+    const [appConfigStore, setAppConfigStore] = createAppConfigStore()
 
     const [gameStore, setGameStore] = createStore(buildGameStore(appState.boardWorker, appState.historyTree, "Black"))
 
@@ -130,4 +126,48 @@ export function AppContextProvider(props: ParentProps) {
         }}
         children={props.children}
     />
+}
+
+export function createAppConfigStore(): [AppConfig, SetStoreFunction<AppConfig>] {
+    const [appConfigStore, setAppConfigStore] = makePersisted(
+        createStore(defaultAppConfig())
+    )
+
+    const removeTheme = () =>
+        document.documentElement.removeAttribute("data-theme")
+
+    const applyTheme = (theme: Exclude<Theme, "system">) => {
+        document.documentElement.setAttribute("data-theme", theme)
+    }
+
+    onMount(() => {
+        const mediaQueryList = window.matchMedia("(prefers-color-scheme: dark)");
+
+        const handler = () => {
+            if (appConfigStore.theme === "system")
+                removeTheme()
+        }
+
+        mediaQueryList.addEventListener?.("change", handler)
+
+        onCleanup(() => {
+            mediaQueryList.removeEventListener?.("change", handler)
+        })
+    })
+
+    createEffect(() => {
+        if (appConfigStore.theme === "system")
+            removeTheme()
+        else
+            applyTheme(appConfigStore.theme)
+    })
+
+    return [appConfigStore, setAppConfigStore]
+}
+
+export function createAppState(): AppState {
+    return {
+        boardWorker: new BoardWorker(defaultBoard()),
+        historyTree: EmptyHistoryTree,
+    }
 }

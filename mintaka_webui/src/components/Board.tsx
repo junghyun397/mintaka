@@ -5,7 +5,7 @@ import {LETTERS, NUMS} from "../domain/rusty-renju";
 import {BoardCellView} from "../stores/game.store";
 
 export function Board() {
-    const { gameStore, computingStore } = useContext(AppContext)!
+    const { appConfigStore, gameStore, computingStore } = useContext(AppContext)!
 
     const boardViewTopDown = createMemo(() =>
         chunk(gameStore.boardView, 15).toReversed()
@@ -16,51 +16,63 @@ export function Board() {
     )
 
     // 1+2x15+1 = 32
-    return <div class="relative aspect-square w-full @container-[size] bg-[#efb072] rounded-lg">
-        <svg class="absolute inset-0" viewBox="0 0 32 32">
-            <g stroke="black" stroke-width="0.08" stroke-linecap="butt">
-                <For each={NUMS.slice(1, -1)}>{(sequence) =>
-                    <>
-                        <line x1={sequence * 2} y1="2" x2={sequence * 2} y2="30" />
-                        <line x1="2" y1={sequence * 2} x2="30" y2={sequence * 2} />
-                    </>
-                }</For>
-                <rect x="2" y="2" width="28" height="28" fill="none" />
-                <circle cx="16" cy="16" r="0.15"/>
-            </g>
-            <g font-family="serif" font-size="0.8" fill="black" text-anchor="middle" dominant-baseline="middle">
-                <For each={range(0, 15)}>{(index) => {
-                    const num = NUMS[index]
-                    const letter = LETTERS[index].toUpperCase()
-
-                    const numPosition = 30 - index * 2
-                    const letterPosition = (index + 1) * 2
-                    return <>
-                        <text x="1" y={numPosition} text-anchor="end">{num}</text>
-                        <text x="31" y={numPosition} text-anchor="start">{num}</text>
-                        <text x={letterPosition} y="0.5">{letter}</text>
-                        <text x={letterPosition} y="31.5">{letter}</text>
-                    </>
-                }}</For>
-            </g>
-        </svg>
+    return <div
+        class="w-full flex justify-center"
+        classList={{
+            "overflow-x-auto overflow-y-auto": appConfigStore.zoomBoard,
+        }}
+    >
         <div
-            class="absolute inset-0 p-[3.125%]" // 1/32
+            class="relative bg-[#efb072] rounded-lg w-[min(100cqw,100cqh,48rem)] h-[min(100cqw,100cqh,48rem)]"
+            classList={{
+                "min-w-xl min-h-xl": appConfigStore.zoomBoard,
+            }}
         >
-            <div
-                class="h-full w-full grid grid-rows-15 grid-cols-15 stroke-gray-500"
-                classList={{
-                    "[&_button]:cursor-wait": inComputing(),
-                    "[&_button]:cursor-crosshair": !inComputing(),
-                    "[&_button.stone]:cursor-auto": !inComputing(),
-                    "[&_button.forbidden]:cursor-not-allowed": true,
-                }}
-            >
-                <For each={boardViewTopDown()}>{(row) =>
-                    <For each={row}>{(cell) =>
-                        <Cell cell={cell} />
+            <svg class="absolute inset-0" viewBox="0 0 32 32">
+                <g stroke="black" stroke-width="0.08" stroke-linecap="butt">
+                    <For each={NUMS.slice(1, -1)}>{sequence =>
+                        <>
+                            <line x1={sequence * 2} y1="2" x2={sequence * 2} y2="30" />
+                            <line x1="2" y1={sequence * 2} x2="30" y2={sequence * 2} />
+                        </>
                     }</For>
-                }</For>
+                    <rect x="2" y="2" width="28" height="28" fill="none" />
+                    <circle cx="16" cy="16" r="0.15"/>
+                </g>
+                <g font-family="serif" font-size="0.8" fill="black" text-anchor="middle" dominant-baseline="middle">
+                    <For each={range(0, 15)}>{index => {
+                        const num = NUMS[index]
+                        const letter = LETTERS[index].toUpperCase()
+
+                        const numPosition = 30 - index * 2
+                        const letterPosition = (index + 1) * 2
+                        return <>
+                            <text x="1" y={numPosition} text-anchor="end">{num}</text>
+                            <text x="31" y={numPosition} text-anchor="start">{num}</text>
+                            <text x={letterPosition} y="0.5">{letter}</text>
+                            <text x={letterPosition} y="31.5">{letter}</text>
+                        </>
+                    }}</For>
+                </g>
+            </svg>
+            <div
+                class="absolute inset-0 p-[3.125%]" // 1/32
+            >
+                <div
+                    class="h-full w-full grid grid-rows-15 grid-cols-15 stroke-gray-500"
+                    classList={{
+                        "[&_button]:cursor-wait": inComputing(),
+                        "[&_button]:cursor-crosshair": !inComputing(),
+                        "[&_button.stone]:cursor-auto": !inComputing(),
+                        "[&_button.forbidden]:cursor-not-allowed": true,
+                    }}
+                >
+                    <For each={boardViewTopDown()}>{(row) =>
+                        <For each={row}>{(cell) =>
+                            <Cell cell={cell} />
+                        }</For>
+                    }</For>
+                </div>
             </div>
         </div>
     </div>
@@ -104,13 +116,16 @@ function Cell(props: { cell: BoardCellView }) {
                                 {cell().sequence}
                             </text>
                         </Match>
-                        <Match when={appConfigStore.historyDisplay == "last" && cell().sequence === gameStore.history.length}>
+                        <Match when={
+                            (appConfigStore.historyDisplay == "pair" || appConfigStore.historyDisplay == "last")
+                            && cell().sequence === gameStore.history.length
+                        }>
                             <circle
                                 fill={reversedFill()}
                                 cx="50" cy="50" r="10"
                             />
                         </Match>
-                        <Match when={appConfigStore.historyDisplay == "last" && (cell().sequence + 1) === gameStore.history.length}>
+                        <Match when={appConfigStore.historyDisplay == "pair" && (cell().sequence + 1) === gameStore.history.length}>
                             <g
                                 stroke={reversedFill()}
                                 stroke-width="4"
