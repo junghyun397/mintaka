@@ -9,11 +9,9 @@ use crate::notation::pos::{MaybePos, Pos};
 use crate::pattern::Pattern;
 use crate::slice::Slice;
 use crate::utils::str_utils::join_str_horizontally;
-use regex_lite::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
-use std::sync::OnceLock;
 
 pub const SYMBOL_BLACK: char = 'X';
 pub const SYMBOL_WHITE: char = 'O';
@@ -40,6 +38,10 @@ fn match_symbol(c: char) -> Option<BoardElement> {
     }
 }
 
+fn match_space(c: char) -> bool {
+    [' ', '[', ']', '|'].contains(&c)
+}
+
 fn board_iter_item_to_symbol(board: &Board, pos: Pos, item: BoardIterItem) -> String {
     match item {
         BoardIterItem::Stone(color) => char::from(color),
@@ -50,26 +52,25 @@ fn board_iter_item_to_symbol(board: &Board, pos: Pos, item: BoardIterItem) -> St
     }.to_string()
 }
 
-fn parse_board_elements(source: &str) -> Result<Box<[BoardElement]>, &'static str> {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    let re = RE.get_or_init(||
-        // regex: \d[\s\[\|](\S[\s\[\]\|]){N}\d
-        format!(r"\d[\s\[\|](\S[\s\[\]\|]){{{}}}\d", pos::U_BOARD_WIDTH)
-            .as_str()
-            .parse::<Regex>()
-            .unwrap()
-    );
+fn parse_board_elements(source: &str) -> Result<Vec<BoardElement>, &'static str> {
+    let elements: Vec<BoardElement> = source
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
 
-    let elements: Box<[BoardElement]> = re.find_iter(source)
-        .map(|m| m.as_str())
-        .collect::<Box<[&str]>>()
-        .iter().rev()
-        .flat_map(|m| m
-            .chars()
-            .skip(1) // N> . . . . . N
-            .take(pos::BOARD_WIDTH as usize * 2) // N . . . . .< N
-        )
-        .filter_map(match_symbol)
+            if !line.starts_with(|c: char| c.is_ascii_digit()) {
+                return None;
+            }
+
+            Some(
+                line[line.find(|c: char| !c.is_ascii_digit())?..]
+                    .chars()
+                    .take(pos::BOARD_WIDTH as usize * 2)
+                    .filter_map(match_symbol)
+            )
+        })
+        .rev()
+        .flatten()
         .collect();
 
     (elements.len() == pos::BOARD_SIZE)

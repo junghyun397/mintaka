@@ -12,10 +12,8 @@ name = "rusty_renju"
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-regex-lite = "0.1"
-rand = "0.9"
 serde = { version = "1.0", features = ["derive"] }
-base64 = "0.22"
+rand = "0.9"
 
 typeshare = "1.0"
 

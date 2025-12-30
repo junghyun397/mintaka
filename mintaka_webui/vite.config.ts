@@ -4,28 +4,28 @@ import devtools from "solid-devtools/vite";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  plugins: [
-    solidPlugin(),
-    devtools(),
-    tailwindcss()
-  ],
-  worker: {
-    format: 'es',
-  },
-  server: {
-    port: 3000,
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
+    plugins: [
+        solidPlugin(),
+        devtools(),
+        tailwindcss(),
+    ],
+    worker: {
+        format: 'es',
     },
-  },
-  preview: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
+    server: {
+        port: 3000,
+        headers: {
+            'Cross-Origin-Opener-Policy': 'same-origin',
+            'Cross-Origin-Embedder-Policy': 'require-corp',
+        },
     },
-  },
-  build: {
-    target: 'esnext',
-  },
+    preview: {
+        headers: {
+            'Cross-Origin-Opener-Policy': 'same-origin',
+            'Cross-Origin-Embedder-Policy': 'require-corp',
+        },
+    },
+    build: {
+        target: 'esnext',
+    },
 });

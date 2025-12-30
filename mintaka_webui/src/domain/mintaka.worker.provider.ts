@@ -1,11 +1,11 @@
 import {
-    MintakaProviderBase,
+    MintakaProvider,
     MintakaProviderMessage,
     MintakaProviderResponse,
     MintakaProviderRuntimeMessage,
-    MintakaProviderState
+    MintakaProviderState, MintakaProviderType,
 } from "./mintaka.provider";
-import {Config, GameState} from "../wasm/pkg/mintaka_wasm_worker";
+import { Config, GameState } from "../wasm/pkg/mintaka_wasm_worker";
 
 export type MintakaWorkerMessage =
     | MintakaProviderMessage
@@ -19,24 +19,26 @@ export type MintakaLoadingResponse =
 export type MintakaWorkerResponse =
     | MintakaProviderResponse
     | { type: "Load", content: MintakaLoadingResponse }
-    | { type: "Ready", control: MintakaWorkerControl }
+    | { type: "Ready", sab: SharedArrayBuffer, controlPtr: number }
 
 export class MintakaWorkerControl {
     readonly sab: SharedArrayBuffer
-    readonly control_ptr: number
+    readonly controlPtr: number
 
     constructor(sab: SharedArrayBuffer, control_ptr: number) {
         this.sab = sab
-        this.control_ptr = control_ptr
+        this.controlPtr = control_ptr
     }
 
     abort() {
         const mem = new Uint8Array(this.sab)
-        Atomics.store(mem, this.control_ptr, 1)
+        Atomics.store(mem, this.controlPtr, 1)
     }
 }
 
-export class MintakaWorkerProvider extends MintakaProviderBase {
+export class MintakaWorkerProvider implements MintakaProvider {
+    readonly type: MintakaProviderType = "worker"
+
     private readonly worker: Worker
     private workerControl?: MintakaWorkerControl
 
@@ -46,8 +48,6 @@ export class MintakaWorkerProvider extends MintakaProviderBase {
     state: MintakaProviderState
 
     constructor(config: Config, gameState: GameState) {
-        super()
-
         this.state = {
             type: "idle",
             message: this.idleMessage,
@@ -55,7 +55,7 @@ export class MintakaWorkerProvider extends MintakaProviderBase {
 
         this.worker = new Worker(
             new URL("mintaka.worker.ts", import.meta.url),
-            {type: "module"},
+            { type: "module" },
         )
 
         this.worker.onmessage = (event: MessageEvent<MintakaWorkerResponse>) => {
@@ -65,7 +65,7 @@ export class MintakaWorkerProvider extends MintakaProviderBase {
                     return
                 }
                 case "Ready": {
-                    this.workerControl = event.data.control
+                    this.workerControl = new MintakaWorkerControl(event.data.sab, event.data.controlPtr)
                     return
                 }
                 case "BestMove": {
@@ -83,11 +83,11 @@ export class MintakaWorkerProvider extends MintakaProviderBase {
             this.onError && this.onError(event)
         }
 
-        this.worker.postMessage({type: "init", payload: { config: config, state: gameState }})
+        this.worker.postMessage({ type: "init", payload: { config: config, state: gameState } })
     }
 
     private idleMessage = (message: MintakaProviderMessage) => {
-        if (message.type == "launch") {
+        if (message.type === "launch") {
             this.state = {
                 type: "in_computing",
                 message: this.runtimeMessage,

@@ -1,25 +1,22 @@
-import {Match, Show, Switch, useContext} from "solid-js";
-import {AppContext} from "../context";
+import { Match, Show, Switch, useContext } from "solid-js";
+import { AppContext } from "../context";
 import {
-    IconArrowUturnRight,
-    IconChevronDoubleLeft,
-    IconChevronDoubleRight,
-    IconChevronLeft,
-    IconChevronRight,
-    IconCog8Tooth,
-    IconCpuChip,
-    IconGitBranch,
-    IconMagnifyingGlassMinus,
-    IconMagnifyingGlassPlus,
-    IconMoon,
-    IconPlay,
-    IconSun,
-    IconThemeAuto
+    IconArrowUturnRight, IconChevronDoubleLeft, IconChevronDoubleRight, IconChevronLeft, IconChevronRight, IconCog8Tooth,
+    IconCpuChip, IconGitBranch, IconInformationCircle, IconMagnifyingGlassMinus, IconMagnifyingGlassPlus, IconMoon,
+    IconPlay, IconStop, IconSun, IconThemeAuto,
 } from "./icons";
-import {nextHistoryDisplay, nextTheme} from "../stores/app.config.store";
+import { nextHistoryDisplay, nextTheme } from "../stores/app.config.store";
 
 export function Control() {
-    const { actions, appConfigStore, setAppConfigStore, gameStore } = useContext(AppContext)!
+    return <div class="flex gap-2 rounded-box bg-base-100 p-2">
+        <ConfigButton />
+        <ControlButtons />
+        <DashboardButton />
+    </div>
+}
+
+function ConfigButton() {
+    const { appConfigStore, setAppConfigStore } = useContext(AppContext)!
 
     const cycleTheme = () =>
         // @ts-ignore
@@ -34,52 +31,90 @@ export function Control() {
         setAppConfigStore("zoomBoard", !appConfigStore.zoomBoard)
     }
 
-    return <div class="flex gap-2 bg-base-100 p-2 rounded-box">
-        <div class="dropdown dropdown-top dropdown-center">
-            <div tabindex="0" role="button" class="btn btn-square">
-                <IconCog8Tooth />
-            </div>
-            <ul tabindex="-1" class="dropdown-content menu rounded-box gap-2 bg-base-100 z-1">
-                <li>
-                    <button
-                        class="btn btn-square"
-                        onClick={cycleTheme}
-                    >
-                        <Switch>
-                            <Match when={appConfigStore.theme == "system"}><IconThemeAuto /></Match>
-                            <Match when={appConfigStore.theme == "dark"}><IconMoon /></Match>
-                            <Match when={appConfigStore.theme == "light"}><IconSun /></Match>
-                        </Switch>
-                    </button>
-                </li>
-                <li>
-                    <button
-                        class="btn btn-square"
-                        onClick={cycleHistoryDisplay}
-                    >
-                        <Switch>
-                            <Match when={appConfigStore.historyDisplay == "none"}>None</Match>
-                            <Match when={appConfigStore.historyDisplay == "last"}>Last</Match>
-                            <Match when={appConfigStore.historyDisplay == "pair"}>Pair</Match>
-                            <Match when={appConfigStore.historyDisplay == "sequence"}>Seq</Match>
-                        </Switch>
-                    </button>
-                </li>
-                <li class="block md:hidden">
-                    <button
-                        class="btn btn-square"
-                        onClick={toggleZoomBoard}
-                    >
-                        <Switch>
-                            <Match when={!appConfigStore.zoomBoard}><IconMagnifyingGlassPlus /></Match>
-                            <Match when={appConfigStore.zoomBoard}><IconMagnifyingGlassMinus /></Match>
-                        </Switch>
-                    </button>
-                </li>
-            </ul>
+    return <div class="dropdown dropdown-center dropdown-top">
+        <div tabindex="0" role="button" class="btn btn-square">
+            <IconCog8Tooth />
         </div>
+        <ul tabindex="-1" class="dropdown-content menu z-1 gap-2 rounded-box bg-base-100">
+            <li>
+                <button
+                    class="btn btn-square"
+                >
+                    <IconInformationCircle />
+                </button>
+            </li>
+            <li>
+                <button
+                    class="btn btn-square"
+                    onClick={cycleTheme}
+                >
+                    <Switch>
+                        <Match when={appConfigStore.theme === "system"}><IconThemeAuto /></Match>
+                        <Match when={appConfigStore.theme === "dark"}><IconMoon /></Match>
+                        <Match when={appConfigStore.theme === "light"}><IconSun /></Match>
+                    </Switch>
+                </button>
+            </li>
+            <li>
+                <button
+                    class="btn btn-square"
+                    onClick={cycleHistoryDisplay}
+                >
+                    <svg viewBox="0 0 100 100">
+                        <defs><mask id="historyDisplayMask">
+                            <rect x="0" y="0" width="100" height="100" fill="white"/>
+                            <Switch>
+                                <Match when={appConfigStore.historyDisplay === "last"}>
+                                    <circle fill="black" cx="50" cy="50" r="8"/>
+                                </Match>
+                                <Match when={appConfigStore.historyDisplay === "pair"}>
+                                    <g stroke="black" stroke-width="4">
+                                        <line x1="35" y1="50" x2="65" y2="50"/>
+                                        <line x1="50" y1="35" x2="50" y2="65"/>
+                                    </g>
+                                </Match>
+                                <Match when={appConfigStore.historyDisplay === "sequence"}>
+                                    <text
+                                        font-family="serif"
+                                        font-size="42"
+                                        text-anchor="middle" dominant-baseline="middle"
+                                        fill="black"
+                                        x="50" y="54"
+                                    >
+                                        42
+                                    </text>
+                                </Match>
+                            </Switch>
+                        </mask></defs>
+                        <circle
+                            fill="currentColor"
+                            cx="50" cy="50" r="32"
+                            mask="url(#historyDisplayMask)"
+                        />
+                    </svg>
+                </button>
+            </li>
+            <li class="block md:hidden">
+                <button
+                    class="btn btn-square"
+                    onClick={toggleZoomBoard}
+                >
+                    <Switch>
+                        <Match when={!appConfigStore.zoomBoard}><IconMagnifyingGlassPlus /></Match>
+                        <Match when={appConfigStore.zoomBoard}><IconMagnifyingGlassMinus /></Match>
+                    </Switch>
+                </button>
+            </li>
+        </ul>
+    </div>
+}
+
+function ControlButtons() {
+    const { actions, workerStore, gameStore } = useContext(AppContext)!
+
+    return <>
         <button
-            class="btn btn-square"
+            class="btn btn-square max-xs:hidden"
             classList={{
                 "btn-disabled": !gameStore.backwardable,
             }}
@@ -96,14 +131,27 @@ export function Control() {
         >
             <IconChevronLeft />
         </button>
-        <button
-            class="btn btn-square"
-            classList={{
-                "btn-disabled": true
-            }}
-        >
-            <IconPlay />
-        </button>
+        <Show when={workerStore.inComputing} fallback={
+            <button
+                class="btn btn-square"
+                classList={{
+                    "btn-disabled": workerStore.loadedProviderType === undefined,
+                }}
+                onClick={actions.launch}
+            >
+                <IconPlay />
+            </button>
+        }>
+            <button
+                class="btn btn-square animate-pulse"
+                classList={{
+                    "btn-disabled": false,
+                }}
+                onClick={actions.abort}
+            >
+                <IconStop />
+            </button>
+        </Show>
         <Show when={gameStore.inBranchHead} fallback={
             <button
                 class="btn btn-square"
@@ -115,11 +163,11 @@ export function Control() {
                 <IconChevronRight />
             </button>
         }>
-            <div class="dropdown dropdown-top dropdown-center">
+            <div class="dropdown dropdown-center dropdown-top">
                 <div tabindex="0" role="button" class="btn btn-square">
-                      <IconGitBranch />
+                    <IconGitBranch />
                 </div>
-                <ul tabindex="-1" class="dropdown-content menu rounded-box gap-2 bg-base-100 z-1">
+                <ul tabindex="-1" class="dropdown-content menu z-1 gap-2 rounded-box bg-base-100">
                     <li>
                         <button
                             class="btn btn-square"
@@ -140,7 +188,7 @@ export function Control() {
             </div>
         </Show>
         <button
-            class="btn btn-square"
+            class="btn btn-square max-xs:hidden"
             classList={{
                 "btn-disabled": !gameStore.forwardable,
             }}
@@ -148,13 +196,18 @@ export function Control() {
         >
             <IconChevronDoubleRight />
         </button>
-        <button
-            class="btn btn-square btn-active"
-            classList={{
-                "btn-active": appConfigStore.openDashboard
-            }}
-        >
-            <IconCpuChip />
-        </button>
-    </div>
+    </>
+}
+
+function DashboardButton() {
+    const { actions, appConfigStore } = useContext(AppContext)!
+
+    return <button
+        class="btn btn-active btn-square"
+        classList={{
+            "btn-active": appConfigStore.openDashboard,
+        }}
+    >
+        <IconCpuChip />
+    </button>
 }

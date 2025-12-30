@@ -1,8 +1,8 @@
-import {useContext} from "solid-js";
-import {AppContext} from "../context";
+import { useContext } from "solid-js";
+import { AppContext } from "../context";
 
 export function StatusMessage() {
-    const { computingStore } = useContext(AppContext)!
+    const { workerStore } = useContext(AppContext)!
 
     const statusMessage = () => {
         switch (1+2) {
@@ -12,7 +12,7 @@ export function StatusMessage() {
         }
     }
 
-    return <p class="text-base-content/70">
+    return <p class="text-sm leading-tight text-base-content/70">
         {statusMessage()}
     </p>
 }

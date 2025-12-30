@@ -1,7 +1,10 @@
-import {MaybePos} from "../wasm/pkg/mintaka_wasm";
+import { HashKey, MaybePos } from "../wasm/pkg/mintaka_wasm";
 
-export type HistoryEntry = {pos: MaybePos}
-export type HistoryBranchMarker = {readonly branched: boolean}
+export type HistoryEntry = {
+    hashKey: HashKey,
+    pos: MaybePos,
+}
+
 export type ForwardMethod = "continue" | "return"
 
 export class HistoryTree {

@@ -1,13 +1,19 @@
 /* @refresh reload */
 import './index.css';
-import {render} from 'solid-js/web';
+import { render } from 'solid-js/web';
 import 'solid-devtools';
-import {App} from "./App";
+import { App } from "./App";
 
-import init, {defaultConfig, defaultGameState} from "./wasm/pkg/mintaka_wasm";
-import {MintakaWorkerProvider} from "./domain/mintaka.worker.provider";
-import {MintakaProvider} from "./domain/mintaka.provider";
-import {checkHealth, createSession, MintakaServerConfig, MintakaServerProvider} from "./domain/mintaka.server.provider";
+import init, { defaultConfig, defaultGameState } from "./wasm/pkg/mintaka_wasm";
+import { MintakaWorkerProvider } from "./domain/mintaka.worker.provider";
+import { MintakaProvider } from "./domain/mintaka.provider";
+import {
+    checkHealth,
+    createSession,
+    LocalHostServerConfig,
+    MintakaServerConfig,
+    MintakaServerProvider,
+} from "./domain/mintaka.server.provider";
 
 await init()
 
@@ -30,7 +36,7 @@ async function server(): Promise<MintakaProvider> {
     const config = defaultConfig()
     const gameState = defaultGameState()
 
-    const serverConfig = new MintakaServerConfig("http://localhost", 8080, "test")
+    const serverConfig = LocalHostServerConfig
 
     const healthy = await checkHealth(serverConfig)
 
@@ -54,7 +60,7 @@ async function consoleDemo() {
         console.error("worker error: ", error)
     }
 
-    mintakaProvider.idleState!.message({type: "command", payload: { type: "TurnTime", content: { secs: 1, nanos: 0}}})
-    mintakaProvider.idleState!.message({type: "command", payload: { type: "Workers", content: 1}})
-    mintakaProvider.idleState!.message({type: "launch", payload: { objective: "Best" }})
+    mintakaProvider.idleState!.message({ type: "command", payload: { type: "TurnTime", content: { secs: 1, nanos: 0 } } })
+    mintakaProvider.idleState!.message({ type: "command", payload: { type: "Workers", content: 1 } })
+    mintakaProvider.idleState!.message({ type: "launch", payload: { objective: "Best" } })
 }

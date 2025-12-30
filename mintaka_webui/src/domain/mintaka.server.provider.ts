@@ -1,11 +1,11 @@
 import {
-    MintakaProviderBase,
+    MintakaProvider,
     MintakaProviderMessage,
     MintakaProviderResponse,
     MintakaProviderRuntimeMessage,
-    MintakaProviderState
+    MintakaProviderState, MintakaProviderType,
 } from "./mintaka.provider";
-import {Command, Config, GameState} from "../wasm/pkg/mintaka_wasm";
+import { Command, Config, GameState } from "../wasm/pkg/mintaka_wasm";
 
 export class MintakaServerConfig {
     readonly address: string
@@ -31,7 +31,7 @@ export class MintakaServerConfig {
     }
 }
 
-export const localHostServerConfig = new MintakaServerConfig("http://localhost", 8080, "test")
+export const LocalHostServerConfig = new MintakaServerConfig("http://localhost", 8080, "test")
 
 export type MintakaServerSession = {
     readonly sid: string
@@ -62,7 +62,7 @@ export async function createSession(serverConfig: MintakaServerConfig, config: C
     const response = await fetch(serverConfig.url + "/sessions", {
         method: "POST",
         headers: serverConfig.headers({
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }),
         body: JSON.stringify({
             config: config,
@@ -75,7 +75,7 @@ export async function createSession(serverConfig: MintakaServerConfig, config: C
     return { sid: await response.json() as string }
 }
 
-export class MintakaServerProvider extends MintakaProviderBase {
+export class MintakaServerProvider implements MintakaProvider {
     private readonly serverConfig: MintakaServerConfig
     private readonly session: MintakaServerSession
     private messageQueue: Promise<void> = Promise.resolve()
@@ -83,10 +83,11 @@ export class MintakaServerProvider extends MintakaProviderBase {
     onResponse?: (message: MintakaProviderResponse) => void
     onError?: (error: any) => void
 
+    readonly type: MintakaProviderType = "server"
+
     state: MintakaProviderState
 
     constructor(config: MintakaServerConfig, session: MintakaServerSession) {
-        super()
         this.serverConfig = config
         this.session = session
         this.state = {
@@ -117,7 +118,7 @@ export class MintakaServerProvider extends MintakaProviderBase {
         const response = await fetch(this.serverConfig.url + `/sessions/${this.session.sid}/commands`, {
             method: "POST",
             headers: this.serverConfig.headers({
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }),
             body: JSON.stringify(command),
         })
@@ -165,7 +166,7 @@ export class MintakaServerProvider extends MintakaProviderBase {
 
         eventSource.addEventListener("BestMove", (event) => {
             eventSource.close()
-            this.onResponse && this.onResponse({type: "BestMove", content: JSON.parse(event.data)})
+            this.onResponse && this.onResponse({ type: "BestMove", content: JSON.parse(event.data) })
 
             this.state = {
                 type: "idle",

@@ -1,7 +1,7 @@
 use crate::{impl_wrapper, to_js_value, try_from_js_value};
 use std::str::FromStr;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsError, JsValue};
+use wasm_bindgen::JsError;
 
 #[wasm_bindgen]
 extern "C" {
@@ -19,6 +19,9 @@ extern "C" {
 
     #[wasm_bindgen(typescript_type = "Board")]
     pub type Board;
+
+    #[wasm_bindgen(typescript_type = "HashKey")]
+    pub type HashKey;
 
     #[wasm_bindgen(typescript_type = "BoardExportItem")]
     pub type BoardExportItem;
@@ -45,6 +48,11 @@ impl BoardWorker {
     #[wasm_bindgen(js_name = toString)]
     pub fn to_string(&self) -> String {
         self.inner.to_string()
+    }
+
+    #[wasm_bindgen(js_name = hashKey)]
+    pub fn hash_key(&self) -> HashKey {
+        to_js_value(&self.inner.hash_key)
     }
 
     #[wasm_bindgen(js_name = playerColor)]

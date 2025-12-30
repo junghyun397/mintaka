@@ -1,11 +1,9 @@
 pub mod rusty_renju;
 pub mod mintaka;
 
-use ::mintaka::utils::time::MonotonicClock;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
 
 #[wasm_bindgen(typescript_custom_section)]
 const MINTAKA_TYPES: &'static str = include_str!("../../mintaka_wasm/types_ts");

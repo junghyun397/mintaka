@@ -2,7 +2,7 @@ use crate::rusty_renju::{Board, BoardWorker, History, Pos};
 use crate::{impl_wrapper, to_js_value, try_from_js_value};
 use std::cmp::Ordering;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsCast, JsError};
+use wasm_bindgen::JsError;
 
 #[wasm_bindgen]
 extern "C" {

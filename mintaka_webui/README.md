@@ -2,5 +2,5 @@
 
 ```shell
 pnpm run requirements
-pnpm run dev:wasm
+pnpm run serve
 ```

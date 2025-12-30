@@ -1,5 +1,5 @@
-import init, {BestMove, GameAgent, initThreadPool, JsAbortHandle} from "../wasm/pkg/mintaka_wasm_worker";
-import {MintakaWorkerControl, MintakaWorkerMessage, MintakaWorkerResponse} from "./mintaka.worker.provider";
+import init, { GameAgent, initThreadPool, JsAbortHandle } from "../wasm/pkg/mintaka_wasm_worker";
+import { MintakaWorkerMessage, MintakaWorkerResponse } from "./mintaka.worker.provider";
 
 let readyPromise: Promise<void> | undefined
 let memory: SharedArrayBuffer | undefined
@@ -27,7 +27,7 @@ const ctx = {
         abort: JsAbortHandle
     } | undefined,
     post: (data: MintakaWorkerResponse) => self.postMessage(data),
-    postError: (error: any) => self.postMessage({type: "Error", error: error})
+    postError: (error: any) => self.postMessage({ type: "Error", error: error }),
 }
 
 self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage>) => {
@@ -41,14 +41,12 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
                 const abortHandle = new JsAbortHandle()
                 const ptr = abortHandle.ptr()
 
-                const control = new MintakaWorkerControl(memory!, ptr)
-
                 ctx.state = {
                     abort: abortHandle,
-                    agent: new GameAgent(config, state)
+                    agent: new GameAgent(config, state),
                 }
 
-                ctx.post({type: "Ready", control: control })
+                ctx.post({ type: "Ready", sab: memory!, controlPtr: ptr })
                 break
             }
             case "command": {
@@ -56,9 +54,9 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
                 break
             }
             case "launch": {
-                const bestMove: BestMove = ctx.state!.agent.launch("Best", ctx.state!.abort)
+                const bestMove = ctx.state!.agent.launch("Best", ctx.state!.abort)
 
-                ctx.post({type: "BestMove", content: bestMove })
+                ctx.post({ type: "BestMove", content: bestMove })
                 break
             }
         }

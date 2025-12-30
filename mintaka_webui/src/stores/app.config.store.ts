@@ -1,5 +1,7 @@
-import {MintakaServerConfig} from "../domain/mintaka.server.provider";
-import {Config, defaultConfig} from "../wasm/pkg/mintaka_wasm";
+import { MintakaServerConfig } from "../domain/mintaka.server.provider";
+import { Config, defaultConfig } from "../wasm/pkg/mintaka_wasm";
+import { MintakaProviderType } from "../domain/mintaka.provider";
+import { duration } from "../domain/rusty-renju";
 
 const Themes = ["system", "dark", "light"] as const
 
@@ -18,6 +20,7 @@ export function nextHistoryDisplay(historyDisplay: HistoryDisplay): HistoryDispl
 }
 
 export type AppConfig = {
+    readonly providerType: MintakaProviderType,
     readonly serverConfig?: MintakaServerConfig,
     readonly config: Config,
     readonly theme: Theme,
@@ -29,8 +32,16 @@ export type AppConfig = {
 
 export function defaultAppConfig(): AppConfig {
     return {
+        providerType: "worker",
         serverConfig: undefined,
-        config: defaultConfig(),
+        config: {
+            ...defaultConfig(),
+            "initial_timer": {
+                total_remaining: duration(3000),
+                increment: duration(0),
+                turn: duration(1),
+            },
+        },
         theme: "system",
         zoomBoard: false,
         historyDisplay: "pair",

@@ -1,20 +1,31 @@
-import {Show} from "solid-js";
+import { createMemo, useContext } from "solid-js";
+import { AppContext } from "../context";
+import { flatmap } from "../utils/undefined";
 
-export function EvaluationBar(props: { value: number | undefined }) {
-    const blackPercent = () =>
-        props.value ? ((props.value + 1) / 2) * 100 : undefined
+export function RootEvaluationBar() {
+    const { workerStore } = useContext(AppContext)!
 
-    return <Show when={blackPercent()} fallback={
-        <div class="h-4" />
-    }>{percent =>
+    return <div class="mx-auto w-full max-w-90">
+        <EvaluationBar normEval={0} />
+    </div>
+}
+
+export function EvaluationBar(props: { normEval: number | undefined }) {
+    const whitePercent = createMemo(() =>
+        flatmap(props.normEval, blackNormEval => (-blackNormEval + 1) / 2 * 100),
+    )
+
+    return <div
+        class="h-4 overflow-hidden rounded-full border-3 border-base-300 bg-black transition-opacity duration-200 ease-out"
+        classList={{
+            "opacity-0": whitePercent() === undefined,
+        }}
+    >
         <div
-            class="h-4 border-3 border-base-300 rounded-full bg-white"
-            role="meter"
-        >
-            <div
-                class="h-full bg-black transition-all duration-200 ease-out rounded-l-full"
-                style={{ width: `${percent}%` }}
-            />
-        </div>
-    }</Show>
+            class="ml-auto h-full bg-white transition-[width] duration-300 ease-out"
+            style={{
+                width: `${whitePercent() ?? 50}%`,
+            }}
+        />
+    </div>
 }

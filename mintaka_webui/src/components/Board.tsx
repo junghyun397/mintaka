@@ -1,78 +1,60 @@
-import {createMemo, For, Match, Switch, useContext} from "solid-js";
-import {AppContext} from "../context";
-import {chunk, range} from "../utils/array";
-import {LETTERS, NUMS} from "../domain/rusty-renju";
-import {BoardCellView} from "../stores/game.store";
+import { createMemo, For, Match, Switch, useContext } from "solid-js";
+import { AppContext } from "../context";
+import { chunk, range } from "../utils/array";
+import { LETTERS, NUMS } from "../domain/rusty-renju";
+import { BoardCellView } from "../stores/game.store";
 
 export function Board() {
-    const { appConfigStore, gameStore, computingStore } = useContext(AppContext)!
+    const { gameStore, workerStore } = useContext(AppContext)!
 
     const boardViewTopDown = createMemo(() =>
-        chunk(gameStore.boardView, 15).toReversed()
-    )
-
-    const inComputing = createMemo(() =>
-        computingStore.state !== undefined
+        chunk(gameStore.boardView, 15).toReversed(),
     )
 
     // 1+2x15+1 = 32
-    return <div
-        class="w-full flex justify-center"
-        classList={{
-            "overflow-x-auto overflow-y-auto": appConfigStore.zoomBoard,
-        }}
-    >
-        <div
-            class="relative bg-[#efb072] rounded-lg w-[min(100cqw,100cqh,48rem)] h-[min(100cqw,100cqh,48rem)]"
-            classList={{
-                "min-w-xl min-h-xl": appConfigStore.zoomBoard,
-            }}
-        >
-            <svg class="absolute inset-0" viewBox="0 0 32 32">
-                <g stroke="black" stroke-width="0.08" stroke-linecap="butt">
-                    <For each={NUMS.slice(1, -1)}>{sequence =>
-                        <>
-                            <line x1={sequence * 2} y1="2" x2={sequence * 2} y2="30" />
-                            <line x1="2" y1={sequence * 2} x2="30" y2={sequence * 2} />
-                        </>
-                    }</For>
-                    <rect x="2" y="2" width="28" height="28" fill="none" />
-                    <circle cx="16" cy="16" r="0.15"/>
-                </g>
-                <g font-family="serif" font-size="0.8" fill="black" text-anchor="middle" dominant-baseline="middle">
-                    <For each={range(0, 15)}>{index => {
-                        const num = NUMS[index]
-                        const letter = LETTERS[index].toUpperCase()
+    return <div class="relative h-full w-full rounded-box bg-[#efb072]">
+        <svg class="absolute inset-0" viewBox="0 0 32 32">
+            <g stroke="black" stroke-width="0.08" stroke-linecap="butt">
+                <For each={NUMS.slice(1, -1)}>{sequence =>
+                    <>
+                        <line x1={sequence * 2} y1="2" x2={sequence * 2} y2="30" />
+                        <line x1="2" y1={sequence * 2} x2="30" y2={sequence * 2} />
+                    </>
+                }</For>
+                <rect x="2" y="2" width="28" height="28" fill="none" />
+                <circle cx="16" cy="16" r="0.15"/>
+            </g>
+            <g font-family="serif" font-size="0.8" fill="black" text-anchor="middle" dominant-baseline="middle">
+                <For each={range(0, 15)}>{index => {
+                    const num = index + 1
+                    const letter = LETTERS[index].toUpperCase()
 
-                        const numPosition = 30 - index * 2
-                        const letterPosition = (index + 1) * 2
-                        return <>
-                            <text x="1" y={numPosition} text-anchor="end">{num}</text>
-                            <text x="31" y={numPosition} text-anchor="start">{num}</text>
-                            <text x={letterPosition} y="0.5">{letter}</text>
-                            <text x={letterPosition} y="31.5">{letter}</text>
-                        </>
-                    }}</For>
-                </g>
-            </svg>
+                    const numPosition = 30 - index * 2
+                    const letterPosition = (index + 1) * 2
+                    return <>
+                        <text x="1" y={numPosition} text-anchor="end">{num}</text>
+                        <text x="31" y={numPosition} text-anchor="start">{num}</text>
+                        <text x={letterPosition} y="0.5">{letter}</text>
+                        <text x={letterPosition} y="31.5">{letter}</text>
+                    </>
+                }}</For>
+            </g>
+        </svg>
+        <div
+            class="absolute inset-0 p-[3.125%]" // 1/32
+        >
             <div
-                class="absolute inset-0 p-[3.125%]" // 1/32
+                class="grid h-full w-full grid-cols-15 grid-rows-15 stroke-gray-500 [&_button.forbidden]:cursor-not-allowed"
+                classList={{
+                    "[&_button]:cursor-wait": workerStore.inComputing,
+                    "[&_button.stone]:cursor-auto [&_button]:cursor-crosshair": workerStore.inComputing,
+                }}
             >
-                <div
-                    class="h-full w-full grid grid-rows-15 grid-cols-15 stroke-gray-500"
-                    classList={{
-                        "[&_button]:cursor-wait": inComputing(),
-                        "[&_button]:cursor-crosshair": !inComputing(),
-                        "[&_button.stone]:cursor-auto": !inComputing(),
-                        "[&_button.forbidden]:cursor-not-allowed": true,
-                    }}
-                >
-                    <For each={boardViewTopDown()}>{(row) =>
-                        <For each={row}>{(cell) =>
-                            <Cell cell={cell} />
-                        }</For>
+                <For each={boardViewTopDown()}>{(row) =>
+                    <For each={row}>{(cell) =>
+                        <Cell cell={cell} />
                     }</For>
-                </div>
+                }</For>
             </div>
         </div>
     </div>
@@ -92,13 +74,13 @@ function Cell(props: { cell: BoardCellView }) {
         title={props.cell.pos}
         classList={{
             "stone": props.cell.type === "Stone",
-            "forbidden": props.cell.type === "Forbidden" && gameStore.userColor == "Black",
+            "forbidden": props.cell.type === "Forbidden" && gameStore.userColor === "Black",
         }}
         onClick={[actions.play, props.cell.pos]}
     >
         <Switch>
             <Match when={props.cell.type === "Stone" ? props.cell : undefined}>{cell =>
-                <svg class="" viewBox="0 0 100 100">
+                <svg viewBox="0 0 100 100">
                     <circle
                         fill={fill()}
                         stroke-width="4"
@@ -117,7 +99,7 @@ function Cell(props: { cell: BoardCellView }) {
                             </text>
                         </Match>
                         <Match when={
-                            (appConfigStore.historyDisplay == "pair" || appConfigStore.historyDisplay == "last")
+                            (appConfigStore.historyDisplay === "pair" || appConfigStore.historyDisplay === "last")
                             && cell().sequence === gameStore.history.length
                         }>
                             <circle
@@ -125,7 +107,7 @@ function Cell(props: { cell: BoardCellView }) {
                                 cx="50" cy="50" r="10"
                             />
                         </Match>
-                        <Match when={appConfigStore.historyDisplay == "pair" && (cell().sequence + 1) === gameStore.history.length}>
+                        <Match when={appConfigStore.historyDisplay === "pair" && (cell().sequence + 1) === gameStore.history.length}>
                             <g
                                 stroke={reversedFill()}
                                 stroke-width="4"
@@ -138,7 +120,7 @@ function Cell(props: { cell: BoardCellView }) {
                 </svg>
             }</Match>
             <Match when={props.cell.type === "Forbidden"}>
-                <svg class="stroke-0 fill-error" viewBox="0 0 100 100">
+                <svg class="fill-error stroke-0" viewBox="0 0 100 100">
                     <circle cx="50" cy="50" r="10"/>
                 </svg>
             </Match>
