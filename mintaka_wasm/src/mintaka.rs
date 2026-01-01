@@ -2,10 +2,13 @@ use crate::rusty_renju::{Board, BoardWorker, History, Pos};
 use crate::{impl_wrapper, to_js_value, try_from_js_value};
 use std::cmp::Ordering;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::JsError;
+use wasm_bindgen::{JsError, JsValue};
 
 #[wasm_bindgen]
 extern "C" {
+    #[wasm_bindgen(js_namespace = "Score")]
+    pub type Score;
+
     #[wasm_bindgen(typescript_type = "Config")]
     pub type Config;
 
@@ -33,6 +36,11 @@ pub fn compare_config(a: Config, b: Config) -> isize {
         Ordering::Equal => 0,
         Ordering::Greater => 1
     }
+}
+
+#[wasm_bindgen(js_name = calculateNormEval)]
+pub fn calculate_norm_eval(score: Score) -> JsValue {
+    0.into()
 }
 
 impl_wrapper! {

@@ -2,17 +2,18 @@ import argparse
 import random
 import shlex
 import subprocess
-import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Self
+
+import time
+
 
 class Color(Enum):
     BLACK = 0
     WHITE = 1
 
-    def flip(self) -> Self:
+    def flip(self) -> 'Color':
         return Color.BLACK if self == Color.WHITE else Color.WHITE
 
     def __str__(self) -> str:
@@ -22,7 +23,7 @@ class Player(Enum):
     A = 0
     B = 1
 
-    def flip(self) -> Self:
+    def flip(self) -> 'Player':
         return Player.B if self == Player.A else Player.A
 
     def __str__(self) -> str:

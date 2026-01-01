@@ -1,5 +1,6 @@
 use crate::protocol::response::{Response, ResponseSender};
 use crate::utils::time::MonotonicClock;
+use rusty_renju::memo::hash_key::HashKey;
 use std::time::Duration;
 
 pub trait ThreadType {
@@ -10,9 +11,12 @@ pub trait ThreadType {
 
     fn time_exceeded(&self) -> bool;
 
+    fn position_hash(&self) -> HashKey;
+
 }
 
 pub struct MainThread<CLK: MonotonicClock, T: ResponseSender> {
+    position_hash: HashKey,
     response_sender: T,
     start_time: CLK,
     running_time: Option<Duration>,
@@ -21,11 +25,13 @@ pub struct MainThread<CLK: MonotonicClock, T: ResponseSender> {
 impl<CLK: MonotonicClock, T: ResponseSender> MainThread<CLK, T> {
 
     pub fn new(
+        position_hash: HashKey,
         response_sender: T,
         start_time: CLK,
         running_time: Option<Duration>,
     ) -> Self {
         Self {
+            position_hash,
             response_sender,
             start_time,
             running_time,
@@ -44,6 +50,10 @@ impl<CLK: MonotonicClock, T: ResponseSender> ThreadType for MainThread<CLK, T> {
     fn time_exceeded(&self) -> bool {
         self.running_time.is_some_and(|running_time| self.start_time.elapsed() >= running_time)
     }
+
+    fn position_hash(&self) -> HashKey {
+        self.position_hash
+    }
 }
 
 #[derive(Clone)]
@@ -56,5 +66,9 @@ impl ThreadType for WorkerThread {
 
     fn time_exceeded(&self) -> bool {
         false
+    }
+
+    fn position_hash(&self) -> HashKey {
+        unreachable!();
     }
 }

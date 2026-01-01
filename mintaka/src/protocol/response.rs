@@ -1,6 +1,7 @@
 use crate::game_agent::ComputingResource;
 use crate::principal_variation::PrincipalVariation;
 use crate::value::Depth;
+use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::score::Score;
 use serde::{Deserialize, Serialize};
@@ -11,14 +12,14 @@ use serde::{Deserialize, Serialize};
 pub enum Response {
     Begins(ComputingResource),
     Status {
+        hash: HashKey,
         best_move: MaybePos,
         score: Score,
-        pv: PrincipalVariation,
+        selective_depth: Depth,
         #[typeshare(serialized_as = "number")]
         total_nodes_in_1k: u64,
-        depth: Depth,
+        pv: PrincipalVariation,
     },
-    Finished,
 }
 
 pub trait ResponseSender: Send {

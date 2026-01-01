@@ -68,11 +68,11 @@ fn main() -> Result<(), impl Error> {
                 );
 
                 if apply {
-                    let result = game_agent.command(Command::Play(best_move.pos))?;
+                    let result = game_agent.command(Command::Play(best_move.best_move))?;
                     message_sender.result(result);
                 }
 
-                PiskvorkResponse::Pos(best_move.pos.unwrap());
+                PiskvorkResponse::Pos(best_move.best_move.unwrap());
             },
             _ => unreachable!()
         }
@@ -108,15 +108,14 @@ fn response_receiver(response: Response) {
             PiskvorkResponse::Info(format!(
                 "MESSAGE begins workers={workers}, running-time={time:?}, nodes={nodes_in_1k:?}k, tt-size={tt_size}"
             )),
-        Response::Status { best_move, score, pv, total_nodes_in_1k, depth } =>
+        Response::Status { best_move, score, pv, total_nodes_in_1k, selective_depth, .. } =>
             PiskvorkResponse::Info(format!(
                 "DEBUG status score={score}, \
                 best-move={best_move:?}, \
-                depth={depth}, \
+                depth={selective_depth}, \
                 total_nodes_in_1k={total_nodes_in_1k}, \
                 pv={pv:?}"
             )),
-        Response::Finished => return
     };
 
     stdio_out(piskvork_response);

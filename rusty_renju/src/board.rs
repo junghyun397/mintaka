@@ -7,6 +7,7 @@ use crate::notation::rule::RuleKind;
 use crate::pattern;
 use crate::pattern::Patterns;
 use crate::slice::{Slice, Slices};
+use std::hash::{Hash, Hasher};
 use typeshare::typeshare;
 
 #[typeshare(serialized_as = "BoardData")]
@@ -64,11 +65,11 @@ impl Board {
 
         self.incremental_update_mut::<{ MoveType::Set }>(pos);
 
-        self.switch_player_mut();
+        self.player_color = !self.player_color;
     }
 
     pub fn unset_mut(&mut self, pos: Pos) {
-        self.switch_player_mut();
+        self.player_color = !self.player_color;
 
         self.stones -= 1;
         self.hot_field.unset(pos);
@@ -78,11 +79,15 @@ impl Board {
     }
 
     pub fn pass_mut(&mut self) {
-        self.switch_player_mut();
+        self.hash_key = self.hash_key.switch();
+
+        self.player_color = !self.player_color;
     }
 
     pub fn unpass_mut(&mut self) {
-        self.switch_player_mut();
+        self.player_color = !self.player_color;
+
+        self.hash_key = self.hash_key.switch();
     }
 
     pub fn batch_set_mut(&mut self, moves: &[MaybePos]) {
@@ -130,6 +135,8 @@ impl Board {
     }
 
     pub fn switch_player_mut(&mut self) {
+        self.hash_key = self.hash_key.switch();
+
         self.player_color = !self.player_color;
     }
 
@@ -473,6 +480,20 @@ impl Board {
         }
     }
 
+}
+
+impl PartialEq for Board {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash_key == other.hash_key
+    }
+}
+
+impl Eq for Board {}
+
+impl Hash for Board {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash_key.hash(state);
+    }
 }
 
 #[derive(std::marker::ConstParamTy, Eq, PartialEq,)]

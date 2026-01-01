@@ -6,6 +6,7 @@ use crate::slice::Slice;
 use crate::{cartesian_to_index, impl_debug_from_display};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
+use std::hash::{Hash, Hasher};
 
 #[typeshare::typeshare]
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -25,20 +26,25 @@ impl HashKey {
     }
 
     pub fn set_idx(self, color: Color, idx: usize) -> Self {
-        HashKey(self.0 ^ match color {
-            Color::Black => hash_table::HASH_TABLE[0][idx],
-            Color::White => hash_table::HASH_TABLE[1][idx],
-        })
+        HashKey(self.0 ^ hash_table::HASH_TABLE[color][idx] ^ hash_table::TOGGLE_HASH)
+    }
+
+    pub fn switch(self) -> Self {
+        HashKey(self.0 ^ hash_table::TOGGLE_HASH)
     }
 
 }
 
 impl Default for HashKey {
-
     fn default() -> Self {
         Self(hash_table::EMPTY_HASH)
     }
+}
 
+impl Hash for HashKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.0);
+    }
 }
 
 impl From<&[Slice; pos::U_BOARD_WIDTH]> for HashKey {

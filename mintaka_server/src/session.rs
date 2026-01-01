@@ -80,7 +80,7 @@ pub struct SessionResultResponse {
 
 impl Debug for SessionResultResponse {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}, {}", self.game_agent.state.history, self.best_move.pos)
+        write!(f, "{}, {}", self.game_agent.state.history, self.best_move.best_move)
     }
 }
 
@@ -201,7 +201,7 @@ impl Session {
                 abort_flag
             );
 
-            let game_result = game_agent.command(Command::Play(best_move.pos)).unwrap();
+            let game_result = game_agent.command(Command::Play(best_move.best_move)).unwrap();
 
             let _ = result_sender.send(SessionResultResponse { game_agent, best_move, game_result });
 

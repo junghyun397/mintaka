@@ -5,9 +5,16 @@ mod codegen {
     use rusty_renju::notation::pos;
 
     #[allow(dead_code)]
+    #[test]
     fn generate_hash_table() {
         let seed = 42;
         let mut rng = StdRng::seed_from_u64(seed);
+
+        for _ in 0 .. 2 {
+            println!("0x{:016X},", rng.random::<u64>());
+        }
+
+        println!("---");
 
         for _ in 0..pos::BOARD_SIZE {
             println!("0x{:016X},", rng.random::<u64>());

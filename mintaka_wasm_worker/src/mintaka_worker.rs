@@ -58,7 +58,7 @@ impl GameAgent {
     pub fn launch(
         &mut self,
         search_objective: SearchObjective,
-        abort_handle: JsAbortHandle,
+        abort_handle: &JsAbortHandle,
     ) -> Result<BestMove, JsError> {
         let inner = Arc::clone(&self.inner);
         let search_objective = try_from_js_value(search_objective)?;
@@ -99,7 +99,7 @@ impl JsAbortHandle {
     }
 
     pub fn ptr(&self) -> u32 {
-        Arc::as_ptr(&self.inner) as usize as u32
+        self.inner.as_ptr() as usize as u32
     }
 
 }

@@ -52,13 +52,13 @@ export interface DurationSchema {
 }
 
 export interface BestMove {
-	hash: HashKey;
-	pos: MaybePos;
+	position_hash: HashKey;
+	best_move: MaybePos;
 	score: Score;
 	selective_depth: number;
 	total_nodes_in_1k: number;
-	time_elapsed: DurationSchema;
 	pv: PrincipalVariation;
+	time_elapsed: DurationSchema;
 }
 
 export interface ComputingResource {
@@ -131,11 +131,11 @@ export type GameResult =
 export type Response = 
 	| { type: "Begins", content: ComputingResource }
 	| { type: "Status", content: {
+	hash: HashKey;
 	best_move: MaybePos;
 	score: Score;
-	pv: PrincipalVariation;
+	selective_depth: Depth;
 	total_nodes_in_1k: number;
-	depth: Depth;
-}}
-	| { type: "Finished", content?: undefined };
+	pv: PrincipalVariation;
+}};
 

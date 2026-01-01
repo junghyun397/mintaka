@@ -1,5 +1,4 @@
 use crate::eval::evaluator::Evaluator;
-use crate::state::GameState;
 use crate::memo::history_table::{QuietPlied, TacticalPlied};
 use crate::memo::transposition_table::TTHit;
 use crate::memo::tt_entry::ScoreKind;
@@ -9,6 +8,7 @@ use crate::movegen::move_picker::MovePicker;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
 use crate::search_endgame::endgame_search;
+use crate::state::GameState;
 use crate::thread_data::{SearchFrame, ThreadData};
 use crate::thread_type::ThreadType;
 use crate::utils::time::MonotonicClock;
@@ -76,11 +76,12 @@ pub fn iterative_deepening<CLK: MonotonicClock, const R: RuleKind, TH: ThreadTyp
 
         if TH::IS_MAIN {
             td.thread_type.make_response(Response::Status {
+                hash: td.thread_type.position_hash(),
                 best_move,
                 score,
                 pv: td.pvs[0],
                 total_nodes_in_1k: td.batch_counter.count_global_in_1k(),
-                depth,
+                selective_depth: selective_depth as Depth,
             })
         }
 

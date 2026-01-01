@@ -38,10 +38,6 @@ fn match_symbol(c: char) -> Option<BoardElement> {
     }
 }
 
-fn match_space(c: char) -> bool {
-    [' ', '[', ']', '|'].contains(&c)
-}
-
 fn board_iter_item_to_symbol(board: &Board, pos: Pos, item: BoardIterItem) -> String {
     match item {
         BoardIterItem::Stone(color) => char::from(color),

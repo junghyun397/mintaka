@@ -32,16 +32,16 @@ use std::time::Duration;
 #[typeshare::typeshare]
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct BestMove {
-    pub hash: HashKey,
-    pub pos: MaybePos,
+    pub position_hash: HashKey,
+    pub best_move: MaybePos,
     pub score: Score,
     #[typeshare(serialized_as = "number")]
     pub selective_depth: u64,
     #[typeshare(serialized_as = "number")]
     pub total_nodes_in_1k: u64,
+    pub pv: PrincipalVariation,
     #[typeshare(serialized_as = "DurationSchema")]
     pub time_elapsed: Duration,
-    pub pv: PrincipalVariation,
 }
 
 #[derive(Debug)]
@@ -329,6 +329,7 @@ impl GameAgent {
 
             let mut main_td = ThreadData::new(
                 MainThread::<CLK, _>::new(
+                    state.board.hash_key,
                     response_sender,
                     started_time,
                     computing_resource.time,
@@ -373,6 +374,7 @@ impl GameAgent {
 
             let mut main_td = ThreadData::new(
                 MainThread::<CLK, _>::new(
+                    state.board.hash_key,
                     response_sender,
                     started_time,
                     computing_resource.time,
@@ -406,8 +408,8 @@ impl GameAgent {
         self.time_manager.time_history.push((best_move, time_elapsed));
 
         BestMove {
-            hash: self.state.board.hash_key,
-            pos: best_move,
+            position_hash: self.state.board.hash_key,
+            best_move,
             score,
             selective_depth: main_td.selective_depth as u64,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),

@@ -86,13 +86,13 @@ fn text_protocol(config: Config, state: GameState, command_sequence: Vec<String>
 
                 println!(
                     "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}",
-                    best_move.pos, best_move.score, best_move.selective_depth, best_move.total_nodes_in_1k, best_move.time_elapsed
+                    best_move.best_move, best_move.score, best_move.selective_depth, best_move.total_nodes_in_1k, best_move.time_elapsed
                 );
 
-                println!("= {}", best_move.pos);
+                println!("= {}", best_move.best_move);
 
                 if apply {
-                    message_sender.command(Command::Play(best_move.pos.into()));
+                    message_sender.command(Command::Play(best_move.best_move.into()));
                 }
 
                 if interactive {
@@ -112,15 +112,14 @@ fn response_printer(response: Response) {
                 running-time={time:?}, \
                 nodes={nodes_in_1k:?}, \
                 tt-size={tt_size}"),
-        Response::Status { best_move, score, pv, total_nodes_in_1k, depth } =>
+        Response::Status { best_move, score, pv, total_nodes_in_1k, selective_depth, .. } =>
             println!(
-                "status: depth={depth}, \
+                "status: depth={selective_depth}, \
                 score={score}, \
                 best_move={best_move}, \
                 total_nodes_in_1k={total_nodes_in_1k}, \
                 pv={pv:?}"
             ),
-        _ => {}
     }
 }
 

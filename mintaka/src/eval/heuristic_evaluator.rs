@@ -1,6 +1,6 @@
 use crate::eval::evaluator::{Evaluator, PolicyDistribution};
-use crate::state::GameState;
 use crate::movegen::move_scores::MoveScores;
+use crate::state::GameState;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::board::Board;
 use rusty_renju::memo::hash_key::HashKey;
@@ -70,12 +70,13 @@ impl Evaluator for HeuristicEvaluator {
 
         let parent_score =
             if state.len() > 1 {
+                let recent_action = state.history.recent_action().unwrap();
                 if let Some(&(hash_key, score)) = self.eval_history.get(state.len() - 2)
-                    && hash_key == state.board.hash_key.set(!state.board.player_color, state.history.recent_action().unwrap())
+                    && hash_key == state.board.hash_key.set(!state.board.player_color, recent_action)
                 {
                     -score
                 } else {
-                    let parent_board = state.board.unset(state.history.recent_action().unwrap());
+                    let parent_board = state.board.unset(recent_action);
 
                     let parent_score = self.eval_board_value(&parent_board, !parent_board.hot_field);
 

@@ -1,8 +1,11 @@
+use crate::notation::color::AlignedColorContainer;
 use crate::notation::pos;
 
 pub const EMPTY_HASH: u64 = 0x20FC58598E432543;
 
-pub const HASH_TABLE: [[u64; pos::BOARD_SIZE]; 2] = [
+pub const TOGGLE_HASH: u64 = 0xA6CC7763222724A2;
+
+pub const HASH_TABLE: AlignedColorContainer<[u64; pos::BOARD_SIZE]> = AlignedColorContainer([
     [
         0x86CC7763222724A2,
         0x8AF00A133FAD517D,
@@ -457,4 +460,4 @@ pub const HASH_TABLE: [[u64; pos::BOARD_SIZE]; 2] = [
         0x3643FC143FED6FF9,
         0x469C4D2555D00F4F,
     ]
-];
+]);
