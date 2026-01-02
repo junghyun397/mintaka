@@ -1,10 +1,22 @@
-use crate::game_agent::ComputingResource;
+use std::time::Duration;
 use crate::principal_variation::PrincipalVariation;
 use crate::value::Depth;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::score::Score;
 use serde::{Deserialize, Serialize};
+use rusty_renju::utils::byte_size::ByteSize;
+
+#[typeshare::typeshare]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub struct ComputingResource {
+    pub workers: u32,
+    pub tt_size: ByteSize,
+    #[typeshare(serialized_as = "DurationSchema")]
+    pub time: Option<Duration>,
+    #[typeshare(serialized_as = "Option<number>")]
+    pub nodes_in_1k: Option<u64>,
+}
 
 #[typeshare::typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]

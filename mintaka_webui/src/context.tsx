@@ -5,7 +5,7 @@ import { buildGameStore, GameStore } from "./stores/game.store";
 import { EmptyHistoryTree, ForwardMethod, HistoryTree } from "./domain/HistoryTree";
 import {
     calculateNormEval, defaultBoard, defaultConfig, defaultGameState,
-    BoardWorker, HashKey, History, Pos,
+    BoardWorker, HashKey, History, Pos, MaybePos, Color,
 } from "./wasm/pkg/mintaka_wasm";
 import { AppConfig, defaultAppConfig, Theme } from "./stores/app.config.store";
 import { flip } from "./domain/rusty-renju";
@@ -54,6 +54,30 @@ export function AppContextProvider(props: ParentProps) {
     const reconcileGameStore = () =>
         setGameStore(reconcile(buildGameStore(appState.boardWorker, appState.historyTree, flip(unwrap(gameStore.playerColor)))))
 
+    const syncSet = (pos: MaybePos) => {
+        if (appState.mintakaProvider && appState.mintakaProvider.state.type === "idle")
+            appState.mintakaProvider.state.command({ type: "Play", content: pos })
+    }
+
+    const syncUnset = (pos: MaybePos, color: Color) => {
+        if (appState.mintakaProvider && appState.mintakaProvider.state.type === "idle")
+            return
+    }
+
+    const resolveDesync = (stopAt: HashKey) => {
+        const result = appState.historyTree.backwardTo(stopAt)
+
+        if (!result) return
+        const [historyTree, entries] = result
+
+        appState.historyTree = historyTree
+        for (const entry of entries.reverse()) {
+            appState.boardWorker = appState.boardWorker.unset(entry.pos)
+        }
+
+        reconcileGameStore()
+    }
+
     const actions = {
         play: (pos: Pos) => {
             if (!appState.boardWorker.isLegalMove(pos)) return
@@ -63,8 +87,7 @@ export function AppContextProvider(props: ParentProps) {
 
             appState.historyTree = appState.historyTree.push({ hashKey, pos })
 
-            if (appState.mintakaProvider && appState.mintakaProvider.state.type === "idle")
-                appState.mintakaProvider.state.message({ type: "command", payload: { type: "Play", content: pos } })
+            syncSet(pos)
 
             reconcileGameStore()
         },
@@ -75,6 +98,8 @@ export function AppContextProvider(props: ParentProps) {
 
             appState.historyTree = historyTree
             appState.boardWorker = appState.boardWorker.set(entry.pos!)
+
+            syncSet(entry.pos)
 
             reconcileGameStore()
         },
@@ -91,6 +116,8 @@ export function AppContextProvider(props: ParentProps) {
             reconcileGameStore()
         },
         backward: () => {
+            if (workerStore.inComputing) return
+
             const result = appState.historyTree.backward()
             if (!result) return
             const [historyTree, entry] = result
@@ -101,6 +128,8 @@ export function AppContextProvider(props: ParentProps) {
             reconcileGameStore()
         },
         bulkBackward: () => {
+            if (workerStore.inComputing) return
+
             const result = appState.historyTree.bulkBackward()
             if (!result) return
             const [historyTree, entries] = result
@@ -117,7 +146,7 @@ export function AppContextProvider(props: ParentProps) {
 
             if (appState.mintakaProvider.state.type === "in_computing") return
 
-            appState.mintakaProvider.state.message({ type: "launch", payload: { objective: "Best" } })
+            const result = appState.mintakaProvider.state.launch(appState.boardWorker.hashKey(), "Best")
         },
         abort: () => {
             if (appState.mintakaProvider === undefined) return
@@ -161,7 +190,7 @@ export function AppContextProvider(props: ParentProps) {
                 }
                 case "BestMove": {
                     if (response.content.position_hash !== appState.boardWorker.hashKey())
-                        console.log("desync")
+                        resolveDesync(response.content.position_hash)
 
                     if (response.content.best_move !== undefined)
                         actions.play(response.content.best_move)

@@ -61,6 +61,16 @@ export interface BestMove {
 	time_elapsed: DurationSchema;
 }
 
+export type GameResult = 
+	| { type: "Win", content: Color }
+	| { type: "Draw", content?: undefined }
+	| { type: "Full", content?: undefined };
+
+export interface CommandResult {
+	hash_key: HashKey;
+	result?: GameResult;
+}
+
 export interface ComputingResource {
 	workers: number;
 	tt_size: ByteSize;
@@ -96,6 +106,7 @@ export type BoardExportItem =
 export type Command = 
 	| { type: "Clear", content?: undefined }
 	| { type: "Load", content: GameState }
+	| { type: "Sync", content: GameState }
 	| { type: "Play", content: MaybePos }
 	| { type: "Set", content: {
 	pos: Pos;
@@ -122,11 +133,6 @@ export type Command =
 	| { type: "MaxMemory", content: ByteSize }
 	| { type: "Rule", content: RuleKind }
 	| { type: "Config", content: Config };
-
-export type GameResult = 
-	| { type: "Win", content: Color }
-	| { type: "Draw", content?: undefined }
-	| { type: "Full", content?: undefined };
 
 export type Response = 
 	| { type: "Begins", content: ComputingResource }

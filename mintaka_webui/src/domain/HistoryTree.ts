@@ -1,4 +1,4 @@
-import { HashKey, MaybePos } from "../wasm/pkg/mintaka_wasm";
+import { emptyHash, HashKey, MaybePos } from "../wasm/pkg/mintaka_wasm";
 
 export type HistoryEntry = {
     hashKey: HashKey,
@@ -32,6 +32,10 @@ export class HistoryTree {
 
     get inBranchHead(): boolean {
         return this.root != undefined && this.top === 0
+    }
+
+    get topEntry(): HistoryEntry | undefined {
+        return this.history[this.top - 1]
     }
 
     linear(): HistoryEntry[] {
@@ -89,6 +93,24 @@ export class HistoryTree {
         if (this.top >= this.history.length) return undefined
 
         return [new HistoryTree(this.root, this.history), this.history.slice(this.top)]
+    }
+
+    backwardTo(stopAt: HashKey): [HistoryTree, HistoryEntry[]] | undefined {
+        let historyTree: HistoryTree = this
+        let stack: HistoryEntry[] = []
+
+        while (historyTree.backwardable) {
+            const [childHistoryTree, entry] = historyTree.backward()!
+
+            stack.push(entry)
+
+            if (childHistoryTree.topEntry ? childHistoryTree.topEntry.hashKey : emptyHash() === stopAt)
+                return [childHistoryTree, stack]
+
+            historyTree = childHistoryTree
+        }
+
+        return undefined
     }
 }
 

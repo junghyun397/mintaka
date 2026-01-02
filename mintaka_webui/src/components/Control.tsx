@@ -112,11 +112,14 @@ function ConfigButton() {
 function ControlButtons() {
     const { actions, workerStore, gameStore } = useContext(AppContext)!
 
+    const backwardDisabled = () =>
+        !gameStore.backwardable || workerStore.inComputing
+
     return <>
         <button
             class="btn btn-square max-xs:hidden"
             classList={{
-                "btn-disabled": !gameStore.backwardable,
+                "btn-disabled": backwardDisabled(),
             }}
             onClick={actions.bulkBackward}
         >
@@ -125,7 +128,7 @@ function ControlButtons() {
         <button
             class="btn btn-square"
             classList={{
-                "btn-disabled": !gameStore.backwardable,
+                "btn-disabled": backwardDisabled(),
             }}
             onClick={actions.backward}
         >

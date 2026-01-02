@@ -1,6 +1,6 @@
 pub(crate) use crate::app_error::AppError;
 use crate::preference::Preference;
-use crate::session::{Session, SessionCommandResponse, SessionData, SessionKey, SessionResponse, SessionResultResponse, SessionStatus, Sessions};
+use crate::session::{Session, SessionData, SessionKey, SessionResponse, SessionResultResponse, SessionStatus, Sessions};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use mintaka::config::Config;
 use mintaka::game_agent::BestMove;
@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_stream::wrappers::UnboundedReceiverStream;
+use mintaka::protocol::results::CommandResult;
 
 pub struct WorkerPermit(OwnedSemaphorePermit);
 
@@ -231,7 +232,7 @@ impl AppState {
         &self,
         session_key: SessionKey,
         command: Command,
-    ) -> Result<SessionCommandResponse, AppError> {
+    ) -> Result<CommandResult, AppError> {
         let mut session = self.sessions.get_mut_with_touch(&session_key)
             .ok_or(AppError::SessionNotFound)?;
 

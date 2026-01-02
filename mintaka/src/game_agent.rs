@@ -5,13 +5,13 @@ use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::command::Command;
-use crate::protocol::game_result::GameResult;
-use crate::protocol::response::{Response, ResponseSender};
+use crate::protocol::results::{CommandResult, GameResult};
+pub use crate::protocol::response::{ComputingResource, Response, ResponseSender};
 use crate::search::iterative_deepening;
 use crate::state::GameState;
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
-use crate::time::TimeManager;
+use crate::time::{TimeManager, Timer};
 use crate::utils::time::MonotonicClock;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
@@ -71,17 +71,6 @@ impl Display for GameError {
 
 impl std::error::Error for GameError {}
 
-#[typeshare::typeshare]
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-pub struct ComputingResource {
-    pub workers: u32,
-    pub tt_size: ByteSize,
-    #[typeshare(serialized_as = "DurationSchema")]
-    pub time: Option<Duration>,
-    #[typeshare(serialized_as = "Option<number>")]
-    pub nodes_in_1k: Option<u64>,
-}
-
 pub struct GameAgent {
     pub config: Config,
     pub state: GameState,
@@ -112,7 +101,7 @@ impl GameAgent {
         }
     }
 
-    pub fn command(&mut self, command: Command) -> Result<Option<GameResult>, GameError> {
+    pub fn command(&mut self, command: Command) -> Result<CommandResult, GameError> {
         match command {
             Command::Play(action) => {
                 match action {
@@ -132,15 +121,15 @@ impl GameAgent {
                         self.evaluator.update(&self.state);
 
                         if let Some(winner) = self.state.board.find_winner(pos) {
-                            return Ok(Some(GameResult::Win(winner)));
+                            return Ok(CommandResult::finished(self.state.board.hash_key, GameResult::Win(winner)));
                         }
                     }
                 }
 
                 if self.state.board.stones == pos::U8_BOARD_SIZE {
-                    return Ok(Some(GameResult::Full));
+                    return Ok(CommandResult::finished(self.state.board.hash_key, GameResult::Full));
                 } else if self.state.len() >= self.config.draw_condition as usize {
-                    return Ok(Some(GameResult::Draw));
+                    return Ok(CommandResult::finished(self.state.board.hash_key, GameResult::Draw));
                 }
             },
             Command::Undo => {
@@ -239,6 +228,9 @@ impl GameAgent {
             Command::Load(state) => {
                 self.reinit_from_state(*state);
             },
+            Command::Sync(state) => {
+                self.sync_state(*state);
+            }
             Command::TurnTime(time) => {
                 self.time_manager.timer.turn = time;
             },
@@ -273,10 +265,20 @@ impl GameAgent {
                 if old_config.tt_size != self.config.tt_size {
                     self.resize_tt(self.config.tt_size);
                 }
+
+                self.time_manager.timer = Timer {
+                    turn: self.config.initial_timer.turn,
+                    increment: self.config.initial_timer.increment,
+                    total_remaining: self.time_manager.timer.total_remaining,
+                }
             }
         };
 
-        Ok(None)
+        Ok(CommandResult::hash(self.state.board.hash_key))
+    }
+
+    pub fn batch_command(&mut self, commands: Vec<Command>) -> Result<(u32, CommandResult), (u32, GameError)> {
+        todo!()
     }
 
     fn next_computing_resource(&self) -> ComputingResource {
@@ -418,10 +420,14 @@ impl GameAgent {
         }
     }
 
+    fn sync_state(&mut self, state: GameState) {
+        self.state = state;
+    }
+
     fn reinit_from_state(&mut self, state: GameState) {
         self.state = state;
 
-        self.evaluator = HeuristicEvaluator::from_state(&self.state);
+        self.evaluator = ActiveEvaluator::from_state(&self.state);
 
         self.tt.clear(self.config.workers);
         self.executed_moves = Bitfield::default();

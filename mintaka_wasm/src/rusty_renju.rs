@@ -32,6 +32,11 @@ pub fn default_board() -> Board {
     to_js_value(&rusty_renju::board::Board::default())
 }
 
+#[wasm_bindgen(js_name = emptyHash)]
+pub fn empty_hash() -> HashKey {
+    to_js_value(&rusty_renju::memo::hash_key::HashKey::EMPTY)
+}
+
 impl_wrapper! {
     pub BoardWorker { inner: rusty_renju::board::Board } <-> Board
 }

@@ -50,11 +50,19 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
                 break
             }
             case "command": {
-                ctx.state!.agent.command(event.data.payload)
+                const result = ctx.state!.agent.command(event.data.payload)
+
+                ctx.post({ type: "CommandResult", content: result })
                 break
             }
             case "launch": {
-                const bestMove = ctx.state!.agent.launch("Best", ctx.state!.abort)
+                if (ctx.state?.agent === undefined)
+                    throw Error("agent not ready")
+
+                if (ctx.state?.agent?.hashKey() !== event.data.payload.hash)
+                    throw Error("snapshot missmatch")
+
+                const bestMove = ctx.state.agent.launch(event.data.payload.objective, ctx.state.abort)
 
                 ctx.post({ type: "BestMove", content: bestMove })
                 break

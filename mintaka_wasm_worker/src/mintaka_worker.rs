@@ -1,4 +1,4 @@
-use crate::{to_js_result, to_js_value, try_from_js_value, WebClock};
+use crate::{to_js_err, to_js_value, try_from_js_value, WebClock};
 use mintaka::protocol::response::ResponseSender;
 use std::cell::RefCell;
 use std::sync::atomic::AtomicBool;
@@ -17,14 +17,17 @@ extern "C" {
     #[wasm_bindgen(typescript_type = "Command")]
     pub type Command;
 
-    #[wasm_bindgen(typescript_type = "GameResult")]
-    pub type GameResult;
+    #[wasm_bindgen(typescript_type = "CommandResult")]
+    pub type CommandResult;
 
     #[wasm_bindgen(typescript_type = "BestMove")]
     pub type BestMove;
 
     #[wasm_bindgen(typescript_type = "GameState")]
     pub type GameState;
+
+    #[wasm_bindgen(typescript_type = "HashKey")]
+    pub type HashKey;
 }
 
 #[wasm_bindgen]
@@ -45,13 +48,13 @@ impl GameAgent {
         }
     }
 
-    pub fn command(&mut self, command: Command) -> Result<GameResult, JsError> {
+    pub fn command(&mut self, command: Command) -> Result<CommandResult, JsError> {
         let command: mintaka::protocol::command::Command = try_from_js_value(command)?;
 
-        let maybe_result = self.inner.borrow_mut().command(command)
-            .map_err(|e| JsError::new(&format!("{}", e)))?;
+        let result = self.inner.borrow_mut().command(command)
+            .map_err(to_js_err)?;
 
-        to_js_result(&maybe_result).into()
+        Ok(to_js_value(&result))
     }
 
     #[wasm_bindgen]
@@ -69,7 +72,12 @@ impl GameAgent {
             abort_handle.inner.clone(),
         );
 
-        to_js_result(&best_move).into()
+        Ok(to_js_value(&best_move))
+    }
+
+    #[wasm_bindgen(js_name = "hashKey")]
+    pub fn hash_key(&self) -> HashKey {
+        to_js_value(&self.inner.borrow().state.board.hash_key)
     }
 
 }

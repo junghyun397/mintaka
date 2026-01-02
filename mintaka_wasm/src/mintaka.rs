@@ -1,5 +1,5 @@
 use crate::rusty_renju::{Board, BoardWorker, History, Pos};
-use crate::{impl_wrapper, to_js_value, try_from_js_value};
+use crate::{impl_wrapper, to_js_err, to_js_value, try_from_js_value};
 use std::cmp::Ordering;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
@@ -24,6 +24,13 @@ pub fn default_config() -> Config {
 #[wasm_bindgen(js_name = defaultGameState)]
 pub fn default_game_state() -> GameState {
     to_js_value(&mintaka::state::GameState::default())
+}
+
+#[wasm_bindgen(js_name = validateConfig)]
+pub fn validate_config(config: Config) -> Result<Config, JsError> {
+    let config: mintaka::config::Config = try_from_js_value(config)?;
+
+    Ok(to_js_value(&config.validate().map_err(to_js_err)?))
 }
 
 #[wasm_bindgen(js_name = de)]

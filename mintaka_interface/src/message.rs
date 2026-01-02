@@ -1,6 +1,6 @@
 use mintaka::config::SearchObjective;
 use mintaka::protocol::command::Command;
-use mintaka::protocol::game_result::GameResult;
+use mintaka::protocol::results::{CommandResult, GameResult};
 use std::sync::mpsc;
 
 pub const CHANNEL_CLOSED_MESSAGE: &str = "sender channel closed.";
@@ -47,10 +47,12 @@ impl MessageSender {
         self.sender.send(Message::Launch { objective, apply, interactive }).expect(CHANNEL_CLOSED_MESSAGE);
     }
 
-    pub fn result(&self, result: Option<GameResult>) {
-        match result {
-            Some(result) => self.sender.send(Message::Finished(result)).expect(CHANNEL_CLOSED_MESSAGE),
-            None => self.sender.send(Message::Ok).expect(CHANNEL_CLOSED_MESSAGE),
+    pub fn result(&self, command_result: CommandResult) {
+        match command_result.result {
+            Some(game_result) =>
+                self.sender.send(Message::Finished(game_result)).expect(CHANNEL_CLOSED_MESSAGE),
+            None =>
+                self.sender.send(Message::Ok).expect(CHANNEL_CLOSED_MESSAGE),
         }
     }
 

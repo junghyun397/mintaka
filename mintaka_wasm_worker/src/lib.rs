@@ -31,12 +31,6 @@ pub fn to_js_value<R: From<JsValue>>(value: &impl Serialize) -> R {
         .into()
 }
 
-pub fn to_js_result<R: From<JsValue>>(value: &impl Serialize) -> Result<R, JsError> {
-    serde_wasm_bindgen::to_value(value.into())
-        .map(Into::into)
-        .map_err(to_js_err)
-}
-
 pub fn try_from_js_value<R: DeserializeOwned>(value: impl Into<JsValue>) -> Result<R, JsError> {
     serde_wasm_bindgen::from_value(value.into())
         .map_err(to_js_err)

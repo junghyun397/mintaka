@@ -1,3 +1,3 @@
 pub mod response;
 pub mod command;
-pub mod game_result;
+pub mod results;

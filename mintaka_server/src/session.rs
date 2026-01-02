@@ -4,7 +4,7 @@ use dashmap::DashMap;
 use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{BestMove, GameAgent};
 use mintaka::protocol::command::Command;
-use mintaka::protocol::game_result::GameResult;
+use mintaka::protocol::results::{CommandResult, GameResult};
 use mintaka::protocol::response::Response;
 use mintaka::state::GameState;
 use rusty_renju::memo::hash_key::HashKey;
@@ -75,19 +75,12 @@ pub enum SessionResponse {
 pub struct SessionResultResponse {
     pub game_agent: GameAgent,
     pub best_move: BestMove,
-    pub game_result: Option<GameResult>,
 }
 
 impl Debug for SessionResultResponse {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}, {}", self.game_agent.state.history, self.best_move.best_move)
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SessionCommandResponse {
-    board_hash: HashKey,
-    game_result: Option<GameResult>,
 }
 
 pub enum AgentState {
@@ -169,16 +162,11 @@ impl Session {
         self.last_active_seq += 1;
     }
 
-    pub fn command(&mut self, command: Command) -> Result<SessionCommandResponse, AppError> {
+    pub fn command(&mut self, command: Command) -> Result<CommandResult, AppError> {
         let game_agent = self.game_agent_mut()?;
 
-        let game_result = game_agent.command(command)
-            .map_err(AppError::GameError)?;
-
-        Ok(SessionCommandResponse {
-            board_hash: game_agent.state.board.hash_key,
-            game_result,
-        })
+        game_agent.command(command)
+            .map_err(AppError::GameError)
     }
 
     pub fn launch(
@@ -201,9 +189,7 @@ impl Session {
                 abort_flag
             );
 
-            let game_result = game_agent.command(Command::Play(best_move.best_move)).unwrap();
-
-            let _ = result_sender.send(SessionResultResponse { game_agent, best_move, game_result });
+            let _ = result_sender.send(SessionResultResponse { game_agent, best_move });
 
             tracing::info!("session finished")
         });

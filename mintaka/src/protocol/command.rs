@@ -17,6 +17,7 @@ use rusty_renju::utils::lang::DurationSchema;
 pub enum Command {
     Clear,
     Load(Box<GameState>),
+    Sync(Box<GameState>),
     Play(MaybePos),
     Set {
         pos: Pos,
