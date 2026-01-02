@@ -27,8 +27,16 @@ export type MintakaProviderState = MintakaProviderIdleState | MintakaProviderInC
 
 export interface MintakaProvider {
     readonly type: MintakaProviderType
-    onResponse?: (message: MintakaProviderResponse) => void
-    onError?: (error: any) => void
     snapshot: HashKey
     state: MintakaProviderState
+    onResponse?: (message: MintakaProviderResponse) => void
+    onError?: (error: any) => void
+}
+
+export abstract class BaseMintakaProvider implements MintakaProvider {
+    abstract readonly type: MintakaProviderType
+    abstract snapshot: HashKey
+    abstract state: MintakaProviderState
+
+    private chain: Promise<void> = Promise.resolve()
 }

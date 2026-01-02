@@ -4,8 +4,16 @@ import { createStore, reconcile, SetStoreFunction, unwrap } from "solid-js/store
 import { buildGameStore, GameStore } from "./stores/game.store";
 import { EmptyHistoryTree, ForwardMethod, HistoryTree } from "./domain/HistoryTree";
 import {
-    calculateNormEval, defaultBoard, defaultConfig, defaultGameState,
-    BoardWorker, HashKey, History, Pos, MaybePos, Color,
+    BoardWorker,
+    calculateNormEval,
+    Color,
+    defaultBoard,
+    defaultConfig,
+    defaultGameState,
+    HashKey,
+    History,
+    MaybePos,
+    Pos,
 } from "./wasm/pkg/mintaka_wasm";
 import { AppConfig, defaultAppConfig, Theme } from "./stores/app.config.store";
 import { flip } from "./domain/rusty-renju";
@@ -26,8 +34,9 @@ interface AppActions {
     bulkForward: (method: ForwardMethod) => void,
     backward: () => void,
     bulkBackward: () => void,
-    launch: () => void,
-    abort: () => void,
+    start: () => void,
+    pause: () => void,
+    stop: () => void,
 }
 
 type AppContext = {
@@ -78,18 +87,45 @@ export function AppContextProvider(props: ParentProps) {
         reconcileGameStore()
     }
 
+    const play = (pos: MaybePos) => {
+        if (pos ? !appState.boardWorker.isLegalMove(pos) : true) return
+
+        appState.boardWorker = appState.boardWorker.set(pos)
+        const hashKey = appState.boardWorker.hashKey()
+
+        appState.historyTree = appState.historyTree.push({ hashKey, pos })
+
+        syncSet(pos)
+
+        reconcileGameStore()
+    }
+
+    const launch = () => {
+        if (appState.mintakaProvider === undefined) return
+
+        if (appState.mintakaProvider.state.type === "in_computing") return
+
+        setWorkerStore("inComputing", true)
+
+        const result = appState.mintakaProvider.state.launch(appState.boardWorker.hashKey(), "Best")
+
+        console.log(result)
+    }
+
+    const abort = () => {
+        if (appState.mintakaProvider === undefined) return
+
+        if (appState.mintakaProvider.state.type === "idle") return
+
+        appState.mintakaProvider.state.message({ type: "abort" })
+    }
+
     const actions = {
         play: (pos: Pos) => {
-            if (!appState.boardWorker.isLegalMove(pos)) return
+            play(pos)
 
-            appState.boardWorker = appState.boardWorker.set(pos)
-            const hashKey = appState.boardWorker.hashKey()
-
-            appState.historyTree = appState.historyTree.push({ hashKey, pos })
-
-            syncSet(pos)
-
-            reconcileGameStore()
+            if (workerStore.autoLaunch)
+                launch()
         },
         forward: (method: ForwardMethod) => {
             const result = appState.historyTree.forward(method)
@@ -141,19 +177,17 @@ export function AppContextProvider(props: ParentProps) {
 
             reconcileGameStore()
         },
-        launch: () => {
-            if (appState.mintakaProvider === undefined) return
+        start: () => {
+            setWorkerStore("autoLaunch", true)
 
-            if (appState.mintakaProvider.state.type === "in_computing") return
-
-            const result = appState.mintakaProvider.state.launch(appState.boardWorker.hashKey(), "Best")
+            launch()
         },
-        abort: () => {
-            if (appState.mintakaProvider === undefined) return
-
-            if (appState.mintakaProvider.state.type === "idle") return
-
-            appState.mintakaProvider.state.message({ type: "abort" })
+        pause: () => {
+            setWorkerStore("autoLaunch", false)
+        },
+        stop: () => {
+            setWorkerStore("autoLaunch", false)
+            abort()
         },
     }
 
@@ -193,7 +227,7 @@ export function AppContextProvider(props: ParentProps) {
                         resolveDesync(response.content.position_hash)
 
                     if (response.content.best_move !== undefined)
-                        actions.play(response.content.best_move)
+                        play(response.content.best_move)
 
                     setWorkerStore("state", reconcile({
                         type: "finished",

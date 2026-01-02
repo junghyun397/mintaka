@@ -1,11 +1,11 @@
 import {
     MintakaProvider,
-    MintakaProviderMessage,
     MintakaProviderResponse,
     MintakaProviderRuntimeMessage,
-    MintakaProviderState, MintakaProviderType,
+    MintakaProviderState,
+    MintakaProviderType,
 } from "./mintaka.provider";
-import { Command, Config, GameState } from "../wasm/pkg/mintaka_wasm";
+import { Command, Config, emptyHash, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm";
 
 export class MintakaServerConfig {
     readonly address: string
@@ -78,12 +78,13 @@ export async function createSession(serverConfig: MintakaServerConfig, config: C
 export class MintakaServerProvider implements MintakaProvider {
     private readonly serverConfig: MintakaServerConfig
     private readonly session: MintakaServerSession
-    private messageQueue: Promise<void> = Promise.resolve()
+    private chain: Promise<void> = Promise.resolve()
 
     onResponse?: (message: MintakaProviderResponse) => void
     onError?: (error: any) => void
 
     readonly type: MintakaProviderType = "server"
+    snapshot: HashKey = emptyHash()
 
     state: MintakaProviderState
 
@@ -92,21 +93,15 @@ export class MintakaServerProvider implements MintakaProvider {
         this.session = session
         this.state = {
             type: "idle",
-            message: this.idleMessage,
+            command: this.command,
+            launch: () => void this.launch,
         }
     }
 
-    private idleMessage = (message: MintakaProviderMessage) => {
-        this.messageQueue = this.messageQueue
+    private command = (command: Command) => {
+        this.chain = this.chain
             .then(async () => {
-                switch (message.type) {
-                    case "command":
-                        await this.sendCommand(message.payload)
-                        break
-                    case "launch":
-                        await this.launch()
-                        break
-                }
+                await this.sendCommand(command)
             })
     }
 
@@ -126,10 +121,11 @@ export class MintakaServerProvider implements MintakaProvider {
         await assertOk(response)
     }
 
-    private launch = async () => {
+    private launch = async (hash: HashKey, objective: SearchObjective) => {
         const response = await fetch(this.serverConfig.url + `/sessions/${this.session.sid}/launch`, {
             method: "POST",
             headers: this.serverConfig.headers(),
+            body: JSON.stringify({ hash, objective }),
         })
 
         await assertOk(response)
@@ -170,7 +166,8 @@ export class MintakaServerProvider implements MintakaProvider {
 
             this.state = {
                 type: "idle",
-                message: this.idleMessage,
+                command: this.command,
+                launch: () => void this.launch,
             }
         })
 

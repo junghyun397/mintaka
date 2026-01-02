@@ -13,7 +13,7 @@ export type WorkerState =
 export type WorkerStore = {
     loadedProviderType?: MintakaProviderType,
     state?: WorkerState,
-    paused: boolean,
+    autoLaunch: boolean,
     inComputing: boolean,
 }
 
@@ -21,7 +21,7 @@ export function createWorkerStore(): [WorkerStore, SetStoreFunction<WorkerStore>
     const [workerStore, setWorkerStore] = createStore<WorkerStore>({
         loadedProviderType: undefined,
         state: undefined,
-        paused: false,
+        autoLaunch: false,
         inComputing: false,
     })
 

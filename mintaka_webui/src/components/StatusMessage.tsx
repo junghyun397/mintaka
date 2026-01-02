@@ -5,11 +5,15 @@ export function StatusMessage() {
     const { workerStore } = useContext(AppContext)!
 
     const statusMessage = () => {
-        switch (1+2) {
-            case 1: return "Downloading mintaka engine."
-            case 2: return "Compiling mintaka engine."
-            case 3: return "Mintaka engine is waiting for your move."
-        }
+        if (workerStore.inComputing)
+            return "Mintaka engine is thinking now..."
+
+        if (workerStore.loadedProviderType !== undefined && workerStore.autoLaunch)
+            return "Mintaka engine is waiting for your move."
+
+        // "Downloading and compiling mintaka engine..."
+
+        return ""
     }
 
     return <p class="text-sm leading-tight text-base-content/70">

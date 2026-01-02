@@ -1,9 +1,23 @@
 import { Match, Show, Switch, useContext } from "solid-js";
 import { AppContext } from "../context";
 import {
-    IconArrowUturnRight, IconChevronDoubleLeft, IconChevronDoubleRight, IconChevronLeft, IconChevronRight, IconCog8Tooth,
-    IconCpuChip, IconGitBranch, IconInformationCircle, IconMagnifyingGlassMinus, IconMagnifyingGlassPlus, IconMoon,
-    IconPlay, IconStop, IconSun, IconThemeAuto,
+    IconArrowUturnRight,
+    IconChevronDoubleLeft,
+    IconChevronDoubleRight,
+    IconChevronLeft,
+    IconChevronRight,
+    IconCog8Tooth,
+    IconCpuChip,
+    IconGitBranch,
+    IconInformationCircle,
+    IconMagnifyingGlassMinus,
+    IconMagnifyingGlassPlus,
+    IconMoon,
+    IconPause,
+    IconPlay,
+    IconStop,
+    IconSun,
+    IconThemeAuto,
 } from "./icons";
 import { nextHistoryDisplay, nextTheme } from "../stores/app.config.store";
 
@@ -134,27 +148,35 @@ function ControlButtons() {
         >
             <IconChevronLeft />
         </button>
-        <Show when={workerStore.inComputing} fallback={
-            <button
-                class="btn btn-square"
-                classList={{
-                    "btn-disabled": workerStore.loadedProviderType === undefined,
-                }}
-                onClick={actions.launch}
-            >
-                <IconPlay />
-            </button>
-        }>
-            <button
-                class="btn btn-square animate-pulse"
-                classList={{
-                    "btn-disabled": false,
-                }}
-                onClick={actions.abort}
-            >
-                <IconStop />
-            </button>
-        </Show>
+        <Switch>
+            <Match when={workerStore.inComputing}>
+                <button
+                    class="btn btn-square animate-pulse"
+                    onClick={actions.stop}
+                >
+                    <IconStop />
+                </button>
+            </Match>
+            <Match when={workerStore.autoLaunch && !workerStore.inComputing}>
+                <button
+                    class="btn btn-square"
+                    onClick={actions.pause}
+                >
+                    <IconPause />
+                </button>
+            </Match>
+            <Match when={!workerStore.autoLaunch && !workerStore.inComputing}>
+                <button
+                    class="btn btn-square"
+                    classList={{
+                        "btn-disabled": workerStore.loadedProviderType === undefined,
+                    }}
+                    onClick={actions.start}
+                >
+                    <IconPlay />
+                </button>
+            </Match>
+        </Switch>
         <Show when={gameStore.inBranchHead} fallback={
             <button
                 class="btn btn-square"

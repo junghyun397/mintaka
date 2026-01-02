@@ -42,8 +42,8 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
                 const ptr = abortHandle.ptr()
 
                 ctx.state = {
-                    abort: abortHandle,
                     agent: new GameAgent(config, state),
+                    abort: abortHandle,
                 }
 
                 ctx.post({ type: "Ready", sab: memory!, controlPtr: ptr })
@@ -56,11 +56,15 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
                 break
             }
             case "launch": {
-                if (ctx.state?.agent === undefined)
-                    throw Error("agent not ready")
+                if (ctx.state?.agent === undefined) {
+                    ctx.postError("agent not ready")
+                    break
+                }
 
-                if (ctx.state?.agent?.hashKey() !== event.data.payload.hash)
-                    throw Error("snapshot missmatch")
+                if (ctx.state?.agent?.hashKey() !== event.data.payload.hash) {
+                    ctx.postError("snapshot missmatch")
+                    break
+                }
 
                 const bestMove = ctx.state.agent.launch(event.data.payload.objective, ctx.state.abort)
 
