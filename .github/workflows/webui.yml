@@ -2,9 +2,11 @@ name: Web UI
 
 on:
   push:
-    branches: [ "master" ]
+    branches:
+      - master
   pull_request:
-    branches: [ "master" ]
+    branches:
+      - master
 
 env:
   CARGO_TERM_COLOR: always
@@ -22,7 +24,9 @@ jobs:
           path: |
             ~/.cargo/bin
             ~/.cargo/registry
-            ~/.cargo/git
+            ~/.cargo/target
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
@@ -50,13 +54,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
+      - name: Cache Rustup
+        uses: actions/cache@v3
+        with:
+          path: ~/.rustup
+          key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain.toml', 'mintaka_webui/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-rustup-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         working-directory: mintaka_webui
 
       - name: Install requirements
         run: |
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
           pnpm requirements
         working-directory: mintaka_webui
 
