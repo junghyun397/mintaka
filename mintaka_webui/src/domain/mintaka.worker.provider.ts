@@ -3,10 +3,10 @@ import {
     MintakaProviderResponse,
     MintakaProviderRuntimeMessage,
     MintakaProviderState, MintakaProviderType,
-} from "./mintaka.provider";
-import { Config, GameState } from "../wasm/pkg/mintaka_wasm_worker";
-import { Command, defaultConfig, emptyHash, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm";
-import { InfiniteDuration } from "./rusty-renju";
+} from "./mintaka.provider"
+import { Config, GameState } from "../wasm/pkg/mintaka_wasm_worker"
+import { Command, defaultConfig, emptyHash, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
+import { InfiniteDuration } from "./rusty-renju"
 
 export type MintakaWorkerMessage =
     | { type: "command", command: Command }

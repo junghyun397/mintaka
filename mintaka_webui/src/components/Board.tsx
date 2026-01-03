@@ -1,8 +1,8 @@
-import { createMemo, For, Match, Switch, useContext } from "solid-js";
-import { AppContext } from "../context";
-import { chunk, range } from "../utils/array";
-import { LETTERS, NUMS } from "../domain/rusty-renju";
-import { BoardCellView } from "../stores/game.store";
+import { createMemo, For, Match, Switch, useContext } from "solid-js"
+import { AppContext } from "../context"
+import { chunk, range } from "../utils/array"
+import { LETTERS, NUMS } from "../domain/rusty-renju"
+import { BoardCellView } from "../stores/game.store"
 
 export function Board() {
     const { gameStore, workerStore } = useContext(AppContext)!
@@ -66,7 +66,7 @@ export function Board() {
 }
 
 function Cell(props: { cell: BoardCellView }) {
-    const { actions, appConfigStore, gameStore } = useContext(AppContext)!
+    const { gameActions, appConfigStore, gameStore } = useContext(AppContext)!
 
     const reversedFill = () =>
         props.cell.content === "Black" ? "white" : "black"
@@ -80,7 +80,7 @@ function Cell(props: { cell: BoardCellView }) {
             "white": props.cell.content === "White",
             "forbidden": props.cell.type === "Forbidden" && gameStore.userColor === "Black",
         }}
-        onClick={[actions.play, props.cell.pos]}
+        onClick={[gameActions.play, props.cell.pos]}
     >
         <Switch>
             <Match when={props.cell.type === "Stone" ? props.cell : undefined}>{cell =>

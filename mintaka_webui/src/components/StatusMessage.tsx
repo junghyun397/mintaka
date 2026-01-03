@@ -1,5 +1,5 @@
-import { useContext } from "solid-js";
-import { AppContext } from "../context";
+import { useContext } from "solid-js"
+import { AppContext } from "../context"
 
 export function StatusMessage() {
     const { workerStore } = useContext(AppContext)!

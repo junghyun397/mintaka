@@ -1,9 +1,10 @@
-import { useContext } from "solid-js";
-import { AppContext, AppContextProvider } from "./context";
-import { Board } from "./components/Board";
-import { Control } from "./components/Control";
-import { RootEvaluationBar } from "./components/EvaluationBar";
-import { StatusMessage } from "./components/StatusMessage";
+import { useContext } from "solid-js"
+import { AppContext, AppContextProvider } from "./context"
+import { Board } from "./components/Board"
+import { Control } from "./components/Control"
+import { RootEvaluationBar } from "./components/EvaluationBar"
+import { StatusMessage } from "./components/StatusMessage"
+import { Dashboard } from "./components/Dashboard"
 
 export function App() {
     return <AppContextProvider>
@@ -42,5 +43,6 @@ function AppLayout() {
                 <StatusMessage />
             </div>
         </div>
+        <Dashboard />
     </div>
 }

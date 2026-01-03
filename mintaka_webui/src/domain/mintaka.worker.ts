@@ -1,5 +1,5 @@
-import init, { GameAgent, initThreadPool, JsAbortHandle } from "../wasm/pkg/mintaka_wasm_worker";
-import { MintakaWorkerMessage, MintakaWorkerResponse } from "./mintaka.worker.provider";
+import init, { GameAgent, initThreadPool, JsAbortHandle } from "../wasm/pkg/mintaka_wasm_worker"
+import { MintakaWorkerMessage, MintakaWorkerResponse } from "./mintaka.worker.provider"
 
 let readyPromise: Promise<void> | undefined
 let memory: SharedArrayBuffer | undefined
@@ -15,7 +15,7 @@ export function initWorker() {
                 throw new Error("check COOP/COEP")
             }
             memory = buffer
-        })();
+        })()
     }
 
     return readyPromise

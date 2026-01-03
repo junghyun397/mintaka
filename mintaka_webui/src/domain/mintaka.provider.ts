@@ -1,4 +1,4 @@
-import { BestMove, Command, CommandResult, Config, HashKey, Response, SearchObjective } from "../wasm/pkg/mintaka_wasm";
+import { BestMove, Command, CommandResult, Config, HashKey, Response, SearchObjective } from "../wasm/pkg/mintaka_wasm"
 
 export type MintakaProviderType = "server" | "worker"
 

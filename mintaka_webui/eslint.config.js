@@ -18,6 +18,7 @@ export default [
     },
 
     rules: {
+      "@stylistic/semi": ["error", "never"],
       "@stylistic/indent": ["error", 4, {
         ignoredNodes: ["JSXElement", "JSXExpressionContainer"],
         SwitchCase: 1,

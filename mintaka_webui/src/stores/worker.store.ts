@@ -1,7 +1,7 @@
-import { BestMove, ComputingResource, Response } from "../wasm/pkg/mintaka_wasm";
-import { MintakaProviderType } from "../domain/mintaka.provider";
-import { createStore, SetStoreFunction } from "solid-js/store";
-import { createEffect } from "solid-js";
+import { BestMove, ComputingResource, Response } from "../wasm/pkg/mintaka_wasm"
+import { MintakaProviderType } from "../domain/mintaka.provider"
+import { createStore, SetStoreFunction } from "solid-js/store"
+import { createEffect } from "solid-js"
 
 type NormEval = { normEval: number }
 

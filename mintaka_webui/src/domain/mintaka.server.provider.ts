@@ -4,8 +4,8 @@ import {
     MintakaProviderRuntimeMessage,
     MintakaProviderState,
     MintakaProviderType,
-} from "./mintaka.provider";
-import { Command, Config, emptyHash, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm";
+} from "./mintaka.provider"
+import { Command, Config, emptyHash, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
 
 export class MintakaServerConfig {
     readonly address: string

@@ -1,6 +1,6 @@
-import { BoardExportItem, BoardWorker, Color, Pos } from "../wasm/pkg/mintaka_wasm";
-import { INDEX_TO_POS } from "../domain/rusty-renju";
-import { HistoryEntry, HistoryTree } from "../domain/HistoryTree";
+import { BoardExportItem, BoardWorker, Color, Pos } from "../wasm/pkg/mintaka_wasm"
+import { INDEX_TO_POS } from "../domain/rusty-renju"
+import { HistoryEntry, HistoryTree } from "../domain/HistoryTree"
 
 type StoneItem = Extract<BoardExportItem, { type: "Stone" }>
 type NonStoneItem = Exclude<BoardExportItem, { type: "Stone" }>

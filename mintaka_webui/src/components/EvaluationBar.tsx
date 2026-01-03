@@ -1,6 +1,5 @@
-import { createMemo, useContext } from "solid-js";
-import { AppContext } from "../context";
-import { flatmap } from "../utils/undefined";
+import { createMemo, useContext } from "solid-js"
+import { AppContext } from "../context"
 
 export function RootEvaluationBar() {
     const { workerStore } = useContext(AppContext)!
@@ -12,7 +11,7 @@ export function RootEvaluationBar() {
 
 export function EvaluationBar(props: { normEval: number | undefined }) {
     const whitePercent = createMemo(() =>
-        flatmap(props.normEval, blackNormEval => (-blackNormEval + 1) / 2 * 100),
+        props.normEval !== undefined ? (-props.normEval + 1) / 2 * 100 : undefined,
     )
 
     return <div

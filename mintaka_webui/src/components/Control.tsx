@@ -1,26 +1,12 @@
-import { Match, Show, Switch, useContext } from "solid-js";
-import { AppContext } from "../context";
+import { Match, Show, Switch, useContext } from "solid-js"
+import { AppContext } from "../context"
 import {
-    IconArrowUturnRight,
-    IconChevronDoubleLeft,
-    IconChevronDoubleRight,
-    IconChevronLeft,
-    IconChevronRight,
-    IconCog8Tooth,
-    IconCpuChip,
-    IconGitBranch,
-    IconInformationCircle,
-    IconMagnifyingGlassMinus,
-    IconMagnifyingGlassPlus,
-    IconMoon,
-    IconPause,
-    IconPlay,
-    IconStop,
-    IconSun,
-    IconThemeAuto,
-} from "./icons";
-import { nextHistoryDisplay, nextTheme } from "../stores/app.config.store";
-import { Portal } from "solid-js/web";
+    IconArrowUturnRight, IconChevronDoubleLeft, IconChevronDoubleRight, IconChevronLeft, IconChevronRight,
+    IconCog8Tooth, IconCpuChip, IconGitBranch, IconInformationCircle, IconMagnifyingGlassMinus, IconMagnifyingGlassPlus,
+    IconMoon, IconPause, IconPlay, IconStop, IconSun, IconThemeAuto,
+} from "./icons"
+import { nextHistoryDisplay, nextTheme } from "../stores/app.config.store"
+import { Portal } from "solid-js/web"
 
 export function Control() {
     return <div class="flex gap-2 rounded-box bg-base-100 p-2 max-xs:gap-1 max-xs:p-1">
@@ -31,7 +17,7 @@ export function Control() {
 }
 
 function ControlButtons() {
-    const { actions, workerStore, gameStore } = useContext(AppContext)!
+    const { gameActions, workerStore, gameStore } = useContext(AppContext)!
 
     const backwardDisabled = () =>
         !gameStore.backwardable || workerStore.inComputing
@@ -42,7 +28,7 @@ function ControlButtons() {
             classList={{
                 "btn-disabled": backwardDisabled(),
             }}
-            onClick={actions.bulkBackward}
+            onClick={gameActions.bulkBackward}
         >
             <IconChevronDoubleLeft />
         </button>
@@ -51,7 +37,7 @@ function ControlButtons() {
             classList={{
                 "btn-disabled": backwardDisabled(),
             }}
-            onClick={actions.backward}
+            onClick={gameActions.backward}
         >
             <IconChevronLeft />
         </button>
@@ -59,7 +45,7 @@ function ControlButtons() {
             <Match when={workerStore.inComputing}>
                 <button
                     class="btn btn-square animate-pulse"
-                    onClick={actions.abort}
+                    onClick={gameActions.abort}
                 >
                     <IconStop />
                 </button>
@@ -67,7 +53,7 @@ function ControlButtons() {
             <Match when={workerStore.autoLaunch && !workerStore.inComputing}>
                 <button
                     class="btn btn-square"
-                    onClick={actions.pause}
+                    onClick={gameActions.pause}
                 >
                     <IconPause />
                 </button>
@@ -78,7 +64,7 @@ function ControlButtons() {
                     classList={{
                         "btn-disabled": workerStore.loadedProviderType === undefined,
                     }}
-                    onClick={actions.start}
+                    onClick={gameActions.start}
                 >
                     <IconPlay />
                 </button>
@@ -90,7 +76,7 @@ function ControlButtons() {
                 classList={{
                     "btn-disabled": !gameStore.forwardable,
                 }}
-                onClick={[actions.forward, "continue"]}
+                onClick={[gameActions.forward, "continue"]}
             >
                 <IconChevronRight />
             </button>
@@ -103,7 +89,7 @@ function ControlButtons() {
                     <li>
                         <button
                             class="btn btn-square"
-                            onClick={[actions.forward, "return"]}
+                            onClick={[gameActions.forward, "return"]}
                         >
                             <IconArrowUturnRight />
                         </button>
@@ -111,7 +97,7 @@ function ControlButtons() {
                     <li>
                         <button
                             class="btn btn-square"
-                            onClick={[actions.forward, "continue"]}
+                            onClick={[gameActions.forward, "continue"]}
                         >
                             <IconChevronRight />
                         </button>
@@ -124,7 +110,7 @@ function ControlButtons() {
             classList={{
                 "btn-disabled": !gameStore.forwardable,
             }}
-            onClick={[actions.bulkForward, "continue"]}
+            onClick={[gameActions.bulkForward, "continue"]}
         >
             <IconChevronDoubleRight />
         </button>
@@ -132,13 +118,19 @@ function ControlButtons() {
 }
 
 function DashboardButton() {
-    const { actions, appConfigStore } = useContext(AppContext)!
+    const { setAppConfigStore, appConfigStore } = useContext(AppContext)!
+
+    const toggleDashboard = () => {
+        // @ts-ignore
+        setAppConfigStore("openDashboard", !appConfigStore.openDashboard)
+    }
 
     return <button
         class="btn btn-active btn-square"
         classList={{
             "btn-active": appConfigStore.openDashboard,
         }}
+        onClick={toggleDashboard}
     >
         <IconCpuChip />
     </button>
@@ -239,7 +231,7 @@ function ConfigButton() {
 }
 
 function AboutButton() {
-    let dialogRef: HTMLDialogElement | undefined;
+    let dialogRef: HTMLDialogElement | undefined
 
     return <>
         <button
@@ -252,7 +244,7 @@ function AboutButton() {
             <dialog ref={ref => dialogRef = ref} id="about_modal" class="modal">
                 <div class="modal-box p-3">
                     <form method="dialog">
-                        <button class="btn absolute top-2 right-2 btn-sm btn-error">X</button>
+                        <button class="btn absolute top-2 right-2 btn-sm btn-primary">X</button>
                     </form>
                     <h3 class="text-lg">Mintaka WebUI</h3>
                     <a class="link" target="_blank" rel="noopener" href="https://github.com/junghyun397/mintaka">github.com/junghyun397/mintaka</a>

@@ -1,12 +1,12 @@
 /* @refresh reload */
-import './index.css';
-import { render } from 'solid-js/web';
-import 'solid-devtools';
-import { App } from "./App";
+import './index.css'
+import { render } from 'solid-js/web'
+import 'solid-devtools'
+import { App } from "./App"
 
-import init, { defaultConfig, defaultGameState } from "./wasm/pkg/mintaka_wasm";
-import { MintakaWorkerProvider } from "./domain/mintaka.worker.provider";
-import { MintakaProvider } from "./domain/mintaka.provider";
+import init, { defaultConfig, defaultGameState } from "./wasm/pkg/mintaka_wasm"
+import { MintakaWorkerProvider } from "./domain/mintaka.worker.provider"
+import { MintakaProvider } from "./domain/mintaka.provider"
 
 await init()
 

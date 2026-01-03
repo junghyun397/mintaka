@@ -1,4 +1,4 @@
-import { emptyHash, HashKey, MaybePos } from "../wasm/pkg/mintaka_wasm";
+import { emptyHash, HashKey, MaybePos } from "../wasm/pkg/mintaka_wasm"
 
 export type HistoryEntry = {
     hashKey: HashKey,

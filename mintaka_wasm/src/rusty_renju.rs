@@ -44,6 +44,13 @@ impl_wrapper! {
 #[wasm_bindgen]
 impl BoardWorker {
 
+    #[wasm_bindgen(js_name = fromHistory)]
+    pub fn from_history(source: History) -> Result<Self, JsError> {
+        let history: rusty_renju::history::History = try_from_js_value(source)?;
+
+        Ok(Self { inner: (&history).into() })
+    }
+
     #[wasm_bindgen(js_name = fromString)]
     pub fn from_string(source: &str) -> Result<Self, JsError> {
         let board = rusty_renju::board::Board::from_str(source).map_err(JsError::new)?;
