@@ -36,7 +36,7 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
 
         switch (event.data.type) {
             case "init": {
-                const { config, state } = event.data.payload
+                const { config, state } = event.data
 
                 const abortHandle = new JsAbortHandle()
                 const ptr = abortHandle.ptr()
@@ -50,7 +50,7 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
                 break
             }
             case "command": {
-                const result = ctx.state!.agent.command(event.data.payload)
+                const result = ctx.state!.agent.command(event.data.command)
 
                 ctx.post({ type: "CommandResult", content: result })
                 break
@@ -61,12 +61,12 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
                     break
                 }
 
-                if (ctx.state?.agent?.hashKey() !== event.data.payload.hash) {
+                if (ctx.state?.agent?.hashKey() !== event.data.hash) {
                     ctx.postError("snapshot missmatch")
                     break
                 }
 
-                const bestMove = ctx.state.agent.launch(event.data.payload.objective, ctx.state.abort)
+                const bestMove = ctx.state.agent.launch(event.data.objective, ctx.state.abort)
 
                 ctx.post({ type: "BestMove", content: bestMove })
                 break

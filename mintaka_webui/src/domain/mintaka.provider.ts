@@ -1,4 +1,4 @@
-import { BestMove, Command, CommandResult, HashKey, Response, SearchObjective } from "../wasm/pkg/mintaka_wasm";
+import { BestMove, Command, CommandResult, Config, HashKey, Response, SearchObjective } from "../wasm/pkg/mintaka_wasm";
 
 export type MintakaProviderType = "server" | "worker"
 
@@ -27,6 +27,7 @@ export type MintakaProviderState = MintakaProviderIdleState | MintakaProviderInC
 
 export interface MintakaProvider {
     readonly type: MintakaProviderType
+    readonly maxConfig: Config
     snapshot: HashKey
     state: MintakaProviderState
     onResponse?: (message: MintakaProviderResponse) => void
@@ -35,6 +36,7 @@ export interface MintakaProvider {
 
 export abstract class BaseMintakaProvider implements MintakaProvider {
     abstract readonly type: MintakaProviderType
+    abstract maxConfig: Config
     abstract snapshot: HashKey
     abstract state: MintakaProviderState
 

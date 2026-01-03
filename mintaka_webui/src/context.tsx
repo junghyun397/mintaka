@@ -6,7 +6,7 @@ import { EmptyHistoryTree, ForwardMethod, HistoryTree } from "./domain/HistoryTr
 import {
     BoardWorker,
     calculateNormEval,
-    Color,
+    Color, Config,
     defaultBoard,
     defaultConfig,
     defaultGameState,
@@ -36,7 +36,7 @@ interface AppActions {
     bulkBackward: () => void,
     start: () => void,
     pause: () => void,
-    stop: () => void,
+    abort: () => void,
 }
 
 type AppContext = {
@@ -185,7 +185,7 @@ export function AppContextProvider(props: ParentProps) {
         pause: () => {
             setWorkerStore("autoLaunch", false)
         },
-        stop: () => {
+        abort: () => {
             setWorkerStore("autoLaunch", false)
             abort()
         },

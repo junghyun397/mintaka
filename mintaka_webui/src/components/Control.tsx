@@ -20,13 +20,128 @@ import {
     IconThemeAuto,
 } from "./icons";
 import { nextHistoryDisplay, nextTheme } from "../stores/app.config.store";
+import { Portal } from "solid-js/web";
 
 export function Control() {
-    return <div class="flex gap-2 rounded-box bg-base-100 p-2">
-        <ConfigButton />
-        <ControlButtons />
+    return <div class="flex gap-2 rounded-box bg-base-100 p-2 max-xs:gap-1 max-xs:p-1">
         <DashboardButton />
+        <ControlButtons />
+        <ConfigButton />
     </div>
+}
+
+function ControlButtons() {
+    const { actions, workerStore, gameStore } = useContext(AppContext)!
+
+    const backwardDisabled = () =>
+        !gameStore.backwardable || workerStore.inComputing
+
+    return <>
+        <button
+            class="btn btn-square"
+            classList={{
+                "btn-disabled": backwardDisabled(),
+            }}
+            onClick={actions.bulkBackward}
+        >
+            <IconChevronDoubleLeft />
+        </button>
+        <button
+            class="btn btn-square"
+            classList={{
+                "btn-disabled": backwardDisabled(),
+            }}
+            onClick={actions.backward}
+        >
+            <IconChevronLeft />
+        </button>
+        <Switch>
+            <Match when={workerStore.inComputing}>
+                <button
+                    class="btn btn-square animate-pulse"
+                    onClick={actions.abort}
+                >
+                    <IconStop />
+                </button>
+            </Match>
+            <Match when={workerStore.autoLaunch && !workerStore.inComputing}>
+                <button
+                    class="btn btn-square"
+                    onClick={actions.pause}
+                >
+                    <IconPause />
+                </button>
+            </Match>
+            <Match when={!workerStore.autoLaunch && !workerStore.inComputing}>
+                <button
+                    class="btn btn-square"
+                    classList={{
+                        "btn-disabled": workerStore.loadedProviderType === undefined,
+                    }}
+                    onClick={actions.start}
+                >
+                    <IconPlay />
+                </button>
+            </Match>
+        </Switch>
+        <Show when={gameStore.inBranchHead} fallback={
+            <button
+                class="btn btn-square"
+                classList={{
+                    "btn-disabled": !gameStore.forwardable,
+                }}
+                onClick={[actions.forward, "continue"]}
+            >
+                <IconChevronRight />
+            </button>
+        }>
+            <div class="dropdown dropdown-center dropdown-top">
+                <div tabindex="0" role="button" class="btn btn-square">
+                    <IconGitBranch />
+                </div>
+                <ul tabindex="-1" class="dropdown-content menu z-1 gap-2 rounded-box bg-base-100 max-xs:gap-1 max-xs:p-1">
+                    <li>
+                        <button
+                            class="btn btn-square"
+                            onClick={[actions.forward, "return"]}
+                        >
+                            <IconArrowUturnRight />
+                        </button>
+                    </li>
+                    <li>
+                        <button
+                            class="btn btn-square"
+                            onClick={[actions.forward, "continue"]}
+                        >
+                            <IconChevronRight />
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </Show>
+        <button
+            class="btn btn-square"
+            classList={{
+                "btn-disabled": !gameStore.forwardable,
+            }}
+            onClick={[actions.bulkForward, "continue"]}
+        >
+            <IconChevronDoubleRight />
+        </button>
+    </>
+}
+
+function DashboardButton() {
+    const { actions, appConfigStore } = useContext(AppContext)!
+
+    return <button
+        class="btn btn-active btn-square"
+        classList={{
+            "btn-active": appConfigStore.openDashboard,
+        }}
+    >
+        <IconCpuChip />
+    </button>
 }
 
 function ConfigButton() {
@@ -49,13 +164,9 @@ function ConfigButton() {
         <div tabindex="0" role="button" class="btn btn-square">
             <IconCog8Tooth />
         </div>
-        <ul tabindex="-1" class="dropdown-content menu z-1 gap-2 rounded-box bg-base-100">
+        <ul tabindex="-1" class="dropdown-content menu z-1 gap-2 rounded-box bg-base-100 p-2 max-xs:gap-1 max-xs:p-1">
             <li>
-                <button
-                    class="btn btn-square"
-                >
-                    <IconInformationCircle />
-                </button>
+                <AboutButton />
             </li>
             <li>
                 <button
@@ -102,20 +213,24 @@ function ConfigButton() {
                         </mask></defs>
                         <circle
                             fill="currentColor"
-                            cx="50" cy="50" r="32"
+                            cx="50" cy="50" r="30"
                             mask="url(#historyDisplayMask)"
                         />
                     </svg>
                 </button>
             </li>
-            <li class="block md:hidden">
+            <li class="block zoom:hidden">
                 <button
                     class="btn btn-square"
                     onClick={toggleZoomBoard}
                 >
                     <Switch>
-                        <Match when={!appConfigStore.zoomBoard}><IconMagnifyingGlassPlus /></Match>
-                        <Match when={appConfigStore.zoomBoard}><IconMagnifyingGlassMinus /></Match>
+                        <Match when={!appConfigStore.zoomBoard}>
+                            <IconMagnifyingGlassPlus />
+                        </Match>
+                        <Match when={appConfigStore.zoomBoard}>
+                            <IconMagnifyingGlassMinus />
+                        </Match>
                     </Switch>
                 </button>
             </li>
@@ -123,116 +238,29 @@ function ConfigButton() {
     </div>
 }
 
-function ControlButtons() {
-    const { actions, workerStore, gameStore } = useContext(AppContext)!
-
-    const backwardDisabled = () =>
-        !gameStore.backwardable || workerStore.inComputing
+function AboutButton() {
+    let dialogRef: HTMLDialogElement | undefined;
 
     return <>
         <button
-            class="btn btn-square max-xs:hidden"
-            classList={{
-                "btn-disabled": backwardDisabled(),
-            }}
-            onClick={actions.bulkBackward}
-        >
-            <IconChevronDoubleLeft />
-        </button>
-        <button
             class="btn btn-square"
-            classList={{
-                "btn-disabled": backwardDisabled(),
-            }}
-            onClick={actions.backward}
+            onClick={() => dialogRef?.showModal()}
         >
-            <IconChevronLeft />
+            <IconInformationCircle />
         </button>
-        <Switch>
-            <Match when={workerStore.inComputing}>
-                <button
-                    class="btn btn-square animate-pulse"
-                    onClick={actions.stop}
-                >
-                    <IconStop />
-                </button>
-            </Match>
-            <Match when={workerStore.autoLaunch && !workerStore.inComputing}>
-                <button
-                    class="btn btn-square"
-                    onClick={actions.pause}
-                >
-                    <IconPause />
-                </button>
-            </Match>
-            <Match when={!workerStore.autoLaunch && !workerStore.inComputing}>
-                <button
-                    class="btn btn-square"
-                    classList={{
-                        "btn-disabled": workerStore.loadedProviderType === undefined,
-                    }}
-                    onClick={actions.start}
-                >
-                    <IconPlay />
-                </button>
-            </Match>
-        </Switch>
-        <Show when={gameStore.inBranchHead} fallback={
-            <button
-                class="btn btn-square"
-                classList={{
-                    "btn-disabled": !gameStore.forwardable,
-                }}
-                onClick={[actions.forward, "continue"]}
-            >
-                <IconChevronRight />
-            </button>
-        }>
-            <div class="dropdown dropdown-center dropdown-top">
-                <div tabindex="0" role="button" class="btn btn-square">
-                    <IconGitBranch />
+        <Portal>
+            <dialog ref={ref => dialogRef = ref} id="about_modal" class="modal">
+                <div class="modal-box p-3">
+                    <form method="dialog">
+                        <button class="btn absolute top-2 right-2 btn-sm btn-error">X</button>
+                    </form>
+                    <h3 class="text-lg">Mintaka WebUI</h3>
+                    <a class="link" target="_blank" rel="noopener" href="https://github.com/junghyun397/mintaka">github.com/junghyun397/mintaka</a>
                 </div>
-                <ul tabindex="-1" class="dropdown-content menu z-1 gap-2 rounded-box bg-base-100">
-                    <li>
-                        <button
-                            class="btn btn-square"
-                            onClick={[actions.forward, "return"]}
-                        >
-                            <IconArrowUturnRight />
-                        </button>
-                    </li>
-                    <li>
-                        <button
-                            class="btn btn-square"
-                            onClick={[actions.forward, "continue"]}
-                        >
-                            <IconChevronRight />
-                        </button>
-                    </li>
-                </ul>
-            </div>
-        </Show>
-        <button
-            class="btn btn-square max-xs:hidden"
-            classList={{
-                "btn-disabled": !gameStore.forwardable,
-            }}
-            onClick={[actions.bulkForward, "continue"]}
-        >
-            <IconChevronDoubleRight />
-        </button>
+                <form method="dialog" class="modal-backdrop">
+                    <button aria-label="Close"></button>
+                </form>
+            </dialog>
+        </Portal>
     </>
-}
-
-function DashboardButton() {
-    const { actions, appConfigStore } = useContext(AppContext)!
-
-    return <button
-        class="btn btn-active btn-square"
-        classList={{
-            "btn-active": appConfigStore.openDashboard,
-        }}
-    >
-        <IconCpuChip />
-    </button>
 }

@@ -29,3 +29,5 @@ export function duration(secs: number, nanos?: number): DurationSchema {
         nanos: nanos ?? 0,
     }
 }
+
+export const InfiniteDuration = duration(9271584000)

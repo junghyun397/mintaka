@@ -5,21 +5,17 @@ import {
     MintakaProviderState, MintakaProviderType,
 } from "./mintaka.provider";
 import { Config, GameState } from "../wasm/pkg/mintaka_wasm_worker";
-import { Command, emptyHash, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm";
+import { Command, defaultConfig, emptyHash, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm";
+import { InfiniteDuration } from "./rusty-renju";
 
 export type MintakaWorkerMessage =
-    | { type: "command", payload: Command }
-    | { type: "launch", payload: { hash: HashKey, objective: SearchObjective } }
-    | { type: "init", payload: { config: Config, state: GameState } }
-
-export type MintakaLoadingResponse =
-    | { step: "download", size: number }
-    | { step: "downloading", size: number, loaded: number }
-    | { step: "compile" }
+    | { type: "command", command: Command }
+    | { type: "launch", hash: HashKey, objective: SearchObjective }
+    | { type: "init", config: Config, state: GameState }
 
 export type MintakaWorkerResponse =
     | MintakaProviderResponse
-    | { type: "Load", content: MintakaLoadingResponse }
+    | { type: "Load" }
     | { type: "Ready", sab: SharedArrayBuffer, controlPtr: number }
 
 export class MintakaWorkerControl {
@@ -39,6 +35,19 @@ export class MintakaWorkerControl {
 
 export class MintakaWorkerProvider implements MintakaProvider {
     readonly type: MintakaProviderType = "worker"
+    readonly maxConfig: Config = {
+        ...defaultConfig(),
+        max_vcf_depth: 225,
+        workers: 256,
+        tt_size: 1024 * 1024 * 2048, // 2 GiB
+        pondering: true,
+        initial_timer: {
+            total_remaining: InfiniteDuration,
+            turn: InfiniteDuration,
+            increment: InfiniteDuration,
+        },
+    }
+
     snapshot: HashKey = emptyHash()
 
     private readonly worker: Worker
@@ -64,7 +73,6 @@ export class MintakaWorkerProvider implements MintakaProvider {
         this.worker.onmessage = (event: MessageEvent<MintakaWorkerResponse>) => {
             switch (event.data.type) {
                 case "Load": {
-                    console.log(event.data.content)
                     return
                 }
                 case "Ready": {
@@ -92,11 +100,11 @@ export class MintakaWorkerProvider implements MintakaProvider {
             this.onError && this.onError(event)
         }
 
-        this.worker.postMessage({ type: "init", payload: { config: config, state: gameState } })
+        this.worker.postMessage({ type: "init", config: config, state: gameState })
     }
 
     private command = (command: Command) => {
-        this.worker.postMessage({ type: "command", payload: command } as MintakaWorkerMessage)
+        this.worker.postMessage({ type: "command", command: command } as MintakaWorkerMessage)
     }
 
     private launch = (hash: HashKey, objective: SearchObjective): MintakaProviderLaunchError | undefined => {
@@ -107,7 +115,7 @@ export class MintakaWorkerProvider implements MintakaProvider {
             message: this.runtimeMessage,
         }
 
-        this.worker.postMessage({ type: "launch", payload: { hash, objective } })
+        this.worker.postMessage({ type: "launch", hash, objective })
 
         return undefined
     }

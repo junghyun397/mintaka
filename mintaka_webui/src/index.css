@@ -2,6 +2,7 @@
 @plugin 'daisyui';
 
 @theme {
+    --breakpoint-zoom: 36rem;
     --breakpoint-xs: 350px;
 }
 
@@ -71,4 +72,18 @@
     --border: 1px;
     --depth: 0;
     --noise: 0;
+}
+
+@layer utilities {
+    dialog.modal .modal-box,
+    dialog.modal .modal-backdrop,
+    dialog.modal::backdrop {
+        animation-duration: 100ms !important;
+        transition-duration: 100ms !important;
+    }
+
+    dialog.modal {
+        place-items: start center;
+        padding-top: 8rem;
+    }
 }

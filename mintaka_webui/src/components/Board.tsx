@@ -44,7 +44,12 @@ export function Board() {
             class="absolute inset-0 p-[3.125%]" // 1/32
         >
             <div
-                class="grid h-full w-full grid-cols-15 grid-rows-15 stroke-gray-500 [&_button.forbidden]:cursor-not-allowed"
+                class="
+                grid h-full w-full
+                grid-cols-15 grid-rows-15
+                stroke-gray-500
+                [&_button.forbidden]:cursor-not-allowed [&_button.stone.black]:fill-black [&_button.stone.white]:fill-white
+                "
                 classList={{
                     "[&_button]:cursor-wait": workerStore.inComputing,
                     "[&_button.stone]:cursor-auto [&_button]:cursor-crosshair": workerStore.inComputing,
@@ -63,9 +68,6 @@ export function Board() {
 function Cell(props: { cell: BoardCellView }) {
     const { actions, appConfigStore, gameStore } = useContext(AppContext)!
 
-    const fill = () =>
-        props.cell.content === "Black" ? "black" : "white"
-
     const reversedFill = () =>
         props.cell.content === "Black" ? "white" : "black"
 
@@ -74,6 +76,8 @@ function Cell(props: { cell: BoardCellView }) {
         title={props.cell.pos}
         classList={{
             "stone": props.cell.type === "Stone",
+            "black": props.cell.content === "Black",
+            "white": props.cell.content === "White",
             "forbidden": props.cell.type === "Forbidden" && gameStore.userColor === "Black",
         }}
         onClick={[actions.play, props.cell.pos]}
@@ -82,7 +86,6 @@ function Cell(props: { cell: BoardCellView }) {
             <Match when={props.cell.type === "Stone" ? props.cell : undefined}>{cell =>
                 <svg viewBox="0 0 100 100">
                     <circle
-                        fill={fill()}
                         stroke-width="4"
                         cx="50" cy="50" r="45"
                     />
