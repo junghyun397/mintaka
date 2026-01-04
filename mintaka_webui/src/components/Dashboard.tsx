@@ -60,10 +60,13 @@ function Config() {
             <h3 class="text-lg">Resources</h3>
             <fieldset class="fieldset">
                 <legend class="fieldset-legend">Workers</legend>
-                <input
-                    type="number" class="input"
-                    value={appConfigStore.config.workers}
-                />
+                <label class="input">
+                    <input
+                        type="number"
+                        value={appConfigStore.config.workers}
+                    />
+                    <span class="label">CPUS</span>
+                </label>
                 <p class="label">Number of CPU cores used for computation.</p>
             </fieldset>
             <fieldset class="fieldset">

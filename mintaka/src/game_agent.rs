@@ -4,7 +4,7 @@ use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::principal_variation::PrincipalVariation;
-use crate::protocol::command::Command;
+use crate::protocol::command::{Command, CompactGameState};
 use crate::protocol::results::{CommandResult, GameResult};
 pub use crate::protocol::response::{ComputingResource, Response, ResponseSender};
 use crate::search::iterative_deepening;
@@ -28,6 +28,8 @@ use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use rusty_renju::board::Board;
+use rusty_renju::history::History;
 
 #[typeshare::typeshare]
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
@@ -223,7 +225,10 @@ impl GameAgent {
                 self.evaluator = HeuristicEvaluator::from_state(&self.state);
             },
             Command::Clear => {
-                self.reinit_from_state(GameState::default());
+                self.reinit_from_state(CompactGameState {
+                    board: Board::default(),
+                    history: History::default(),
+                });
             },
             Command::Load(state) => {
                 self.reinit_from_state(*state);
@@ -278,7 +283,19 @@ impl GameAgent {
     }
 
     pub fn batch_command(&mut self, commands: Vec<Command>) -> Result<(u32, CommandResult), (u32, GameError)> {
-        todo!()
+        let mut command_result = None;
+
+        for (index, command) in commands.into_iter().enumerate() {
+            match self.command(command) {
+                Ok(CommandResult { hash_key, result: Some(result) }) =>
+                    return Ok((index as u32, CommandResult::finished(hash_key, result))),
+                Err(error) =>
+                    return Err((index as u32, error)),
+                Ok(result) => command_result = Some(result),
+            }
+        }
+
+        Ok(command_result.map(|result| (0, result)).unwrap())
     }
 
     fn next_computing_resource(&self) -> ComputingResource {
@@ -420,12 +437,12 @@ impl GameAgent {
         }
     }
 
-    fn sync_state(&mut self, state: GameState) {
-        self.state = state;
+    fn sync_state(&mut self, compact_state: CompactGameState) {
+        self.state = GameState::from_board_and_history(compact_state.board, compact_state.history);
     }
 
-    fn reinit_from_state(&mut self, state: GameState) {
-        self.state = state;
+    fn reinit_from_state(&mut self, compact_state: CompactGameState) {
+        self.state = GameState::from_board_and_history(compact_state.board, compact_state.history);
 
         self.evaluator = ActiveEvaluator::from_state(&self.state);
 

@@ -1,162 +1,69 @@
-import { reconcile, SetStoreFunction, unwrap } from "solid-js/store"
 import { ForwardMethod } from "../domain/HistoryTree"
-import { Color, HashKey, MaybePos, Pos } from "../wasm/pkg/mintaka_wasm"
-import { WorkerStore } from "../stores/worker.store"
-import { buildGameStore, GameStore } from "../stores/game.store"
-import { flip } from "../domain/rusty-renju"
-import { AppState } from "../stores/app.state"
+import { Pos } from "../wasm/pkg/mintaka_wasm"
+import { AppGameState } from "../stores/app.state"
 
-export interface GameActions {
+interface GameController {
     play: (pos: Pos) => void,
     forward: (method: ForwardMethod) => void,
     bulkForward: (method: ForwardMethod) => void,
     backward: () => void,
     bulkBackward: () => void,
-    start: () => void,
-    pause: () => void,
-    abort: () => void,
 }
 
-export function createGameController(props: {
-    appState: AppState,
-    workerStore: WorkerStore,
-    setWorkerStore: SetStoreFunction<WorkerStore>,
-    gameStore: GameStore,
-    setGameStore: SetStoreFunction<GameStore>,
-}): {
-    play: (pos: MaybePos) => void,
-    resolveDesync: (hash: HashKey) => void,
-    gameActions: GameActions,
-} {
-    const reconcileGameStore = () =>
-        props.setGameStore(reconcile(buildGameStore(props.appState.boardWorker, props.appState.historyTree, flip(unwrap(props.gameStore.playerColor)))))
-
-    const syncSet = (pos: MaybePos) => {
-        if (props.appState.mintakaProvider && props.appState.mintakaProvider.state.type === "idle")
-            props.appState.mintakaProvider.state.command({ type: "Play", content: pos })
-    }
-
-    const syncUnset = (pos: MaybePos, color: Color) => {
-        if (props.appState.mintakaProvider && props.appState.mintakaProvider.state.type === "idle")
-            return
-    }
-
-    const play = (pos: MaybePos) => {
-        if (pos ? !props.appState.boardWorker.isLegalMove(pos) : true) return
-
-        props.appState.boardWorker = props.appState.boardWorker.set(pos)
-        const hashKey = props.appState.boardWorker.hashKey()
-
-        props.appState.historyTree = props.appState.historyTree.push({ hashKey, pos })
-
-        syncSet(pos)
-
-        reconcileGameStore()
-    }
-
-    const launch = () => {
-        if (props.appState.mintakaProvider === undefined) return
-
-        if (props.appState.mintakaProvider.state.type === "in_computing") return
-
-        props.setWorkerStore("inComputing", true)
-
-        const _ = props.appState.mintakaProvider.state.launch(props.appState.boardWorker.hashKey(), "Best")
-    }
-
-    const abort = () => {
-        if (props.appState.mintakaProvider === undefined) return
-
-        if (props.appState.mintakaProvider.state.type === "idle") return
-
-        props.appState.mintakaProvider.state.message({ type: "abort" })
-    }
-
-    const resolveDesync = (stopAt: HashKey) => {
-        const result = props.appState.historyTree.backwardTo(stopAt)
-
-        if (!result) return
-        const [historyTree, entries] = result
-
-        props.appState.historyTree = historyTree
-        for (const entry of entries.reverse()) {
-            props.appState.boardWorker = props.appState.boardWorker.unset(entry.pos)
-        }
-
-        reconcileGameStore()
-    }
-
-    const gameActions: GameActions = {
+export function createGameController(
+    gameState: () => AppGameState,
+    setGameState: (gameState: AppGameState) => void,
+): GameController {
+    return {
         play: (pos: Pos) => {
-            play(pos)
+            if (pos ? !gameState().boardWorker.isLegalMove(pos) : true) return
 
-            if (unwrap(props.workerStore.autoLaunch))
-                launch()
+            const boardWorker = gameState().boardWorker.set(pos)
+            const hashKey = boardWorker.hashKey()
+
+            const historyTree = gameState().historyTree.push({ hashKey, pos })
+
+            setGameState({ boardWorker, historyTree })
         },
         forward: (method: ForwardMethod) => {
-            const result = props.appState.historyTree.forward(method)
+            const result = gameState().historyTree.forward(method)
             if (!result) return
             const [historyTree, entry] = result
 
-            props.appState.historyTree = historyTree
-            props.appState.boardWorker = props.appState.boardWorker.set(entry.pos!)
+            const boardWorker = gameState().boardWorker.set(entry.pos!)
 
-            syncSet(entry.pos)
-
-            reconcileGameStore()
+            setGameState({ boardWorker, historyTree })
         },
         bulkForward: (method: ForwardMethod) => {
-            const result = props.appState.historyTree.bulkForward(method)
+            const result = gameState().historyTree.bulkForward(method)
             if (!result) return
             const [historyTree, entries] = result
 
-            props.appState.historyTree = historyTree
-            for (const entry of entries) {
-                props.appState.boardWorker = props.appState.boardWorker.set(entry.pos)
-            }
+            let boardWorker = gameState().boardWorker
+            for (const entry of entries)
+                boardWorker = boardWorker.set(entry.pos)
 
-            reconcileGameStore()
+            setGameState({ boardWorker, historyTree })
         },
         backward: () => {
-            if (unwrap(props.workerStore.inComputing)) return
-
-            const result = props.appState.historyTree.backward()
+            const result = gameState().historyTree.backward()
             if (!result) return
             const [historyTree, entry] = result
 
-            props.appState.historyTree = historyTree
-            props.appState.boardWorker = props.appState.boardWorker.unset(entry.pos!)
+            const boardWorker = gameState().boardWorker.unset(entry.pos!)
 
-            reconcileGameStore()
+            setGameState({ boardWorker, historyTree })
         },
         bulkBackward: () => {
-            if (unwrap(props.workerStore.inComputing)) return
-
-            const result = props.appState.historyTree.bulkBackward()
+            const result = gameState().historyTree.bulkBackward()
             if (!result) return
             const [historyTree, entries] = result
 
-            props.appState.historyTree = historyTree
-            for (const entry of entries.reverse()) {
-                props.appState.boardWorker = props.appState.boardWorker.unset(entry.pos)
-            }
+            let boardWorker = gameState().boardWorker
+            for (const entry of entries.reverse())
+                boardWorker = boardWorker.unset(entry.pos)
 
-            reconcileGameStore()
-        },
-        start: () => {
-            props.setWorkerStore("autoLaunch", true)
-
-            launch()
-        },
-        pause: () => {
-            props.setWorkerStore("autoLaunch", false)
-        },
-        abort: () => {
-            props.setWorkerStore("autoLaunch", false)
-
-            abort()
+            setGameState({ boardWorker, historyTree })
         },
     }
-
-    return { play, resolveDesync, gameActions }
 }

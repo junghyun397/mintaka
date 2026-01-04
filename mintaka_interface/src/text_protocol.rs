@@ -1,6 +1,6 @@
 use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
-use mintaka::protocol::command::Command;
+use mintaka::protocol::command::{Command, CompactGameState};
 use mintaka::protocol::response::{CallBackResponseSender, Response};
 use mintaka::state::GameState;
 use mintaka_interface::message::{Message, MessageSender, StatusCommand};
@@ -253,9 +253,9 @@ fn handle_command(
 
                         let history = (&board).try_into().unwrap_or_default();
 
-                        let state = GameState::from_board_and_history(board, history);
-
-                        message_sender.command(Command::Load(Box::new(state)));
+                        message_sender.command(Command::Load(Box::new(
+                            CompactGameState { board, history }
+                        )));
                     },
                     "history" => {
                         let history: History = args.get(2)
@@ -264,9 +264,9 @@ fn handle_command(
 
                         let board: Board = (&history).into();
 
-                        let state = GameState::from_board_and_history(board, history);
-
-                        message_sender.command(Command::Load(Box::new(state)));
+                        message_sender.command(Command::Load(Box::new(
+                            CompactGameState { board, history }
+                        )));
                     },
                     &_ => return Err("unknown data type.".to_string()),
                 }

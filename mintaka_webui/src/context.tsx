@@ -1,23 +1,30 @@
-import { createContext, createEffect, onCleanup, onMount, ParentProps } from "solid-js"
+import { createContext, createEffect, createMemo, onCleanup, onMount, ParentProps } from "solid-js"
 import { MintakaProvider } from "./domain/mintaka.provider"
 import { createStore, reconcile, SetStoreFunction, unwrap } from "solid-js/store"
 import { buildGameStore, GameStore } from "./stores/game.store"
-import { HistoryTree } from "./domain/HistoryTree"
-import {
-    calculateNormEval,
-    defaultGameState,
-    History,
-
-} from "./wasm/pkg/mintaka_wasm"
+import { ForwardMethod, HistoryTree } from "./domain/HistoryTree"
+import { calculateNormEval, defaultGameState, History, Pos } from "./wasm/pkg/mintaka_wasm"
 import { AppConfig, defaultAppConfig, Theme } from "./stores/app.config.store"
 import { makePersisted } from "@solid-primitives/storage"
 import { MintakaWorkerProvider } from "./domain/mintaka.worker.provider"
 import { createWorkerStore, WorkerStore } from "./stores/worker.store"
-import { createGameController, type GameActions } from "./controllers/game.controller"
-import { createDefaultAppState } from "./stores/app.state"
+import { createGameController } from "./controllers/game.controller"
+import { createProviderController } from "./controllers/provider.controller"
+import { createAppState } from "./stores/app.state"
 
 interface AppActions {
     clearAppConfigStore: () => void,
+}
+
+interface GameActions {
+    play: (pos: Pos) => void,
+    forward: (method: ForwardMethod) => void,
+    bulkForward: (method: ForwardMethod) => void,
+    backward: () => void,
+    bulkBackward: () => void,
+    start: () => void,
+    pause: () => void,
+    abort: () => void,
 }
 
 type AppContext = {
@@ -34,21 +41,63 @@ type AppContext = {
 export const AppContext = createContext<AppContext>()
 
 export function AppContextProvider(props: ParentProps) {
-    const appState = createDefaultAppState()
+    const appState = createAppState({})
 
     const [appConfigStore, setAppConfigStore] = createAppConfigStore()
 
-    const [gameStore, setGameStore] = createStore(buildGameStore(appState.boardWorker, appState.historyTree, "Black"))
+    const [gameStore, setGameStore] = createStore(buildGameStore(appState.gameState().boardWorker, appState.gameState().historyTree))
 
     const [workerStore, setWorkerStore] = createWorkerStore()
 
-    const { play, resolveDesync, gameActions } = createGameController({
-        appState,
-        workerStore,
-        setWorkerStore,
-        gameStore,
-        setGameStore,
+    const gameController = createGameController(appState.gameState, appState.setGameState)
+
+    const providerController = createProviderController(appState.gameState, appState.mintakaProvider)
+
+    const gameStateMemo = createMemo(() => {
+        const gameState = appState.gameState()
+
+        return buildGameStore(gameState.boardWorker, gameState.historyTree)
     })
+
+    createEffect(() => setGameStore(reconcile(gameStateMemo())))
+
+    const gameActions: GameActions = {
+        play: (pos) => {
+            gameController.play(pos)
+
+            if (!workerStore.inComputing && workerStore.autoLaunch)
+                providerController.launch()
+        },
+        forward: (method) => {
+            gameController.forward(method)
+        },
+        bulkForward: (method) => {
+            gameController.bulkForward(method)
+        },
+        backward: () => {
+            gameController.backward()
+        },
+        bulkBackward: () => {
+            gameController.bulkBackward()
+        },
+        start: () => {
+            const result = providerController.launch()
+
+            if (result === "ok") {
+                setWorkerStore("inComputing", true)
+                setWorkerStore("autoLaunch", true)
+            }
+        },
+        pause: () => {
+            setWorkerStore("autoLaunch", false)
+        },
+        abort: () => {
+            const result = providerController.abort()
+
+            if (result === "ok")
+                setWorkerStore("autoLaunch", false)
+        },
+    }
 
     const appActions: AppActions = {
         clearAppConfigStore: () => {
@@ -62,11 +111,12 @@ export function AppContextProvider(props: ParentProps) {
 
         const gameState = defaultGameState()
 
-        appState.mintakaProvider = new MintakaWorkerProvider(config, gameState)
+        const provider = new MintakaWorkerProvider(config, gameState)
+        appState.setMintakaProvider(provider)
 
         setWorkerStore("loadedProviderType", providerType)
 
-        connectProvider(appState.mintakaProvider)
+        connectProvider(provider)
     }
 
     const connectProvider = (provider: MintakaProvider) => {
@@ -77,6 +127,7 @@ export function AppContextProvider(props: ParentProps) {
                         type: "began",
                         content: response.content,
                     })
+
                     break
                 }
                 case "Status": {
@@ -85,14 +136,14 @@ export function AppContextProvider(props: ParentProps) {
                         content: response.content,
                         normEval: calculateNormEval(response.content.score),
                     }))
+
                     break
                 }
                 case "BestMove": {
-                    if (response.content.position_hash !== appState.boardWorker.hashKey())
-                        resolveDesync(response.content.position_hash)
+                    if (response.content.position_hash !== appState.gameState().boardWorker.hashKey())
+                        providerController.syncAll()
 
-                    if (response.content.best_move !== undefined)
-                        play(response.content.best_move)
+                    gameController.play(response.content.best_move!)
 
                     setWorkerStore("state", reconcile({
                         type: "finished",

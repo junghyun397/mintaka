@@ -5,12 +5,12 @@ export type MintakaProviderType = "server" | "worker"
 export type MintakaProviderRuntimeMessage =
     { type: "abort" }
 
-export type MintakaProviderLaunchError = "snapshot-mismatch"
+export type MintakaProviderLaunchResult = "ok" | "snapshot-mismatch"
 
 export type MintakaProviderIdleState = {
     type: "idle",
     command: (command: Command) => void,
-    launch: (hash: HashKey, objective: SearchObjective) => MintakaProviderLaunchError | undefined
+    launch: (hash: HashKey, objective: SearchObjective) => MintakaProviderLaunchResult
 }
 
 export type MintakaProviderInComputingState = {

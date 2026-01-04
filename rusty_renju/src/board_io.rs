@@ -12,6 +12,7 @@ use crate::utils::str_utils::join_str_horizontally;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
+use crate::memo::hash_key::HashKey;
 
 pub const SYMBOL_BLACK: char = 'X';
 pub const SYMBOL_WHITE: char = 'O';
@@ -342,6 +343,7 @@ impl Display for Slice {
 #[typeshare::typeshare]
 #[derive(Serialize, Deserialize)]
 struct BoardData {
+    hash_key: HashKey,
     player_color: Color,
     bitfield: ColorContainer<Bitfield>,
 }
@@ -349,6 +351,7 @@ struct BoardData {
 impl Serialize for Board {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         BoardData {
+            hash_key: self.hash_key,
             player_color: self.player_color,
             bitfield: self.slices.bitfield()
         }.serialize(serializer)

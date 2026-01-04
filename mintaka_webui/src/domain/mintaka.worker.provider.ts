@@ -1,5 +1,5 @@
 import {
-    MintakaProvider, MintakaProviderLaunchError,
+    MintakaProvider, MintakaProviderLaunchResult,
     MintakaProviderResponse,
     MintakaProviderRuntimeMessage,
     MintakaProviderState, MintakaProviderType,
@@ -65,6 +65,8 @@ export class MintakaWorkerProvider implements MintakaProvider {
             launch: this.launch,
         }
 
+        this.snapshot = gameState.board.hash_key
+
         this.worker = new Worker(
             new URL("mintaka.worker.ts", import.meta.url),
             { type: "module" },
@@ -107,7 +109,7 @@ export class MintakaWorkerProvider implements MintakaProvider {
         this.worker.postMessage({ type: "command", command: command } as MintakaWorkerMessage)
     }
 
-    private launch = (hash: HashKey, objective: SearchObjective): MintakaProviderLaunchError | undefined => {
+    private launch = (hash: HashKey, objective: SearchObjective): MintakaProviderLaunchResult => {
         if (this.snapshot !== hash) return "snapshot-mismatch"
 
         this.state = {
@@ -117,7 +119,7 @@ export class MintakaWorkerProvider implements MintakaProvider {
 
         this.worker.postMessage({ type: "launch", hash, objective })
 
-        return undefined
+        return "ok"
     }
 
     private runtimeMessage = (_: MintakaProviderRuntimeMessage) => {

@@ -78,7 +78,7 @@ function Cell(props: { cell: BoardCellView }) {
             "stone": props.cell.type === "Stone",
             "black": props.cell.content === "Black",
             "white": props.cell.content === "White",
-            "forbidden": props.cell.type === "Forbidden" && gameStore.userColor === "Black",
+            "forbidden": props.cell.type === "Forbidden" && gameStore.playerColor === "Black",
         }}
         onClick={[gameActions.play, props.cell.pos]}
     >

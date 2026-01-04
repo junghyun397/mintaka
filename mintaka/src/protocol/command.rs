@@ -1,23 +1,30 @@
+use crate::config::Config;
+use rusty_renju::board::Board;
+use rusty_renju::history::History;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
+#[allow(unused_imports)]
+use rusty_renju::utils::lang::DurationSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::time::Duration;
 
-use crate::config::Config;
-use crate::state::GameState;
-#[allow(unused_imports)]
-use rusty_renju::utils::lang::DurationSchema;
+#[typeshare::typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompactGameState {
+    pub board: Board,
+    pub history: History,
+}
 
 #[typeshare::typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "content")]
 pub enum Command {
     Clear,
-    Load(Box<GameState>),
-    Sync(Box<GameState>),
+    Load(Box<CompactGameState>),
+    Sync(Box<CompactGameState>),
     Play(MaybePos),
     Set {
         pos: Pos,

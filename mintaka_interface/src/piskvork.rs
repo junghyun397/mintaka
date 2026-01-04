@@ -284,7 +284,7 @@ fn match_command(
                 }
             },
             "YXHASHCLEAR" => {
-                message_sender.command(Command::Load(Box::default()));
+                message_sender.command(Command::Clear);
 
                 PiskvorkResponse::None
             },

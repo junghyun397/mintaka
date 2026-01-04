@@ -4,11 +4,14 @@
 
 export type Bitfield = string;
 
+export type HashKey = string;
+
 export type Color = string;
 
 export type ColorContainer<T> = [T, T];
 
 export interface BoardData {
+	hash_key: HashKey;
 	player_color: Color;
 	bitfield: ColorContainer<Bitfield>;
 }
@@ -33,8 +36,6 @@ export interface GameStateData {
 }
 
 export type GameState = GameStateData;
-
-export type HashKey = string;
 
 export type PrincipalVariation = MaybePos[];
 
@@ -71,6 +72,11 @@ export interface CommandResult {
 	result?: GameResult;
 }
 
+export interface CompactGameState {
+	board: Board;
+	history: History;
+}
+
 export interface ComputingResource {
 	workers: number;
 	tt_size: ByteSize;
@@ -105,8 +111,8 @@ export type BoardExportItem =
 
 export type Command = 
 	| { type: "Clear", content?: undefined }
-	| { type: "Load", content: GameState }
-	| { type: "Sync", content: GameState }
+	| { type: "Load", content: CompactGameState }
+	| { type: "Sync", content: CompactGameState }
 	| { type: "Play", content: MaybePos }
 	| { type: "Set", content: {
 	pos: Pos;

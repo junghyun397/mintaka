@@ -14,7 +14,6 @@ export type BoardCellView =
 
 export type GameStore = {
     readonly boardView: BoardCellView[],
-    readonly userColor: Color,
     readonly playerColor: Color,
 
     readonly history: HistoryEntry[],
@@ -23,13 +22,12 @@ export type GameStore = {
     readonly inBranchHead: boolean,
 }
 
-export function buildGameStore(board: BoardWorker, historyTree: HistoryTree, playerColor: Color): GameStore {
+export function buildGameStore(board: BoardWorker, historyTree: HistoryTree): GameStore {
     const history = historyTree.linear()
 
     return {
         boardView: buildBoardView(board.field(), history),
-        userColor: board.playerColor(),
-        playerColor: playerColor,
+        playerColor: board.playerColor(),
 
         history,
         backwardable: historyTree.backwardable,
