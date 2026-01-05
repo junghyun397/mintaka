@@ -1,4 +1,4 @@
-import { Match, Show, Switch, useContext } from "solid-js"
+import { createMemo, Match, Show, Switch, useContext } from "solid-js"
 import { AppContext } from "../context"
 import {
     IconArrowUturnRight, IconChevronDoubleLeft, IconChevronDoubleRight, IconChevronLeft, IconChevronRight,
@@ -17,32 +17,31 @@ export function Control() {
 }
 
 function ControlButtons() {
-    const { gameActions, workerStore, gameStore } = useContext(AppContext)!
+    const { gameActions, appStore, gameState, runtimeState } = useContext(AppContext)!
 
-    const backwardDisabled = () =>
-        !gameStore.backwardable || workerStore.inComputing
+    const inComputing = createMemo(() => runtimeState()?.type !== "idle")
+
+    const inBranchHead = createMemo(() => gameState().historyTree.inBranchHead)
+    const forwardable = createMemo(() => gameState().historyTree.forwardable)
+    const backwardable = createMemo(() => gameState().historyTree.backwardable)
 
     return <>
         <button
             class="btn btn-square"
-            classList={{
-                "btn-disabled": backwardDisabled(),
-            }}
+            classList={{ "btn-disabled": !backwardable() }}
             onClick={gameActions.bulkBackward}
         >
             <IconChevronDoubleLeft />
         </button>
         <button
             class="btn btn-square"
-            classList={{
-                "btn-disabled": backwardDisabled(),
-            }}
+            classList={{ "btn-disabled": !backwardable() }}
             onClick={gameActions.backward}
         >
             <IconChevronLeft />
         </button>
         <Switch>
-            <Match when={workerStore.inComputing}>
+            <Match when={inComputing()}>
                 <button
                     class="btn btn-square animate-pulse"
                     onClick={gameActions.abort}
@@ -50,7 +49,7 @@ function ControlButtons() {
                     <IconStop />
                 </button>
             </Match>
-            <Match when={workerStore.autoLaunch && !workerStore.inComputing}>
+            <Match when={appStore.autoLaunch && !inComputing()}>
                 <button
                     class="btn btn-square"
                     onClick={gameActions.pause}
@@ -58,24 +57,20 @@ function ControlButtons() {
                     <IconPause />
                 </button>
             </Match>
-            <Match when={!workerStore.autoLaunch && !workerStore.inComputing}>
+            <Match when={!appStore.autoLaunch && !inComputing()}>
                 <button
                     class="btn btn-square"
-                    classList={{
-                        "btn-disabled": workerStore.loadedProviderType === undefined,
-                    }}
+                    classList={{ "btn-disabled": runtimeState() === undefined }}
                     onClick={gameActions.start}
                 >
                     <IconPlay />
                 </button>
             </Match>
         </Switch>
-        <Show when={gameStore.inBranchHead} fallback={
+        <Show when={inBranchHead()} fallback={
             <button
                 class="btn btn-square"
-                classList={{
-                    "btn-disabled": !gameStore.forwardable,
-                }}
+                classList={{ "btn-disabled": !forwardable() }}
                 onClick={[gameActions.forward, "continue"]}
             >
                 <IconChevronRight />
@@ -107,9 +102,7 @@ function ControlButtons() {
         </Show>
         <button
             class="btn btn-square"
-            classList={{
-                "btn-disabled": !gameStore.forwardable,
-            }}
+            classList={{ "btn-disabled": !forwardable() }}
             onClick={[gameActions.bulkForward, "continue"]}
         >
             <IconChevronDoubleRight />

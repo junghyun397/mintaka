@@ -4,9 +4,7 @@ import { render } from 'solid-js/web'
 import 'solid-devtools'
 import { App } from "./App"
 
-import init, { defaultConfig, defaultGameState } from "./wasm/pkg/mintaka_wasm"
-import { MintakaWorkerProvider } from "./domain/mintaka.worker.provider"
-import { MintakaProvider } from "./domain/mintaka.provider"
+import init from "./wasm/pkg/mintaka_wasm"
 
 await init()
 
@@ -17,10 +15,3 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
 }
 
 render(() => <App />, root!)
-
-async function worker(): Promise<MintakaProvider> {
-    const config = defaultConfig()
-    const gameState = defaultGameState()
-
-    return new MintakaWorkerProvider(config, gameState)
-}

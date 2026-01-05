@@ -61,7 +61,7 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
                     break
                 }
 
-                if (ctx.state?.agent?.hashKey() !== event.data.hash) {
+                if (ctx.state?.agent?.hashKey() !== event.data.positionHash) {
                     ctx.postError("snapshot missmatch")
                     break
                 }

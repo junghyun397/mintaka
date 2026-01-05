@@ -12,9 +12,7 @@ export function Dashboard() {
     return (
         <div
             class="fixed inset-0 z-999"
-            classList={{
-                "pointer-events-none": !appConfigStore.openDashboard,
-            }}
+            classList={{ "pointer-events-none": !appConfigStore.openDashboard }}
         >
             <button
                 class="absolute inset-0 bg-black/40 transition-opacity"
@@ -36,6 +34,7 @@ export function Dashboard() {
                     onClick={closeDashboard}
                 >X</button>
                 <div class="flex flex-col gap-4 p-4">
+                    <Overview />
                     <Config />
                     <DangerZone />
                 </div>
@@ -45,7 +44,10 @@ export function Dashboard() {
 }
 
 function Overview() {
-    return <div>
+    return <div class="flex flex-col gap-4">
+        <div>
+            <h3 class="text-lg">Overview</h3>
+        </div>
     </div>
 }
 
@@ -63,20 +65,24 @@ function Config() {
                 <label class="input">
                     <input
                         type="number"
+                        min={1}
                         value={appConfigStore.config.workers}
                     />
-                    <span class="label">CPUS</span>
+                    <span class="label">Cores</span>
                 </label>
                 <p class="label">Number of CPU cores used for computation.</p>
             </fieldset>
             <fieldset class="fieldset">
                 <legend class="fieldset-legend">TT Size</legend>
-                <input
-                    type="number" class="input"
-                    min={32}
-                    max={2048}
-                    value={ttSizeInMib()}
-                />
+                <label class="input">
+                    <input
+                        type="number"
+                        min={16}
+                        max={2048}
+                        value={ttSizeInMib()}
+                    />
+                    <span class="label">MiB</span>
+                </label>
                 <p class="label">RAM capacity for use in computation.</p>
             </fieldset>
         </div>
@@ -84,26 +90,40 @@ function Config() {
             <h3 class="text-lg">Time Controls</h3>
             <fieldset class="fieldset">
                 <legend class="fieldset-legend">Total Time</legend>
-                <input
-                    type="number" class="input"
-                    value={appConfigStore.config.initial_timer.total_remaining.secs}
-                />
+                <label class="input">
+                    <input
+                        type="number"
+                        min={1}
+                        placeholder="unlimited"
+                        value={appConfigStore.config.initial_timer.total_remaining.secs}
+                    />
+                    <span class="label">seconds</span>
+                </label>
                 <p class="label">Max Turn</p>
             </fieldset>
             <fieldset class="fieldset">
                 <legend class="fieldset-legend">Increment Time</legend>
-                <input
-                    type="number" class="input"
-                    value={appConfigStore.config.initial_timer.increment.secs}
-                />
+                <label class="input">
+                    <input
+                        type="number"
+                        min={0}
+                        value={appConfigStore.config.initial_timer.increment.secs}
+                    />
+                    <span class="label">seconds</span>
+                </label>
                 <p class="label">Max Turn</p>
             </fieldset>
             <fieldset class="fieldset">
                 <legend class="fieldset-legend">Max Turn Time</legend>
-                <input
-                    type="number" class="input"
-                    value={appConfigStore.config.initial_timer.turn.secs}
-                />
+                <label class="input">
+                    <input
+                        type="number"
+                        min={1}
+                        placeholder="unlimited"
+                        value={appConfigStore.config.initial_timer.turn.secs}
+                    />
+                    <span class="label">seconds</span>
+                </label>
                 <p class="label">Max Turn</p>
             </fieldset>
         </div>
@@ -111,18 +131,28 @@ function Config() {
             <h3 class="text-lg">Search Limits</h3>
             <fieldset class="fieldset">
                 <legend class="fieldset-legend">Node Limit</legend>
-                <input
-                    type="number" class="input"
-                    value={appConfigStore.config.max_nodes_in_1k}
-                />
+                <label class="input">
+                    <input
+                        type="number"
+                        min={1}
+                        placeholder="unlimited"
+                        value={appConfigStore.config.max_nodes_in_1k}
+                    />
+                    <span class="label">×1000</span>
+                </label>
                 <p class="label">Max Nodes</p>
             </fieldset>
             <fieldset class="fieldset">
                 <legend class="fieldset-legend">Depth Limit</legend>
-                <input
-                    type="number" class="input"
-                    value={appConfigStore.config.max_depth}
-                />
+                <label class="input">
+                    <input
+                        type="number"
+                        min={1}
+                        placeholder="unlimited"
+                        value={appConfigStore.config.max_depth}
+                    />
+                    <span class="label">moves</span>
+                </label>
                 <p class="label">Max Depth</p>
             </fieldset>
         </div>
@@ -130,14 +160,14 @@ function Config() {
 }
 
 function ProviderConfig() {
-    const { appActions, workerStore } = useContext(AppContext)!
+    const { appActions, appStore } = useContext(AppContext)!
 
     return <div class="flex flex-col gap-2">
     </div>
 }
 
 function DangerZone() {
-    const { appActions, workerStore } = useContext(AppContext)!
+    const { appActions, appStore } = useContext(AppContext)!
 
     return <div class="flex flex-col gap-2">
         <h3 class="text-lg">Data Controls</h3>

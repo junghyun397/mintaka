@@ -1,4 +1,4 @@
-import { emptyHash, HashKey, MaybePos } from "../wasm/pkg/mintaka_wasm"
+import { HashKey, History, MaybePos } from "../wasm/pkg/mintaka_wasm"
 
 export type HistoryEntry = {
     hashKey: HashKey,
@@ -50,8 +50,8 @@ export class HistoryTree {
         return acc.reverse().flat()
     }
 
-    flatten(): HistoryTree {
-        return new HistoryTree(undefined, this.linear())
+    toHistory(): History {
+        return this.linear().map(entry => entry.pos)
     }
 
     push(entry: HistoryEntry): HistoryTree {
@@ -93,24 +93,6 @@ export class HistoryTree {
         if (this.top >= this.history.length) return undefined
 
         return [new HistoryTree(this.root, this.history), this.history.slice(this.top)]
-    }
-
-    backwardTo(stopAt: HashKey): [HistoryTree, HistoryEntry[]] | undefined {
-        let historyTree: HistoryTree = this
-        let stack: HistoryEntry[] = []
-
-        while (historyTree.backwardable) {
-            const [childHistoryTree, entry] = historyTree.backward()!
-
-            stack.push(entry)
-
-            if (childHistoryTree.topEntry ? childHistoryTree.topEntry.hashKey : emptyHash() === stopAt)
-                return [childHistoryTree, stack]
-
-            historyTree = childHistoryTree
-        }
-
-        return undefined
     }
 }
 

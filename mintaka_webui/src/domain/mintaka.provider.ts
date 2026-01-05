@@ -2,43 +2,21 @@ import { BestMove, Command, CommandResult, Config, HashKey, Response, SearchObje
 
 export type MintakaProviderType = "server" | "worker"
 
-export type MintakaProviderRuntimeMessage =
-    { type: "abort" }
-
-export type MintakaProviderLaunchResult = "ok" | "snapshot-mismatch"
-
-export type MintakaProviderIdleState = {
-    type: "idle",
-    command: (command: Command) => void,
-    launch: (hash: HashKey, objective: SearchObjective) => MintakaProviderLaunchResult
-}
-
-export type MintakaProviderInComputingState = {
-    type: "in_computing",
-    message: (message: MintakaProviderRuntimeMessage) => void,
-}
-
 export type MintakaProviderResponse =
-    | Response
     | { type: "CommandResult", content: CommandResult }
+    | Response
     | { type: "BestMove", content: BestMove }
 
-export type MintakaProviderState = MintakaProviderIdleState | MintakaProviderInComputingState
+export type MintakaProviderRuntimeCommand =
+    { type: "abort" }
 
 export interface MintakaProvider {
-    readonly type: MintakaProviderType
-    readonly maxConfig: Config
-    snapshot: HashKey
-    state: MintakaProviderState
-    onResponse?: (message: MintakaProviderResponse) => void
-    onError?: (error: any) => void
-}
-
-export abstract class BaseMintakaProvider implements MintakaProvider {
-    abstract readonly type: MintakaProviderType
-    abstract maxConfig: Config
-    abstract snapshot: HashKey
-    abstract state: MintakaProviderState
-
-    private chain: Promise<void> = Promise.resolve()
+    readonly type: MintakaProviderType,
+    readonly maxConfig: Config,
+    subscribeResponse(handler: (response: MintakaProviderResponse) => void): void,
+    subscribeError(handler: (error: any) => void): void,
+    dispose(): void,
+    command(command: Command): void,
+    launch(positionHash: HashKey, objective: SearchObjective): void
+    control(command: MintakaProviderRuntimeCommand): void,
 }

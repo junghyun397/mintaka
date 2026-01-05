@@ -17,19 +17,20 @@ function AppLayout() {
 
     const boardHeight = () => {
         if (appConfigStore.zoomBoard)
-            return "min(48rem,max(var(--breakpoint-zoom),100dvw),calc(100dvh - var(--vertical-ui-space)))"
+            return "min(48rem,max(var(--breakpoint-zoom),100dvw),var(--board-max-height))"
         else
-            return "min(48rem,100dvw,calc(100dvh - var(--vertical-ui-space))"
+            return "min(48rem,100dvw,var(--board-max-height))"
     }
 
     return <div
         class="flex justify-center"
         style={{
             "--vertical-ui-space": "9rem",
+            "--board-max-height": "calc(100dvh - var(--vertical-ui-space)",
             "--board-height": boardHeight(),
         }}
     >
-        <div class="flex flex-col items-center gap-4 py-2">
+        <div class="flex flex-col items-center gap-4 py-2 max-xs:gap-2">
             <RootEvaluationBar />
             <div class="overflow-x-hidden">
                 <div class="max-w-dvw overflow-x-auto">

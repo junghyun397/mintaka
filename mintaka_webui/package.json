@@ -10,6 +10,7 @@
     "wasm:build": "wasm-pack build ../mintaka_wasm --release --target web --out-name mintaka_wasm --out-dir ../mintaka_webui/src/wasm/pkg/mintaka_wasm -- -Z build-std=std,panic_abort",
     "wasm-worker:build": "wasm-pack build ../mintaka_wasm_worker --release --target web --out-name mintaka_wasm_worker --out-dir ../mintaka_webui/src/wasm/pkg/mintaka_wasm_worker -- -Z build-std=std,panic_abort",
     "wasm:package": "pnpm run typeshare:build && pnpm run wasm:build && pnpm run wasm-worker:build",
+    "typecheck": "tsc --noEmit --strict",
     "dev:wasm": "pnpm run wasm:package && vite --host",
     "dev": "vite --host",
     "build": "pnpm run wasm:package && vite build",

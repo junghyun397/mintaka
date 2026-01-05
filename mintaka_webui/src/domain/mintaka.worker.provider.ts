@@ -1,21 +1,17 @@
-import {
-    MintakaProvider, MintakaProviderLaunchResult,
-    MintakaProviderResponse,
-    MintakaProviderRuntimeMessage,
-    MintakaProviderState, MintakaProviderType,
-} from "./mintaka.provider"
 import { Config, GameState } from "../wasm/pkg/mintaka_wasm_worker"
-import { Command, defaultConfig, emptyHash, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
+import { Command, CommandResult, defaultConfig, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
 import { InfiniteDuration } from "./rusty-renju"
+import { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand, MintakaProviderType } from "./mintaka.provider"
 
 export type MintakaWorkerMessage =
     | { type: "command", command: Command }
-    | { type: "launch", hash: HashKey, objective: SearchObjective }
+    | { type: "launch", positionHash: HashKey, objective: SearchObjective }
     | { type: "init", config: Config, state: GameState }
 
 export type MintakaWorkerResponse =
     | MintakaProviderResponse
     | { type: "Load" }
+    | { type: "CommandResult", content: CommandResult }
     | { type: "Ready", sab: SharedArrayBuffer, controlPtr: number }
 
 export class MintakaWorkerControl {
@@ -48,25 +44,13 @@ export class MintakaWorkerProvider implements MintakaProvider {
         },
     }
 
-    snapshot: HashKey = emptyHash()
-
     private readonly worker: Worker
     private workerControl?: MintakaWorkerControl
 
-    onResponse?: (message: MintakaProviderResponse) => void
-    onError?: (error: any) => void
-
-    state: MintakaProviderState
+    private onResponse?: (message: MintakaProviderResponse) => void
+    private onError?: (error: any) => void
 
     constructor(config: Config, gameState: GameState) {
-        this.state = {
-            type: "idle",
-            command: this.command,
-            launch: this.launch,
-        }
-
-        this.snapshot = gameState.board.hash_key
-
         this.worker = new Worker(
             new URL("mintaka.worker.ts", import.meta.url),
             { type: "module" },
@@ -81,18 +65,6 @@ export class MintakaWorkerProvider implements MintakaProvider {
                     this.workerControl = new MintakaWorkerControl(event.data.sab, event.data.controlPtr)
                     return
                 }
-                case "CommandResult": {
-                    this.snapshot = event.data.content.hash_key
-                    break
-                }
-                case "BestMove": {
-                    this.state = {
-                        type: "idle",
-                        command: this.command,
-                        launch: this.launch,
-                    }
-                    break
-                }
             }
 
             this.onResponse && this.onResponse(event.data)
@@ -102,28 +74,41 @@ export class MintakaWorkerProvider implements MintakaProvider {
             this.onError && this.onError(event)
         }
 
-        this.worker.postMessage({ type: "init", config: config, state: gameState })
+        this.postMessage({ type: "init", config: config, state: gameState })
     }
 
-    private command = (command: Command) => {
-        this.worker.postMessage({ type: "command", command: command } as MintakaWorkerMessage)
+    subscribeResponse(handler: (response: MintakaProviderResponse) => void) {
+        this.onResponse = handler
     }
 
-    private launch = (hash: HashKey, objective: SearchObjective): MintakaProviderLaunchResult => {
-        if (this.snapshot !== hash) return "snapshot-mismatch"
+    subscribeError(handler: (error: any) => void) {
+        this.onError = handler
+    }
 
-        this.state = {
-            type: "in_computing",
-            message: this.runtimeMessage,
+    dispose() {
+        this.onResponse = undefined
+        this.onError = undefined
+        this.worker.terminate()
+    }
+
+    command(command: Command) {
+        this.postMessage({ type: "command", command: command })
+    }
+
+    launch(positionHash: HashKey, objective: SearchObjective) {
+        this.postMessage({ type: "launch", positionHash, objective })
+    }
+
+    control(command: MintakaProviderRuntimeCommand) {
+        switch (command.type) {
+            case "abort": {
+                this.workerControl?.abort()
+                break
+            }
         }
-
-        this.worker.postMessage({ type: "launch", hash, objective })
-
-        return "ok"
     }
 
-    private runtimeMessage = (_: MintakaProviderRuntimeMessage) => {
-        this.workerControl?.abort()
+    private postMessage(message: MintakaWorkerMessage) {
+        this.worker.postMessage(message)
     }
-
 }

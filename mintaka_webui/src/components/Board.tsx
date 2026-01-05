@@ -1,15 +1,22 @@
 import { createMemo, For, Match, Switch, useContext } from "solid-js"
 import { AppContext } from "../context"
-import { chunk, range } from "../utils/array"
-import { LETTERS, NUMS } from "../domain/rusty-renju"
-import { BoardCellView } from "../stores/game.store"
+import { chunk } from "../utils/array"
+import { BoardCellView, buildBoardCellView, LETTERS, NUMS } from "../domain/rusty-renju"
 
 export function Board() {
-    const { gameStore, workerStore } = useContext(AppContext)!
+    const { gameState, runtimeState } = useContext(AppContext)!
 
-    const boardViewTopDown = createMemo(() =>
-        chunk(gameStore.boardView, 15).toReversed(),
-    )
+    const inComputing = createMemo(() => runtimeState()?.type !== "idle")
+
+    const boardViewTopDown = createMemo(() => {
+        const cells = buildBoardCellView(gameState().boardWorker.field(), gameState().historyTree.linear())
+
+        return chunk(cells, 15).toReversed()
+    })
+
+    const playerColor = createMemo(() => gameState().boardWorker.playerColor())
+
+    const historyLength = createMemo(() => gameState().historyTree.length)
 
     // 1+2x15+1 = 32
     return <div class="relative h-full w-full rounded-box bg-[#efb072]">
@@ -25,12 +32,11 @@ export function Board() {
                 <circle cx="16" cy="16" r="0.15"/>
             </g>
             <g font-family="serif" font-size="0.8" fill="black" text-anchor="middle" dominant-baseline="middle">
-                <For each={range(0, 15)}>{index => {
-                    const num = index + 1
-                    const letter = LETTERS[index].toUpperCase()
+                <For each={NUMS}>{num => {
+                    const letter = LETTERS[num - 1].toUpperCase()
 
-                    const numPosition = 30 - index * 2
-                    const letterPosition = (index + 1) * 2
+                    const numPosition = 32 - num * 2
+                    const letterPosition = num * 2
                     return <>
                         <text x="1" y={numPosition} text-anchor="end">{num}</text>
                         <text x="31" y={numPosition} text-anchor="start">{num}</text>
@@ -48,16 +54,17 @@ export function Board() {
                 grid h-full w-full
                 grid-cols-15 grid-rows-15
                 stroke-gray-500
-                [&_button.forbidden]:cursor-not-allowed [&_button.stone.black]:fill-black [&_button.stone.white]:fill-white
+                [&_button.stone.black]:fill-black [&_button.stone.white]:fill-white
                 "
                 classList={{
-                    "[&_button]:cursor-wait": workerStore.inComputing,
-                    "[&_button.stone]:cursor-auto [&_button]:cursor-crosshair": workerStore.inComputing,
+                    "[&_button.forbidden]:cursor-not-allowed": playerColor() === "Black",
+                    "[&_button]:cursor-wait": inComputing(),
+                    "[&_button.stone]:cursor-auto [&_button]:cursor-crosshair": !inComputing(),
                 }}
             >
                 <For each={boardViewTopDown()}>{(row) =>
                     <For each={row}>{(cell) =>
-                        <Cell cell={cell} />
+                        <Cell cell={cell} historyLength={historyLength()} />
                     }</For>
                 }</For>
             </div>
@@ -65,8 +72,8 @@ export function Board() {
     </div>
 }
 
-function Cell(props: { cell: BoardCellView }) {
-    const { gameActions, appConfigStore, gameStore } = useContext(AppContext)!
+function Cell(props: { cell: BoardCellView, historyLength: number }) {
+    const { gameActions, appConfigStore } = useContext(AppContext)!
 
     const reversedFill = () =>
         props.cell.content === "Black" ? "white" : "black"
@@ -78,7 +85,7 @@ function Cell(props: { cell: BoardCellView }) {
             "stone": props.cell.type === "Stone",
             "black": props.cell.content === "Black",
             "white": props.cell.content === "White",
-            "forbidden": props.cell.type === "Forbidden" && gameStore.playerColor === "Black",
+            "forbidden": props.cell.type === "Forbidden",
         }}
         onClick={[gameActions.play, props.cell.pos]}
     >
@@ -103,14 +110,14 @@ function Cell(props: { cell: BoardCellView }) {
                         </Match>
                         <Match when={
                             (appConfigStore.historyDisplay === "pair" || appConfigStore.historyDisplay === "last")
-                            && cell().sequence === gameStore.history.length
+                            && cell().sequence === props.historyLength
                         }>
                             <circle
                                 fill={reversedFill()}
                                 cx="50" cy="50" r="10"
                             />
                         </Match>
-                        <Match when={appConfigStore.historyDisplay === "pair" && (cell().sequence + 1) === gameStore.history.length}>
+                        <Match when={appConfigStore.historyDisplay === "pair" && (cell().sequence + 1) === props.historyLength}>
                             <g
                                 stroke={reversedFill()}
                                 stroke-width="4"

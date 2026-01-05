@@ -1,11 +1,5 @@
-import {
-    MintakaProvider,
-    MintakaProviderResponse,
-    MintakaProviderRuntimeMessage,
-    MintakaProviderState,
-    MintakaProviderType,
-} from "./mintaka.provider"
-import { Command, Config, emptyHash, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
+import { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand, MintakaProviderType } from "./mintaka.provider"
+import { Command, CommandResult, Config, defaultConfig, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
 
 export class MintakaServerConfig {
     readonly address: string
@@ -58,7 +52,7 @@ export async function checkHealth(serverConfig: MintakaServerConfig): Promise<bo
     }
 }
 
-export async function createSession(serverConfig: MintakaServerConfig, config: Config, state: GameState): Promise<MintakaServerSession> {
+export async function createSession(serverConfig: MintakaServerConfig, config: Config, state: GameState) {
     const response = await fetch(serverConfig.url + "/sessions", {
         method: "POST",
         headers: serverConfig.headers({
@@ -79,38 +73,56 @@ export class MintakaServerProvider implements MintakaProvider {
     private readonly serverConfig: MintakaServerConfig
     private readonly session: MintakaServerSession
     private chain: Promise<void> = Promise.resolve()
+    private eventSource?: EventSource
 
-    onResponse?: (message: MintakaProviderResponse) => void
-    onError?: (error: any) => void
+    private onResponse?: (message: MintakaProviderResponse) => void
+    private onError?: (error: any) => void
 
     readonly type: MintakaProviderType = "server"
-    snapshot: HashKey = emptyHash()
+    readonly maxConfig: Config
 
-    state: MintakaProviderState
-
-    constructor(config: MintakaServerConfig, session: MintakaServerSession) {
+    constructor(config: MintakaServerConfig, session: MintakaServerSession, maxConfig?: Config) {
         this.serverConfig = config
         this.session = session
-        this.state = {
-            type: "idle",
-            command: this.command,
-            launch: () => void this.launch,
-        }
+        this.maxConfig = maxConfig ?? defaultConfig()
     }
 
-    private command = (command: Command) => {
+    subscribeResponse(handler: (response: MintakaProviderResponse) => void) {
+        this.onResponse = handler
+    }
+
+    subscribeError(handler: (error: any) => void) {
+        this.onError = handler
+    }
+
+    dispose() {
+        this.onResponse = undefined
+        this.onError = undefined
+        this.closeStream()
+    }
+
+    command(command: Command) {
         this.chain = this.chain
             .then(async () => {
                 await this.sendCommand(command)
             })
+            .catch((error) => {
+                this.onError && this.onError(error)
+            })
     }
 
-    private runtimeMessage = (_: MintakaProviderRuntimeMessage) => {
-        void this.sendAbort()
+    launch(positionHash: HashKey, objective: SearchObjective) {
+        this.chain = this.chain
+            .then(async () => {
+                await this.sendLaunch(positionHash, objective)
+            })
+            .catch((error) => {
+                this.onError && this.onError(error)
+            })
     }
 
     private sendCommand = async (command: Command) => {
-        const response = await fetch(this.serverConfig.url + `/sessions/${this.session.sid}/commands`, {
+        const response = await fetch(`${this.serverConfig.url}/sessions/${this.session.sid}/command`, {
             method: "POST",
             headers: this.serverConfig.headers({
                 "Content-Type": "application/json",
@@ -119,10 +131,14 @@ export class MintakaServerProvider implements MintakaProvider {
         })
 
         await assertOk(response)
+
+        const result = await response.json() as CommandResult
+
+        this.onResponse && this.onResponse({ type: "CommandResult", content: result })
     }
 
-    private launch = async (hash: HashKey, objective: SearchObjective) => {
-        const response = await fetch(this.serverConfig.url + `/sessions/${this.session.sid}/launch`, {
+    private sendLaunch = async (hash: HashKey, objective: SearchObjective) => {
+        const response = await fetch(`${this.serverConfig.url}/sessions/${this.session.sid}/launch`, {
             method: "POST",
             headers: this.serverConfig.headers(),
             body: JSON.stringify({ hash, objective }),
@@ -130,16 +146,20 @@ export class MintakaServerProvider implements MintakaProvider {
 
         await assertOk(response)
 
-        this.state = {
-            type: "in_computing",
-            message: this.runtimeMessage,
-        }
+        this.startStream()
+    }
 
-        void this.startStream()
+    control(command: MintakaProviderRuntimeCommand) {
+        switch (command.type) {
+            case "abort": {
+                void this.sendAbort()
+                break
+            }
+        }
     }
 
     private sendAbort = async () => {
-        const response = await fetch(this.serverConfig.url + `/sessions/${this.session.sid}/abort`, {
+        const response = await fetch(`${this.serverConfig.url}/sessions/${this.session.sid}/abort`, {
             method: "POST",
             headers: this.serverConfig.headers(),
         })
@@ -147,14 +167,24 @@ export class MintakaServerProvider implements MintakaProvider {
         await assertOk(response)
     }
 
+    private closeStream() {
+        if (this.eventSource) {
+            this.eventSource.close()
+            this.eventSource = undefined
+        }
+    }
+
     private startStream = () => {
-        const streamUrl = new URL(this.serverConfig.url + `/sessions/${this.session.sid}/stream`)
+        this.closeStream()
+
+        const streamUrl = new URL(`${this.serverConfig.url}/sessions/${this.session.sid}/stream`)
 
         if (this.serverConfig.apiPassword) {
             streamUrl.searchParams.set("api_password", this.serverConfig.apiPassword)
         }
 
         const eventSource = new EventSource(streamUrl.toString())
+        this.eventSource = eventSource
 
         eventSource.addEventListener("Response", (event) => {
             this.onResponse && this.onResponse(JSON.parse(event.data))
@@ -163,17 +193,13 @@ export class MintakaServerProvider implements MintakaProvider {
         eventSource.addEventListener("BestMove", (event) => {
             eventSource.close()
             this.onResponse && this.onResponse({ type: "BestMove", content: JSON.parse(event.data) })
-
-            this.state = {
-                type: "idle",
-                command: this.command,
-                launch: () => void this.launch,
-            }
+            this.eventSource = undefined
         })
 
         eventSource.onerror = (error) => {
             eventSource.close()
             this.onError && this.onError(error)
+            this.eventSource = undefined
         }
     }
 }
