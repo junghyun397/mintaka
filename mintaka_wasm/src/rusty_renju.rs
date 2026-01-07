@@ -23,8 +23,8 @@ extern "C" {
     #[wasm_bindgen(typescript_type = "HashKey")]
     pub type HashKey;
 
-    #[wasm_bindgen(typescript_type = "BoardExportItem")]
-    pub type BoardExportItem;
+    #[wasm_bindgen(typescript_type = "BoardDescribe")]
+    pub type BoardDescribe;
 }
 
 #[wasm_bindgen(js_name = defaultBoard)]
@@ -83,10 +83,10 @@ impl BoardWorker {
         self.inner.patterns.field[color][pos.idx_usize()].into()
     }
 
-    pub fn field(&self) -> Vec<BoardExportItem> {
-        self.inner.iter_export_items()
-            .map(|item| to_js_value(&item))
-            .collect()
+    pub fn describe(&self, history: &History) -> BoardDescribe {
+        let history: rusty_renju::history::History = try_from_js_value(history).unwrap();
+
+        to_js_value(&self.inner.describe(&history))
     }
 
     #[wasm_bindgen(js_name = isPosEmpty)]

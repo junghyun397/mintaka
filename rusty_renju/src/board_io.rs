@@ -1,8 +1,9 @@
 use crate::bitfield::Bitfield;
 use crate::board::Board;
-use crate::board_iter::BoardIterItem;
+use crate::board_iter::{BoardExportItem, BoardIterItem};
 use crate::history::History;
 use crate::impl_debug_from_display;
+use crate::memo::hash_key::HashKey;
 use crate::notation::color::{Color, ColorContainer};
 use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
@@ -12,7 +13,6 @@ use crate::utils::str_utils::join_str_horizontally;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
-use crate::memo::hash_key::HashKey;
 
 pub const SYMBOL_BLACK: char = 'X';
 pub const SYMBOL_WHITE: char = 'O';
@@ -27,6 +27,14 @@ pub const HISTORY_LITERAL_PASS: &str = "pass";
 enum BoardElement {
     Stone(Color),
     Empty
+}
+
+#[typeshare::typeshare]
+#[derive(Serialize, Deserialize)]
+pub struct BoardDescribe {
+    pub hash_key: HashKey,
+    pub player_color: Color,
+    pub field: Vec<BoardExportItem>,
 }
 
 fn match_symbol(c: char) -> Option<BoardElement> {
@@ -242,6 +250,14 @@ impl Board {
             build_each_color_string(self, Color::Black),
             build_each_color_string(self, Color::White)
         )
+    }
+
+    pub fn describe(&self, history: &History) -> BoardDescribe {
+        BoardDescribe {
+            hash_key: self.hash_key,
+            player_color: self.player_color,
+            field: self.export_items(history).into()
+        }
     }
 
 }

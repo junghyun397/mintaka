@@ -1,4 +1,5 @@
-import { BoardWorker, defaultBoard, HashKey, History } from "../wasm/pkg/mintaka_wasm"
+import type { HashKey, History } from "../wasm/pkg/mintaka_wasm"
+import { defaultBoard, BoardWorker } from "../wasm/pkg/mintaka_wasm"
 import { EmptyHistoryTree, HistoryTree } from "../domain/HistoryTree"
 import { Accessor, createSignal, Setter } from "solid-js"
 import { MintakaRuntime } from "../domain/mintaka.runtime"

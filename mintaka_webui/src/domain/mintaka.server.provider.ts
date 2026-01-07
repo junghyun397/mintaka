@@ -1,5 +1,6 @@
 import { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand, MintakaProviderType } from "./mintaka.provider"
-import { Command, CommandResult, Config, defaultConfig, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
+import { defaultConfig } from "../wasm/pkg/mintaka_wasm"
+import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
 
 export class MintakaServerConfig {
     readonly address: string

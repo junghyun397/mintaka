@@ -2,7 +2,7 @@ import { createMemo, useContext } from "solid-js"
 import { AppContext } from "../context"
 
 export function StatusMessage() {
-    const { runtimeState, appStore } = useContext(AppContext)!
+    const { runtimeState, appConfig } = useContext(AppContext)!
 
     const inComputing = createMemo(() => runtimeState()?.type !== "idle")
 
@@ -10,7 +10,7 @@ export function StatusMessage() {
         if (inComputing())
             return "Mintaka engine is thinking now..."
 
-        if (runtimeState() !== undefined && appStore.autoLaunch)
+        if (runtimeState() !== undefined && appConfig.autoLaunch)
             return "Mintaka engine is waiting for your move."
 
         // "Downloading and compiling mintaka engine..."

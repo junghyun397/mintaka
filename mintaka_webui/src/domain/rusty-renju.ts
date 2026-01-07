@@ -1,4 +1,4 @@
-import { BoardExportItem, Color, DurationSchema, Pos } from "../wasm/pkg/mintaka_wasm"
+import type { BoardExportItem, Color, DurationSchema, Pos, Response } from "../wasm/pkg/mintaka_wasm"
 import { HistoryEntry } from "./HistoryTree"
 
 export const NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as const
@@ -35,28 +35,4 @@ export type BoardCellView =
         )
     & { pos: Pos }
 
-export function buildBoardCellView(items: BoardExportItem[], linearHistory: HistoryEntry[]): BoardCellView[] {
-    const sequenceMap = buildSequenceMap(linearHistory)
-
-    return items.map((item, index) => {
-        const pos = INDEX_TO_POS[index]
-
-        return {
-            pos,
-            sequence: sequenceMap.get(pos)!,
-            ...item,
-        }
-    })
-}
-
-function buildSequenceMap(linearHistory: HistoryEntry[]): Map<Pos, number> {
-    const map = new Map<Pos, number>()
-
-    for (const [index, entry] of linearHistory.entries()) {
-        if (entry.pos === undefined) continue
-
-        map.set(entry.pos, index + 1)
-    }
-
-    return map
-}
+export type ResponseBody = Extract<Response, { type: "Status" }>["content"]

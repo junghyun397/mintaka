@@ -13,10 +13,10 @@ export function App() {
 }
 
 function AppLayout() {
-    const { appConfigStore } = useContext(AppContext)!
+    const { persistConfig } = useContext(AppContext)!
 
     const boardHeight = () => {
-        if (appConfigStore.zoomBoard)
+        if (persistConfig.zoomBoard)
             return "min(48rem,max(var(--breakpoint-zoom),100dvw),var(--board-max-height))"
         else
             return "min(48rem,100dvw,var(--board-max-height))"
@@ -26,7 +26,7 @@ function AppLayout() {
         class="flex justify-center"
         style={{
             "--vertical-ui-space": "9rem",
-            "--board-max-height": "calc(100dvh - var(--vertical-ui-space)",
+            "--board-max-height": "calc(100dvh - var(--vertical-ui-space))",
             "--board-height": boardHeight(),
         }}
     >

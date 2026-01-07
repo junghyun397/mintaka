@@ -1,17 +1,17 @@
 import { Accessor, createContext, createEffect, onCleanup, onMount, ParentProps } from "solid-js"
-import { createStore, SetStoreFunction, unwrap } from "solid-js/store"
-import { ForwardMethod, HistoryTree } from "./domain/HistoryTree"
-import { BestMove, Pos } from "./wasm/pkg/mintaka_wasm"
-import { AppConfig, defaultAppConfig, Theme } from "./stores/app.config.store"
+import { createStore, reconcile, SetStoreFunction, unwrap } from "solid-js/store"
+import { ForwardMethod } from "./domain/HistoryTree"
+import type { BoardDescribe, Pos } from "./wasm/pkg/mintaka_wasm"
+import { PersistConfig, defaultPersistConfig, Theme } from "./stores/persist.config.store"
 import { makePersisted } from "@solid-primitives/storage"
-import { AppStore } from "./stores/appStore"
+import { AppConfig } from "./stores/app.config"
 import { createGameController } from "./controllers/game.controller"
 import { createProviderController } from "./controllers/runtime.controller"
 import { AppGameState, createAppState } from "./stores/app.state"
 import { MintakaRuntimeState } from "./domain/mintaka.runtime"
 
 interface AppActions {
-    readonly clearAppConfigStore: () => void,
+    readonly cleatAppData: () => void,
 }
 
 interface GameActions {
@@ -32,10 +32,12 @@ type AppContext = {
     readonly gameState: Accessor<AppGameState>,
     readonly runtimeState: Accessor<MintakaRuntimeState | undefined>
 
-    readonly appConfigStore: AppConfig,
-    readonly setAppConfigStore: SetStoreFunction<AppConfig>,
+    readonly boardDescribe: BoardDescribe,
 
-    readonly appStore: AppStore,
+    readonly persistConfig: PersistConfig,
+    readonly setPersistConfig: SetStoreFunction<PersistConfig>,
+
+    readonly appConfig: AppConfig,
 }
 
 export const AppContext = createContext<AppContext>()
@@ -43,13 +45,21 @@ export const AppContext = createContext<AppContext>()
 export function AppContextProvider(props: ParentProps) {
     const appState = createAppState({})
 
-    const [appConfigStore, setAppConfigStore] = createAppConfigStore()
-
-    const [appStore, setAppStore] = createStore<AppStore>({ autoLaunch: false })
+    const [persistConfig, setPersistConfig] = createPersistConfigStore()
 
     const gameController = createGameController(appState.gameState, appState.setGameState)
 
     const providerController = createProviderController(appState.gameState, appState.mintakaRuntime, appState.setMintakaRuntime, gameController.applyBestMove)
+
+    const [appConfig, setAppConfig] = createStore<AppConfig>({ autoLaunch: false })
+
+    const [boardDescribe, setBoardDescribe] = createStore<BoardDescribe>(appState.gameState().boardWorker.describe(appState.gameState().historyTree.toHistory()))
+
+    createEffect(() => {
+        const describe = appState.gameState().boardWorker.describe(appState.gameState().historyTree.toHistory())
+
+        setBoardDescribe(reconcile(describe))
+    })
 
     const gameActions: GameActions = {
         play: (pos) => {
@@ -62,7 +72,7 @@ export function AppContextProvider(props: ParentProps) {
 
             providerController.syncPlay(pos)
 
-            if (!appStore.autoLaunch) return
+            if (!appConfig.autoLaunch) return
 
             providerController.launch(appState.gameState().boardWorker.hashKey(), appState.gameState().historyTree)
         },
@@ -94,19 +104,19 @@ export function AppContextProvider(props: ParentProps) {
             const response = providerController.launch(appState.gameState().boardWorker.hashKey(), appState.gameState().historyTree)
 
             if (response === "ok") {
-                setAppStore("autoLaunch", true)
+                setAppConfig("autoLaunch", true)
             } else {
                 throw new Error(response)
             }
         },
         pause: () => {
-            setAppStore("autoLaunch", false)
+            setAppConfig("autoLaunch", false)
         },
         abort: () => {
             const result = providerController.abort()
 
             if (result === "ok") {
-                setAppStore("autoLaunch", false)
+                setAppConfig("autoLaunch", false)
             } else {
                 throw new Error(result)
             }
@@ -114,14 +124,14 @@ export function AppContextProvider(props: ParentProps) {
     }
 
     const appActions: AppActions = {
-        clearAppConfigStore: () => {
-            setAppConfigStore(defaultAppConfig())
+        cleatAppData: () => {
+            setPersistConfig(defaultPersistConfig())
         },
     }
 
     const runtimeState = () => appState.mintakaRuntime()?.state
 
-    providerController.loadRuntime(unwrap(appConfigStore))
+    providerController.loadRuntime(unwrap(persistConfig))
 
     return <AppContext.Provider
         value={{
@@ -131,18 +141,20 @@ export function AppContextProvider(props: ParentProps) {
             gameState: appState.gameState,
             runtimeState,
 
-            appConfigStore,
-            setAppConfigStore,
+            boardDescribe,
 
-            appStore,
+            persistConfig,
+            setPersistConfig,
+
+            appConfig,
         }}
         children={props.children}
     />
 }
 
-function createAppConfigStore(): [AppConfig, SetStoreFunction<AppConfig>] {
-    const [appConfigStore, setAppConfigStore] = makePersisted(
-        createStore(defaultAppConfig()),
+function createPersistConfigStore(): [PersistConfig, SetStoreFunction<PersistConfig>] {
+    const [persistConfig, setPersistConfig] = makePersisted(
+        createStore(defaultPersistConfig()),
     )
 
     const removeTheme = () =>
@@ -156,7 +168,7 @@ function createAppConfigStore(): [AppConfig, SetStoreFunction<AppConfig>] {
         const mediaQueryList = window.matchMedia("(prefers-color-scheme: dark)")
 
         const handler = () => {
-            if (appConfigStore.theme === "system")
+            if (persistConfig.theme === "system")
                 removeTheme()
         }
 
@@ -168,11 +180,11 @@ function createAppConfigStore(): [AppConfig, SetStoreFunction<AppConfig>] {
     })
 
     createEffect(() => {
-        if (appConfigStore.theme === "system")
+        if (persistConfig.theme === "system")
             removeTheme()
         else
-            applyTheme(appConfigStore.theme)
+            applyTheme(persistConfig.theme)
     })
 
-    return [appConfigStore, setAppConfigStore]
+    return [persistConfig, setPersistConfig]
 }

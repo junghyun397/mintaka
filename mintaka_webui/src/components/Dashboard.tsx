@@ -1,32 +1,31 @@
 import { AppContext } from "../context"
-import { useContext } from "solid-js"
+import { createMemo, useContext } from "solid-js"
 
 export function Dashboard() {
-    const { appConfigStore, setAppConfigStore } = useContext(AppContext)!
+    const { persistConfig, setPersistConfig, runtimeState } = useContext(AppContext)!
 
     const closeDashboard = () => {
-        // @ts-ignore
-        setAppConfigStore("openDashboard", false)
+        setPersistConfig("openDashboard", false)
     }
 
     return (
         <div
             class="fixed inset-0 z-999"
-            classList={{ "pointer-events-none": !appConfigStore.openDashboard }}
+            classList={{ "pointer-events-none": !persistConfig.openDashboard }}
         >
             <button
                 class="absolute inset-0 bg-black/40 transition-opacity"
                 classList={{
-                    "opacity-0": !appConfigStore.openDashboard,
-                    "opacity-100": appConfigStore.openDashboard,
+                    "opacity-0": !persistConfig.openDashboard,
+                    "opacity-100": persistConfig.openDashboard,
                 }}
                 onClick={closeDashboard}
             />
             <aside
                 class="absolute top-0 left-0 h-full w-80 max-w-[85vw] overflow-y-auto bg-base-200 shadow-lg transition-transform"
                 classList={{
-                    "-translate-x-full": !appConfigStore.openDashboard,
-                    "translate-x-0": appConfigStore.openDashboard,
+                    "-translate-x-full": !persistConfig.openDashboard,
+                    "translate-x-0": persistConfig.openDashboard,
                 }}
             >
                 <button
@@ -52,10 +51,10 @@ function Overview() {
 }
 
 function Config() {
-    const { appConfigStore } = useContext(AppContext)!
+    const { persistConfig } = useContext(AppContext)!
 
     const ttSizeInMib = () =>
-        Math.floor(appConfigStore.config.tt_size / 1024 / 1024)
+        Math.floor(persistConfig.config.tt_size / 1024 / 1024)
 
     return <div class="flex flex-col gap-4">
         <div>
@@ -66,11 +65,14 @@ function Config() {
                     <input
                         type="number"
                         min={1}
-                        value={appConfigStore.config.workers}
+                        value={persistConfig.config.workers}
+                        onChange={event => {
+                            event.target.valueAsNumber
+                        }}
                     />
                     <span class="label">Cores</span>
                 </label>
-                <p class="label">Number of CPU cores used for computation.</p>
+                <p class="label text-wrap">CPU core allocation. Must be less than the number of physical CPUs.</p>
             </fieldset>
             <fieldset class="fieldset">
                 <legend class="fieldset-legend">TT Size</legend>
@@ -83,7 +85,7 @@ function Config() {
                     />
                     <span class="label">MiB</span>
                 </label>
-                <p class="label">RAM capacity for use in computation.</p>
+                <p class="label text-wrap">Shared memory size. Should be properly sized relative to computational volume.</p>
             </fieldset>
         </div>
         <div>
@@ -95,11 +97,11 @@ function Config() {
                         type="number"
                         min={1}
                         placeholder="unlimited"
-                        value={appConfigStore.config.initial_timer.total_remaining.secs}
+                        value={persistConfig.config.initial_timer.total_remaining.secs}
                     />
                     <span class="label">seconds</span>
                 </label>
-                <p class="label">Max Turn</p>
+                <p class="label text-wrap">Max Turn</p>
             </fieldset>
             <fieldset class="fieldset">
                 <legend class="fieldset-legend">Increment Time</legend>
@@ -107,9 +109,9 @@ function Config() {
                     <input
                         type="number"
                         min={0}
-                        value={appConfigStore.config.initial_timer.increment.secs}
+                        value={persistConfig.config.initial_timer.increment.secs}
                     />
-                    <span class="label">seconds</span>
+                    <span class="label text-wrap">seconds</span>
                 </label>
                 <p class="label">Max Turn</p>
             </fieldset>
@@ -120,9 +122,9 @@ function Config() {
                         type="number"
                         min={1}
                         placeholder="unlimited"
-                        value={appConfigStore.config.initial_timer.turn.secs}
+                        value={persistConfig.config.initial_timer.turn.secs}
                     />
-                    <span class="label">seconds</span>
+                    <span class="label text-wrap">seconds</span>
                 </label>
                 <p class="label">Max Turn</p>
             </fieldset>
@@ -136,11 +138,11 @@ function Config() {
                         type="number"
                         min={1}
                         placeholder="unlimited"
-                        value={appConfigStore.config.max_nodes_in_1k}
+                        value={persistConfig.config.max_nodes_in_1k}
                     />
                     <span class="label">×1000</span>
                 </label>
-                <p class="label">Max Nodes</p>
+                <p class="label text-wrap">Maximum reachable nodes. Specify when maintaining a constant level regardless of time or hardware.</p>
             </fieldset>
             <fieldset class="fieldset">
                 <legend class="fieldset-legend">Depth Limit</legend>
@@ -149,31 +151,31 @@ function Config() {
                         type="number"
                         min={1}
                         placeholder="unlimited"
-                        value={appConfigStore.config.max_depth}
+                        value={persistConfig.config.max_depth}
                     />
                     <span class="label">moves</span>
                 </label>
-                <p class="label">Max Depth</p>
+                <p class="label text-wrap">Maximum reachable selective depth.</p>
             </fieldset>
         </div>
     </div>
 }
 
 function ProviderConfig() {
-    const { appActions, appStore } = useContext(AppContext)!
+    const { appActions } = useContext(AppContext)!
 
     return <div class="flex flex-col gap-2">
     </div>
 }
 
 function DangerZone() {
-    const { appActions, appStore } = useContext(AppContext)!
+    const { appActions } = useContext(AppContext)!
 
     return <div class="flex flex-col gap-2">
         <h3 class="text-lg">Data Controls</h3>
         <button
             class="btn btn-error"
-            onClick={appActions.clearAppConfigStore}
+            onClick={appActions.cleatAppData}
         >
             Reset App Data
         </button>

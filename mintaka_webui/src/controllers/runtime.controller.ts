@@ -1,13 +1,13 @@
 import { AppGameState } from "../stores/app.state"
 import { BestMove, Board, defaultGameState, HashKey, History, MaybePos } from "../wasm/pkg/mintaka_wasm"
 import { HistoryTree } from "../domain/HistoryTree"
-import { AppConfig } from "../stores/app.config.store"
+import { PersistConfig } from "../stores/persist.config.store"
 import { MintakaWorkerProvider } from "../domain/mintaka.worker.provider"
-import { buildMintakaRuntimeState, MintakaRuntime } from "../domain/mintaka.runtime"
+import { buildMintakaRuntime, MintakaRuntime } from "../domain/mintaka.runtime"
 import { assertNever } from "../utils/never"
 
 interface RuntimeController {
-    loadRuntime: (appConfig: AppConfig) => void,
+    loadRuntime: (persistConfig: PersistConfig) => void,
     launch: (snapshot: HashKey, historyTreeSnapshot: HistoryTree) => "ok" | "provider-not-ready",
     abort: () => "ok" | "provider-not-launched",
     syncPlay: (pos: MaybePos) => "ok" | "provider-not-ready" | "desynced",
@@ -78,7 +78,7 @@ export function createProviderController(
     }
 
     return {
-        loadRuntime: (appConfig: AppConfig) => {
+        loadRuntime: (persistConfig: PersistConfig) => {
             const previousRuntime = mintakaRuntime()
 
             if (previousRuntime !== undefined) {
@@ -87,9 +87,9 @@ export function createProviderController(
 
             const gameState = defaultGameState()
 
-            const provider = new MintakaWorkerProvider(appConfig.config, gameState)
+            const provider = new MintakaWorkerProvider(persistConfig.config, gameState)
 
-            const runtimeState = buildMintakaRuntimeState(gameState.board.hash_key)
+            const runtimeState = buildMintakaRuntime(gameState.board.hash_key)
 
             const runtime: MintakaRuntime = { provider, state: runtimeState }
 

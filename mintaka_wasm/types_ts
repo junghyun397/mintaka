@@ -62,6 +62,22 @@ export interface BestMove {
 	time_elapsed: DurationSchema;
 }
 
+export type BoardExportItem = 
+	| { type: "Stone", content: BoardExportStone }
+	| { type: "Empty", content?: undefined }
+	| { type: "Forbidden", content: ForbiddenKind };
+
+export interface BoardDescribe {
+	hash_key: HashKey;
+	player_color: Color;
+	field: BoardExportItem[];
+}
+
+export interface BoardExportStone {
+	color: Color;
+	sequence: number;
+}
+
 export type GameResult = 
 	| { type: "Win", content: Color }
 	| { type: "Draw", content?: undefined }
@@ -103,11 +119,6 @@ export interface Config {
 	initial_timer: Timer;
 	spawn_depth_specialist: boolean;
 }
-
-export type BoardExportItem = 
-	| { type: "Stone", content: Color }
-	| { type: "Empty", content?: undefined }
-	| { type: "Forbidden", content: ForbiddenKind };
 
 export type Command = 
 	| { type: "Clear", content?: undefined }

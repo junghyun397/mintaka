@@ -1,5 +1,6 @@
 import { MintakaServerConfig } from "../domain/mintaka.server.provider"
-import { Config, defaultConfig } from "../wasm/pkg/mintaka_wasm"
+import type { Config } from "../wasm/pkg/mintaka_wasm"
+import { defaultConfig } from "../wasm/pkg/mintaka_wasm"
 import { duration } from "../domain/rusty-renju"
 import { MintakaProviderType } from "../domain/mintaka.provider"
 
@@ -19,18 +20,18 @@ export function nextHistoryDisplay(historyDisplay: HistoryDisplay): HistoryDispl
     return HistoryDisplays[(HistoryDisplays.indexOf(historyDisplay) + 1) % HistoryDisplays.length]
 }
 
-export type AppConfig = {
-    readonly providerType: MintakaProviderType,
-    readonly serverConfig?: MintakaServerConfig,
-    readonly config: Config,
-    readonly theme: Theme,
-    readonly zoomBoard: boolean,
-    readonly historyDisplay: HistoryDisplay,
-    readonly openHistory: boolean,
-    readonly openDashboard: boolean,
+export type PersistConfig = {
+    providerType: MintakaProviderType,
+    serverConfig?: MintakaServerConfig,
+    config: Config,
+    theme: Theme,
+    zoomBoard: boolean,
+    historyDisplay: HistoryDisplay,
+    openHistory: boolean,
+    openDashboard: boolean,
 }
 
-export function defaultAppConfig(): AppConfig {
+export function defaultPersistConfig(): PersistConfig {
     return {
         providerType: "worker",
         serverConfig: undefined,

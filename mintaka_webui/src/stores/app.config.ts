@@ -1,3 +1,3 @@
-export type AppStore = {
+export type AppConfig = {
     autoLaunch: boolean,
 }

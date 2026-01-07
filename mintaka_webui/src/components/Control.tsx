@@ -5,7 +5,7 @@ import {
     IconCog8Tooth, IconCpuChip, IconGitBranch, IconInformationCircle, IconMagnifyingGlassMinus, IconMagnifyingGlassPlus,
     IconMoon, IconPause, IconPlay, IconStop, IconSun, IconThemeAuto,
 } from "./icons"
-import { nextHistoryDisplay, nextTheme } from "../stores/app.config.store"
+import { nextHistoryDisplay, nextTheme } from "../stores/persist.config.store"
 import { Portal } from "solid-js/web"
 
 export function Control() {
@@ -17,7 +17,7 @@ export function Control() {
 }
 
 function ControlButtons() {
-    const { gameActions, appStore, gameState, runtimeState } = useContext(AppContext)!
+    const { gameActions, appConfig, gameState, runtimeState } = useContext(AppContext)!
 
     const inComputing = createMemo(() => runtimeState()?.type !== "idle")
 
@@ -49,7 +49,7 @@ function ControlButtons() {
                     <IconStop />
                 </button>
             </Match>
-            <Match when={appStore.autoLaunch && !inComputing()}>
+            <Match when={appConfig.autoLaunch && !inComputing()}>
                 <button
                     class="btn btn-square"
                     onClick={gameActions.pause}
@@ -57,7 +57,7 @@ function ControlButtons() {
                     <IconPause />
                 </button>
             </Match>
-            <Match when={!appStore.autoLaunch && !inComputing()}>
+            <Match when={!appConfig.autoLaunch && !inComputing()}>
                 <button
                     class="btn btn-square"
                     classList={{ "btn-disabled": runtimeState() === undefined }}
@@ -111,17 +111,16 @@ function ControlButtons() {
 }
 
 function DashboardButton() {
-    const { setAppConfigStore, appConfigStore } = useContext(AppContext)!
+    const { setPersistConfig, persistConfig } = useContext(AppContext)!
 
     const toggleDashboard = () => {
-        // @ts-ignore
-        setAppConfigStore("openDashboard", !appConfigStore.openDashboard)
+        setPersistConfig("openDashboard", !persistConfig.openDashboard)
     }
 
     return <button
         class="btn btn-active btn-square"
         classList={{
-            "btn-active": appConfigStore.openDashboard,
+            "btn-active": persistConfig.openDashboard,
         }}
         onClick={toggleDashboard}
     >
@@ -130,19 +129,16 @@ function DashboardButton() {
 }
 
 function ConfigButton() {
-    const { appConfigStore, setAppConfigStore } = useContext(AppContext)!
+    const { persistConfig, setPersistConfig } = useContext(AppContext)!
 
     const cycleTheme = () =>
-        // @ts-ignore
-        setAppConfigStore("theme", nextTheme(appConfigStore.theme))
+        setPersistConfig("theme", nextTheme(persistConfig.theme))
 
     const cycleHistoryDisplay = () =>
-        // @ts-ignore
-        setAppConfigStore("historyDisplay", nextHistoryDisplay(appConfigStore.historyDisplay))
+        setPersistConfig("historyDisplay", nextHistoryDisplay(persistConfig.historyDisplay))
 
     const toggleZoomBoard = () => {
-        // @ts-ignore
-        setAppConfigStore("zoomBoard", !appConfigStore.zoomBoard)
+        setPersistConfig("zoomBoard", !persistConfig.zoomBoard)
     }
 
     return <div class="dropdown dropdown-center dropdown-top">
@@ -159,9 +155,9 @@ function ConfigButton() {
                     onClick={cycleTheme}
                 >
                     <Switch>
-                        <Match when={appConfigStore.theme === "system"}><IconThemeAuto /></Match>
-                        <Match when={appConfigStore.theme === "dark"}><IconMoon /></Match>
-                        <Match when={appConfigStore.theme === "light"}><IconSun /></Match>
+                        <Match when={persistConfig.theme === "system"}><IconThemeAuto /></Match>
+                        <Match when={persistConfig.theme === "dark"}><IconMoon /></Match>
+                        <Match when={persistConfig.theme === "light"}><IconSun /></Match>
                     </Switch>
                 </button>
             </li>
@@ -174,16 +170,16 @@ function ConfigButton() {
                         <defs><mask id="historyDisplayMask">
                             <rect x="0" y="0" width="100" height="100" fill="white"/>
                             <Switch>
-                                <Match when={appConfigStore.historyDisplay === "last"}>
+                                <Match when={persistConfig.historyDisplay === "last"}>
                                     <circle fill="black" cx="50" cy="50" r="8"/>
                                 </Match>
-                                <Match when={appConfigStore.historyDisplay === "pair"}>
+                                <Match when={persistConfig.historyDisplay === "pair"}>
                                     <g stroke="black" stroke-width="4">
                                         <line x1="35" y1="50" x2="65" y2="50"/>
                                         <line x1="50" y1="35" x2="50" y2="65"/>
                                     </g>
                                 </Match>
-                                <Match when={appConfigStore.historyDisplay === "sequence"}>
+                                <Match when={persistConfig.historyDisplay === "sequence"}>
                                     <text
                                         font-family="serif"
                                         font-size="42"
@@ -210,10 +206,10 @@ function ConfigButton() {
                     onClick={toggleZoomBoard}
                 >
                     <Switch>
-                        <Match when={!appConfigStore.zoomBoard}>
+                        <Match when={!persistConfig.zoomBoard}>
                             <IconMagnifyingGlassPlus />
                         </Match>
-                        <Match when={appConfigStore.zoomBoard}>
+                        <Match when={persistConfig.zoomBoard}>
                             <IconMagnifyingGlassMinus />
                         </Match>
                     </Switch>

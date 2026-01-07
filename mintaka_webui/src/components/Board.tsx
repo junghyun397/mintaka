@@ -1,22 +1,17 @@
-import { createMemo, For, Match, Switch, useContext } from "solid-js"
+import { createMemo, createSelector, For, Index, Match, Switch, useContext } from "solid-js"
 import { AppContext } from "../context"
-import { chunk } from "../utils/array"
-import { BoardCellView, buildBoardCellView, LETTERS, NUMS } from "../domain/rusty-renju"
+import { INDEX_TO_POS, LETTERS, NUMS } from "../domain/rusty-renju"
+import { range } from "../utils/array"
 
 export function Board() {
-    const { gameState, runtimeState } = useContext(AppContext)!
+    const { boardDescribe, gameState, runtimeState } = useContext(AppContext)!
 
     const inComputing = createMemo(() => runtimeState()?.type !== "idle")
 
-    const boardViewTopDown = createMemo(() => {
-        const cells = buildBoardCellView(gameState().boardWorker.field(), gameState().historyTree.linear())
-
-        return chunk(cells, 15).toReversed()
-    })
-
-    const playerColor = createMemo(() => gameState().boardWorker.playerColor())
-
-    const historyLength = createMemo(() => gameState().historyTree.length)
+    const lastSequence = createMemo(() => gameState().historyTree.length)
+    const prevSequence = createMemo(() => lastSequence() - 1)
+    const isLastSequence = createSelector(lastSequence)
+    const isPrevSequence = createSelector(prevSequence)
 
     // 1+2x15+1 = 32
     return <div class="relative h-full w-full rounded-box bg-[#efb072]">
@@ -54,83 +49,104 @@ export function Board() {
                 grid h-full w-full
                 grid-cols-15 grid-rows-15
                 stroke-gray-500
-                [&_button.stone.black]:fill-black [&_button.stone.white]:fill-white
+                [&_button.stone.black]:fill-black [&_button.stone.black_.glyph]:fill-white
+                [&_button.stone.white]:fill-white [&_button.stone.white_.glyph]:fill-black
                 "
                 classList={{
-                    "[&_button.forbidden]:cursor-not-allowed": playerColor() === "Black",
+                    "[&_button.forbidden]:cursor-not-allowed": boardDescribe.player_color === "Black",
                     "[&_button]:cursor-wait": inComputing(),
                     "[&_button.stone]:cursor-auto [&_button]:cursor-crosshair": !inComputing(),
                 }}
             >
-                <For each={boardViewTopDown()}>{(row) =>
-                    <For each={row}>{(cell) =>
-                        <Cell cell={cell} historyLength={historyLength()} />
-                    }</For>
-                }</For>
+                <Index each={range(0, 15 * 15)}>{position =>
+                    <Cell
+                        position={position()}
+                        isLastSequence={isLastSequence}
+                        isPrevSequence={isPrevSequence}
+                    />
+                }</Index>
             </div>
         </div>
     </div>
 }
 
-function Cell(props: { cell: BoardCellView, historyLength: number }) {
-    const { gameActions, appConfigStore } = useContext(AppContext)!
+function Cell(props: {
+    position: number,
+    isLastSequence: (sequence: number) => boolean,
+    isPrevSequence: (sequence: number) => boolean,
+}) {
+    const { gameActions, persistConfig, boardDescribe } = useContext(AppContext)!
 
-    const reversedFill = () =>
-        props.cell.content === "Black" ? "white" : "black"
+    const pos = INDEX_TO_POS[props.position]
+
+    const cell = createMemo(() => boardDescribe.field[props.position])
+
+    const stone = createMemo(() => {
+        const stoneCell = cell()
+
+        return stoneCell.type === "Stone" ? stoneCell : undefined
+    })
 
     return <button
-        id={props.cell.pos}
-        title={props.cell.pos}
+        id={pos}
+        title={pos}
         classList={{
-            "stone": props.cell.type === "Stone",
-            "black": props.cell.content === "Black",
-            "white": props.cell.content === "White",
-            "forbidden": props.cell.type === "Forbidden",
+            "stone": cell().type === "Stone",
+            "black": stone()?.content.color === "Black",
+            "white": stone()?.content.color === "White",
+            "forbidden": cell().type === "Forbidden",
         }}
-        onClick={[gameActions.play, props.cell.pos]}
+        style={{
+            "grid-row": 15 - Math.trunc(props.position / 15),
+            "grid-column": (props.position % 15) + 1,
+        }}
+        onClick={[gameActions.play, pos]}
     >
         <Switch>
-            <Match when={props.cell.type === "Stone" ? props.cell : undefined}>{cell =>
+            <Match when={stone()}>{stone =>
                 <svg viewBox="0 0 100 100">
                     <circle
                         stroke-width="4"
                         cx="50" cy="50" r="45"
                     />
                     <Switch>
-                        <Match when={appConfigStore.historyDisplay === "sequence"}>
+                        <Match when={persistConfig.historyDisplay === "sequence"}>
                             <text
+                                class="glyph"
                                 font-family="serif"
                                 font-size="50"
-                                fill={reversedFill()}
                                 text-anchor="middle" dominant-baseline="middle"
                                 x="50" y="54"
                             >
-                                {cell().sequence}
+                                {stone().content.sequence}
                             </text>
                         </Match>
                         <Match when={
-                            (appConfigStore.historyDisplay === "pair" || appConfigStore.historyDisplay === "last")
-                            && cell().sequence === props.historyLength
+                            (persistConfig.historyDisplay === "pair" || persistConfig.historyDisplay === "last")
+                            && props.isLastSequence(stone().content.sequence)
                         }>
                             <circle
-                                fill={reversedFill()}
+                                class="glyph"
                                 cx="50" cy="50" r="10"
                             />
                         </Match>
-                        <Match when={appConfigStore.historyDisplay === "pair" && (cell().sequence + 1) === props.historyLength}>
-                            <g
-                                stroke={reversedFill()}
-                                stroke-width="4"
-                            >
-                                <line x1="35" y1="50" x2="65" y2="50"/>
-                                <line x1="50" y1="35" x2="50" y2="65"/>
+                        <Match when={
+                            persistConfig.historyDisplay === "pair"
+                            && props.isPrevSequence(stone().content.sequence)
+                        }>
+                            <g class="glyph">
+                                <rect x="35" y="48" width="30" height="4"/>
+                                <rect x="48" y="35" width="4" height="30"/>
                             </g>
                         </Match>
                     </Switch>
                 </svg>
             }</Match>
-            <Match when={props.cell.type === "Forbidden"}>
-                <svg class="fill-error stroke-0" viewBox="0 0 100 100">
+            <Match when={cell().type === "Forbidden"}>
+                <svg
+                    class="forbidden fill-error stroke-0"
+                    viewBox="0 0 100 100"
+                >
                     <circle cx="50" cy="50" r="10"/>
                 </svg>
             </Match>

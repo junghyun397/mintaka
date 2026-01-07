@@ -1,5 +1,5 @@
-import { Config, GameState } from "../wasm/pkg/mintaka_wasm_worker"
-import { Command, CommandResult, defaultConfig, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
+import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
+import { defaultConfig } from "../wasm/pkg/mintaka_wasm"
 import { InfiniteDuration } from "./rusty-renju"
 import { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand, MintakaProviderType } from "./mintaka.provider"
 

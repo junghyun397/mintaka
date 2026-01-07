@@ -114,6 +114,18 @@ impl History {
         self.entries[..self.top].iter()
     }
 
+    pub fn inverted_sequence(&self) -> [u8; pos::BOARD_SIZE + 1] {
+        let mut result = [0; pos::BOARD_SIZE + 1];
+
+        for (index, &action) in self.iter().enumerate() {
+            if action.is_some() {
+                result[action.unwrap().idx_usize()] = (index + 1) as u8;
+            }
+        }
+
+        result
+    }
+
     pub fn recent_action_pair(&self) -> [MaybePos; 2] {
         match self.len() {
             0 => [MaybePos::NONE, MaybePos::NONE],

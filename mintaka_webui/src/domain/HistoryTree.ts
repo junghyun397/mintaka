@@ -1,4 +1,4 @@
-import { HashKey, History, MaybePos } from "../wasm/pkg/mintaka_wasm"
+import type { HashKey, History, MaybePos } from "../wasm/pkg/mintaka_wasm"
 
 export type HistoryEntry = {
     hashKey: HashKey,
@@ -32,10 +32,6 @@ export class HistoryTree {
 
     get inBranchHead(): boolean {
         return this.root != undefined && this.top === 0
-    }
-
-    get topEntry(): HistoryEntry | undefined {
-        return this.history[this.top - 1]
     }
 
     linear(): HistoryEntry[] {
