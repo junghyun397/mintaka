@@ -56,10 +56,7 @@ pub enum Command {
         Duration
     ),
     Pondering(bool),
-    MaxNodes {
-        #[typeshare(serialized_as = "number")]
-        in_1k: u64
-    },
+    MaxNodes { in_1k: u32 },
     Workers(u32),
     MaxMemory(ByteSize),
     Rule(RuleKind),

@@ -1,8 +1,13 @@
 import { AppContext } from "../context"
-import { createMemo, useContext } from "solid-js"
+import { createEffect, createSignal, useContext } from "solid-js"
+import { unwrap } from "solid-js/store"
+import { compareConfig } from "../wasm/pkg/mintaka_wasm"
+import type { Config } from "../wasm/pkg/mintaka_wasm"
+import { Keys } from "../utils/types"
+import { flatmap } from "../utils/undefined"
 
 export function Dashboard() {
-    const { persistConfig, setPersistConfig, runtimeState } = useContext(AppContext)!
+    const { persistConfig, setPersistConfig } = useContext(AppContext)!
 
     const closeDashboard = () => {
         setPersistConfig("openDashboard", false)
@@ -34,7 +39,7 @@ export function Dashboard() {
                 >X</button>
                 <div class="flex flex-col gap-4 p-4">
                     <Overview />
-                    <Config />
+                    <MintakaConfig />
                     <DangerZone />
                 </div>
             </aside>
@@ -50,43 +55,49 @@ function Overview() {
     </div>
 }
 
-function Config() {
-    const { persistConfig } = useContext(AppContext)!
+function ConfigSection<T extends Keys<number | undefined, Config>>(props: {
+    configKey: T,
+    min: number,
+    scale: number,
+    legend: string,
+    label: string,
+    description: string,
+    placeholder: string,
+}) {
 
-    const ttSizeInMib = () =>
-        Math.floor(persistConfig.config.tt_size / 1024 / 1024)
+    return <fieldset class="fieldset">
+        <legend class="fieldset-legend">{props.legend}</legend>
+        <label class="input">
+            <input
+                type="number"
+                min={props.min}
+                max={maxValue()}
+                value={inputValue()}
+                onInput={event => {
+                }}
+            />
+            <span class="label">{props.label}</span>
+        </label>
+        <p class="label text-wrap">{props.description}</p>
+    </fieldset>
+}
+
+function MintakaConfig() {
+    const { persistConfig, maxMintakaConfig } = useContext(AppContext)!
 
     return <div class="flex flex-col gap-4">
         <div>
             <h3 class="text-lg">Resources</h3>
-            <fieldset class="fieldset">
-                <legend class="fieldset-legend">Workers</legend>
-                <label class="input">
-                    <input
-                        type="number"
-                        min={1}
-                        value={persistConfig.config.workers}
-                        onChange={event => {
-                            event.target.valueAsNumber
-                        }}
-                    />
-                    <span class="label">Cores</span>
-                </label>
-                <p class="label text-wrap">CPU core allocation. Must be less than the number of physical CPUs.</p>
-            </fieldset>
-            <fieldset class="fieldset">
-                <legend class="fieldset-legend">TT Size</legend>
-                <label class="input">
-                    <input
-                        type="number"
-                        min={16}
-                        max={2048}
-                        value={ttSizeInMib()}
-                    />
-                    <span class="label">MiB</span>
-                </label>
-                <p class="label text-wrap">Shared memory size. Should be properly sized relative to computational volume.</p>
-            </fieldset>
+            <ConfigSection
+                configKey="workers" min={1} scale={1}
+                legend="Workers" label="Cores"
+                description="CPU core allocation. Must be less than the number of physical CPUs."
+            />
+            <ConfigSection
+                configKey="tt_size" min={16} scale={1}
+                legend="TT Size" label="MiB"
+                description="Shared memory size. Should be properly sized relative to computational volume."
+            />
         </div>
         <div>
             <h3 class="text-lg">Time Controls</h3>
@@ -95,9 +106,10 @@ function Config() {
                 <label class="input">
                     <input
                         type="number"
-                        min={1}
                         placeholder="unlimited"
-                        value={persistConfig.config.initial_timer.total_remaining.secs}
+                        min={1}
+                        max={maxMintakaConfig()?.initial_timer.total_remaining?.secs}
+                        value={persistConfig.config.initial_timer.total_remaining?.secs}
                     />
                     <span class="label">seconds</span>
                 </label>
@@ -109,6 +121,7 @@ function Config() {
                     <input
                         type="number"
                         min={0}
+                        max={maxMintakaConfig()?.initial_timer.increment.secs}
                         value={persistConfig.config.initial_timer.increment.secs}
                     />
                     <span class="label text-wrap">seconds</span>
@@ -120,9 +133,10 @@ function Config() {
                 <label class="input">
                     <input
                         type="number"
-                        min={1}
                         placeholder="unlimited"
-                        value={persistConfig.config.initial_timer.turn.secs}
+                        min={1}
+                        max={maxMintakaConfig()?.initial_timer.turn?.secs}
+                        value={persistConfig.config.initial_timer.turn?.secs}
                     />
                     <span class="label text-wrap">seconds</span>
                 </label>
@@ -131,32 +145,18 @@ function Config() {
         </div>
         <div>
             <h3 class="text-lg">Search Limits</h3>
-            <fieldset class="fieldset">
-                <legend class="fieldset-legend">Node Limit</legend>
-                <label class="input">
-                    <input
-                        type="number"
-                        min={1}
-                        placeholder="unlimited"
-                        value={persistConfig.config.max_nodes_in_1k}
-                    />
-                    <span class="label">×1000</span>
-                </label>
-                <p class="label text-wrap">Maximum reachable nodes. Specify when maintaining a constant level regardless of time or hardware.</p>
-            </fieldset>
-            <fieldset class="fieldset">
-                <legend class="fieldset-legend">Depth Limit</legend>
-                <label class="input">
-                    <input
-                        type="number"
-                        min={1}
-                        placeholder="unlimited"
-                        value={persistConfig.config.max_depth}
-                    />
-                    <span class="label">moves</span>
-                </label>
-                <p class="label text-wrap">Maximum reachable selective depth.</p>
-            </fieldset>
+            <ConfigSection
+                configKey="max_nodes_in_1k" min={1} scale={1}
+                placeholder="unlimited"
+                legend="Node Limit" label="×1000"
+                description="Maximum reachable nodes. Specify when maintaining a constant level regardless of time or hardware."
+            />
+            <ConfigSection
+                configKey="max_depth" min={4} scale={1}
+                placeholder="unlimited"
+                legend="Depth Limit" label="moves"
+                description="Maximum reachable selective depth."
+            />
         </div>
     </div>
 }
@@ -174,8 +174,14 @@ function DangerZone() {
     return <div class="flex flex-col gap-2">
         <h3 class="text-lg">Data Controls</h3>
         <button
+            class="btn btn-accent"
+            onClick={appActions.resetConfig}
+        >
+            Reset Config
+        </button>
+        <button
             class="btn btn-error"
-            onClick={appActions.cleatAppData}
+            onClick={appActions.clearAppData}
         >
             Reset App Data
         </button>

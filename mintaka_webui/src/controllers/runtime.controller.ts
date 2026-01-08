@@ -1,16 +1,20 @@
 import { AppGameState } from "../stores/app.state"
-import { BestMove, Board, defaultGameState, HashKey, History, MaybePos } from "../wasm/pkg/mintaka_wasm"
+import { BestMove, Board, Config, defaultGameState, HashKey, History, MaybePos } from "../wasm/pkg/mintaka_wasm"
 import { HistoryTree } from "../domain/HistoryTree"
-import { PersistConfig } from "../stores/persist.config.store"
+import { PersistConfig } from "../stores/persist.config"
 import { MintakaWorkerProvider } from "../domain/mintaka.worker.provider"
 import { buildMintakaRuntime, MintakaRuntime } from "../domain/mintaka.runtime"
 import { assertNever } from "../utils/never"
 
+export type RequireProviderReady = "ok" | "provider-not-ready"
+export type RequireProviderComputing = "ok" | "provider-not-launched"
+
 interface RuntimeController {
     loadRuntime: (persistConfig: PersistConfig) => void,
-    launch: (snapshot: HashKey, historyTreeSnapshot: HistoryTree) => "ok" | "provider-not-ready",
-    abort: () => "ok" | "provider-not-launched",
-    syncPlay: (pos: MaybePos) => "ok" | "provider-not-ready" | "desynced",
+    launch: (snapshot: HashKey, historyTreeSnapshot: HistoryTree) => RequireProviderReady,
+    abort: () => RequireProviderComputing,
+    syncPlay: (pos: MaybePos) => RequireProviderReady | "desynced",
+    syncConfig: (config: Config) => RequireProviderReady,
 }
 
 export function createProviderController(
@@ -32,7 +36,7 @@ export function createProviderController(
         return "ok"
     }
 
-    const connectRuntime = (initialRuntime: MintakaRuntime) => {
+    const subscribeRuntime = (initialRuntime: MintakaRuntime) => {
         initialRuntime.provider.subscribeResponse(response => {
             const runtime = mintakaRuntime()
 
@@ -68,12 +72,12 @@ export function createProviderController(
                     setMintakaRuntime({ ...runtime, state: runtime.state.bestMove(response.content) })
                     break
                 }
+                case "Error": {
+                    console.error(response.content)
+                    break
+                }
                 default: assertNever(response)
             }
-        })
-
-        initialRuntime.provider.subscribeError(error => {
-            console.log(error)
         })
     }
 
@@ -87,13 +91,13 @@ export function createProviderController(
 
             const gameState = defaultGameState()
 
-            const provider = new MintakaWorkerProvider(persistConfig.config, gameState)
+            const provider = new MintakaWorkerProvider(gameState, persistConfig.config)
 
             const runtimeState = buildMintakaRuntime(gameState.board.hash_key)
 
             const runtime: MintakaRuntime = { provider, state: runtimeState }
 
-            connectRuntime(runtime)
+            subscribeRuntime(runtime)
 
             setMintakaRuntime(runtime)
         },
@@ -131,6 +135,15 @@ export function createProviderController(
                 return "desynced"
 
             runtime.provider.command({ type: "Play", content: pos })
+
+            return "ok"
+        },
+        syncConfig: (config: Config) => {
+            const runtime = mintakaRuntime()
+            if (runtime === undefined || runtime.state.type !== "idle")
+                return "provider-not-ready"
+
+            runtime.provider.command({ type: "Config", content: config })
 
             return "ok"
         },

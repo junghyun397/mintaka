@@ -22,13 +22,11 @@ pub enum SearchObjective {
 #[serde(default)]
 pub struct Config {
     pub rule_kind: RuleKind,
-    #[typeshare(serialized_as = "number")]
-    pub draw_condition: u64,
+    pub draw_condition: u32,
 
-    #[typeshare(serialized_as = "number")]
-    pub max_nodes_in_1k: Option<u64>,
-    pub max_depth: Depth,
-    pub max_vcf_depth: Depth,
+    pub max_nodes_in_1k: Option<u32>,
+    pub max_depth: Option<Depth>,
+    pub max_vcf_depth: Option<Depth>,
 
     pub tt_size: ByteSize,
     pub workers: u32,
@@ -44,10 +42,10 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             rule_kind: RuleKind::Renju,
-            draw_condition: pos::BOARD_SIZE as u64,
+            draw_condition: pos::BOARD_SIZE as u32,
             max_nodes_in_1k: None,
-            max_depth: Depth::PLY_LIMIT,
-            max_vcf_depth: 24,
+            max_depth: None,
+            max_vcf_depth: None,
             tt_size: ByteSize::from_mib(512),
             workers: 1,
             pondering: false,
@@ -87,6 +85,14 @@ impl Ord for Config {
     }
 }
 
+impl Config {
+
+    pub fn max_depth(&self) -> Depth {
+        self.max_depth.unwrap_or(Depth::PLY_LIMIT)
+    }
+
+}
+
 #[derive(Debug)]
 pub enum ConfigValidationError {
     DrawConditionDeeperThenMaxHistory,
@@ -105,11 +111,11 @@ impl std::error::Error for ConfigValidationError {}
 impl Config {
 
     pub fn validate(self) -> Result<Self, ConfigValidationError> {
-        if self.draw_condition > history::MAX_HISTORY_SIZE as u64 {
+        if self.draw_condition > history::MAX_HISTORY_SIZE as u32 {
             Err(ConfigValidationError::DrawConditionDeeperThenMaxHistory)
-        } else if self.max_depth > Depth::PLY_LIMIT {
+        } else if self.max_depth > Some(Depth::PLY_LIMIT) {
             Err(ConfigValidationError::DepthDeeperThanMaxPly)
-        } else if self.max_vcf_depth > Depth::PLY_LIMIT {
+        } else if self.max_vcf_depth > Some(Depth::PLY_LIMIT) {
             Err(ConfigValidationError::VCFDepthDeeperThanMaxPly)
         } else {
             Ok(self)

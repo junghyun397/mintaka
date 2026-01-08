@@ -1,8 +1,9 @@
-import type { HashKey, History } from "../wasm/pkg/mintaka_wasm"
+import type { HashKey } from "../wasm/pkg/mintaka_wasm"
 import { defaultBoard, BoardWorker } from "../wasm/pkg/mintaka_wasm"
-import { EmptyHistoryTree, HistoryTree } from "../domain/HistoryTree"
+import { EmptyHistoryTree, HistoryEntry, HistorySource, HistoryTree } from "../domain/HistoryTree"
 import { Accessor, createSignal, Setter } from "solid-js"
 import { MintakaRuntime } from "../domain/mintaka.runtime"
+import { assertNever } from "../utils/never"
 
 export type AppGameState = {
     readonly boardWorker: BoardWorker,
@@ -37,9 +38,22 @@ export function createAppState(initial: {
     }
 }
 
-export function restoreAppStateFromHistory(history: History): AppState {
-    return createAppState({
-        boardWorker: BoardWorker.fromHistory(history),
-        historyTree: EmptyHistoryTree,
-    })
+function buildGameStateFromHistorySource(historySource: HistorySource): [BoardWorker, HistoryTree] {
+    switch (historySource.type) {
+        case "history": {
+            const historyEntries: HistoryEntry[] = []
+
+            let boardWorker = new BoardWorker(defaultBoard())
+            for (const pos of historySource.content) {
+                boardWorker = boardWorker.set(pos)
+                historyEntries.push({ hashKey: boardWorker.hashKey(), pos })
+            }
+
+            return [boardWorker, new HistoryTree(undefined, historyEntries)]
+        }
+        case "history-tree": {
+            return [BoardWorker.fromHistory(historySource.content.toHistory()), historySource.content]
+        }
+        default: assertNever(historySource)
+    }
 }

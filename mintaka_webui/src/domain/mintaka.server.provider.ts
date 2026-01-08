@@ -1,5 +1,4 @@
 import { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand, MintakaProviderType } from "./mintaka.provider"
-import { defaultConfig } from "../wasm/pkg/mintaka_wasm"
 import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
 
 export class MintakaServerConfig {
@@ -29,16 +28,9 @@ export class MintakaServerConfig {
 export const LocalHostServerConfig = new MintakaServerConfig("http://localhost", 8080, "test")
 
 export type MintakaServerSession = {
-    readonly sid: string
-}
-
-async function assertOk(response: Response) {
-    if (response.ok) {
-        return
-    }
-
-    const message = await response.text()
-    throw new Error(message || `request failed: ${response.status}`)
+    readonly sid: string,
+    readonly defaultConfig: Config,
+    readonly maxConfig: Config,
 }
 
 export async function checkHealth(serverConfig: MintakaServerConfig): Promise<boolean> {
@@ -53,7 +45,7 @@ export async function checkHealth(serverConfig: MintakaServerConfig): Promise<bo
     }
 }
 
-export async function createSession(serverConfig: MintakaServerConfig, config: Config, state: GameState) {
+export async function createSession(serverConfig: MintakaServerConfig, config: Config, state: GameState): Promise<MintakaServerSession> {
     const response = await fetch(serverConfig.url + "/sessions", {
         method: "POST",
         headers: serverConfig.headers({
@@ -65,9 +57,7 @@ export async function createSession(serverConfig: MintakaServerConfig, config: C
         }),
     })
 
-    await assertOk(response)
-
-    return { sid: await response.json() as string }
+    return await response.json()
 }
 
 export class MintakaServerProvider implements MintakaProvider {
@@ -80,20 +70,22 @@ export class MintakaServerProvider implements MintakaProvider {
     private onError?: (error: any) => void
 
     readonly type: MintakaProviderType = "server"
-    readonly maxConfig: Config
 
-    constructor(config: MintakaServerConfig, session: MintakaServerSession, maxConfig?: Config) {
+    get defaultConfig() {
+        return this.session.defaultConfig
+    }
+
+    get maxConfig() {
+        return this.session.maxConfig
+    }
+
+    constructor(config: MintakaServerConfig, session: MintakaServerSession) {
         this.serverConfig = config
         this.session = session
-        this.maxConfig = maxConfig ?? defaultConfig()
     }
 
     subscribeResponse(handler: (response: MintakaProviderResponse) => void) {
         this.onResponse = handler
-    }
-
-    subscribeError(handler: (error: any) => void) {
-        this.onError = handler
     }
 
     dispose() {
@@ -131,8 +123,6 @@ export class MintakaServerProvider implements MintakaProvider {
             body: JSON.stringify(command),
         })
 
-        await assertOk(response)
-
         const result = await response.json() as CommandResult
 
         this.onResponse && this.onResponse({ type: "CommandResult", content: result })
@@ -144,8 +134,6 @@ export class MintakaServerProvider implements MintakaProvider {
             headers: this.serverConfig.headers(),
             body: JSON.stringify({ hash, objective }),
         })
-
-        await assertOk(response)
 
         this.startStream()
     }
@@ -164,8 +152,6 @@ export class MintakaServerProvider implements MintakaProvider {
             method: "POST",
             headers: this.serverConfig.headers(),
         })
-
-        await assertOk(response)
     }
 
     private closeStream() {

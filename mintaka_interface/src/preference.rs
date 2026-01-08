@@ -16,13 +16,13 @@ pub struct Preference {
     #[arg(short, long)]
     pub history: Option<History>,
     #[arg(short, long, num_args = 3)]
-    pub time: Option<Vec<u64>>,
+    pub time: Option<Vec<u32>>,
     #[arg(long)]
     pub dynamic_time: bool,
     #[arg(short, long)]
-    pub nodes_in_1k: Option<u64>,
+    pub nodes_in_1k: Option<u32>,
     #[arg(short, long)]
-    pub memory_in_mib: Option<u64>,
+    pub memory_in_mib: Option<u32>,
     #[arg(short, long)]
     pub workers: Option<u32>,
     #[arg(short, long)]
@@ -54,9 +54,9 @@ impl Preference {
         }
 
         if let Some(&[total_time_in_ms, increment_time_in_ms, turn_time_in_ms]) = self.time.as_deref() {
-            self.default_config.initial_timer.total_remaining = Duration::from_millis(total_time_in_ms);
-            self.default_config.initial_timer.increment = Duration::from_millis(increment_time_in_ms);
-            self.default_config.initial_timer.turn = Duration::from_millis(turn_time_in_ms);
+            self.default_config.initial_timer.total_remaining = Some(Duration::from_millis(total_time_in_ms as u64));
+            self.default_config.initial_timer.increment = Duration::from_millis(increment_time_in_ms as u64);
+            self.default_config.initial_timer.turn = Some(Duration::from_millis(turn_time_in_ms as u64));
         }
 
         self.default_config.dynamic_time = self.dynamic_time;
@@ -64,7 +64,7 @@ impl Preference {
         self.default_config.pondering = self.pondering;
 
         if let Some(memory_in_mib) = self.memory_in_mib {
-            self.default_config.tt_size = ByteSize::from_mib(memory_in_mib);
+            self.default_config.tt_size = ByteSize::from_mib(memory_in_mib as u64);
         }
 
         match self.workers {

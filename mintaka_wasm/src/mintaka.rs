@@ -1,5 +1,5 @@
 use crate::rusty_renju::{Board, BoardWorker, History, Pos};
-use crate::{impl_wrapper, to_js_err, to_js_value, try_from_js_value};
+use crate::{impl_wrapper, to_js_value, try_from_js_value};
 use std::cmp::Ordering;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
@@ -27,13 +27,13 @@ pub fn default_game_state() -> GameState {
 }
 
 #[wasm_bindgen(js_name = validateConfig)]
-pub fn validate_config(config: Config) -> Result<Config, JsError> {
+pub fn validate_config(config: Config) -> Result<bool, JsError> {
     let config: mintaka::config::Config = try_from_js_value(config)?;
 
-    Ok(to_js_value(&config.validate().map_err(to_js_err)?))
+    Ok(config.validate().is_ok())
 }
 
-#[wasm_bindgen(js_name = de)]
+#[wasm_bindgen(js_name = compareConfig)]
 pub fn compare_config(a: Config, b: Config) -> isize {
     let a_config: mintaka::config::Config = try_from_js_value(a).unwrap();
     let b_config: mintaka::config::Config = try_from_js_value(b).unwrap();

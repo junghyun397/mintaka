@@ -5,7 +5,7 @@ import {
     IconCog8Tooth, IconCpuChip, IconGitBranch, IconInformationCircle, IconMagnifyingGlassMinus, IconMagnifyingGlassPlus,
     IconMoon, IconPause, IconPlay, IconStop, IconSun, IconThemeAuto,
 } from "./icons"
-import { nextHistoryDisplay, nextTheme } from "../stores/persist.config.store"
+import { nextHistoryDisplay, nextTheme } from "../stores/persist.config"
 import { Portal } from "solid-js/web"
 
 export function Control() {

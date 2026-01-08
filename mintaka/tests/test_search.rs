@@ -15,7 +15,7 @@ mod test_search {
             let mut agent = {
                 let mut config = Config::default();
                 config.max_nodes_in_1k = Some(100);
-                config.max_depth = 5;
+                config.max_depth = Some(5);
 
                 let state: GameState = $source.into();
 

@@ -1,8 +1,8 @@
 import { MintakaServerConfig } from "../domain/mintaka.server.provider"
 import type { Config } from "../wasm/pkg/mintaka_wasm"
 import { defaultConfig } from "../wasm/pkg/mintaka_wasm"
-import { duration } from "../domain/rusty-renju"
 import { MintakaProviderType } from "../domain/mintaka.provider"
+import { duration } from "../domain/mintaka"
 
 const Themes = ["system", "dark", "light"] as const
 
@@ -40,7 +40,7 @@ export function defaultPersistConfig(): PersistConfig {
             "initial_timer": {
                 total_remaining: duration(3000),
                 increment: duration(0),
-                turn: duration(1),
+                turn: duration(5),
             },
         },
         theme: "system",

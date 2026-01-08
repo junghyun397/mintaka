@@ -14,8 +14,7 @@ pub struct ComputingResource {
     pub tt_size: ByteSize,
     #[typeshare(serialized_as = "DurationSchema")]
     pub time: Option<Duration>,
-    #[typeshare(serialized_as = "Option<number>")]
-    pub nodes_in_1k: Option<u64>,
+    pub nodes_in_1k: Option<u32>,
 }
 
 #[typeshare::typeshare]
@@ -28,8 +27,7 @@ pub enum Response {
         best_move: MaybePos,
         score: Score,
         selective_depth: Depth,
-        #[typeshare(serialized_as = "number")]
-        total_nodes_in_1k: u64,
+        total_nodes_in_1k: u32,
         pv: PrincipalVariation,
     },
 }

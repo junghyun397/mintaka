@@ -4,23 +4,39 @@ import { AppContext } from "../context"
 export function StatusMessage() {
     const { runtimeState, appConfig } = useContext(AppContext)!
 
-    const inComputing = createMemo(() => runtimeState()?.type !== "idle")
+    const statusType = createMemo(() => runtimeState()?.type)
+
+    const nodes = createMemo(() => 0)
+
+    const remainingTime = createMemo(() => 0)
 
     const statusMessage = () => {
-        if (inComputing())
-            return "Mintaka engine is thinking now..."
+        const status = statusType()
 
-        if (runtimeState() !== undefined && appConfig.autoLaunch)
-            return "Mintaka engine is waiting for your move."
+        if (status === undefined)
+            return ""
 
-        // "Downloading and compiling mintaka engine..."
+        if (status === "idle")
+            if (appConfig.autoLaunch)
+                return "Mintaka engine is waiting for your move."
+            else
+                return ""
+
+        if (status === "launched" || status === "begins")
+            return "Engine is started thinking..."
+
+        if (status === "streaming")
+            return `Engine is thinking now. ${nodes()}K nodes visited, up to ${remainingTime()} seconds remaining...`
+
+        if (status === "aborted")
+            return "Engine is stopping the current analysis..."
 
         return ""
     }
 
     return <p
         class="text-sm leading-tight text-base-content/70"
-        classList={{ "animate-pulse": inComputing() }}
+        classList={{ "animate-pulse": statusType() !== "idle" }}
     >
         {statusMessage()}
     </p>

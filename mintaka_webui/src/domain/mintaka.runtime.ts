@@ -1,7 +1,7 @@
 import type { BestMove, CommandResult, ComputingResource, HashKey } from "../wasm/pkg/mintaka_wasm"
 import { HistoryTree } from "./HistoryTree"
 import { MintakaProvider } from "./mintaka.provider"
-import { ResponseBody } from "./rusty-renju"
+import { ResponseBody } from "./mintaka"
 
 class IdleState {
     readonly type: "idle" = "idle"

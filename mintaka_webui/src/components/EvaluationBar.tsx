@@ -2,8 +2,6 @@ import { createMemo, useContext } from "solid-js"
 import { AppContext } from "../context"
 
 export function RootEvaluationBar() {
-    const { appStore } = useContext(AppContext)!
-
     return <div class="mx-auto w-full max-w-90">
         <EvaluationBar normEval={0} />
     </div>

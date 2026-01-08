@@ -236,7 +236,7 @@ fn handle_command(
                     "nodes" => {
                         let nodes = args.get(1)
                             .ok_or("nodes not provided.")?
-                            .parse::<u64>()
+                            .parse::<u32>()
                             .map_err(|_| "invalid nodes number.")?;
 
                         message_sender.command(Command::MaxNodes { in_1k: nodes });

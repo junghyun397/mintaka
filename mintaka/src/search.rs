@@ -58,7 +58,7 @@ pub fn iterative_deepening<CLK: MonotonicClock, const R: RuleKind, TH: ThreadTyp
 
     let starting_depth = (td.tid % 10 + 1) as Depth;
 
-    'iterative_deepening: for depth in starting_depth ..= td.config.max_depth {
+    'iterative_deepening: for depth in starting_depth ..= td.config.max_depth() {
         let iter_score = if depth < 5 {
             pvs::<CLK, R, TH, RootNode>(td, &mut state, depth, -Score::INF, Score::INF, false)
         } else {
@@ -299,7 +299,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
     };
 
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
-        return endgame_search::<R, false>(td, td.config.max_vcf_depth, state, static_eval, alpha, beta);
+        return endgame_search::<R, false>(td, td.config.max_vcf_depth.unwrap_or(100), state, static_eval, alpha, beta);
     }
 
     td.ss[td.ply].recovery_state = state.recovery_state();

@@ -1,19 +1,19 @@
 use crate::batch_counter::BatchCounter;
 use crate::config::{Config, SearchObjective};
 use crate::eval::evaluator::Evaluator;
-use crate::state::RecoveryState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::movegen::move_picker;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_endgame::EndgameFrame;
+use crate::state::RecoveryState;
 use crate::thread_type::ThreadType;
 use crate::value::Depth;
 use crate::{params, value};
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::{Score, Scores};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct RootMove {
@@ -112,7 +112,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
         tt: TTView<'a>,
         ht: HistoryTable,
         aborted: &'a AtomicBool,
-        global_counter_in_1k: &'a AtomicU64
+        global_counter_in_1k: &'a AtomicU32
     ) -> Self {
         Self {
             thread_type,
