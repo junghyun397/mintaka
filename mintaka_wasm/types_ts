@@ -6,7 +6,7 @@ export type Bitfield = string;
 
 export type HashKey = string;
 
-export type Color = string;
+export type Color = ColorSchema;
 
 export type ColorContainer<T> = [T, T];
 
@@ -101,17 +101,17 @@ export interface ComputingResource {
 }
 
 export interface Timer {
-	total_remaining: DurationSchema;
+	total_remaining?: DurationSchema;
 	increment: DurationSchema;
-	turn: DurationSchema;
+	turn?: DurationSchema;
 }
 
 export interface Config {
 	rule_kind: RuleKind;
 	draw_condition: number;
-	max_nodes_in_1k: number;
-	max_depth: Depth;
-	max_vcf_depth: Depth;
+	max_nodes_in_1k?: number;
+	max_depth?: Depth;
+	max_vcf_depth?: Depth;
 	tt_size: ByteSize;
 	workers: number;
 	pondering: boolean;

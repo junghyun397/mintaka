@@ -1,7 +1,7 @@
-import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
+import type { Command, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
 import { defaultConfig } from "../wasm/pkg/mintaka_wasm"
-import { InfiniteDuration } from "./rusty-renju"
 import { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand, MintakaProviderType } from "./mintaka.provider"
+import { duration, InfiniteDuration } from "./mintaka"
 
 export type MintakaWorkerMessage =
     | { type: "command", command: Command }
@@ -11,7 +11,6 @@ export type MintakaWorkerMessage =
 export type MintakaWorkerResponse =
     | MintakaProviderResponse
     | { type: "Load" }
-    | { type: "CommandResult", content: CommandResult }
     | { type: "Ready", sab: SharedArrayBuffer, controlPtr: number }
 
 export class MintakaWorkerControl {
@@ -31,6 +30,14 @@ export class MintakaWorkerControl {
 
 export class MintakaWorkerProvider implements MintakaProvider {
     readonly type: MintakaProviderType = "worker"
+    readonly defaultConfig: Config = {
+        ...defaultConfig(),
+        workers: Math.min(1, navigator.hardwareConcurrency - 1),
+        initial_timer: {
+            increment: duration(0),
+            turn: duration(10),
+        },
+    }
     readonly maxConfig: Config = {
         ...defaultConfig(),
         max_vcf_depth: 225,
@@ -38,8 +45,6 @@ export class MintakaWorkerProvider implements MintakaProvider {
         tt_size: 1024 * 1024 * 2048, // 2 GiB
         pondering: true,
         initial_timer: {
-            total_remaining: InfiniteDuration,
-            turn: InfiniteDuration,
             increment: InfiniteDuration,
         },
     }
@@ -50,7 +55,7 @@ export class MintakaWorkerProvider implements MintakaProvider {
     private onResponse?: (message: MintakaProviderResponse) => void
     private onError?: (error: any) => void
 
-    constructor(config: Config, gameState: GameState) {
+    constructor(gameState: GameState, config?: Config) {
         this.worker = new Worker(
             new URL("mintaka.worker.ts", import.meta.url),
             { type: "module" },
@@ -74,15 +79,11 @@ export class MintakaWorkerProvider implements MintakaProvider {
             this.onError && this.onError(event)
         }
 
-        this.postMessage({ type: "init", config: config, state: gameState })
+        this.postMessage({ type: "init", config: config ?? this.defaultConfig, state: gameState })
     }
 
     subscribeResponse(handler: (response: MintakaProviderResponse) => void) {
         this.onResponse = handler
-    }
-
-    subscribeError(handler: (error: any) => void) {
-        this.onError = handler
     }
 
     dispose() {

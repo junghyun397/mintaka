@@ -1,4 +1,8 @@
-import type { HashKey, History, MaybePos } from "../wasm/pkg/mintaka_wasm"
+import { HashKey, History, MaybePos } from "../wasm/pkg/mintaka_wasm"
+
+export type HistorySource =
+    | { type: "history", content: History }
+    | { type: "history-tree", content: HistoryTree }
 
 export type HistoryEntry = {
     hashKey: HashKey,

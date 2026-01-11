@@ -1,17 +1,19 @@
-import { Accessor, createContext, createEffect, onCleanup, onMount, ParentProps } from "solid-js"
+import { Accessor, createContext, createEffect, createMemo, onCleanup, onMount, ParentProps } from "solid-js"
 import { createStore, reconcile, SetStoreFunction, unwrap } from "solid-js/store"
 import { ForwardMethod } from "./domain/HistoryTree"
-import type { BoardDescribe, Pos } from "./wasm/pkg/mintaka_wasm"
-import { PersistConfig, defaultPersistConfig, Theme } from "./stores/persist.config.store"
+import { BoardDescribe, Config, defaultConfig, Pos } from "./wasm/pkg/mintaka_wasm"
+import { PersistConfig, defaultPersistConfig, Theme } from "./stores/persist.config"
 import { makePersisted } from "@solid-primitives/storage"
 import { AppConfig } from "./stores/app.config"
 import { createGameController } from "./controllers/game.controller"
-import { createProviderController } from "./controllers/runtime.controller"
+import { createProviderController, RequireProviderReady } from "./controllers/runtime.controller"
 import { AppGameState, createAppState } from "./stores/app.state"
 import { MintakaRuntimeState } from "./domain/mintaka.runtime"
 
 interface AppActions {
-    readonly cleatAppData: () => void,
+    readonly syncConfig: (config: Config) => RequireProviderReady,
+    readonly resetConfig: () => RequireProviderReady,
+    readonly clearAppData: () => void,
 }
 
 interface GameActions {
@@ -36,6 +38,7 @@ type AppContext = {
 
     readonly persistConfig: PersistConfig,
     readonly setPersistConfig: SetStoreFunction<PersistConfig>,
+    readonly maxMintakaConfig: Accessor<Config | undefined>,
 
     readonly appConfig: AppConfig,
 }
@@ -49,17 +52,23 @@ export function AppContextProvider(props: ParentProps) {
 
     const gameController = createGameController(appState.gameState, appState.setGameState)
 
-    const providerController = createProviderController(appState.gameState, appState.mintakaRuntime, appState.setMintakaRuntime, gameController.applyBestMove)
+    const providerController = createProviderController(
+        appState.gameState, appState.mintakaRuntime, appState.setMintakaRuntime, gameController.applyBestMove,
+    )
 
     const [appConfig, setAppConfig] = createStore<AppConfig>({ autoLaunch: false })
 
-    const [boardDescribe, setBoardDescribe] = createStore<BoardDescribe>(appState.gameState().boardWorker.describe(appState.gameState().historyTree.toHistory()))
+    const [boardDescribe, setBoardDescribe] = createStore<BoardDescribe>(
+        appState.gameState().boardWorker.describe(appState.gameState().historyTree.toHistory()),
+    )
 
     createEffect(() => {
-        const describe = appState.gameState().boardWorker.describe(appState.gameState().historyTree.toHistory())
-
-        setBoardDescribe(reconcile(describe))
+        setBoardDescribe(reconcile(
+            appState.gameState().boardWorker.describe(appState.gameState().historyTree.toHistory()),
+        ))
     })
+
+    const maxMintakaConfig = createMemo(() => appState.mintakaRuntime()?.provider.maxConfig)
 
     const gameActions: GameActions = {
         play: (pos) => {
@@ -124,7 +133,19 @@ export function AppContextProvider(props: ParentProps) {
     }
 
     const appActions: AppActions = {
-        cleatAppData: () => {
+        syncConfig: (config: Config) => {
+            setPersistConfig("config", reconcile(config))
+
+            return providerController.syncConfig(config)
+        },
+        resetConfig: () => {
+            const config = appState.mintakaRuntime()?.provider.defaultConfig ?? defaultConfig()
+
+            setPersistConfig("config", reconcile(config))
+
+            return providerController.syncConfig(config)
+        },
+        clearAppData: () => {
             setPersistConfig(defaultPersistConfig())
         },
     }
@@ -145,6 +166,7 @@ export function AppContextProvider(props: ParentProps) {
 
             persistConfig,
             setPersistConfig,
+            maxMintakaConfig,
 
             appConfig,
         }}

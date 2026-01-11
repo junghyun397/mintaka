@@ -1,10 +1,7 @@
-import { HistoryTree } from "./domain/HistoryTree"
-import { History } from "./wasm/pkg/mintaka_wasm"
+import { HistorySource } from "./domain/HistoryTree"
 
 type UrlParams = {
-    readonly history?:
-        | { type: "history", history: History }
-        | { type: "history-tree", historyTree: HistoryTree },
+    readonly historySource?: HistorySource,
     readonly viewer?: true,
 }
 
@@ -13,28 +10,18 @@ function parserUrlParams(): UrlParams {
 
     const moves = params.get("moves")
     const history = params.get("history")
+    const historyTree = params.get("history-tree")
     const viewer = params.get("viewer")
 
-    return {
-        history: history ? JSON.parse(history) : undefined,
-        viewer: viewer ? true : undefined,
-    }
+    return { }
 }
 
 function pushUrlParams(params: UrlParams) {
     const url = new URL(window.location.href)
 
-    if (params?.history?.type === "history") {
-        url.searchParams.set("moves", params.history.history.join(","))
-    }
-
-    if (params?.history?.type === "history-tree") {
-        url.searchParams.set("history", JSON.stringify(params.history.historyTree.toHistory()))
-    }
-
     if (params.viewer) {
         url.searchParams.set("viewer", "true")
     }
 
-    window.history.pushState({}, "", url.toString())
+    window.history.replaceState({}, "", url.toString())
 }

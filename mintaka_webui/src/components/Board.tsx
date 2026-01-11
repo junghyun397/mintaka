@@ -2,6 +2,7 @@ import { createMemo, createSelector, For, Index, Match, Switch, useContext } fro
 import { AppContext } from "../context"
 import { INDEX_TO_POS, LETTERS, NUMS } from "../domain/rusty-renju"
 import { range } from "../utils/array"
+import { filter } from "../utils/undefined"
 
 export function Board() {
     const { boardDescribe, gameState, runtimeState } = useContext(AppContext)!
@@ -81,11 +82,7 @@ function Cell(props: {
 
     const cell = createMemo(() => boardDescribe.field[props.position])
 
-    const stone = createMemo(() => {
-        const stoneCell = cell()
-
-        return stoneCell.type === "Stone" ? stoneCell : undefined
-    })
+    const stone = createMemo(() => filter(cell(), valid => valid.type === "Stone"))
 
     return <button
         id={pos}
