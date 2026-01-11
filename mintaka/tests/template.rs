@@ -8,7 +8,7 @@ mod template {
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
     use rusty_renju::board::Board;
-    use std::sync::atomic::{AtomicBool, AtomicU64};
+    use std::sync::atomic::{AtomicBool, AtomicU32};
     use std::sync::Arc;
     use std::time::Instant;
 
@@ -23,7 +23,7 @@ mod template {
         let tt = TranspositionTable::new_with_size(config.tt_size);
         let ht = HistoryTable::EMPTY;
 
-        let global_counter_in_1k = AtomicU64::new(0);
+        let global_counter_in_1k = AtomicU32::new(0);
         let aborted = AtomicBool::new(false);
 
         let _ = ThreadData::new(

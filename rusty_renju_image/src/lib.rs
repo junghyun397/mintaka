@@ -434,14 +434,14 @@ fn blit_cell(canvas: &mut Pixmap, sprite: &Pixmap, cell: &Cell) {
 }
 
 fn draw_board(canvas: &mut Pixmap, board: &Board, opts: &RenderPayloads<'_>, res: &Resources) {
-    for (idx, item) in board.iter_export_items().enumerate() {
-        let cell = &res.cells[idx];
-        match item {
-            BoardExportItem::Stone(color) => blit_cell(canvas, &res.lut.stone[color], cell),
-            BoardExportItem::Forbidden(_) if opts.enable_forbidden => blit_cell(canvas, &res.lut.forbidden, cell),
-            _ => {}
-        }
-    }
+    // for (idx, item) in board.export_items(&History::default()).enumerate() {
+    //     let cell = &res.cells[idx];
+    //     match item {
+    //         BoardExportItem::Stone(color) => blit_cell(canvas, &res.lut.stone[color], cell),
+    //         BoardExportItem::Forbidden(_) if opts.enable_forbidden => blit_cell(canvas, &res.lut.forbidden, cell),
+    //         _ => {}
+    //     }
+    // }
 
     let offer = &res.lut.offer[board.player_color];
     for pos in opts.offers {

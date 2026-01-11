@@ -8,21 +8,21 @@ use rusty_renju::utils::lang::DurationSchema;
 #[typeshare::typeshare]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Timer {
-    #[typeshare(serialized_as = "DurationSchema")]
-    pub total_remaining: Duration,
+    #[typeshare(serialized_as = "Option<DurationSchema>")]
+    pub total_remaining: Option<Duration>,
     #[typeshare(serialized_as = "DurationSchema")]
     pub increment: Duration,
-    #[typeshare(serialized_as = "DurationSchema")]
-    pub turn: Duration,
+    #[typeshare(serialized_as = "Option<DurationSchema>")]
+    pub turn: Option<Duration>,
 }
 
 impl Default for Timer {
 
     fn default() -> Self {
         Self {
-            total_remaining: Duration::from_secs(60 * 5),
+            total_remaining: Some(Duration::from_secs(60 * 5)),
             increment: Duration::from_secs(0),
-            turn: Duration::from_secs(30),
+            turn: Some(Duration::from_secs(30)),
         }
     }
 
@@ -30,12 +30,12 @@ impl Default for Timer {
 
 impl Timer {
 
-    pub const INFINITE: Self = Self::new(Duration::MAX, Duration::ZERO, Duration::MAX);
+    pub const INFINITE: Self = Self::new(None, Duration::ZERO, None);
 
     pub const fn new(
-        total_time: Duration,
+        total_time: Option<Duration>,
         increment: Duration,
-        turn: Duration,
+        turn: Option<Duration>,
     ) -> Self {
         Self {
             total_remaining: total_time,
@@ -45,19 +45,25 @@ impl Timer {
     }
 
     pub fn is_infinite(&self) -> bool {
-        self.total_remaining == Duration::MAX && self.turn == Duration::MAX
+        self.total_remaining.is_none() && self.turn.is_none()
     }
 
     pub fn consume(&mut self, running_time: Duration) {
-        self.total_remaining = self.total_remaining.saturating_sub(running_time);
+        if let Some(total_remaining) = &mut self.total_remaining {
+            *total_remaining = total_remaining.saturating_sub(running_time);
+        }
     }
 
     pub fn apply_increment(&mut self) {
-        self.total_remaining += self.increment;
+        if let Some(total_remaining) = &mut self.total_remaining {
+            *total_remaining += self.increment;
+        }
     }
 
     pub fn append(&mut self, additional_time: Duration) {
-        self.total_remaining += additional_time;
+        if let Some(total_remaining) = &mut self.total_remaining {
+            *total_remaining += additional_time;
+        }
     }
 
 }
@@ -102,9 +108,11 @@ impl TimeManager {
         if self.timer.is_infinite() {
             None
         } else if self.dynamic_time {
-            Some(self.timer.total_remaining / 20 + self.timer.increment)
+            self.timer.total_remaining
+                .map(|total_remaining| total_remaining / 20 + self.timer.increment)
+                .or(self.timer.turn)
         } else {
-            Some(self.timer.turn)
+            self.timer.turn
         }
     }
 

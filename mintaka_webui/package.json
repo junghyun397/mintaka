@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit --strict",
     "dev:wasm": "pnpm run wasm:package && vite --host",
     "dev": "vite --host",
-    "build": "pnpm run typecheck && pnpm run wasm:package && vite build",
+    "build": "pnpm run wasm:package && pnpm run typecheck && vite build",
     "serve": "pnpm run build && vite preview --host"
   },
   "devDependencies": {

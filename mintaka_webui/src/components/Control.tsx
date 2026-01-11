@@ -111,16 +111,16 @@ function ControlButtons() {
 }
 
 function DashboardButton() {
-    const { setPersistConfig, persistConfig } = useContext(AppContext)!
+    const { appConfig, setAppConfig } = useContext(AppContext)!
 
     const toggleDashboard = () => {
-        setPersistConfig("openDashboard", !persistConfig.openDashboard)
+        setAppConfig("openDashboard", !appConfig.openDashboard)
     }
 
     return <button
         class="btn btn-active btn-square"
         classList={{
-            "btn-active": persistConfig.openDashboard,
+            "btn-active": appConfig.openDashboard,
         }}
         onClick={toggleDashboard}
     >

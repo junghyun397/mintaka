@@ -5,30 +5,30 @@ import type { Config } from "../wasm/pkg/mintaka_wasm"
 import { flatmap } from "../utils/undefined"
 
 export function Dashboard() {
-    const { persistConfig, setPersistConfig } = useContext(AppContext)!
+    const { appConfig, setAppConfig } = useContext(AppContext)!
 
     const closeDashboard = () => {
-        setPersistConfig("openDashboard", false)
+        setAppConfig("openDashboard", false)
     }
 
     return (
         <div
             class="fixed inset-0 z-999"
-            classList={{ "pointer-events-none": !persistConfig.openDashboard }}
+            classList={{ "pointer-events-none": !appConfig.openDashboard }}
         >
             <button
                 class="absolute inset-0 bg-black/40 transition-opacity"
                 classList={{
-                    "opacity-0": !persistConfig.openDashboard,
-                    "opacity-100": persistConfig.openDashboard,
+                    "opacity-0": !appConfig.openDashboard,
+                    "opacity-100": appConfig.openDashboard,
                 }}
                 onClick={closeDashboard}
             />
             <aside
                 class="absolute top-0 left-0 h-full w-80 max-w-[85vw] overflow-y-auto bg-base-200 shadow-lg transition-transform"
                 classList={{
-                    "-translate-x-full": !persistConfig.openDashboard,
-                    "translate-x-0": persistConfig.openDashboard,
+                    "-translate-x-full": !appConfig.openDashboard,
+                    "translate-x-0": appConfig.openDashboard,
                 }}
             >
                 <button

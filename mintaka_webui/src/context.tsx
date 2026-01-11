@@ -41,6 +41,7 @@ type AppContext = {
     readonly maxMintakaConfig: Accessor<Config | undefined>,
 
     readonly appConfig: AppConfig,
+    readonly setAppConfig: SetStoreFunction<AppConfig>,
 }
 
 export const AppContext = createContext<AppContext>()
@@ -56,7 +57,7 @@ export function AppContextProvider(props: ParentProps) {
         appState.gameState, appState.mintakaRuntime, appState.setMintakaRuntime, gameController.applyBestMove,
     )
 
-    const [appConfig, setAppConfig] = createStore<AppConfig>({ autoLaunch: false })
+    const [appConfig, setAppConfig] = createStore<AppConfig>({ autoLaunch: false, openDashboard: false })
 
     const [boardDescribe, setBoardDescribe] = createStore<BoardDescribe>(
         appState.gameState().boardWorker.describe(appState.gameState().historyTree.toHistory()),
@@ -169,6 +170,7 @@ export function AppContextProvider(props: ParentProps) {
             maxMintakaConfig,
 
             appConfig,
+            setAppConfig,
         }}
         children={props.children}
     />

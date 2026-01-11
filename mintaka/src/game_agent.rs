@@ -5,8 +5,8 @@ use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::command::{Command, CompactGameState};
-use crate::protocol::results::{CommandResult, GameResult};
 pub use crate::protocol::response::{ComputingResource, Response, ResponseSender};
+use crate::protocol::results::{CommandResult, GameResult};
 use crate::search::iterative_deepening;
 use crate::state::GameState;
 use crate::thread_data::ThreadData;
@@ -14,6 +14,8 @@ use crate::thread_type::{MainThread, WorkerThread};
 use crate::time::{TimeManager, Timer};
 use crate::utils::time::MonotonicClock;
 use rusty_renju::bitfield::Bitfield;
+use rusty_renju::board::Board;
+use rusty_renju::history::History;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
@@ -25,11 +27,9 @@ use rusty_renju::utils::byte_size::ByteSize;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use rusty_renju::board::Board;
-use rusty_renju::history::History;
 
 #[typeshare::typeshare]
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
@@ -37,10 +37,8 @@ pub struct BestMove {
     pub position_hash: HashKey,
     pub best_move: MaybePos,
     pub score: Score,
-    #[typeshare(serialized_as = "number")]
-    pub selective_depth: u64,
-    #[typeshare(serialized_as = "number")]
-    pub total_nodes_in_1k: u64,
+    pub selective_depth: u32,
+    pub total_nodes_in_1k: u32,
     pub pv: PrincipalVariation,
     #[typeshare(serialized_as = "DurationSchema")]
     pub time_elapsed: Duration,
@@ -237,13 +235,13 @@ impl GameAgent {
                 self.sync_state(*state);
             }
             Command::TurnTime(time) => {
-                self.time_manager.timer.turn = time;
+                self.time_manager.timer.turn = Some(time);
             },
             Command::IncrementTime(time) => {
                 self.time_manager.timer.increment = time;
             },
             Command::TotalTime(time) => {
-                self.time_manager.timer.total_remaining = time;
+                self.time_manager.timer.total_remaining = Some(time);
             },
             Command::ConsumeTime(time) => {
                 self.time_manager.timer.consume(time);
@@ -318,7 +316,7 @@ impl GameAgent {
         let started_time = CLK::now();
 
         aborted.store(false, Ordering::Relaxed);
-        let global_counter_in_1k = Arc::new(AtomicU64::new(0));
+        let global_counter_in_1k = Arc::new(AtomicU32::new(0));
 
         response_sender.response(Response::Begins(computing_resource));
 
@@ -430,7 +428,7 @@ impl GameAgent {
             position_hash: self.state.board.hash_key,
             best_move,
             score,
-            selective_depth: main_td.selective_depth as u64,
+            selective_depth: main_td.selective_depth as u32,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed,
             pv: main_td.root_pv

@@ -1,7 +1,7 @@
 import type { BestMove, CommandResult, ComputingResource, HashKey } from "../wasm/pkg/mintaka_wasm"
 import { HistoryTree } from "./HistoryTree"
 import { MintakaProvider } from "./mintaka.provider"
-import { ResponseBody } from "./mintaka"
+import { StatusResponseBody } from "./mintaka"
 
 class IdleState {
     readonly type: "idle" = "idle"
@@ -33,7 +33,7 @@ abstract class BaseComputingState {
 }
 
 abstract class StreamableComputingState extends BaseComputingState {
-    status(response: ResponseBody): StreamingComputingState {
+    status(response: StatusResponseBody): StreamingComputingState {
         return new StreamingComputingState(this.snapshot, this.historySnapshot, response)
     }
 }
@@ -58,7 +58,7 @@ class BeginsComputingState extends StreamableComputingState {
         readonly resource: ComputingResource,
     ) { super(snapshot, historySnapshot) }
 
-    status(response: ResponseBody): StreamingComputingState {
+    status(response: StatusResponseBody): StreamingComputingState {
         return new StreamingComputingState(this.snapshot, this.historySnapshot, response)
     }
 }
@@ -68,10 +68,10 @@ class StreamingComputingState extends StreamableComputingState {
 
     constructor(
         snapshot: HashKey, historySnapshot: HistoryTree,
-        readonly lastStatus: ResponseBody,
+        readonly lastStatus: StatusResponseBody,
     ) { super(snapshot, historySnapshot) }
 
-    status(response: ResponseBody): StreamingComputingState {
+    status(response: StatusResponseBody): StreamingComputingState {
         return new StreamingComputingState(this.snapshot, this.historySnapshot, response)
     }
 }
@@ -81,7 +81,7 @@ class AbortedComputingState extends BaseComputingState {
 
     constructor(
         snapshot: HashKey, historySnapshot: HistoryTree,
-        readonly resource?: ComputingResource, readonly lastStatus?: ResponseBody,
+        readonly resource?: ComputingResource, readonly lastStatus?: StatusResponseBody,
     ) { super(snapshot, historySnapshot) }
 }
 
