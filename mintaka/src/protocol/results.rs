@@ -1,16 +1,35 @@
 use rusty_renju::impl_debug_from_display;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
+use typeshare::typeshare;
 
-#[typeshare::typeshare]
-#[derive(Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", content = "content")]
+#[typeshare(serialized_as = "GameResultSchema")]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(tag = "type", content = "content"),
+)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum GameResult {
     Win(Color),
     Draw,
     Full
+}
+
+#[cfg(any())]
+mod typeshare_workaround {
+    use super::*;
+    #[typeshare::typeshare]
+    #[derive(Serialize, Deserialize)]
+    #[serde(tag = "type", content = "content")]
+    pub enum GameResultSchema {
+        Win(Color),
+        Draw,
+        Full
+    }
 }
 
 impl Display for GameResult {
@@ -26,7 +45,8 @@ impl Display for GameResult {
 impl_debug_from_display!(GameResult);
 
 #[typeshare::typeshare]
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Copy, Clone)]
 pub struct CommandResult {
     pub hash_key: HashKey,
     pub result: Option<GameResult>,

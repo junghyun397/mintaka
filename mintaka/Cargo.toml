@@ -4,6 +4,7 @@ version = "0.1.0-pre-alpha"
 edition = "2024"
 
 [features]
+serde = ["dep:serde", "rusty_renju/serde"]
 debug-statics = []
 neural-eval = []
 default = []
@@ -12,8 +13,8 @@ default = []
 rusty_renju = {path = "../rusty_renju" }
 rayon = { version = "1.11", optional = true }
 
-serde = { version = "1.0", features = ["derive"] }
-typeshare = "1.0.4"
+serde = { version = "1.0", features = ["derive"], optional = true }
+typeshare = "1.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 lz4 = "1.28"

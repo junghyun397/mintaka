@@ -5,12 +5,14 @@ use rusty_renju::history;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use typeshare::typeshare;
 
 #[typeshare(serialized_as = "String")] // using string to avoid ts enum
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum SearchObjective {
     #[default] Best = 0,
     Zeroing = 1,
@@ -18,8 +20,12 @@ pub enum SearchObjective {
 }
 
 #[typeshare::typeshare]
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(default),
+)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Config {
     pub rule_kind: RuleKind,
     pub draw_condition: u32,

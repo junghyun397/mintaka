@@ -1,4 +1,5 @@
 use crate::board_io::{SYMBOL_BLACK, SYMBOL_WHITE};
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::Not;
@@ -7,7 +8,8 @@ use std::str::FromStr;
 use typeshare::typeshare;
 
 #[typeshare(serialized_as = "ColorSchema")]
-#[derive(std::marker::ConstParamTy, PartialEq, Eq, Clone, Copy, Debug, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(std::marker::ConstParamTy, PartialEq, Eq, Clone, Copy, Debug, Default)]
 #[repr(u8)]
 pub enum Color {
     #[default] Black = 0,
@@ -138,7 +140,8 @@ macro_rules! impl_color_container {
 }
 
 #[typeshare::typeshare]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ColorContainer<T>(pub [T; 2]);
 
 impl_color_container!(ColorContainer);
@@ -151,7 +154,7 @@ impl<T: Copy> Clone for ColorContainer<T> {
 
 impl<T: Copy> Copy for ColorContainer<T> {}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(align(64))]
 pub struct AlignedColorContainer<T>(pub [T; 2]);
 

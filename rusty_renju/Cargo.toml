@@ -4,15 +4,16 @@ version = "0.9.0"
 edition = "2024"
 
 [features]
-default = ["strict_renju"]
+serde = ["dep:serde"]
 strict_renju = []
+default = ["strict_renju"]
 
 [lib]
 name = "rusty_renju"
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"], optional = true }
 rand = "0.9"
 
 typeshare = "1.0"

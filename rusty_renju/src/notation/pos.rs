@@ -1,6 +1,7 @@
 use crate::notation::direction::Direction;
 use crate::utils::str_utils::u8_from_str;
 use crate::{const_for, const_max, impl_debug_from_display};
+#[cfg(feature = "serde")]
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
@@ -179,6 +180,7 @@ impl Display for Pos {
 
 impl_debug_from_display!(Pos);
 
+#[cfg(feature = "serde")]
 impl Serialize for Pos {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         if serializer.is_human_readable() {
@@ -189,6 +191,7 @@ impl Serialize for Pos {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Pos {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         if deserializer.is_human_readable() {
@@ -301,6 +304,7 @@ impl Display for MaybePos {
 
 impl_debug_from_display!(MaybePos);
 
+#[cfg(feature = "serde")]
 impl Serialize for MaybePos {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         match *self {
@@ -310,6 +314,7 @@ impl Serialize for MaybePos {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for MaybePos {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         Option::<Pos>::deserialize(deserializer).map(MaybePos::from)

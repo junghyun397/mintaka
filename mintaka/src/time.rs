@@ -1,4 +1,5 @@
 use rusty_renju::notation::pos::MaybePos;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -6,7 +7,8 @@ use std::time::Duration;
 use rusty_renju::utils::lang::DurationSchema;
 
 #[typeshare::typeshare]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Timer {
     #[typeshare(serialized_as = "Option<DurationSchema>")]
     pub total_remaining: Option<Duration>,
@@ -68,7 +70,8 @@ impl Timer {
 
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug)]
 pub struct TimeManager {
     pub timer: Timer,
     pub time_history: Vec<(MaybePos, Duration)>,

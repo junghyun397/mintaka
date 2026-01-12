@@ -2,7 +2,8 @@ use crate::movegen::movegen_window::MovegenWindow;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use serde::{Deserialize, Serialize, Serializer};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize, Deserializer, Serializer};
 use typeshare::typeshare;
 
 #[typeshare(serialized_as = "GameStateData")]
@@ -132,12 +133,13 @@ impl From<History> for GameState {
 }
 
 #[typeshare::typeshare]
-#[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct GameStateData {
     board: Board,
     history: History,
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for GameState {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         GameStateData {
@@ -147,8 +149,9 @@ impl Serialize for GameState {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for GameState {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         let data = GameStateData::deserialize(deserializer)?;
 
         Ok(GameState {

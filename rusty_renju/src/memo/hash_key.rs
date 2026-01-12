@@ -4,6 +4,7 @@ use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::slice::Slice;
 use crate::{cartesian_to_index, impl_debug_from_display};
+#[cfg(feature = "serde")]
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -78,6 +79,7 @@ impl Display for HashKey {
 
 impl_debug_from_display!(HashKey);
 
+#[cfg(feature = "serde")]
 impl Serialize for HashKey {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         if serializer.is_human_readable() {
@@ -88,6 +90,7 @@ impl Serialize for HashKey {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for HashKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         if deserializer.is_human_readable() {

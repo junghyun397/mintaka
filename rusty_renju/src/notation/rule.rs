@@ -1,8 +1,10 @@
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 #[typeshare(serialized_as = "String")] // using string to avoid ts enum
-#[derive(std::marker::ConstParamTy, Default, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(std::marker::ConstParamTy, Default, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum RuleKind {
     Gomoku = 0,
     #[default] Renju = 1
@@ -27,7 +29,8 @@ impl RuleKind {
 }
 
 #[typeshare(serialized_as = "String")] // using string to avoid ts enum
-#[derive(PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum ForbiddenKind {
     DoubleThree = 1,
     DoubleFour = 2,

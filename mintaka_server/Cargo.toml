@@ -4,8 +4,8 @@ version = "0.9.0"
 edition = "2024"
 
 [dependencies]
-rusty_renju = { path = "../rusty_renju" }
-mintaka = { path = "../mintaka" }
+rusty_renju = { path = "../rusty_renju", features = ["serde"] }
+mintaka = { path = "../mintaka", features = ["serde"] }
 
 typeshare = "1.0"
 

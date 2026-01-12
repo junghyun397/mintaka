@@ -1,4 +1,4 @@
-use crate::rusty_renju::{Board, BoardWorker, History, Pos};
+use crate::rusty_renju::{Board, BoardWorker, Color, History, Pos};
 use crate::{impl_wrapper, to_js_value, try_from_js_value};
 use std::cmp::Ordering;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -46,8 +46,8 @@ pub fn compare_config(a: Config, b: Config) -> isize {
 }
 
 #[wasm_bindgen(js_name = calculateNormEval)]
-pub fn calculate_norm_eval(score: Score) -> JsValue {
-    0.into()
+pub fn calculate_norm_eval(score: Score, color: Color) -> f32 {
+    0.0
 }
 
 impl_wrapper! {

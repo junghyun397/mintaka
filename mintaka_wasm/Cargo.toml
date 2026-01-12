@@ -20,8 +20,8 @@ crate-type = ["cdylib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-rusty_renju = { path = "../rusty_renju" }
-mintaka = { path = "../mintaka" }
+rusty_renju = { path = "../rusty_renju", features = ["serde"] }
+mintaka = { path = "../mintaka", features = ["serde"] }
 
 serde = "1.0"
 

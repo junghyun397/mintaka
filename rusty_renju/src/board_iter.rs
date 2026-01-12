@@ -6,8 +6,10 @@ use crate::notation::pos::Pos;
 use crate::notation::rule::ForbiddenKind;
 use crate::pattern::Pattern;
 use crate::{index_to_col, index_to_row};
-use serde::{Deserialize, Serialize};
 use std::array;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
 #[repr(u64)]
 #[derive(Copy, Clone)]
@@ -16,17 +18,35 @@ pub enum BoardIterItem {
     Pattern(ColorContainer<Pattern>),
 }
 
-#[typeshare::typeshare]
-#[derive(Copy, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "content")]
+#[typeshare(serialized_as = "BoardExportItemSchema")]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(tag = "type", content = "content"),
+)]
+#[derive(Copy, Clone)]
 pub enum BoardExportItem {
     Stone(BoardExportStone),
     Empty,
     Forbidden(ForbiddenKind)
 }
 
+#[cfg(any())]
+mod typeshare_workaround {
+    use super::*;
+    #[typeshare::typeshare]
+    #[derive(Serialize, Deserialize)]
+    #[serde(tag = "type", content = "content")]
+    pub enum BoardExportItemSchema {
+        Stone(BoardExportStone),
+        Empty,
+        Forbidden(ForbiddenKind)
+    }
+}
+
 #[typeshare::typeshare]
-#[derive(Copy, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone)]
 pub struct BoardExportStone {
     pub color: Color,
     pub sequence: u8,

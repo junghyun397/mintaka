@@ -4,7 +4,8 @@ use crate::impl_debug_from_display;
 use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize, Deserializer, Serializer};
 use std::fmt::{Debug, Display, Formatter};
 use std::iter;
 use std::ops::{Index, IndexMut};
@@ -320,14 +321,16 @@ impl TryFrom<&Board> for History {
     }
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for History {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         serializer.collect_seq(self.iter())
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for History {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         let vector = Vec::<MaybePos>::deserialize(deserializer)?;
         let top = vector.len();
 

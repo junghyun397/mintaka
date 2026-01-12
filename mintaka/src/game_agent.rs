@@ -24,15 +24,18 @@ use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::Score;
 use rusty_renju::utils::byte_size::ByteSize;
+#[cfg(feature = "serde")]
 use serde::ser::SerializeStruct;
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize, Deserializer, Serializer};
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
 #[typeshare::typeshare]
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Copy, Clone)]
 pub struct BestMove {
     pub position_hash: HashKey,
     pub best_move: MaybePos,
@@ -458,8 +461,9 @@ impl GameAgent {
 
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for GameAgent {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         let mut state = serializer.serialize_struct("GameAgent", 6)?;
         state.serialize_field("config", &self.config)?;
         state.serialize_field("state", &self.state)?;
@@ -471,8 +475,9 @@ impl Serialize for GameAgent {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for GameAgent {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         #[derive(Deserialize)]
         struct GameAgentData {
             config: Config,

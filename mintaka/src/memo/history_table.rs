@@ -5,6 +5,7 @@ use rusty_renju::history::History;
 use rusty_renju::notation::color::{Color, ColorContainer};
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos, PosList};
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize, Serializer};
 
 pub type QuietPlied = PosList<{ 256 - 8 }>;
@@ -77,30 +78,43 @@ impl HistoryTable {
 
 }
 
-#[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct HistoryTableData {
-    #[serde(
-        serialize_with = "crate::utils::serde::serialize_array",
-        deserialize_with = "crate::utils::serde::deserialize_array"
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            serialize_with = "crate::utils::serde::serialize_array",
+            deserialize_with = "crate::utils::serde::deserialize_array"
+        ),
     )]
     quiet: [u8; 2 * pos::BOARD_SIZE * 2],
-    #[serde(
-        serialize_with = "crate::utils::serde::serialize_array",
-        deserialize_with = "crate::utils::serde::deserialize_array"
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            serialize_with = "crate::utils::serde::serialize_array",
+            deserialize_with = "crate::utils::serde::deserialize_array"
+        ),
     )]
     three: [u8; 2 * pos::BOARD_SIZE * 2],
-    #[serde(
-        serialize_with = "crate::utils::serde::serialize_array",
-        deserialize_with = "crate::utils::serde::deserialize_array"
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            serialize_with = "crate::utils::serde::serialize_array",
+            deserialize_with = "crate::utils::serde::deserialize_array"
+        ),
     )]
     four: [u8; 2 * pos::BOARD_SIZE * 2],
-    #[serde(
-        serialize_with = "crate::utils::serde::serialize_array",
-        deserialize_with = "crate::utils::serde::deserialize_array"
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            serialize_with = "crate::utils::serde::serialize_array",
+            deserialize_with = "crate::utils::serde::deserialize_array"
+        ),
     )]
     counter: [u8; pos::BOARD_SIZE * 2],
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for HistoryTable {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         let data = unsafe { HistoryTableData {
@@ -114,6 +128,7 @@ impl Serialize for HistoryTable {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for HistoryTable {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
         let data = HistoryTableData::deserialize(deserializer)?;

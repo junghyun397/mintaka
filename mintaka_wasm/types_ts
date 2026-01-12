@@ -18,11 +18,58 @@ export interface BoardData {
 
 export type Board = BoardData;
 
+export type BoardExportItemSchema = 
+	| { type: "Stone", content: BoardExportStone }
+	| { type: "Empty", content?: undefined }
+	| { type: "Forbidden", content: ForbiddenKind };
+
+export type BoardExportItem = BoardExportItemSchema;
+
 export type ByteSize = number;
+
+export type CommandSchema = 
+	| { type: "Clear", content?: undefined }
+	| { type: "Load", content: CompactGameState }
+	| { type: "Sync", content: CompactGameState }
+	| { type: "Play", content: MaybePos }
+	| { type: "Set", content: {
+	pos: Pos;
+	color: Color;
+}}
+	| { type: "Unset", content: {
+	pos: Pos;
+	color: Color;
+}}
+	| { type: "Undo", content?: undefined }
+	| { type: "BatchSet", content: {
+	player_moves: Pos[];
+	opponent_moves: Pos[];
+}}
+	| { type: "TurnTime", content: DurationSchema }
+	| { type: "IncrementTime", content: DurationSchema }
+	| { type: "TotalTime", content: DurationSchema }
+	| { type: "ConsumeTime", content: DurationSchema }
+	| { type: "Pondering", content: boolean }
+	| { type: "MaxNodes", content: {
+	in_1k: number;
+}}
+	| { type: "Workers", content: number }
+	| { type: "MaxMemory", content: ByteSize }
+	| { type: "Rule", content: RuleKind }
+	| { type: "Config", content: Config };
+
+export type Command = CommandSchema;
 
 export type Depth = number;
 
 export type ForbiddenKind = string;
+
+export type GameResultSchema = 
+	| { type: "Win", content: Color }
+	| { type: "Draw", content?: undefined }
+	| { type: "Full", content?: undefined };
+
+export type GameResult = GameResultSchema;
 
 export type Pos = PosSchema;
 
@@ -38,6 +85,19 @@ export interface GameStateData {
 export type GameState = GameStateData;
 
 export type PrincipalVariation = MaybePos[];
+
+export type ResponseSchema = 
+	| { type: "Begins", content: ComputingResource }
+	| { type: "Status", content: {
+	hash: HashKey;
+	best_move: MaybePos;
+	score: Score;
+	selective_depth: Depth;
+	total_nodes_in_1k: number;
+	pv: PrincipalVariation;
+}};
+
+export type Response = ResponseSchema;
 
 export type RuleKind = string;
 
@@ -62,11 +122,6 @@ export interface BestMove {
 	time_elapsed: DurationSchema;
 }
 
-export type BoardExportItem = 
-	| { type: "Stone", content: BoardExportStone }
-	| { type: "Empty", content?: undefined }
-	| { type: "Forbidden", content: ForbiddenKind };
-
 export interface BoardDescribe {
 	hash_key: HashKey;
 	player_color: Color;
@@ -77,11 +132,6 @@ export interface BoardExportStone {
 	color: Color;
 	sequence: number;
 }
-
-export type GameResult = 
-	| { type: "Win", content: Color }
-	| { type: "Draw", content?: undefined }
-	| { type: "Full", content?: undefined };
 
 export interface CommandResult {
 	hash_key: HashKey;
@@ -119,46 +169,4 @@ export interface Config {
 	initial_timer: Timer;
 	spawn_depth_specialist: boolean;
 }
-
-export type Command = 
-	| { type: "Clear", content?: undefined }
-	| { type: "Load", content: CompactGameState }
-	| { type: "Sync", content: CompactGameState }
-	| { type: "Play", content: MaybePos }
-	| { type: "Set", content: {
-	pos: Pos;
-	color: Color;
-}}
-	| { type: "Unset", content: {
-	pos: Pos;
-	color: Color;
-}}
-	| { type: "Undo", content?: undefined }
-	| { type: "BatchSet", content: {
-	player_moves: Pos[];
-	opponent_moves: Pos[];
-}}
-	| { type: "TurnTime", content: DurationSchema }
-	| { type: "IncrementTime", content: DurationSchema }
-	| { type: "TotalTime", content: DurationSchema }
-	| { type: "ConsumeTime", content: DurationSchema }
-	| { type: "Pondering", content: boolean }
-	| { type: "MaxNodes", content: {
-	in_1k: number;
-}}
-	| { type: "Workers", content: number }
-	| { type: "MaxMemory", content: ByteSize }
-	| { type: "Rule", content: RuleKind }
-	| { type: "Config", content: Config };
-
-export type Response = 
-	| { type: "Begins", content: ComputingResource }
-	| { type: "Status", content: {
-	hash: HashKey;
-	best_move: MaybePos;
-	score: Score;
-	selective_depth: Depth;
-	total_nodes_in_1k: number;
-	pv: PrincipalVariation;
-}};
 

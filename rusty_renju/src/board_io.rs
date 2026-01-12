@@ -10,6 +10,7 @@ use crate::notation::pos::{MaybePos, Pos};
 use crate::pattern::Pattern;
 use crate::slice::Slice;
 use crate::utils::str_utils::join_str_horizontally;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -30,7 +31,7 @@ enum BoardElement {
 }
 
 #[typeshare::typeshare]
-#[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BoardDescribe {
     pub hash_key: HashKey,
     pub player_color: Color,
@@ -357,13 +358,14 @@ impl Display for Slice {
 }
 
 #[typeshare::typeshare]
-#[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct BoardData {
     hash_key: HashKey,
     player_color: Color,
     bitfield: ColorContainer<Bitfield>,
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for Board {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         BoardData {
@@ -374,6 +376,7 @@ impl Serialize for Board {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Board {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         let data = BoardData::deserialize(deserializer)?;

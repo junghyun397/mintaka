@@ -1,6 +1,7 @@
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::{assert_struct_sizes, impl_debug_from_display};
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
@@ -280,12 +281,14 @@ impl Display for Bitfield {
 
 impl_debug_from_display!(Bitfield);
 
+#[cfg(feature = "serde")]
 impl Serialize for Bitfield {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         serializer.serialize_bytes(&self.0)
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Bitfield {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
         Ok(Self(Deserialize::deserialize(deserializer)?))

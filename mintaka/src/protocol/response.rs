@@ -4,11 +4,14 @@ use crate::value::Depth;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::score::Score;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 use rusty_renju::utils::byte_size::ByteSize;
 
 #[typeshare::typeshare]
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Copy, Clone)]
 pub struct ComputingResource {
     pub workers: u32,
     pub tt_size: ByteSize,
@@ -17,9 +20,13 @@ pub struct ComputingResource {
     pub nodes_in_1k: Option<u32>,
 }
 
-#[typeshare::typeshare]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "content")]
+#[typeshare(serialized_as = "ResponseSchema")]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(tag = "type", content = "content"),
+)]
+#[derive(Debug, Clone)]
 pub enum Response {
     Begins(ComputingResource),
     Status {
@@ -30,6 +37,25 @@ pub enum Response {
         total_nodes_in_1k: u32,
         pv: PrincipalVariation,
     },
+}
+
+#[cfg(any())]
+mod typeshare_workaround {
+    use super::*;
+    #[typeshare::typeshare]
+    #[derive(Serialize, Deserialize)]
+    #[serde(tag = "type", content = "content")]
+    pub enum ResponseSchema {
+        Begins(ComputingResource),
+        Status {
+            hash: HashKey,
+            best_move: MaybePos,
+            score: Score,
+            selective_depth: Depth,
+            total_nodes_in_1k: u32,
+            pv: PrincipalVariation,
+        },
+    }
 }
 
 pub trait ResponseSender: Send {

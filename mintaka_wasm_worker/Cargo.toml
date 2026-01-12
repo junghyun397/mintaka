@@ -20,7 +20,7 @@ crate-type = ["cdylib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-mintaka = { path = "../mintaka", features = ["rayon"] }
+mintaka = { path = "../mintaka", features = ["serde", "rayon"] }
 
 serde = "1.0"
 

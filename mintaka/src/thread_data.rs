@@ -12,16 +12,19 @@ use crate::value::Depth;
 use crate::{params, value};
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::{Score, Scores};
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct RootMove {
     pub score: RootScore,
     pub nodes_in_1k: usize,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum RootScore {
     Exact(Score),
     FailHigh,

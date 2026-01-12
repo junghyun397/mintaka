@@ -1,6 +1,7 @@
 use crate::value::MAX_PLY;
 use rusty_renju::impl_debug_from_display;
 use rusty_renju::notation::pos::MaybePos;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::{Display, Formatter};
 use typeshare::typeshare;
@@ -45,12 +46,14 @@ impl Display for PrincipalVariation {
 
 impl_debug_from_display!(PrincipalVariation);
 
+#[cfg(feature = "serde")]
 impl Serialize for PrincipalVariation {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
         serializer.collect_seq(self.moves())
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for PrincipalVariation {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         let vec = Vec::<MaybePos>::deserialize(deserializer)?;
