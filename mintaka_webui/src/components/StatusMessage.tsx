@@ -26,9 +26,9 @@ export function StatusMessage() {
             return "Engine is started thinking..."
 
         if (status === "streaming")
-            return `Engine is thinking now. ${nodes()}K nodes visited, up to ${remainingTime()} seconds remaining...`
+            return `Thinking: ${nodes()}K nodes visited, up to ${remainingTime()}s remaining...`
 
-        if (status === "aborted")
+        if (status === "aborting")
             return "Engine is stopping the current analysis..."
 
         return ""

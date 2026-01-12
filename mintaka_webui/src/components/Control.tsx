@@ -17,9 +17,7 @@ export function Control() {
 }
 
 function ControlButtons() {
-    const { gameActions, appConfig, gameState, runtimeState } = useContext(AppContext)!
-
-    const inComputing = createMemo(() => runtimeState()?.type !== "idle")
+    const { gameActions, appConfig, gameState, runtimeState, runtimeSelectors } = useContext(AppContext)!
 
     const inBranchHead = createMemo(() => gameState().historyTree.inBranchHead)
     const forwardable = createMemo(() => gameState().historyTree.forwardable)
@@ -41,7 +39,7 @@ function ControlButtons() {
             <IconChevronLeft />
         </button>
         <Switch>
-            <Match when={inComputing()}>
+            <Match when={runtimeSelectors.inComputing()}>
                 <button
                     class="btn btn-square animate-pulse"
                     onClick={gameActions.abort}
@@ -49,7 +47,7 @@ function ControlButtons() {
                     <IconStop />
                 </button>
             </Match>
-            <Match when={appConfig.autoLaunch && !inComputing()}>
+            <Match when={appConfig.autoLaunch && !runtimeSelectors.inComputing()}>
                 <button
                     class="btn btn-square"
                     onClick={gameActions.pause}
@@ -57,7 +55,7 @@ function ControlButtons() {
                     <IconPause />
                 </button>
             </Match>
-            <Match when={!appConfig.autoLaunch && !inComputing()}>
+            <Match when={!appConfig.autoLaunch && !runtimeSelectors.inComputing()}>
                 <button
                     class="btn btn-square"
                     classList={{ "btn-disabled": runtimeState() === undefined }}

@@ -7,3 +7,7 @@ export function filter<T, S extends T>(value: T | undefined, predict: (valid: T)
     if (value !== undefined && predict(value)) return value
     else return undefined
 }
+
+export function isSomeAnd<T>(value: T | undefined, predict: (valid: T) => boolean): boolean {
+    return value !== undefined && predict(value)
+}

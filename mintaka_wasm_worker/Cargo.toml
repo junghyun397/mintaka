@@ -17,7 +17,8 @@ wasm-opt = [
 crate-type = ["cdylib"]
 
 [features]
-default = ["console_error_panic_hook"]
+console_error_panic_hook = ["dep:console_error_panic_hook"]
+default = []
 
 [dependencies]
 mintaka = { path = "../mintaka", features = ["serde", "rayon"] }

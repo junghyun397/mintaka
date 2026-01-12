@@ -1,9 +1,28 @@
-## ADT const params
+## Rust
+
+### Portable SIMD
+
+### ADT const params
 Optimal code:
 ```rust
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default)]
+#[repr(u8)]
+pub enum Color {
+    #[default] Black = 0,
+    White = 1,
+}
 ```
+Current workaround:
+```rust
+#![feature(adt_const_params)] // nightly feature
 
-## Portable SIMD
+#[derive(std::marker::ConstParamTy, PartialEq, Eq, Clone, Copy, Debug, Default)]
+#[repr(u8)]
+pub enum Color {
+    #[default] Black = 0,
+    White = 1,
+}
+```
 
 ## typeshare and proc_macro attribute bug
 Optimal code:
@@ -22,16 +41,19 @@ pub enum Response {
 Current workaround:
 ```rust
 #[typeshare(serialized_as = "CommandSchema")]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde", 
+    derive(Serialize, Deserialize),
+    serde(tag = "type", content = "content"),
+)]
 #[derive(Debug, Clone)]
 pub enum Response {
     Begins(ComputingResource),
 }
 
 #[cfg(any())]
-mod typeshare_workarounds {
+mod typeshare_workaround {
     use super::*;
-    #[cfg(feature = "serde")]
     #[typeshare::typeshare]
     #[derive(Serialize, Deserialize)]
     #[serde(tag = "type", content = "content")]

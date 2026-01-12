@@ -5,9 +5,7 @@ import { range } from "../utils/array"
 import { filter } from "../utils/undefined"
 
 export function Board() {
-    const { boardDescribe, gameState, runtimeState } = useContext(AppContext)!
-
-    const inComputing = createMemo(() => runtimeState()?.type !== "idle")
+    const { boardDescribe, gameState, runtimeSelectors } = useContext(AppContext)!
 
     const lastSequence = createMemo(() => gameState().historyTree.length)
     const prevSequence = createMemo(() => lastSequence() - 1)
@@ -55,8 +53,8 @@ export function Board() {
                 "
                 classList={{
                     "[&_button.forbidden]:cursor-not-allowed": boardDescribe.player_color === "Black",
-                    "[&_button]:cursor-wait": inComputing(),
-                    "[&_button.stone]:cursor-auto [&_button]:cursor-crosshair": !inComputing(),
+                    "[&_button]:cursor-wait": runtimeSelectors.inComputing(),
+                    "[&_button.stone]:cursor-auto [&_button]:cursor-crosshair": !runtimeSelectors.inComputing(),
                 }}
             >
                 <Index each={range(0, 15 * 15)}>{position =>

@@ -1,4 +1,4 @@
-import type { Command, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
+import type { Board, Command, Config, GameState, HashKey, History, SearchObjective } from "../wasm/pkg/mintaka_wasm"
 import { defaultConfig } from "../wasm/pkg/mintaka_wasm"
 import { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand, MintakaProviderType } from "./mintaka.provider"
 import { duration, InfiniteDuration } from "./mintaka"
@@ -55,7 +55,7 @@ export class MintakaWorkerProvider implements MintakaProvider {
     private onResponse?: (message: MintakaProviderResponse) => void
     private onError?: (error: any) => void
 
-    constructor(gameState: GameState, config?: Config) {
+    constructor(board: Board, history: History, config?: Config) {
         this.worker = new Worker(
             new URL("mintaka.worker.ts", import.meta.url),
             { type: "module" },
@@ -79,7 +79,7 @@ export class MintakaWorkerProvider implements MintakaProvider {
             this.onError && this.onError(event)
         }
 
-        this.postMessage({ type: "init", config: config ?? this.defaultConfig, state: gameState })
+        this.postMessage({ type: "init", config: config ?? this.defaultConfig, state: { board, history } })
     }
 
     subscribeResponse(handler: (response: MintakaProviderResponse) => void) {

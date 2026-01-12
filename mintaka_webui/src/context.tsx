@@ -1,7 +1,7 @@
 import { Accessor, createContext, createEffect, createMemo, onCleanup, onMount, ParentProps } from "solid-js"
 import { createStore, reconcile, SetStoreFunction, unwrap } from "solid-js/store"
 import { ForwardMethod } from "./domain/HistoryTree"
-import { BoardDescribe, Config, defaultConfig, Pos } from "./wasm/pkg/mintaka_wasm"
+import { BoardDescribe, Config, defaultConfig, HashKey, Pos } from "./wasm/pkg/mintaka_wasm"
 import { PersistConfig, defaultPersistConfig, Theme } from "./stores/persist.config"
 import { makePersisted } from "@solid-primitives/storage"
 import { AppConfig } from "./stores/app.config"
@@ -9,11 +9,20 @@ import { createGameController } from "./controllers/game.controller"
 import { createProviderController, RequireProviderReady } from "./controllers/runtime.controller"
 import { AppGameState, createAppState } from "./stores/app.state"
 import { MintakaRuntimeState } from "./domain/mintaka.runtime"
+import { isSomeAnd } from "./utils/undefined"
 
 interface AppActions {
     readonly syncConfig: (config: Config) => RequireProviderReady,
     readonly resetConfig: () => RequireProviderReady,
     readonly clearAppData: () => void,
+}
+
+interface AppSelectors {
+    readonly selectNormEval: (hash: HashKey) => number | undefined,
+}
+
+interface RuntimeSelectors {
+    readonly inComputing: () => boolean,
 }
 
 interface GameActions {
@@ -29,6 +38,8 @@ interface GameActions {
 
 type AppContext = {
     readonly appActions: AppActions,
+    readonly appSelectors: AppSelectors,
+    readonly runtimeSelectors: RuntimeSelectors,
     readonly gameActions: GameActions,
 
     readonly gameState: Accessor<AppGameState>,
@@ -54,7 +65,7 @@ export function AppContextProvider(props: ParentProps) {
     const gameController = createGameController(appState.gameState, appState.setGameState)
 
     const providerController = createProviderController(
-        appState.gameState, appState.mintakaRuntime, appState.setMintakaRuntime, gameController.applyBestMove,
+        appState.mintakaRuntime, appState.setMintakaRuntime, gameController.applyBestMove,
     )
 
     const [appConfig, setAppConfig] = createStore<AppConfig>({ autoLaunch: false, openDashboard: false })
@@ -70,6 +81,9 @@ export function AppContextProvider(props: ParentProps) {
     })
 
     const maxMintakaConfig = createMemo(() => appState.mintakaRuntime()?.provider.maxConfig)
+    const inComputing = createMemo(() =>
+        isSomeAnd(appState.mintakaRuntime()?.state?.type, valid => valid !== "idle"),
+    )
 
     const gameActions: GameActions = {
         play: (pos) => {
@@ -80,11 +94,11 @@ export function AppContextProvider(props: ParentProps) {
 
             if (playResponse !== "ok") return
 
-            providerController.syncPlay(pos)
+            providerController.syncPlay(appState.gameState().boardWorker.hashKey(), pos)
 
             if (!appConfig.autoLaunch) return
 
-            providerController.launch(appState.gameState().boardWorker.hashKey(), appState.gameState().historyTree)
+            providerController.launch(appState.gameState().boardWorker.value(), appState.gameState().historyTree)
         },
         forward: (method) => {
             const response = gameController.forward(method)
@@ -111,7 +125,8 @@ export function AppContextProvider(props: ParentProps) {
                 throw new Error(response)
         },
         start: () => {
-            const response = providerController.launch(appState.gameState().boardWorker.hashKey(), appState.gameState().historyTree)
+            const response =
+                providerController.launch(appState.gameState().boardWorker.value(), appState.gameState().historyTree)
 
             if (response === "ok") {
                 setAppConfig("autoLaunch", true)
@@ -151,17 +166,26 @@ export function AppContextProvider(props: ParentProps) {
         },
     }
 
-    const runtimeState = () => appState.mintakaRuntime()?.state
+    const appSelectors: AppSelectors = {
+        selectNormEval: (hash) => appState.normEvalTable.get(hash),
+    }
+
+    const runtimeSelectors: RuntimeSelectors = {
+        inComputing,
+    }
 
     providerController.loadRuntime(unwrap(persistConfig))
 
     return <AppContext.Provider
         value={{
             appActions,
+            appSelectors,
+            runtimeSelectors,
+
             gameActions,
 
             gameState: appState.gameState,
-            runtimeState,
+            runtimeState: () => appState.mintakaRuntime()?.state,
 
             boardDescribe,
 

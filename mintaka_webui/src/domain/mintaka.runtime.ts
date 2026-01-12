@@ -27,8 +27,8 @@ abstract class BaseComputingState {
         return new IdleState(this.snapshot, bestMove)
     }
 
-    abort(): AbortedComputingState {
-        return new AbortedComputingState(this.snapshot, this.historySnapshot)
+    abort(): AbortingComputingState {
+        return new AbortingComputingState(this.snapshot, this.historySnapshot)
     }
 }
 
@@ -76,8 +76,8 @@ class StreamingComputingState extends StreamableComputingState {
     }
 }
 
-class AbortedComputingState extends BaseComputingState {
-    readonly type: "aborted" = "aborted"
+class AbortingComputingState extends BaseComputingState {
+    readonly type: "aborting" = "aborting"
 
     constructor(
         snapshot: HashKey, historySnapshot: HistoryTree,
@@ -85,7 +85,7 @@ class AbortedComputingState extends BaseComputingState {
     ) { super(snapshot, historySnapshot) }
 }
 
-export type MintakaRuntimeState = IdleState | LaunchedComputingState | BeginsComputingState | StreamingComputingState | AbortedComputingState
+export type MintakaRuntimeState = IdleState | LaunchedComputingState | BeginsComputingState | StreamingComputingState | AbortingComputingState
 
 export type MintakaRuntime = {
     readonly provider: MintakaProvider,
