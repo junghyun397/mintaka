@@ -3,17 +3,15 @@ import type { Command, CommandResult, Config, GameState, HashKey, SearchObjectiv
 
 export class MintakaServerConfig {
     readonly address: string
-    readonly port: number
-    readonly apiPassword?: string
+    private readonly apiPassword?: string
 
-    constructor(address: string, port: number, apiPassword?: string) {
+    constructor(address: string, apiPassword?: string) {
         this.address = address
-        this.port = port
         this.apiPassword = apiPassword
     }
 
     get url() {
-        return `${this.address}:${this.port}`
+        return this.address
     }
 
     headers = (extra?: HeadersInit) => {
@@ -24,8 +22,6 @@ export class MintakaServerConfig {
         return headers
     }
 }
-
-export const LocalHostServerConfig = new MintakaServerConfig("http://localhost", 8080, "test")
 
 export type MintakaServerSession = {
     readonly sid: string,
@@ -165,10 +161,6 @@ export class MintakaServerProvider implements MintakaProvider {
         this.closeStream()
 
         const streamUrl = new URL(`${this.serverConfig.url}/sessions/${this.session.sid}/stream`)
-
-        if (this.serverConfig.apiPassword) {
-            streamUrl.searchParams.set("api_password", this.serverConfig.apiPassword)
-        }
 
         const eventSource = new EventSource(streamUrl.toString())
         this.eventSource = eventSource

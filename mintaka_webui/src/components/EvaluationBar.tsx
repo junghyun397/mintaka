@@ -3,15 +3,15 @@ import { AppContext } from "../context"
 import { calculateNormEval } from "../wasm/pkg/mintaka_wasm"
 
 export function RootEvaluationBar() {
-    const { appSelectors, boardDescribe, runtimeState } = useContext(AppContext)!
+    const { appSelectors, gameSelectors, runtimeSelectors } = useContext(AppContext)!
 
     const currentNormEval = createMemo(() => {
-        const runtime = runtimeState()
+        const runtime = runtimeSelectors.runtimeState()
 
-        if (runtime != undefined && runtime.type === "streaming")
-            return calculateNormEval(runtime.lastStatus.score, boardDescribe.player_color)
+        if (runtime !== undefined && runtime.type === "streaming")
+            return calculateNormEval(runtime.lastStatus.score, gameSelectors.boardDescribe.player_color)
 
-        return appSelectors.selectNormEval(boardDescribe.hash_key)
+        return appSelectors.selectNormEval(gameSelectors.boardDescribe.hash_key)
     })
 
     return <div class="mx-auto w-full max-w-90">

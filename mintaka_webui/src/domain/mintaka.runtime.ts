@@ -87,11 +87,6 @@ class AbortingComputingState extends BaseComputingState {
 
 export type MintakaRuntimeState = IdleState | LaunchedComputingState | BeginsComputingState | StreamingComputingState | AbortingComputingState
 
-export type MintakaRuntime = {
-    readonly provider: MintakaProvider,
-    readonly state: MintakaRuntimeState,
-}
-
 export function buildMintakaRuntime(snapshot: HashKey) {
     return new IdleState(snapshot)
 }

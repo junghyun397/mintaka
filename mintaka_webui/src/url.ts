@@ -1,27 +1,45 @@
-import { HistorySource } from "./domain/HistoryTree"
+import { History } from "./wasm/pkg/mintaka_wasm"
+import { historyToString, parseHistory } from "./domain/rusty-renju"
+import { Accessor, createEffect } from "solid-js"
 
-type UrlParams = {
-    readonly historySource?: HistorySource,
-    readonly viewer?: true,
+export type UrlParams = {
+    readonly moves: History | undefined,
+    readonly viewer: boolean,
 }
 
-function parserUrlParams(): UrlParams {
+export function parseUrlParams(): UrlParams {
     const params = new URLSearchParams(window.location.search)
 
-    const moves = params.get("moves")
-    const history = params.get("history")
-    const historyTree = params.get("history-tree")
-    const viewer = params.get("viewer")
+    const movesSource = params.get("moves")
 
-    return { }
+    return {
+        viewer: params.has("viewer"),
+        moves: movesSource === null ? undefined : parseHistory(movesSource),
+    }
 }
 
-function pushUrlParams(params: UrlParams) {
+export function pushUrlParams(params: UrlParams) {
     const url = new URL(window.location.href)
 
-    if (params.viewer) {
-        url.searchParams.set("viewer", "true")
-    }
+    if (params.viewer)
+        url.searchParams.set("viewer", "")
+    else
+        url.searchParams.delete("viewer")
 
-    window.history.replaceState({}, "", url.toString())
+    const stringHistory = params.moves === undefined ? undefined : historyToString(params.moves)
+    if (stringHistory === undefined)
+        url.searchParams.delete("moves")
+    if (stringHistory !== undefined)
+        url.searchParams.set("moves", stringHistory)
+
+    window.history.replaceState({}, "", url)
+}
+
+export function setupUrlSync(history: Accessor<History>, viewer: Accessor<boolean>) {
+    createEffect(() => {
+        pushUrlParams({
+            moves: history(),
+            viewer: viewer(),
+        })
+    })
 }

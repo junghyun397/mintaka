@@ -2,7 +2,8 @@ import { createMemo, Match, Show, Switch, useContext } from "solid-js"
 import { AppContext } from "../context"
 import {
     IconArrowUturnRight, IconChevronDoubleLeft, IconChevronDoubleRight, IconChevronLeft, IconChevronRight,
-    IconCog8Tooth, IconCpuChip, IconGitBranch, IconInformationCircle, IconMagnifyingGlassMinus, IconMagnifyingGlassPlus,
+    IconCog8Tooth, IconCpuChip,
+    IconDocument, IconGitBranch, IconInformationCircle, IconMagnifyingGlassMinus, IconMagnifyingGlassPlus,
     IconMoon, IconPause, IconPlay, IconStop, IconSun, IconThemeAuto,
 } from "./icons"
 import { nextHistoryDisplay, nextTheme } from "../stores/persist.config"
@@ -17,20 +18,29 @@ export function Control() {
 }
 
 function ControlButtons() {
-    const { gameActions, appConfig, gameState, runtimeState, runtimeSelectors } = useContext(AppContext)!
+    const { gameActions, appConfig, gameSelectors, runtimeSelectors } = useContext(AppContext)!
 
-    const inBranchHead = createMemo(() => gameState().historyTree.inBranchHead)
-    const forwardable = createMemo(() => gameState().historyTree.forwardable)
-    const backwardable = createMemo(() => gameState().historyTree.backwardable)
+    const inBranchHead = createMemo(() => gameSelectors.gameState().historyTree.inBranchHead)
+    const forwardable = createMemo(() => gameSelectors.gameState().historyTree.forwardable)
+    const backwardable = createMemo(() => gameSelectors.gameState().historyTree.backwardable)
 
     return <>
-        <button
-            class="btn btn-square"
-            classList={{ "btn-disabled": !backwardable() }}
-            onClick={gameActions.bulkBackward}
-        >
-            <IconChevronDoubleLeft />
-        </button>
+        <Show when={gameSelectors.history().length === 0 && forwardable()} fallback={
+            <button
+                class="btn btn-square"
+                classList={{ "btn-disabled": !backwardable() }}
+                onClick={gameActions.bulkBackward}
+            >
+                <IconChevronDoubleLeft />
+            </button>
+        }>
+            <button
+                class="btn btn-square"
+                onClick={gameActions.clear}
+            >
+                <IconDocument />
+            </button>
+        </Show>
         <button
             class="btn btn-square"
             classList={{ "btn-disabled": !backwardable() }}
@@ -58,7 +68,7 @@ function ControlButtons() {
             <Match when={!appConfig.autoLaunch && !runtimeSelectors.inComputing()}>
                 <button
                     class="btn btn-square"
-                    classList={{ "btn-disabled": runtimeState() === undefined }}
+                    classList={{ "btn-disabled": runtimeSelectors.runtimeState() === undefined }}
                     onClick={gameActions.start}
                 >
                     <IconPlay />
@@ -229,12 +239,14 @@ function AboutButton() {
         </button>
         <Portal>
             <dialog ref={ref => dialogRef = ref} id="about_modal" class="modal">
-                <div class="modal-box p-3">
+                <div class="modal-box p-2">
                     <form method="dialog">
-                        <button class="btn absolute top-2 right-2 btn-sm btn-primary">X</button>
+                        <button class="btn absolute top-2 right-2 btn-xs btn-primary">X</button>
                     </form>
                     <h3 class="text-lg">Mintaka WebUI</h3>
-                    <a class="link" target="_blank" rel="noopener" href="https://github.com/junghyun397/mintaka">github.com/junghyun397/mintaka</a>
+                    <a class="link" target="_blank" rel="noopener" href="https://github.com/junghyun397/mintaka">
+                        github.com/junghyun397/mintaka
+                    </a>
                 </div>
                 <form method="dialog" class="modal-backdrop">
                     <button aria-label="Close"></button>

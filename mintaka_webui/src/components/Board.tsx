@@ -5,9 +5,9 @@ import { range } from "../utils/array"
 import { filter } from "../utils/undefined"
 
 export function Board() {
-    const { boardDescribe, gameState, runtimeSelectors } = useContext(AppContext)!
+    const { gameSelectors, runtimeSelectors } = useContext(AppContext)!
 
-    const lastSequence = createMemo(() => gameState().historyTree.length)
+    const lastSequence = createMemo(() => gameSelectors.history().length)
     const prevSequence = createMemo(() => lastSequence() - 1)
     const isLastSequence = createSelector(lastSequence)
     const isPrevSequence = createSelector(prevSequence)
@@ -48,13 +48,14 @@ export function Board() {
                 grid h-full w-full
                 grid-cols-15 grid-rows-15
                 stroke-gray-500
+                [&_button.stone]:cursor-auto
                 [&_button.stone.black]:fill-black [&_button.stone.black_.glyph]:fill-white
                 [&_button.stone.white]:fill-white [&_button.stone.white_.glyph]:fill-black
                 "
                 classList={{
-                    "[&_button.forbidden]:cursor-not-allowed": boardDescribe.player_color === "Black",
+                    "[&_button.forbidden]:cursor-not-allowed": gameSelectors.boardDescribe.player_color === "Black",
                     "[&_button]:cursor-wait": runtimeSelectors.inComputing(),
-                    "[&_button.stone]:cursor-auto [&_button]:cursor-crosshair": !runtimeSelectors.inComputing(),
+                    "[&_button]:cursor-crosshair": !runtimeSelectors.inComputing(),
                 }}
             >
                 <Index each={range(0, 15 * 15)}>{position =>
@@ -74,11 +75,11 @@ function Cell(props: {
     isLastSequence: (sequence: number) => boolean,
     isPrevSequence: (sequence: number) => boolean,
 }) {
-    const { gameActions, persistConfig, boardDescribe } = useContext(AppContext)!
+    const { gameActions, persistConfig, gameSelectors } = useContext(AppContext)!
 
     const pos = INDEX_TO_POS[props.position]
 
-    const cell = createMemo(() => boardDescribe.field[props.position])
+    const cell = createMemo(() => gameSelectors.boardDescribe.field[props.position])
 
     const stone = createMemo(() => filter(cell(), valid => valid.type === "Stone"))
 

@@ -1,8 +1,9 @@
-import { ForwardMethod, HistoryTree } from "../domain/HistoryTree"
-import { BestMove, BoardWorker, Pos } from "../wasm/pkg/mintaka_wasm"
-import { AppGameState } from "../stores/app.state"
+import { EmptyHistoryTree, ForwardMethod, HistoryTree } from "../domain/HistoryTree"
+import { BestMove, BoardWorker, defaultBoard, Pos } from "../wasm/pkg/mintaka_wasm"
+import { AppGameState } from "../domain/rusty-renju"
 
 interface GameController {
+    clear: () => void,
     play: (pos: Pos) => "ok" | "illegal",
     forward: (method: ForwardMethod) => "ok" | "illegal",
     bulkForward: (method: ForwardMethod) => "ok" | "illegal",
@@ -16,6 +17,9 @@ export function createGameController(
     setGameState: (gameState: AppGameState) => void,
 ): GameController {
     return {
+        clear: () => {
+            setGameState({ boardWorker: new BoardWorker(defaultBoard()), historyTree: EmptyHistoryTree })
+        },
         play: (pos: Pos) => {
             if (pos ? !gameState().boardWorker.isLegalMove(pos) : true)
                 return "illegal"

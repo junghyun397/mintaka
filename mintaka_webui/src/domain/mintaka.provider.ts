@@ -1,4 +1,5 @@
 import type { BestMove, Command, CommandResult, Config, HashKey, Response, SearchObjective } from "../wasm/pkg/mintaka_wasm"
+import { MintakaServerConfig } from "./mintaka.server.provider"
 
 export type MintakaProviderType = "server" | "worker"
 

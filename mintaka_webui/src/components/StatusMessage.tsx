@@ -2,16 +2,14 @@ import { createMemo, useContext } from "solid-js"
 import { AppContext } from "../context"
 
 export function StatusMessage() {
-    const { runtimeState, appConfig } = useContext(AppContext)!
-
-    const statusType = createMemo(() => runtimeState()?.type)
+    const { appConfig, runtimeSelectors } = useContext(AppContext)!
 
     const nodes = createMemo(() => 0)
 
     const remainingTime = createMemo(() => 0)
 
     const statusMessage = () => {
-        const status = statusType()
+        const status = runtimeSelectors.runtimeState()?.type
 
         if (status === undefined)
             return ""
@@ -34,10 +32,7 @@ export function StatusMessage() {
         return ""
     }
 
-    return <p
-        class="text-sm leading-tight text-base-content/70"
-        classList={{ "animate-pulse": statusType() !== "idle" }}
-    >
+    return <p class="text-sm leading-tight text-base-content/70">
         {statusMessage()}
     </p>
 }

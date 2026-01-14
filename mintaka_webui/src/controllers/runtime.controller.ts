@@ -1,29 +1,50 @@
 import { BestMove, Board, Config, defaultBoard, HashKey, History, MaybePos } from "../wasm/pkg/mintaka_wasm"
 import { HistoryTree } from "../domain/HistoryTree"
-import { PersistConfig } from "../stores/persist.config"
 import { MintakaWorkerProvider } from "../domain/mintaka.worker.provider"
-import { buildMintakaRuntime, MintakaRuntime } from "../domain/mintaka.runtime"
+import { buildMintakaRuntime, MintakaRuntimeState } from "../domain/mintaka.runtime"
 import { assertNever } from "../utils/never"
+import { MintakaServerConfig } from "../domain/mintaka.server.provider"
+import { MintakaProvider, MintakaProviderType } from "../domain/mintaka.provider"
 
 export type RequireProviderReady = "ok" | "provider-not-ready"
 export type RequireProviderComputing = "ok" | "provider-not-launched"
 
+export type MintakaProviderInit =
+    | { type: "server", config: Config, serverConfig: MintakaServerConfig }
+    | { type: "worker", config: Config }
+
 interface RuntimeController {
-    loadRuntime: (persistConfig: PersistConfig) => void,
+    unloadRuntime: () => void,
+    loadRuntime: (init: MintakaProviderInit) => void,
     launch: (boardSnapshot: Board, historyTreeSnapshot: HistoryTree) => RequireProviderReady,
     abort: () => RequireProviderComputing,
     syncPlay: (snapshot: HashKey, pos: MaybePos) => RequireProviderReady | "desynced",
     syncConfig: (config: Config) => RequireProviderReady,
 }
 
-export function createProviderController(
-    mintakaRuntime: () => MintakaRuntime | undefined,
-    setMintakaRuntime: (runtime: MintakaRuntime | undefined) => void,
+export type MintakaReadyRuntime = {
+    type: "ready",
+    provider: MintakaProvider,
+    state: MintakaRuntimeState,
+}
+
+
+export type MintakaRuntime =
+    | { type: "none" }
+    | {
+        type: "loading",
+        providerType: MintakaProviderType,
+    }
+    | MintakaReadyRuntime
+
+export function createRuntimeController(
+    mintakaRuntime: () => MintakaRuntime,
+    setMintakaRuntime: (runtime: MintakaRuntime) => void,
     onBestMove: (bestMove: BestMove, historySnapShot: HistoryTree) => void,
 ): RuntimeController {
     const syncAll = (board: Board, history: History) => {
         const runtime = mintakaRuntime()
-        if (runtime === undefined || runtime.state.type !== "idle")
+        if (runtime.type !== "ready")
             return "provider-not-ready"
 
         runtime.provider.command({
@@ -34,12 +55,12 @@ export function createProviderController(
         return "ok"
     }
 
-    const subscribeRuntime = (initialRuntime: MintakaRuntime) => {
-        initialRuntime.provider.subscribeResponse(response => {
+    const subscribeRuntime = (provider: MintakaProvider) => {
+        provider.subscribeResponse(response => {
             const runtime = mintakaRuntime()
 
-            if (runtime === undefined) {
-                initialRuntime.provider.dispose()
+            if (runtime.type !== "ready") {
+                provider.dispose()
                 return
             }
 
@@ -80,29 +101,36 @@ export function createProviderController(
     }
 
     return {
-        loadRuntime: (persistConfig: PersistConfig) => {
+        unloadRuntime: () => {
             const previousRuntime = mintakaRuntime()
 
-            if (previousRuntime !== undefined) {
+            if (previousRuntime.type === "ready") {
+                previousRuntime.provider.dispose()
+            }
+        },
+        loadRuntime: (init: MintakaProviderInit) => {
+            const previousRuntime = mintakaRuntime()
+
+            if (previousRuntime.type === "ready") {
                 previousRuntime.provider.dispose()
             }
 
             const board: Board = defaultBoard()
             const history: History = []
 
-            const provider = new MintakaWorkerProvider(board, history, persistConfig.config)
+            const provider = new MintakaWorkerProvider(board, history, init.config)
 
             const runtimeState = buildMintakaRuntime(board.hash_key)
 
-            const runtime: MintakaRuntime = { provider, state: runtimeState }
+            const runtime: MintakaRuntime = { type: "ready", provider, state: runtimeState }
 
-            subscribeRuntime(runtime)
+            subscribeRuntime(provider)
 
             setMintakaRuntime(runtime)
         },
         launch: (boardSnapshot: Board, historyTreeSnapshot: HistoryTree) => {
             const runtime = mintakaRuntime()
-            if (runtime === undefined || runtime.state.type !== "idle")
+            if (runtime.type !== "ready" || runtime.state.type !== "idle")
                 return "provider-not-ready"
 
             if (runtime.state.snapshot !== boardSnapshot.hash_key)
@@ -116,7 +144,7 @@ export function createProviderController(
         },
         abort: () => {
             const runtime = mintakaRuntime()
-            if (runtime === undefined || runtime.state.type === "idle")
+            if (runtime.type !== "ready" || runtime.state.type === "idle")
                 return "provider-not-launched"
 
             runtime.provider.control({ type: "abort" })
@@ -127,7 +155,10 @@ export function createProviderController(
         },
         syncPlay: (snapshot: HashKey, pos: MaybePos) => {
             const runtime = mintakaRuntime()
-            if (runtime === undefined || runtime.state.type !== "idle")
+            if (runtime.type === "none")
+                return "ok"
+
+            if (runtime.type !== "ready" || runtime.state.type !== "idle")
                 return "provider-not-ready"
 
             if (runtime.state.snapshot !== snapshot)
@@ -139,7 +170,10 @@ export function createProviderController(
         },
         syncConfig: (config: Config) => {
             const runtime = mintakaRuntime()
-            if (runtime === undefined || runtime.state.type !== "idle")
+            if (runtime.type === "none")
+                return "ok"
+
+            if (runtime.type !== "ready" || runtime.state.type !== "idle")
                 return "provider-not-ready"
 
             runtime.provider.command({ type: "Config", content: config })

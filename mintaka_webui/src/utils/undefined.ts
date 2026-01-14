@@ -1,4 +1,4 @@
-export function flatmap<T>(value: T | undefined, map: (valid: T) => T | undefined): T | undefined {
+export function flatmap<I, O>(value: I | undefined, map: (valid: I) => O | undefined): O | undefined {
     if (value === undefined) return undefined
     else return map(value)
 }
