@@ -9,10 +9,10 @@ use typeshare::typeshare;
 
 #[typeshare(serialized_as = "ColorSchema")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(std::marker::ConstParamTy, PartialEq, Eq, Clone, Copy, Debug, Default)]
+#[derive(std::marker::ConstParamTy, PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]
 pub enum Color {
-    #[default] Black = 0,
+    Black = 0,
     White = 1,
 }
 

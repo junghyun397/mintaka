@@ -7,7 +7,7 @@ members = [
     "mintaka_wasm_worker",
     "mintaka_trainer",
     "mintaka_server",
-    "rusty_renju_jni",
+    "rusty_renju_c",
     "rusty_renju_image",
 ]
 default-members = ["rusty_renju", "mintaka"]

@@ -70,11 +70,9 @@ pub struct Pattern {
 }
 
 impl From<Pattern> for u32 {
-
     fn from(value: Pattern) -> Self {
         unsafe { std::mem::transmute::<Pattern, u32>(value) }
     }
-
 }
 
 impl Pattern {
@@ -209,20 +207,20 @@ pub struct Patterns {
 }
 
 impl Default for Patterns {
-
     fn default() -> Self {
-        Self {
-            field: unsafe { std::mem::zeroed() },
-            counts: SlicePatternCounts::EMPTY,
-            unchecked_five_pos: ColorContainer::new(None, None),
-            candidate_forbidden_field: Bitfield::ZERO_FILLED,
-            forbidden_field: Bitfield::ZERO_FILLED,
-        }
+        Self::EMPTY
     }
-
 }
 
 impl Patterns {
+
+    pub const EMPTY: Self = Self {
+        field: unsafe { std::mem::zeroed() },
+        counts: SlicePatternCounts::EMPTY,
+        unchecked_five_pos: ColorContainer::new(None, None),
+        candidate_forbidden_field: Bitfield::ZERO_FILLED,
+        forbidden_field: Bitfield::ZERO_FILLED,
+    };
 
     pub const EMPTY_UNCHECKED_FIVE_POS: ColorContainer<Option<Pos>> = ColorContainer::new(None, None);
 
@@ -318,7 +316,6 @@ struct DirectionIterator {
 }
 
 impl Iterator for DirectionIterator {
-
     type Item = Direction;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -329,7 +326,6 @@ impl Iterator for DirectionIterator {
             Direction::from(tails as u8 / 8)
         })
     }
-
 }
 
 fn encode_u128_into_u16(source: u128) -> u16 {

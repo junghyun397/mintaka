@@ -15,7 +15,7 @@ use rusty_renju::board_iter::BoardExportItem;
 use rusty_renju::history::{History, MAX_HISTORY_SIZE};
 use rusty_renju::notation::color::{Color, ColorContainer};
 use rusty_renju::notation::pos::{Pos, BOARD_SIZE, U_BOARD_WIDTH};
-use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, PixmapPaint, PremultipliedColorU8, Rect, Transform};
+use tiny_skia::{FillRule, Paint, Path, PathBuilder, Pixmap, PixmapPaint, PremultipliedColorU8, Rect, Transform};
 use webp::Encoder;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -65,6 +65,7 @@ fn cell_center(pos: Pos) -> (u32, u32) {
 }
 
 const POINT_SIZE: u32 = 60;
+const CELL_CENTER: f32 = POINT_SIZE as f32 / 2.0;
 const BOARD_PIXELS: u32 = POINT_SIZE * U_BOARD_WIDTH as u32;
 const COORDINATE_SIZE: u32 = POINT_SIZE / 2;
 const COORDINATE_FONT_SIZE: f32 = POINT_SIZE as f32 / 3.0;
@@ -88,6 +89,14 @@ const LATEST_MOVE_CROSS_WIDTH_OFFSET: u32 = (POINT_SIZE - LATEST_MOVE_CROSS_SIZE
 const FORBID_DOT_SIZE: u32 = POINT_SIZE / 5;
 
 const HISTORY_FONT_SIZE: f32 = POINT_SIZE as f32 / 2.0;
+
+fn circle(cx: f32, cy: f32, r: f32) -> Path {
+    PathBuilder::from_circle(cx, cy, r).unwrap()
+}
+
+fn rect(x: f32, y: f32, w: f32, h: f32) -> Rect {
+    Rect::from_xywh(x, y, w, h).unwrap()
+}
 
 struct Palette {
     wood: tiny_skia::Color,
@@ -187,32 +196,21 @@ fn build_cells() -> [Cell; BOARD_SIZE] {
     })
 }
 
-fn build_numbers(font: &Font) -> Vec<TextBitmap> {
-    let mut numbers = Vec::with_capacity(MAX_HISTORY_SIZE + 1);
-    numbers.push(TextBitmap { width: 0, height: 0, baseline: 0.0, data: Vec::new() });
-    for idx in 1 ..= MAX_HISTORY_SIZE {
-        numbers.push(raster_text(font, &idx.to_string(), HISTORY_FONT_SIZE));
-    }
-    numbers
-}
-
 fn build_base_layer(font: &Font, palette: &Palette) -> Pixmap {
     let coord_letters: [TextBitmap; U_BOARD_WIDTH] = array::from_fn(|idx| {
         let c = (b'A' + idx as u8) as char;
         raster_text(font, &c.to_string(), COORDINATE_FONT_SIZE)
     });
 
-    let coord_rows_left: [TextBitmap; U_BOARD_WIDTH] = array::from_fn(|idx| {
+    let coord_rows: [(TextBitmap, TextBitmap); U_BOARD_WIDTH] = array::from_fn(|idx| {
         let row = U_BOARD_WIDTH as u32 - idx as u32;
-        raster_text(font, &format!("{row:>2}"), COORDINATE_FONT_SIZE)
+        (
+            raster_text(font, &format!("{row:>2}"), COORDINATE_FONT_SIZE),
+            raster_text(font, &row.to_string(), COORDINATE_FONT_SIZE),
+        )
     });
 
-    let coord_rows_right: [TextBitmap; U_BOARD_WIDTH] = array::from_fn(|idx| {
-        let row = U_BOARD_WIDTH as u32 - idx as u32;
-        raster_text(font, &row.to_string(), COORDINATE_FONT_SIZE)
-    });
-
-    let row_width = coord_rows_left.iter().map(|bitmap| bitmap.width).max().unwrap_or(0);
+    let row_width = coord_rows.iter().map(|(left, _)| left.width).max().unwrap_or(0);
 
     let mut pixmap = Pixmap::new(DIMENSION, DIMENSION).unwrap();
     pixmap.fill(palette.wood);
@@ -223,8 +221,8 @@ fn build_base_layer(font: &Font, palette: &Palette) -> Pixmap {
 
     for idx in 0..U_BOARD_WIDTH as u32 {
         let pos = LINE_START_POS + idx * POINT_SIZE;
-        let v = Rect::from_xywh(pos as f32, LINE_START_POS as f32, LINE_WEIGHT as f32, LINE_END_POS as f32).unwrap();
-        let h = Rect::from_xywh(LINE_START_POS as f32, pos as f32, LINE_END_POS as f32, LINE_WEIGHT as f32).unwrap();
+        let v = rect(pos as f32, LINE_START_POS as f32, LINE_WEIGHT as f32, LINE_END_POS as f32);
+        let h = rect(LINE_START_POS as f32, pos as f32, LINE_END_POS as f32, LINE_WEIGHT as f32);
         pixmap.fill_rect(v, &paint, Transform::identity(), None);
         pixmap.fill_rect(h, &paint, Transform::identity(), None);
     }
@@ -234,31 +232,26 @@ fn build_base_layer(font: &Font, palette: &Palette) -> Pixmap {
         let col_x = COORDINATE_START_OFFSET as f32 + idx as f32 * POINT_SIZE as f32
             - col.width as f32 / 2.0;
 
-        draw_text(&mut pixmap, col, col_x, COORDINATE_FONT_SIZE, palette.black_px);
-
-        draw_text(&mut pixmap, col, col_x, DIMENSION as f32 - COORDINATE_PADDING as f32, palette.black_px);
+        for y in [COORDINATE_FONT_SIZE, DIMENSION as f32 - COORDINATE_PADDING as f32] {
+            draw_text(&mut pixmap, col, col_x, y, palette.black_px);
+        }
 
         let row_y =
             COORDINATE_START_OFFSET as f32 + idx as f32 * POINT_SIZE as f32 + COORDINATE_PADDING as f32;
-        let row_left = &coord_rows_left[idx];
-        let row_right = &coord_rows_right[idx];
+        let (row_left, row_right) = &coord_rows[idx];
 
         let left_x =
             COORDINATE_PADDING as f32 + row_width as f32 - row_left.width as f32;
         let right_x =
             DIMENSION as f32 - COORDINATE_PADDING as f32 - row_right.width as f32;
 
-        draw_text(&mut pixmap, row_left, left_x, row_y, palette.black_px);
-        draw_text(&mut pixmap, row_right, right_x, row_y, palette.black_px);
+        for (x, row) in [(left_x, row_left), (right_x, row_right)] {
+            draw_text(&mut pixmap, row, x, row_y, palette.black_px);
+        }
     }
 
     let dot_radius = (LINE_WEIGHT * 3) as f32;
-    let path = PathBuilder::from_circle(
-        DIMENSION as f32 / 2.0,
-        DIMENSION as f32 / 2.0,
-        dot_radius,
-    )
-        .unwrap();
+    let path = circle(DIMENSION as f32 / 2.0, DIMENSION as f32 / 2.0, dot_radius);
     paint.anti_alias = true;
     pixmap.fill_path(&path, &paint, FillRule::Winding, Transform::identity(), None);
 
@@ -266,29 +259,114 @@ fn build_base_layer(font: &Font, palette: &Palette) -> Pixmap {
 }
 
 fn build_lut(font: &Font, palette: &Palette) -> Lut {
+    fn by_color<F: FnMut(Color) -> Pixmap>(mut f: F) -> ColorContainer<Pixmap> {
+        ColorContainer::new(f(Color::Black), f(Color::White))
+    }
+
+    let cell = || Pixmap::new(POINT_SIZE, POINT_SIZE).unwrap();
+
+    let stone_like = |outer, inner_black, inner_white| {
+        by_color(|color| {
+            let mut pixmap = cell();
+            let mut paint = Paint::default();
+            paint.anti_alias = true;
+
+            let outer_path = circle(CELL_CENTER, CELL_CENTER, STONE_SIZE as f32 / 2.0);
+            paint.set_color(outer);
+            pixmap.fill_path(&outer_path, &paint, FillRule::Winding, Transform::identity(), None);
+
+            let inner_path = circle(
+                CELL_CENTER,
+                CELL_CENTER,
+                STONE_SIZE as f32 / 2.0 - BORDER_SIZE as f32,
+            );
+            paint.set_color(match color { Color::Black => inner_black, Color::White => inner_white });
+            pixmap.fill_path(&inner_path, &paint, FillRule::Winding, Transform::identity(), None);
+            pixmap
+        })
+    };
+
+    let marker = |draw: fn(&mut Pixmap, &mut Paint)| {
+        by_color(|color| {
+            let mut pixmap = cell();
+            let mut paint = Paint::default();
+            paint.set_color(match color { Color::Black => palette.white, Color::White => palette.black });
+            draw(&mut pixmap, &mut paint);
+            pixmap
+        })
+    };
+
+    let blind = {
+        let mut pixmap = cell();
+        let mut paint = Paint::default();
+        paint.set_color(palette.black_100);
+        pixmap.fill_rect(
+            rect(0.0, 0.0, POINT_SIZE as f32, POINT_SIZE as f32),
+            &paint,
+            Transform::identity(),
+            None,
+        );
+        pixmap
+    };
+
+    let forbidden = {
+        let mut pixmap = cell();
+        let mut paint = Paint::default();
+        paint.anti_alias = true;
+        paint.set_color(palette.red);
+        let dot = circle(CELL_CENTER, CELL_CENTER, FORBID_DOT_SIZE as f32 / 2.0);
+        pixmap.fill_path(&dot, &paint, FillRule::Winding, Transform::identity(), None);
+        pixmap
+    };
+
+    let last_dot = marker(|pixmap, paint| {
+        paint.anti_alias = true;
+        let dot = circle(CELL_CENTER, CELL_CENTER, LATEST_MOVE_DOT_SIZE as f32 / 2.0);
+        pixmap.fill_path(&dot, paint, FillRule::Winding, Transform::identity(), None);
+    });
+
+    let last_cross = marker(|pixmap, paint| {
+        let horizontal = rect(
+            LATEST_MOVE_CROSS_WIDTH_OFFSET as f32,
+            LATEST_MOVE_CROSS_HEIGHT_OFFSET as f32,
+            LATEST_MOVE_CROSS_SIZE as f32,
+            LATEST_MOVE_CROSS_WEIGHT as f32,
+        );
+
+        let vertical = rect(
+            LATEST_MOVE_CROSS_HEIGHT_OFFSET as f32,
+            LATEST_MOVE_CROSS_WIDTH_OFFSET as f32,
+            LATEST_MOVE_CROSS_WEIGHT as f32,
+            LATEST_MOVE_CROSS_SIZE as f32,
+        );
+
+        pixmap.fill_rect(horizontal, paint, Transform::identity(), None);
+        pixmap.fill_rect(vertical, paint, Transform::identity(), None);
+    });
+
     Lut {
-        stone: build_stones_lut(palette),
-        offer: build_offers_lut(palette),
-        blind: build_blind_lut(palette),
-        forbidden: build_forbidden_lut(palette),
-        last_dot: build_last_dots_lut(palette),
-        last_cross: build_last_cross_lut(palette),
+        stone: stone_like(palette.grey, palette.black, palette.white),
+        offer: stone_like(palette.grey_100, palette.black_100, palette.white_100),
+        blind,
+        forbidden,
+        last_dot,
+        last_cross,
         number: build_number_lut(font, palette),
     }
 }
 
 fn build_number_lut(font: &Font, palette: &Palette) -> ColorContainer<Vec<GlyphPixmap>> {
-    let numbers = build_numbers(font);
-    let build = |color|
-        numbers.iter().map(|glyph| glyph_pixmap(glyph, color)).collect();
+    let numbers: Vec<_> = (0..=MAX_HISTORY_SIZE)
+        .map(|idx| {
+            if idx == 0 {
+                TextBitmap { width: 0, height: 0, baseline: 0.0, data: Vec::new() }
+            } else {
+                raster_text(font, &idx.to_string(), HISTORY_FONT_SIZE)
+            }
+        })
+        .collect();
+    let build = |color| numbers.iter().map(|glyph| glyph_pixmap(glyph, color)).collect();
     ColorContainer::new(build(palette.black_px), build(palette.white_px))
-}
-
-fn color_lut<F>(mut f: F) -> ColorContainer<Pixmap>
-where
-    F: FnMut(Color) -> Pixmap,
-{
-    ColorContainer::new(f(Color::Black), f(Color::White))
 }
 
 fn glyph_pixmap(glyph: &TextBitmap, color: PremultipliedColorU8) -> GlyphPixmap {
@@ -299,123 +377,6 @@ fn glyph_pixmap(glyph: &TextBitmap, color: PremultipliedColorU8) -> GlyphPixmap 
     let mut pixmap = Pixmap::new(glyph.width, glyph.height).unwrap();
     draw_text(&mut pixmap, glyph, 0.0, glyph.baseline, color);
     GlyphPixmap { pixmap: Some(pixmap), width: glyph.width, baseline: glyph.baseline }
-}
-
-fn cell_pixmap() -> Pixmap {
-    Pixmap::new(POINT_SIZE, POINT_SIZE).unwrap()
-}
-
-fn build_stones_lut(palette: &Palette) -> ColorContainer<Pixmap> {
-    color_lut(|color| {
-        let mut pixmap = cell_pixmap();
-        let mut paint = Paint::default();
-        paint.anti_alias = true;
-
-        let center = POINT_SIZE as f32 / 2.0;
-        let outer = PathBuilder::from_circle(center, center, STONE_SIZE as f32 / 2.0).unwrap();
-        paint.set_color(palette.grey);
-        pixmap.fill_path(&outer, &paint, FillRule::Winding, Transform::identity(), None);
-
-        let inner = PathBuilder::from_circle(
-            center,
-            center,
-            STONE_SIZE as f32 / 2.0 - BORDER_SIZE as f32,
-        )
-            .unwrap();
-        paint.set_color(match color { Color::Black => palette.black, Color::White => palette.white });
-        pixmap.fill_path(&inner, &paint, FillRule::Winding, Transform::identity(), None);
-        pixmap
-    })
-}
-
-fn build_offers_lut(palette: &Palette) -> ColorContainer<Pixmap> {
-    color_lut(|color| {
-        let mut pixmap = cell_pixmap();
-        let mut paint = Paint::default();
-        paint.anti_alias = true;
-
-        let center = POINT_SIZE as f32 / 2.0;
-        let outer = PathBuilder::from_circle(center, center, STONE_SIZE as f32 / 2.0).unwrap();
-        paint.set_color(palette.grey_100);
-        pixmap.fill_path(&outer, &paint, FillRule::Winding, Transform::identity(), None);
-
-        let inner = PathBuilder::from_circle(
-            center,
-            center,
-            STONE_SIZE as f32 / 2.0 - BORDER_SIZE as f32,
-        )
-            .unwrap();
-        paint.set_color(match color { Color::Black => palette.black_100, Color::White => palette.white_100 });
-        pixmap.fill_path(&inner, &paint, FillRule::Winding, Transform::identity(), None);
-        pixmap
-    })
-}
-
-fn build_blind_lut(palette: &Palette) -> Pixmap {
-    let mut pixmap = cell_pixmap();
-    let rect = Rect::from_xywh(0.0, 0.0, POINT_SIZE as f32, POINT_SIZE as f32).unwrap();
-    let mut paint = Paint::default();
-    paint.set_color(palette.black_100);
-    pixmap.fill_rect(rect, &paint, Transform::identity(), None);
-    pixmap
-}
-
-fn build_forbidden_lut(palette: &Palette) -> Pixmap {
-    let mut pixmap = cell_pixmap();
-    let mut paint = Paint::default();
-    paint.anti_alias = true;
-    paint.set_color(palette.red);
-    let dot = PathBuilder::from_circle(
-        POINT_SIZE as f32 / 2.0,
-        POINT_SIZE as f32 / 2.0,
-        FORBID_DOT_SIZE as f32 / 2.0,
-    )
-        .unwrap();
-    pixmap.fill_path(&dot, &paint, FillRule::Winding, Transform::identity(), None);
-    pixmap
-}
-
-fn build_last_dots_lut(palette: &Palette) -> ColorContainer<Pixmap> {
-    color_lut(|color| {
-        let mut pixmap = cell_pixmap();
-        let mut paint = Paint::default();
-        paint.anti_alias = true;
-        paint.set_color(match color { Color::Black => palette.white, Color::White => palette.black });
-        let path = PathBuilder::from_circle(
-            POINT_SIZE as f32 / 2.0,
-            POINT_SIZE as f32 / 2.0,
-            LATEST_MOVE_DOT_SIZE as f32 / 2.0,
-        )
-            .unwrap();
-        pixmap.fill_path(&path, &paint, FillRule::Winding, Transform::identity(), None);
-        pixmap
-    })
-}
-
-fn build_last_cross_lut(palette: &Palette) -> ColorContainer<Pixmap> {
-    color_lut(|color| {
-        let mut pixmap = cell_pixmap();
-        let mut paint = Paint::default();
-        paint.set_color(match color { Color::Black => palette.white, Color::White => palette.black });
-
-        let horizontal = Rect::from_xywh(
-            LATEST_MOVE_CROSS_WIDTH_OFFSET as f32,
-            LATEST_MOVE_CROSS_HEIGHT_OFFSET as f32,
-            LATEST_MOVE_CROSS_SIZE as f32,
-            LATEST_MOVE_CROSS_WEIGHT as f32,
-        ).unwrap();
-
-        let vertical = Rect::from_xywh(
-            LATEST_MOVE_CROSS_HEIGHT_OFFSET as f32,
-            LATEST_MOVE_CROSS_WIDTH_OFFSET as f32,
-            LATEST_MOVE_CROSS_WEIGHT as f32,
-            LATEST_MOVE_CROSS_SIZE as f32,
-        ).unwrap();
-
-        pixmap.fill_rect(horizontal, &paint, Transform::identity(), None);
-        pixmap.fill_rect(vertical, &paint, Transform::identity(), None);
-        pixmap
-    })
 }
 
 fn blit(canvas: &mut Pixmap, sprite: &Pixmap, x: f32, y: f32) {
@@ -433,24 +394,24 @@ fn blit_cell(canvas: &mut Pixmap, sprite: &Pixmap, cell: &Cell) {
     blit(canvas, sprite, cell.origin.0, cell.origin.1);
 }
 
+fn draw_positions(canvas: &mut Pixmap, res: &Resources, sprite: &Pixmap, positions: &[Pos]) {
+    for pos in positions {
+        blit_cell(canvas, sprite, &res.cells[pos.idx_usize()]);
+    }
+}
+
 fn draw_board(canvas: &mut Pixmap, board: &Board, opts: &RenderPayloads<'_>, res: &Resources) {
-    // for (idx, item) in board.export_items(&History::default()).enumerate() {
-    //     let cell = &res.cells[idx];
-    //     match item {
-    //         BoardExportItem::Stone(color) => blit_cell(canvas, &res.lut.stone[color], cell),
-    //         BoardExportItem::Forbidden(_) if opts.enable_forbidden => blit_cell(canvas, &res.lut.forbidden, cell),
-    //         _ => {}
-    //     }
-    // }
+    for (cell, item) in res.cells.iter().zip(board.export_items(opts.history)) {
+        match item {
+            BoardExportItem::Stone(stone) => blit_cell(canvas, &res.lut.stone[stone.color], cell),
+            BoardExportItem::Forbidden(_) if opts.enable_forbidden => blit_cell(canvas, &res.lut.forbidden, cell),
+            _ => {}
+        }
+    }
 
     let offer = &res.lut.offer[board.player_color];
-    for pos in opts.offers {
-        blit_cell(canvas, offer, &res.cells[pos.idx_usize()]);
-    }
-
-    for pos in opts.blinds {
-        blit_cell(canvas, &res.lut.blind, &res.cells[pos.idx_usize()]);
-    }
+    draw_positions(canvas, res, offer, opts.offers);
+    draw_positions(canvas, res, &res.lut.blind, opts.blinds);
 
     match opts.history_render {
         HistoryRender::Sequence => draw_sequence(canvas, opts.history, res),
@@ -469,17 +430,18 @@ fn draw_recent(
 ) {
     let [prev, last] = history.recent_action_pair();
 
-    if let Some(pos) = Option::<Pos>::from(last)
-        && let Some(stone_color) = board.stone_kind(pos)
-    {
-        blit_cell(canvas, &res.lut.last_dot[stone_color], &res.cells[pos.idx_usize()]);
-    }
+    let mut draw = |pos: Option<Pos>, sprite: &ColorContainer<Pixmap>| {
+        if let Some(pos) = pos
+            && let Some(stone_color) = board.stone_kind(pos)
+        {
+            blit_cell(canvas, &sprite[stone_color], &res.cells[pos.idx_usize()]);
+        }
+    };
 
-    if include_prev
-        && let Some(pos) = Option::<Pos>::from(prev)
-        && let Some(stone_color) = board.stone_kind(pos)
-    {
-        blit_cell(canvas, &res.lut.last_cross[stone_color], &res.cells[pos.idx_usize()]);
+    draw(last.into(), &res.lut.last_dot);
+
+    if include_prev {
+        draw(prev.into(), &res.lut.last_cross);
     }
 }
 
@@ -492,11 +454,8 @@ fn draw_sequence(canvas: &mut Pixmap, history: &History, res: &Resources) {
         let text = lut.get(seq).unwrap_or_else(|| lut.last().unwrap());
         let Some(sprite) = text.pixmap.as_ref() else { continue };
 
-        let cell = &res.cells[pos.idx_usize()];
-        let center_x = cell.origin.0 + POINT_SIZE as f32 / 2.0;
-        let center_y = cell.origin.1 + POINT_SIZE as f32 / 2.0;
-        let baseline =
-            center_y + HISTORY_FONT_SIZE / 2.0 - HISTORY_FONT_SIZE / 5.0;
+        let (center_x, center_y) = res.cells[pos.idx_usize()].center;
+        let baseline = center_y + HISTORY_FONT_SIZE / 2.0 - HISTORY_FONT_SIZE / 5.0;
         let text_x = center_x - text.width as f32 / 2.0;
 
         blit(canvas, sprite, text_x, baseline - text.baseline);

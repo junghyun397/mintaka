@@ -1,0 +1,12 @@
+[package]
+name = "rusty_renju_c"
+version = "1.0.0"
+edition = "2024"
+
+[lib]
+name = "rusty_renju_c"
+crate-type = ["cdylib"]
+
+[dependencies]
+rusty_renju = { path = "../rusty_renju" }
+mintaka = { path = "../mintaka" }

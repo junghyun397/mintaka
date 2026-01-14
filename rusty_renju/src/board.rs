@@ -11,7 +11,7 @@ use std::hash::{Hash, Hasher};
 use typeshare::typeshare;
 
 #[typeshare(serialized_as = "BoardData")]
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone)]
 pub struct Board {
     pub player_color: Color,
     pub stones: u8,
@@ -21,7 +21,22 @@ pub struct Board {
     pub hash_key: HashKey,
 }
 
+impl Default for Board {
+    fn default() -> Self {
+        Self::EMPTY_BOARD
+    }
+}
+
 impl Board {
+
+    pub const EMPTY_BOARD: Self = Self {
+        player_color: Color::Black,
+        stones: 0,
+        slices: Slices::EMPTY,
+        patterns: Patterns::EMPTY,
+        hot_field: Bitfield::ZERO_FILLED,
+        hash_key: HashKey::EMPTY,
+    };
 
     pub fn is_pos_empty(&self, pos: Pos) -> bool {
         self.hot_field.is_cold(pos)
@@ -484,7 +499,7 @@ impl Board {
 
 impl PartialEq for Board {
     fn eq(&self, other: &Self) -> bool {
-        self.hash_key == other.hash_key
+        self.slices.bitfield() == other.slices.bitfield()
     }
 }
 
