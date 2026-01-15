@@ -57,8 +57,6 @@ export async function createSession(serverConfig: MintakaServerConfig, config: C
 }
 
 export class MintakaServerProvider implements MintakaProvider {
-    private readonly serverConfig: MintakaServerConfig
-    private readonly session: MintakaServerSession
     private chain: Promise<void> = Promise.resolve()
     private eventSource?: EventSource
 
@@ -75,10 +73,7 @@ export class MintakaServerProvider implements MintakaProvider {
         return this.session.maxConfig
     }
 
-    constructor(config: MintakaServerConfig, session: MintakaServerSession) {
-        this.serverConfig = config
-        this.session = session
-    }
+    constructor(private readonly serverConfig: MintakaServerConfig, private readonly session: MintakaServerSession) {}
 
     subscribeResponse(handler: (response: MintakaProviderResponse) => void) {
         this.onResponse = handler

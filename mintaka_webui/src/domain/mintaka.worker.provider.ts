@@ -55,7 +55,7 @@ export class MintakaWorkerProvider implements MintakaProvider {
     private onResponse?: (message: MintakaProviderResponse) => void
     private onError?: (error: any) => void
 
-    constructor(board: Board, history: History, config?: Config) {
+    constructor(state: GameState, config?: Config) {
         this.worker = new Worker(
             new URL("mintaka.worker.ts", import.meta.url),
             { type: "module" },
@@ -79,7 +79,7 @@ export class MintakaWorkerProvider implements MintakaProvider {
             this.onError && this.onError(event)
         }
 
-        this.postMessage({ type: "init", config: config ?? this.defaultConfig, state: { board, history } })
+        this.postMessage({ type: "init", config: config ?? this.defaultConfig, state })
     }
 
     subscribeResponse(handler: (response: MintakaProviderResponse) => void) {

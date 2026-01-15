@@ -3,19 +3,16 @@ import { HistoryTree } from "../domain/HistoryTree"
 import { MintakaWorkerProvider } from "../domain/mintaka.worker.provider"
 import { buildMintakaRuntime, MintakaRuntimeState } from "../domain/mintaka.runtime"
 import { assertNever } from "../utils/never"
-import { MintakaServerConfig } from "../domain/mintaka.server.provider"
+import { createSession, MintakaServerConfig, MintakaServerProvider } from "../domain/mintaka.server.provider"
 import { MintakaProvider, MintakaProviderType } from "../domain/mintaka.provider"
 
 export type RequireProviderReady = "ok" | "provider-not-ready"
 export type RequireProviderComputing = "ok" | "provider-not-launched"
 
-export type MintakaProviderInit =
-    | { type: "server", config: Config, serverConfig: MintakaServerConfig }
-    | { type: "worker", config: Config }
-
 interface RuntimeController {
     unloadRuntime: () => void,
-    loadRuntime: (init: MintakaProviderInit) => void,
+    loadWorkerRuntime: (config: Config) => void,
+    loadServerRuntime: (config: Config, serverConfig: MintakaServerConfig) => void,
     launch: (boardSnapshot: Board, historyTreeSnapshot: HistoryTree) => RequireProviderReady,
     abort: () => RequireProviderComputing,
     syncPlay: (snapshot: HashKey, pos: MaybePos) => RequireProviderReady | "desynced",
@@ -100,25 +97,23 @@ export function createRuntimeController(
         })
     }
 
+    const unloadRuntime = () => {
+        const previousRuntime = mintakaRuntime()
+
+        if (previousRuntime.type === "ready") {
+            previousRuntime.provider.dispose()
+        }
+    }
+
     return {
-        unloadRuntime: () => {
-            const previousRuntime = mintakaRuntime()
-
-            if (previousRuntime.type === "ready") {
-                previousRuntime.provider.dispose()
-            }
-        },
-        loadRuntime: (init: MintakaProviderInit) => {
-            const previousRuntime = mintakaRuntime()
-
-            if (previousRuntime.type === "ready") {
-                previousRuntime.provider.dispose()
-            }
+        unloadRuntime,
+        loadWorkerRuntime: (config: Config) => {
+            unloadRuntime()
 
             const board: Board = defaultBoard()
             const history: History = []
 
-            const provider = new MintakaWorkerProvider(board, history, init.config)
+            const provider = new MintakaWorkerProvider({ board, history }, config)
 
             const runtimeState = buildMintakaRuntime(board.hash_key)
 
@@ -127,6 +122,27 @@ export function createRuntimeController(
             subscribeRuntime(provider)
 
             setMintakaRuntime(runtime)
+        },
+        loadServerRuntime: (config: Config, serverConfig: MintakaServerConfig) => {
+            unloadRuntime()
+
+            const board: Board = defaultBoard()
+            const history: History = []
+
+            setMintakaRuntime({ type: "loading", providerType: "server" })
+
+            createSession(serverConfig, config, { board, history })
+                .then(session => {
+                    const provider = new MintakaServerProvider(serverConfig, session)
+
+                    const runtimeState = buildMintakaRuntime(board.hash_key)
+
+                    const runtime: MintakaRuntime = { type: "ready", provider, state: runtimeState }
+
+                    subscribeRuntime(provider)
+
+                    setMintakaRuntime(runtime)
+                })
         },
         launch: (boardSnapshot: Board, historyTreeSnapshot: HistoryTree) => {
             const runtime = mintakaRuntime()

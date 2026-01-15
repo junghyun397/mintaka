@@ -175,10 +175,7 @@ export function AppContextProvider(props: ParentProps) {
         loadWorkerRuntime: () => {
             setPersistConfig("providerType", "worker")
 
-            runtimeController.loadRuntime({
-                type: "worker",
-                config: unwrap(persistConfig.config),
-            })
+            runtimeController.loadWorkerRuntime(unwrap(persistConfig.config))
         },
         switchServerRuntime: () => {
             setPersistConfig("providerType", "server")
@@ -188,11 +185,7 @@ export function AppContextProvider(props: ParentProps) {
         loadServerRuntime: () => {
             if (persistConfig.providerType === "server" || persistConfig.serverConfig === undefined) return
 
-            runtimeController.loadRuntime({
-                type: "server",
-                config: unwrap(persistConfig.config),
-                serverConfig: unwrap(persistConfig.serverConfig),
-            })
+            runtimeController.loadServerRuntime(unwrap(persistConfig.config), unwrap(persistConfig.serverConfig))
         },
         syncConfig: (config: Config) => {
             setPersistConfig("config", reconcile(config))
@@ -242,10 +235,7 @@ export function AppContextProvider(props: ParentProps) {
         boardDescribe,
     }
 
-    runtimeController.loadRuntime({
-        type: "worker",
-        config: unwrap(persistConfig.config),
-    })
+    runtimeController.loadWorkerRuntime(unwrap(persistConfig.config))
 
     return <AppContext.Provider
         value={{
