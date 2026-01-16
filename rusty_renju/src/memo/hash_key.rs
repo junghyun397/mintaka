@@ -11,6 +11,7 @@ use std::hash::{Hash, Hasher};
 
 #[typeshare::typeshare]
 #[derive(Eq, PartialEq, Copy, Clone)]
+#[repr(C)]
 pub struct HashKey(
     #[typeshare(serialized_as = "String")]
     u64

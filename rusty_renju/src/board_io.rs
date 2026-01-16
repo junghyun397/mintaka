@@ -35,7 +35,14 @@ enum BoardElement {
 pub struct BoardDescribe {
     pub hash_key: HashKey,
     pub player_color: Color,
-    pub field: Vec<BoardExportItem>,
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            serialize_with = "crate::utils::serde::serialize_array",
+            deserialize_with = "crate::utils::serde::deserialize_array"
+        ),
+    )]
+    pub field: [BoardExportItem; pos::BOARD_SIZE],
 }
 
 fn match_symbol(c: char) -> Option<BoardElement> {
@@ -257,7 +264,7 @@ impl Board {
         BoardDescribe {
             hash_key: self.hash_key,
             player_color: self.player_color,
-            field: self.export_items(history).into()
+            field: self.export_items(history)
         }
     }
 
@@ -359,6 +366,7 @@ impl Display for Slice {
 
 #[typeshare::typeshare]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[allow(dead_code)]
 struct BoardData {
     hash_key: HashKey,
     player_color: Color,

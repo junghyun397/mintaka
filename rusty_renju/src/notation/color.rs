@@ -70,6 +70,20 @@ impl From<Color> for u8 {
     }
 }
 
+impl TryFrom<u8> for Color {
+    type Error = UnknownColorError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        const BLACK: u8 = Color::Black as u8;
+        const WHITE: u8 = Color::White as u8;
+
+        match value {
+            BLACK => Ok(Color::Black),
+            WHITE => Ok(Color::White),
+            _ => Err(UnknownColorError)
+        }
+    }
+}
+
 impl Display for Color {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self:?}")

@@ -21,7 +21,7 @@ mod bench_vcf {
     use rusty_renju::notation::rule::RuleKind;
     use rusty_renju::notation::score::{Score, Scores};
     use rusty_renju::utils::byte_size::ByteSize;
-    use std::sync::atomic::{AtomicBool, AtomicU64};
+    use std::sync::atomic::{AtomicBool, AtomicU32};
     use test::Bencher;
 
     macro_rules! bench_vcf {
@@ -46,7 +46,7 @@ mod bench_vcf {
             let tt = TranspositionTable::new_with_size(ByteSize::from_kib(8));
             let ht = HistoryTable::EMPTY;
 
-            let global_counter_in_1k = AtomicU64::new(0);
+            let global_counter_in_1k = AtomicU32::new(0);
             let aborted = AtomicBool::new(false);
 
             let td = ThreadData::new(WorkerThread, 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);

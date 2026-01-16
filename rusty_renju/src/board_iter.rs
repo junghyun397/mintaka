@@ -24,7 +24,7 @@ pub enum BoardIterItem {
     derive(Serialize, Deserialize),
     serde(tag = "type", content = "content"),
 )]
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum BoardExportItem {
     Stone(BoardExportStone),
     Empty,
@@ -46,7 +46,7 @@ mod typeshare_workaround {
 
 #[typeshare::typeshare]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct BoardExportStone {
     pub color: Color,
     pub sequence: u8,

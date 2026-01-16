@@ -83,32 +83,32 @@ struct HistoryTableData {
     #[cfg_attr(
         feature = "serde",
         serde(
-            serialize_with = "crate::utils::serde::serialize_array",
-            deserialize_with = "crate::utils::serde::deserialize_array"
+            serialize_with = "rusty_renju::utils::serde::serialize_array",
+            deserialize_with = "rusty_renju::utils::serde::deserialize_array"
         ),
     )]
     quiet: [u8; 2 * pos::BOARD_SIZE * 2],
     #[cfg_attr(
         feature = "serde",
         serde(
-            serialize_with = "crate::utils::serde::serialize_array",
-            deserialize_with = "crate::utils::serde::deserialize_array"
+            serialize_with = "rusty_renju::utils::serde::serialize_array",
+            deserialize_with = "rusty_renju::utils::serde::deserialize_array"
         ),
     )]
     three: [u8; 2 * pos::BOARD_SIZE * 2],
     #[cfg_attr(
         feature = "serde",
         serde(
-            serialize_with = "crate::utils::serde::serialize_array",
-            deserialize_with = "crate::utils::serde::deserialize_array"
+            serialize_with = "rusty_renju::utils::serde::serialize_array",
+            deserialize_with = "rusty_renju::utils::serde::deserialize_array"
         ),
     )]
     four: [u8; 2 * pos::BOARD_SIZE * 2],
     #[cfg_attr(
         feature = "serde",
         serde(
-            serialize_with = "crate::utils::serde::serialize_array",
-            deserialize_with = "crate::utils::serde::deserialize_array"
+            serialize_with = "rusty_renju::utils::serde::serialize_array",
+            deserialize_with = "rusty_renju::utils::serde::deserialize_array"
         ),
     )]
     counter: [u8; pos::BOARD_SIZE * 2],

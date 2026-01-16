@@ -67,9 +67,14 @@ impl From<usize> for Pos {
     }
 }
 
-impl From<u8> for Pos {
-    fn from(value: u8) -> Self {
-        Pos::from_index(value)
+impl TryFrom<u8> for Pos {
+    type Error = PosError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        if value > U8_BOARD_BOUND {
+            Err(PosError::ColumnOrRowOutOfRange)
+        } else {
+            Ok(Pos::from_index(value))
+        }
     }
 }
 
@@ -251,6 +256,18 @@ impl MaybePos {
 
 }
 
+impl TryFrom<u8> for MaybePos {
+    type Error = PosError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        const INVALID_POS_IDX: u8 = MaybePos::INVALID_POS.idx();
+
+        match value {
+            INVALID_POS_IDX => Ok(Self::NONE),
+            _ => Pos::try_from(value).map(Self)
+        }
+    }
+}
+
 impl From<Pos> for MaybePos {
     fn from(value: Pos) -> Self {
         Self(value)
@@ -373,7 +390,7 @@ impl<const N: usize> IndexMut<usize> for PosList<N> {
     }
 }
 
-const CHEBYSHEV_DISTANCE_LUT: [[u8; BOARD_SIZE]; BOARD_SIZE] = build_chebyshev_distance_lut();
+static CHEBYSHEV_DISTANCE_LUT: [[u8; BOARD_SIZE]; BOARD_SIZE] = build_chebyshev_distance_lut();
 
 const fn build_chebyshev_distance_lut() -> [[u8; BOARD_SIZE]; BOARD_SIZE] {
     let mut table = [[0; BOARD_SIZE]; BOARD_SIZE];

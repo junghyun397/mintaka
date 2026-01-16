@@ -223,7 +223,7 @@ struct SlicePatternLut {
     _dbg_white_length: usize,
 }
 
-const SLICE_PATTERN_LUT: SlicePatternLut = build_slice_pattern_lut();
+static SLICE_PATTERN_LUT: SlicePatternLut = build_slice_pattern_lut();
 
 #[allow(unused_mut)]
 const fn build_slice_pattern_lut() -> SlicePatternLut {
