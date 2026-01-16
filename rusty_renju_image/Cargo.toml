@@ -5,7 +5,7 @@ edition = "2024"
 
 [lib]
 name = "rusty_renju_image"
-crate-type = ["rlib", "cdylib"]
+crate-type = ["cdylib"]
 
 [dependencies]
 rusty_renju = { path = "../rusty_renju" }

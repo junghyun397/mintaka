@@ -6,7 +6,7 @@ import { flatmap } from "../utils/undefined"
 import { SERVER_PROTOCOL, SERVER_URL } from "../config"
 
 export function Dashboard() {
-    const { appConfig, setAppConfig } = useContext(AppContext)!
+    const { appConfig, setAppConfig, runtimeSelectors } = useContext(AppContext)!
 
     const closeDashboard = () => {
         setAppConfig("openDashboard", false)
@@ -40,7 +40,9 @@ export function Dashboard() {
                     <h1 class="text-lg">Mintaka WebUI</h1>
                     <Overview />
                     <RuntimeConfig />
-                    <MintakaConfig />
+                    <Show when={runtimeSelectors.maxConfig()}>{maxConfig =>
+                        <MintakaConfig maxConfig={maxConfig()} />
+                    }</Show>
                     <DangerZone />
                 </div>
             </aside>
@@ -99,7 +101,7 @@ function RuntimeConfig() {
             <Switch>
                 <Match when={runtimeSelectors.runtimeType() === "none"}>
                     <button
-                        class="btn btn-sm"
+                        class="btn"
                         classList={{
                             "btn-success": true,
                             "btn-disabled": false,
@@ -128,8 +130,8 @@ function RuntimeConfig() {
     </div>
 }
 
-function MintakaConfig() {
-    const { persistConfig, runtimeSelectors } = useContext(AppContext)!
+function MintakaConfig(props: { maxConfig: Config }) {
+    const { persistConfig } = useContext(AppContext)!
 
     return <div class="flex flex-col gap-4">
         <div>
@@ -141,7 +143,7 @@ function MintakaConfig() {
                     type: "finite",
                     value: 1,
                 }}
-                max={runtimeSelectors.maxConfig()?.workers ?? 1}
+                max={props.maxConfig.workers ?? 1}
                 scale={1}
                 legend="Workers" label="Cores"
                 description="CPU core allocation. Must be less than the number of logical CPUs."
@@ -153,7 +155,7 @@ function MintakaConfig() {
                     type: "finite",
                     value: 1024 * 1024 * 16,
                 }}
-                max={runtimeSelectors.maxConfig()?.tt_size ?? 1024 * 1024 * 1024 * 8}
+                max={props.maxConfig.tt_size ?? 1024 * 1024 * 1024 * 8}
                 scale={1024 * 1024}
                 legend="TT Size" label="MiB"
                 description="Shared memory size. Should be properly sized relative to computational volume."
@@ -168,7 +170,7 @@ function MintakaConfig() {
                         type="number"
                         placeholder="unlimited"
                         min={1}
-                        max={runtimeSelectors.maxConfig()?.initial_timer.total_remaining?.secs}
+                        max={props.maxConfig.initial_timer.total_remaining?.secs}
                         value={persistConfig.config.initial_timer.total_remaining?.secs}
                     />
                     <span class="label">seconds</span>
@@ -181,7 +183,7 @@ function MintakaConfig() {
                     <input
                         type="number"
                         min={0}
-                        max={runtimeSelectors.maxConfig()?.initial_timer.increment.secs}
+                        max={props.maxConfig.initial_timer.increment.secs}
                         value={persistConfig.config.initial_timer.increment.secs}
                     />
                     <span class="label text-wrap">seconds</span>
@@ -195,7 +197,7 @@ function MintakaConfig() {
                         type="number"
                         placeholder="unlimited"
                         min={1}
-                        max={runtimeSelectors.maxConfig()?.initial_timer.turn?.secs}
+                        max={props.maxConfig.initial_timer.turn?.secs}
                         value={persistConfig.config.initial_timer.turn?.secs}
                     />
                     <span class="label text-wrap">seconds</span>
@@ -214,7 +216,7 @@ function MintakaConfig() {
                     placeholder: "unlimited",
                 }}
                 scale={1000}
-                max={runtimeSelectors.maxConfig()?.max_nodes_in_1k ?? 1000000000000}
+                max={props.maxConfig.max_nodes_in_1k}
                 legend="Node Limit" label="×1000 nodes"
                 description="Maximum reachable nodes. Specify when maintaining a constant level regardless of time or hardware."
             />
@@ -226,7 +228,7 @@ function MintakaConfig() {
                     value: undefined,
                     placeholder: "unlimited",
                 }}
-                max={runtimeSelectors.maxConfig()?.max_depth ?? 225}
+                max={props.maxConfig.max_depth ?? 225}
                 scale={1}
                 legend="Depth Limit" label="moves"
                 description="Maximum reachable selective depth."
@@ -248,7 +250,7 @@ function DangerZone() {
         </button>
         <button
             class="btn btn-error"
-            onClick={appActions.clearAppData}
+            onClick={appActions.resetAppData}
         >
             Reset App Data
         </button>
@@ -263,7 +265,7 @@ function ConfigSection<M extends MinValue, V = number | M["value"]>(props: {
     produce: (config: Config, value: V) => Config,
     value: V,
     min: M,
-    max: number,
+    max: number | undefined,
     scale: number,
     legend: string,
     label: string,
@@ -302,7 +304,9 @@ function ConfigSection<M extends MinValue, V = number | M["value"]>(props: {
                         return
                     }
 
-                    if ((props.min.value ?? -1) <= newValue && newValue <= props.max) {
+                    if ((props.min.value === undefined || props.min.value <= newValue)
+                        && (props.max === undefined || newValue <= props.max)
+                    ) {
                         setIsValid(true)
                         appActions.syncConfig(props.produce(unwrap(persistConfig.config), newValue as V))
                         return

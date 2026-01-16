@@ -13,6 +13,7 @@ import { flatmap } from "./utils/undefined"
 import { parseUrlParams, setupUrlSync } from "./url"
 import { AppGameState, buildGameStateFromHistorySource } from "./domain/rusty-renju"
 import { setupThemeSync } from "./theme"
+import { assertOk } from "./utils/response"
 
 interface AppActions {
     readonly loadWorkerRuntime: () => void,
@@ -20,7 +21,7 @@ interface AppActions {
     readonly loadServerRuntime: () => void,
     readonly syncConfig: (config: Config) => RequireProviderReady,
     readonly resetConfig: () => RequireProviderReady,
-    readonly clearAppData: () => void,
+    readonly resetAppData: () => void,
 }
 
 interface AppSelectors {
@@ -30,6 +31,7 @@ interface AppSelectors {
 interface RuntimeSelectors {
     readonly runtimeType: Accessor<MintakaRuntime["type"]>,
     readonly runtimeState: Accessor<MintakaRuntimeState | undefined>
+    readonly isReady: Accessor<boolean>,
     readonly inComputing: Accessor<boolean>,
     readonly maxConfig: Accessor<Config | undefined>,
 }
@@ -115,47 +117,40 @@ export function AppContextProvider(props: ParentProps) {
 
             const playResponse = gameController.play(pos)
 
-            if (playResponse !== "ok") return
+            assertOk(playResponse)
 
             runtimeController.syncPlay(appState.gameState().boardWorker.hashKey(), pos)
 
             if (!appConfig.autoLaunch) return
 
-            runtimeController.launch(appState.gameState().boardWorker.value(), appState.gameState().historyTree)
+            runtimeController.launch(appState.gameState())
         },
         forward: (method) => {
             const response = gameController.forward(method)
 
-            if (response !== "ok")
-                throw new Error(response)
+            assertOk(response)
         },
         bulkForward: (method) => {
             const response = gameController.bulkForward(method)
 
-            if (response !== "ok")
-                throw new Error(response)
+            assertOk(response)
         },
         backward: () => {
             const response = gameController.backward()
 
-            if (response !== "ok")
-                throw new Error(response)
+            assertOk(response)
         },
         bulkBackward: () => {
             const response = gameController.bulkBackward()
 
-            if (response !== "ok")
-                throw new Error(response)
+            assertOk(response)
         },
         start: () => {
-            const response =
-                runtimeController.launch(appState.gameState().boardWorker.value(), appState.gameState().historyTree)
+            const response = runtimeController.launch(appState.gameState())
 
-            if (response === "ok") {
-                setAppConfig("autoLaunch", true)
-            } else {
-                throw new Error(response)
-            }
+            assertOk(response)
+
+            setAppConfig("autoLaunch", true)
         },
         pause: () => {
             setAppConfig("autoLaunch", false)
@@ -163,11 +158,9 @@ export function AppContextProvider(props: ParentProps) {
         abort: () => {
             const result = runtimeController.abort()
 
-            if (result === "ok") {
-                setAppConfig("autoLaunch", false)
-            } else {
-                throw new Error(result)
-            }
+            assertOk(result)
+
+            setAppConfig("autoLaunch", false)
         },
     }
 
@@ -201,7 +194,7 @@ export function AppContextProvider(props: ParentProps) {
 
             return runtimeController.syncConfig(runtime.provider.defaultConfig)
         },
-        clearAppData: () => {
+        resetAppData: () => {
             setPersistConfig(defaultPersistConfig())
         },
     }
@@ -217,16 +210,21 @@ export function AppContextProvider(props: ParentProps) {
 
             return runtime.type === "ready" ? runtime.state : undefined
         }),
+        isReady: createMemo(() => {
+            const runtime = appState.mintakaRuntime()
+
+            return runtime.type === "ready" && runtime.state.type === "idle"
+        }),
         inComputing: createMemo(() => {
             const runtime = appState.mintakaRuntime()
 
             return runtime.type === "ready" && runtime.state.type !== "idle"
         }),
-        maxConfig: () => {
+        maxConfig: createMemo(() => {
             const runtime = appState.mintakaRuntime()
 
             return runtime.type === "ready" ? runtime.provider.maxConfig : undefined
-        },
+        }),
     }
 
     const gameSelectors: GameSelectors = {

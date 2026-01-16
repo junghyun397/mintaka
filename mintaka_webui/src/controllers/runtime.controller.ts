@@ -5,6 +5,7 @@ import { buildMintakaRuntime, MintakaRuntimeState } from "../domain/mintaka.runt
 import { assertNever } from "../utils/never"
 import { createSession, MintakaServerConfig, MintakaServerProvider } from "../domain/mintaka.server.provider"
 import { MintakaProvider, MintakaProviderType } from "../domain/mintaka.provider"
+import { AppGameState } from "../domain/rusty-renju"
 
 export type RequireProviderReady = "ok" | "provider-not-ready"
 export type RequireProviderComputing = "ok" | "provider-not-launched"
@@ -13,7 +14,7 @@ interface RuntimeController {
     unloadRuntime: () => void,
     loadWorkerRuntime: (config: Config) => void,
     loadServerRuntime: (config: Config, serverConfig: MintakaServerConfig) => void,
-    launch: (boardSnapshot: Board, historyTreeSnapshot: HistoryTree) => RequireProviderReady,
+    launch: (snapshot: AppGameState) => RequireProviderReady,
     abort: () => RequireProviderComputing,
     syncPlay: (snapshot: HashKey, pos: MaybePos) => RequireProviderReady | "desynced",
     syncConfig: (config: Config) => RequireProviderReady,
@@ -103,6 +104,8 @@ export function createRuntimeController(
         if (previousRuntime.type === "ready") {
             previousRuntime.provider.dispose()
         }
+
+        setMintakaRuntime({ type: "none" })
     }
 
     return {
@@ -144,17 +147,17 @@ export function createRuntimeController(
                     setMintakaRuntime(runtime)
                 })
         },
-        launch: (boardSnapshot: Board, historyTreeSnapshot: HistoryTree) => {
+        launch: (snapshot: AppGameState) => {
             const runtime = mintakaRuntime()
             if (runtime.type !== "ready" || runtime.state.type !== "idle")
                 return "provider-not-ready"
 
-            if (runtime.state.snapshot !== boardSnapshot.hash_key)
-                syncAll(boardSnapshot, historyTreeSnapshot.toHistory())
+            if (runtime.state.snapshot !== snapshot.boardWorker.hashKey())
+                syncAll(snapshot.boardWorker.value(), snapshot.historyTree.toHistory())
 
-            runtime.provider.launch(boardSnapshot.hash_key, "Best")
+            runtime.provider.launch(snapshot.boardWorker.hashKey(), "Best")
 
-            setMintakaRuntime({ ...runtime, state: runtime.state.launch(historyTreeSnapshot) })
+            setMintakaRuntime({ ...runtime, state: runtime.state.launch(snapshot.historyTree) })
 
             return "ok"
         },

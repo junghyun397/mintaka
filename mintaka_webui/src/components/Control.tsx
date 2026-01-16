@@ -48,7 +48,11 @@ function ControlButtons() {
         >
             <IconChevronLeft />
         </button>
-        <Switch>
+        <Switch fallback={
+            <button class="btn btn-disabled btn-square">
+                <IconPlay />
+            </button>
+        }>
             <Match when={runtimeSelectors.inComputing()}>
                 <button
                     class="btn btn-square animate-pulse"
@@ -57,7 +61,7 @@ function ControlButtons() {
                     <IconStop />
                 </button>
             </Match>
-            <Match when={appConfig.autoLaunch && !runtimeSelectors.inComputing()}>
+            <Match when={appConfig.autoLaunch && runtimeSelectors.isReady()}>
                 <button
                     class="btn btn-square"
                     onClick={gameActions.pause}
@@ -65,10 +69,9 @@ function ControlButtons() {
                     <IconPause />
                 </button>
             </Match>
-            <Match when={!appConfig.autoLaunch && !runtimeSelectors.inComputing()}>
+            <Match when={!appConfig.autoLaunch && runtimeSelectors.isReady()}>
                 <button
                     class="btn btn-square"
-                    classList={{ "btn-disabled": runtimeSelectors.runtimeState() === undefined }}
                     onClick={gameActions.start}
                 >
                     <IconPlay />

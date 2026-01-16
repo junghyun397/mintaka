@@ -22,17 +22,6 @@ pub const MAYBE_POS_NONE: u8 = rusty_renju::notation::pos::MaybePos::INVALID_POS
 pub extern "C" fn rusty_renju_pos_none() -> u8 { MAYBE_POS_NONE }
 
 #[repr(C)]
-pub struct Board {
-    inner: rusty_renju::board::Board,
-}
-
-impl From<rusty_renju::board::Board> for Board {
-    fn from(value: rusty_renju::board::Board) -> Self {
-        Self { inner: value }
-    }
-}
-
-#[repr(C)]
 #[derive(Copy, Clone)]
 pub struct BoardExportStone {
     pub color: u8,
@@ -113,31 +102,8 @@ impl From<rusty_renju::board_io::BoardDescribe> for BoardDescribe {
     }
 }
 
-fn actions_slice<'a>(actions: *const u8, len: usize) -> Option<&'a [u8]> {
-    if len == 0 {
-        return Some(&[]);
-    }
-
-    if actions.is_null() {
-        return None;
-    }
-
-    Some(unsafe { std::slice::from_raw_parts(actions, len) })
-}
-
-fn history_from_actions(actions: &[u8]) -> Option<rusty_renju::history::History> {
-    let mut history = rusty_renju::history::History::default();
-
-    for &action in actions {
-        let action = rusty_renju::notation::pos::MaybePos::try_from(action).ok()?;
-        history.action_mut(action);
-    }
-
-    Some(history)
-}
-
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_default_board() -> *mut Board {
+pub extern "C" fn rusty_renju_default_board() -> *mut rusty_renju::notation::ffi::CBoard {
     Box::into_raw(Box::new(rusty_renju::board::Board::default().into()))
 }
 
@@ -147,30 +113,28 @@ pub extern "C" fn rusty_renju_empty_hash() -> u64 {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_from_history(actions: *const u8, len: usize) -> *mut Board {
-    if let Some(actions) = actions_slice(actions, len)
-        && let Some(history) = history_from_actions(actions)
-    {
-        Box::into_raw(Box::new(Board { inner: rusty_renju::board::Board::from(&history) }))
+pub extern "C" fn rusty_renju_board_from_history(actions: *const u8, len: usize) -> *mut rusty_renju::notation::ffi::CBoard {
+    if let Some(actions) = rusty_renju::notation::ffi::from_raw_maybe_pos_slice(actions, len) {
+        Box::into_raw(Box::new(rusty_renju::board::Board::from(&actions.into()).into()))
     } else {
         ptr::null_mut()
     }
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_from_string(source: *const c_char) -> *mut Board {
+pub extern "C" fn rusty_renju_board_from_string(source: *const c_char) -> *mut rusty_renju::notation::ffi::CBoard {
     if let Some(source) = unsafe { source.as_ref() }
         && let Ok(source) = unsafe { CStr::from_ptr(source) }.to_str()
         && let Ok(board) = source.parse::<rusty_renju::board::Board>()
     {
-        Box::into_raw(Box::new(Board { inner: board }))
+        Box::into_raw(Box::new(board.into()))
     } else {
         ptr::null_mut()
     }
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_to_string(board: *const Board) -> *mut c_char {
+pub extern "C" fn rusty_renju_board_to_string(board: *const rusty_renju::notation::ffi::CBoard) -> *mut c_char {
     if let Some(board) = unsafe { board.as_ref() }
         && let Ok(result) = CString::new(board.inner.to_string())
     {
@@ -181,25 +145,25 @@ pub extern "C" fn rusty_renju_board_to_string(board: *const Board) -> *mut c_cha
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_hash_key(board: *const Board) -> u64 {
+pub extern "C" fn rusty_renju_board_hash_key(board: *const rusty_renju::notation::ffi::CBoard) -> u64 {
     unsafe { board.as_ref() }
         .map_or(0, |board| u64::from(board.inner.hash_key))
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_player_color(board: *const Board) -> u8 {
+pub extern "C" fn rusty_renju_board_player_color(board: *const rusty_renju::notation::ffi::CBoard) -> u8 {
     unsafe { board.as_ref() }
         .map_or(0, |board| board.inner.player_color as u8)
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_stones(board: *const Board) -> u8 {
+pub extern "C" fn rusty_renju_board_stones(board: *const rusty_renju::notation::ffi::CBoard) -> u8 {
     unsafe { board.as_ref() }
         .map_or(0, |board| board.inner.stones)
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_patterns(board: *const Board) -> *mut Patterns {
+pub extern "C" fn rusty_renju_board_patterns(board: *const rusty_renju::notation::ffi::CBoard) -> *mut Patterns {
     if let Some(board) = unsafe { board.as_ref() } {
         Box::into_raw(Box::new(board.inner.patterns.field.into()))
     } else {
@@ -215,7 +179,7 @@ pub extern "C" fn rusty_renju_board_patterns_free(patterns: *mut Patterns) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_pattern(board: *const Board, color: u8, pos: u8) -> u32 {
+pub extern "C" fn rusty_renju_board_pattern(board: *const rusty_renju::notation::ffi::CBoard, color: u8, pos: u8) -> u32 {
     if let Some(board) = unsafe { board.as_ref() }
         && let Ok(color) = rusty_renju::notation::color::Color::try_from(color)
         && let Ok(pos) = rusty_renju::notation::pos::Pos::try_from(pos)
@@ -227,7 +191,7 @@ pub extern "C" fn rusty_renju_board_pattern(board: *const Board, color: u8, pos:
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_is_pos_empty(board: *const Board, pos: u8) -> bool {
+pub extern "C" fn rusty_renju_board_is_pos_empty(board: *const rusty_renju::notation::ffi::CBoard, pos: u8) -> bool {
     if let Some(board) = unsafe { board.as_ref() }
         && let Ok(pos) = rusty_renju::notation::pos::Pos::try_from(pos)
     {
@@ -238,7 +202,7 @@ pub extern "C" fn rusty_renju_board_is_pos_empty(board: *const Board, pos: u8) -
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_is_legal_move(board: *const Board, pos: u8) -> bool {
+pub extern "C" fn rusty_renju_board_is_legal_move(board: *const rusty_renju::notation::ffi::CBoard, pos: u8) -> bool {
     if let Some(board) = unsafe { board.as_ref() }
         && let Ok(pos) = rusty_renju::notation::pos::Pos::try_from(pos)
     {
@@ -249,7 +213,7 @@ pub extern "C" fn rusty_renju_board_is_legal_move(board: *const Board, pos: u8) 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_stone_kind(board: *const Board, pos: u8) -> u8 {
+pub extern "C" fn rusty_renju_board_stone_kind(board: *const rusty_renju::notation::ffi::CBoard, pos: u8) -> u8 {
     if let Some(board) = unsafe { board.as_ref() }
         && let Ok(pos) = rusty_renju::notation::pos::Pos::try_from(pos)
     {
@@ -260,7 +224,7 @@ pub extern "C" fn rusty_renju_board_stone_kind(board: *const Board, pos: u8) -> 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_set(board: *const Board, pos: u8) -> *mut Board {
+pub extern "C" fn rusty_renju_board_set(board: *const rusty_renju::notation::ffi::CBoard, pos: u8) -> *mut rusty_renju::notation::ffi::CBoard {
     if let Some(board) = unsafe { board.as_ref() }
         && let Ok(action) = rusty_renju::notation::pos::MaybePos::try_from(pos)
     {
@@ -276,11 +240,11 @@ pub extern "C" fn rusty_renju_board_set(board: *const Board, pos: u8) -> *mut Bo
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_unset(board: *const Board, pos: u8) -> *mut Board {
+pub extern "C" fn rusty_renju_board_unset(board: *const rusty_renju::notation::ffi::CBoard, pos: u8) -> *mut rusty_renju::notation::ffi::CBoard {
     if let Some(board) = unsafe { board.as_ref() }
-        && let Ok(action) = rusty_renju::notation::pos::MaybePos::try_from(pos)
+        && let Ok(maybe_pos) = rusty_renju::notation::pos::MaybePos::try_from(pos)
     {
-        let board = match action {
+        let board = match maybe_pos {
             rusty_renju::notation::pos::MaybePos::NONE => board.inner.pass(),
             pos => board.inner.unset(pos.unwrap()),
         }.into();
@@ -292,19 +256,18 @@ pub extern "C" fn rusty_renju_board_unset(board: *const Board, pos: u8) -> *mut 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_free(board: *mut Board) {
+pub extern "C" fn rusty_renju_board_free(board: *mut rusty_renju::notation::ffi::CBoard) {
     if !board.is_null() {
         unsafe { drop(Box::from_raw(board)); }
     }
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_describe(board: *const Board, actions: *const u8, len: usize) -> *mut BoardDescribe {
+pub extern "C" fn rusty_renju_board_describe(board: *const rusty_renju::notation::ffi::CBoard, maybe_pos_slice: *const u8, len: usize) -> *mut BoardDescribe {
     if let Some(board) = unsafe { board.as_ref() }
-        && let Some(actions) = actions_slice(actions, len)
-        && let Some(history) = history_from_actions(actions)
+        && let Some(maybe_pos_slice) = rusty_renju::notation::ffi::from_raw_maybe_pos_slice(maybe_pos_slice, len)
     {
-        Box::into_raw(Box::new(BoardDescribe::from(board.inner.describe(&history))))
+        Box::into_raw(Box::new(BoardDescribe::from(board.inner.describe(&maybe_pos_slice.into()))))
     } else {
         ptr::null_mut()
     }
