@@ -11,9 +11,10 @@ use rusty_renju::utils::lang::DurationSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::time::Duration;
+#[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
-#[typeshare::typeshare]
+#[cfg_attr(feature = "typeshare", typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone)]
 pub struct CompactGameState {
@@ -21,7 +22,7 @@ pub struct CompactGameState {
     pub history: History,
 }
 
-#[typeshare(serialized_as = "CommandSchema")]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "CommandSchema"))]
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -61,7 +62,7 @@ pub enum Command {
 #[cfg(any())]
 mod typeshare_workaround {
     use super::*;
-    #[typeshare::typeshare]
+    #[cfg_attr(feature = "typeshare", typeshare)]
     #[derive(Serialize, Deserialize)]
     #[serde(tag = "type", content = "content")]
     pub enum CommandSchema {

@@ -9,6 +9,7 @@ use crate::{index_to_col, index_to_row};
 use std::array;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
 #[repr(u64)]
@@ -18,7 +19,7 @@ pub enum BoardIterItem {
     Pattern(ColorContainer<Pattern>),
 }
 
-#[typeshare(serialized_as = "BoardExportItemSchema")]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "BoardExportItemSchema"))]
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -34,7 +35,7 @@ pub enum BoardExportItem {
 #[cfg(any())]
 mod typeshare_workaround {
     use super::*;
-    #[typeshare::typeshare]
+    #[cfg_attr(feature = "typeshare", typeshare)]
     #[derive(Serialize, Deserialize)]
     #[serde(tag = "type", content = "content")]
     pub enum BoardExportItemSchema {
@@ -44,7 +45,7 @@ mod typeshare_workaround {
     }
 }
 
-#[typeshare::typeshare]
+#[cfg_attr(feature = "typeshare", typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub struct BoardExportStone {

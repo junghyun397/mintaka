@@ -2,19 +2,18 @@ use rusty_renju::notation::pos::MaybePos;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-
 #[allow(unused_imports)]
 use rusty_renju::utils::lang::DurationSchema;
 
-#[typeshare::typeshare]
+#[cfg_attr(feature = "typeshare", typeshare::typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Timer {
-    #[typeshare(serialized_as = "Option<DurationSchema>")]
+    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Option<DurationSchema>"))]
     pub total_remaining: Option<Duration>,
-    #[typeshare(serialized_as = "DurationSchema")]
+    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "DurationSchema"))]
     pub increment: Duration,
-    #[typeshare(serialized_as = "Option<DurationSchema>")]
+    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Option<DurationSchema>"))]
     pub turn: Option<Duration>,
 }
 

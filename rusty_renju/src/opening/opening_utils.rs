@@ -1,6 +1,5 @@
 use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
-use rand::{rng, Rng};
 use std::collections::HashSet;
 
 fn find_symmetry_moves(ref1: Pos, ref2: Pos, m: Pos) -> HashSet<Pos> {
@@ -64,7 +63,7 @@ pub fn generate_random_opening_moves<const N: usize>() -> [Pos; N] {
     raw_moves[0] = pos::CENTER.idx();
 
     fn generate_move_in(width: u8) -> u8 {
-        let rel_move = rng().random_range(0 .. width * width);
+        let rel_move = 3; // TODO: use random
         let offset = pos::BOARD_WIDTH / 2 - width / 2;
         (rel_move / width + offset) * pos::BOARD_WIDTH + rel_move % width + offset
     }

@@ -3,9 +3,10 @@ use crate::impl_debug_from_display;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
+#[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
-#[typeshare(serialized_as = "number")]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "number"))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Default)]
 pub struct ByteSize(u64);

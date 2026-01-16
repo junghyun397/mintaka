@@ -69,7 +69,8 @@ impl Preference {
 
         match self.workers {
             Some(workers) => self.default_config.workers = workers,
-            None => self.default_config.workers = num_cpus::get() as u32,
+            None => self.default_config.workers = std::thread::available_parallelism()
+                .map_or_else(|_| 1, |n| n.get()) as u32,
         }
 
         self.default_config.max_nodes_in_1k = self.nodes_in_1k;

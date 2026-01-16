@@ -7,10 +7,11 @@ use rusty_renju::notation::score::{Score, Scores};
 use rusty_renju::utils::byte_size::ByteSize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize, Serializer};
-use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU32, Ordering};
+#[cfg(feature = "compress-tt")]
+use std::io::{Read, Write};
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "compress-tt")]
 fn tt_compress(bytes: &[u8], compression_level: u32) -> Vec<u8> {
     let mut encoder = lz4::EncoderBuilder::new()
         .level(compression_level)
@@ -23,12 +24,12 @@ fn tt_compress(bytes: &[u8], compression_level: u32) -> Vec<u8> {
     compressed
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(not(feature = "compress-tt"))]
 fn tt_compress(bytes: &[u8], _compression_level: u32) -> Vec<u8> {
     bytes.to_vec()
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "compress-tt")]
 fn tt_decompress(source: Vec<u8>) -> Result<Vec<u8>, &'static str> {
     let mut decoder = lz4::Decoder::new(std::io::Cursor::new(source))
         .map_err(|_| "failed to build decoder")?;
@@ -39,7 +40,7 @@ fn tt_decompress(source: Vec<u8>) -> Result<Vec<u8>, &'static str> {
     Ok(decompressed)
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(not(feature = "compress-tt"))]
 fn tt_decompress(source: Vec<u8>) -> Result<Vec<u8>, &'static str> {
     Ok(source)
 }

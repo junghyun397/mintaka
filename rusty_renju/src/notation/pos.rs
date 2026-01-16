@@ -6,6 +6,7 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
+#[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
 pub const BOARD_WIDTH: u8 = 15;
@@ -57,7 +58,7 @@ pub const fn pos_unchecked(source: &str) -> Pos {
     Pos::from_cartesian(row, col)
 }
 
-#[typeshare(serialized_as = "PosSchema")]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "PosSchema"))]
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub struct Pos(u8);
 
@@ -207,7 +208,7 @@ impl<'de> Deserialize<'de> for Pos {
     }
 }
 
-#[typeshare(serialized_as = "Option<Pos>")]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Option<Pos>"))]
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 #[repr(transparent)]
 pub struct MaybePos(Pos);

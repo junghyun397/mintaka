@@ -10,11 +10,12 @@ use std::fmt::{Debug, Display, Formatter};
 use std::iter;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
+#[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
 pub const MAX_HISTORY_SIZE: usize = 248;
 
-#[typeshare(serialized_as = "Vec<MaybePos>")]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Vec<MaybePos>"))]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct History {
     pub entries: [MaybePos; MAX_HISTORY_SIZE],

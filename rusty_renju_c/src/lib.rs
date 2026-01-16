@@ -52,9 +52,9 @@ const BOARD_EXPORT_ITEM_FORBIDDEN: u8 = 2;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_board_export_item_empty() -> u8 { BOARD_EXPORT_ITEM_EMPTY }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_board_export_item_stone() -> u8 { BOARD_EXPORT_ITEM_STONE }
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_board_export_item_forbidden() -> u8 { BOARD_EXPORT_ITEM_FORBIDDEN }
 
 type Patterns = rusty_renju::notation::color::ColorContainer<[rusty_renju::pattern::Pattern; rusty_renju::pattern::PATTERN_SIZE]>;
@@ -317,7 +317,7 @@ pub extern "C" fn rusty_renju_board_describe_free(describe: *mut BoardDescribe) 
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_version() -> *const c_char {
     CString::new(env!("CARGO_PKG_VERSION")).unwrap().into_raw()
 }

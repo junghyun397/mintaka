@@ -1,4 +1,4 @@
-#[typeshare::typeshare]
+#[cfg_attr(feature = "typeshare", typeshare::typeshare)]
 pub type Score = i32;
 
 pub trait Scores {

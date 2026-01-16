@@ -33,7 +33,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-#[typeshare::typeshare]
+#[cfg_attr(feature = "typeshare", typeshare::typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub struct BestMove {
@@ -43,7 +43,7 @@ pub struct BestMove {
     pub selective_depth: u32,
     pub total_nodes_in_1k: u32,
     pub pv: PrincipalVariation,
-    #[typeshare(serialized_as = "DurationSchema")]
+    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "DurationSchema"))]
     pub time_elapsed: Duration,
 }
 

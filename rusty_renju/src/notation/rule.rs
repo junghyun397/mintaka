@@ -1,8 +1,9 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
-#[typeshare(serialized_as = "String")] // using string to avoid ts enum
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(std::marker::ConstParamTy, Default, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum RuleKind {
@@ -28,7 +29,7 @@ impl RuleKind {
 
 }
 
-#[typeshare(serialized_as = "String")] // using string to avoid ts enum
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 #[repr(u8)]

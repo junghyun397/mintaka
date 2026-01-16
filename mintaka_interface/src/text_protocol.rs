@@ -169,7 +169,8 @@ fn handle_command(
                             .ok_or("workers not provided.".to_string())?
                         {
                             "auto" => {
-                                let cores = num_cpus::get_physical() as u32;
+                                let cores = std::thread::available_parallelism()
+                                    .map_or_else(|_| 1, |n| n.get()) as u32;
 
                                 println!("info: workers={cores}");
 

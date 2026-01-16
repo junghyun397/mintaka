@@ -8,9 +8,10 @@ use rusty_renju::utils::byte_size::ByteSize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
+#[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
-#[typeshare(serialized_as = "String")] // using string to avoid ts enum
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum SearchObjective {
@@ -19,7 +20,7 @@ pub enum SearchObjective {
     Pondering = 2
 }
 
-#[typeshare::typeshare]
+#[cfg_attr(feature = "typeshare", typeshare)]
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),

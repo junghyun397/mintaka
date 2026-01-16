@@ -8,9 +8,10 @@ use crate::pattern;
 use crate::pattern::Patterns;
 use crate::slice::{Slice, Slices};
 use std::hash::{Hash, Hasher};
+#[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
-#[typeshare(serialized_as = "BoardData")]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "BoardData"))]
 #[derive(Copy, Clone)]
 pub struct Board {
     pub player_color: Color,

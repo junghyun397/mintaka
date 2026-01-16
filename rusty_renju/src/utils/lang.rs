@@ -1,3 +1,6 @@
+#[cfg(feature = "typeshare")]
+use typeshare::typeshare;
+
 #[macro_export] macro_rules! const_for {
     ($idx:ident in $start:expr, $end:expr; $body:block) => {
         {
@@ -69,9 +72,9 @@ pub const fn repeat_16x(source: u8) -> u128 {
 }
 
 #[allow(dead_code)]
-#[typeshare::typeshare]
+#[cfg_attr(feature = "typeshare", typeshare)]
 pub struct DurationSchema {
-    #[typeshare(serialized_as = "number")]
+    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "number"))]
     secs: u64,
     nanos: u32,
 }

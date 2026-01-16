@@ -8,12 +8,14 @@ use crate::{cartesian_to_index, impl_debug_from_display};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
+#[cfg(feature = "typeshare")]
+use typeshare::typeshare;
 
-#[typeshare::typeshare]
+#[cfg_attr(feature = "typeshare", typeshare)]
 #[derive(Eq, PartialEq, Copy, Clone)]
 #[repr(C)]
 pub struct HashKey(
-    #[typeshare(serialized_as = "String")]
+    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
     u64
 );
 

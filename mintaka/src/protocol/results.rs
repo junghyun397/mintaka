@@ -4,9 +4,10 @@ use rusty_renju::notation::color::Color;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
+#[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
-#[typeshare(serialized_as = "GameResultSchema")]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "GameResultSchema"))]
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -22,7 +23,7 @@ pub enum GameResult {
 #[cfg(any())]
 mod typeshare_workaround {
     use super::*;
-    #[typeshare::typeshare]
+    #[cfg_attr(feature = "typeshare", typeshare)]
     #[derive(Serialize, Deserialize)]
     #[serde(tag = "type", content = "content")]
     pub enum GameResultSchema {
@@ -44,7 +45,7 @@ impl Display for GameResult {
 
 impl_debug_from_display!(GameResult);
 
-#[typeshare::typeshare]
+#[cfg_attr(feature = "typeshare", typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub struct CommandResult {

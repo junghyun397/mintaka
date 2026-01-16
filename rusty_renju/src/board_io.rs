@@ -14,6 +14,8 @@ use crate::utils::str_utils::join_str_horizontally;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
+#[cfg(feature = "typeshare")]
+use typeshare::typeshare;
 
 pub const SYMBOL_BLACK: char = 'X';
 pub const SYMBOL_WHITE: char = 'O';
@@ -30,7 +32,7 @@ enum BoardElement {
     Empty
 }
 
-#[typeshare::typeshare]
+#[cfg_attr(feature = "typeshare", typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BoardDescribe {
     pub hash_key: HashKey,
@@ -41,6 +43,10 @@ pub struct BoardDescribe {
             serialize_with = "crate::utils::serde::serialize_array",
             deserialize_with = "crate::utils::serde::deserialize_array"
         ),
+    )]
+    #[cfg_attr(
+        feature = "typeshare",
+        typeshare(serialized_as = "Vec<BoardExportItem>")
     )]
     pub field: [BoardExportItem; pos::BOARD_SIZE],
 }
@@ -364,7 +370,7 @@ impl Display for Slice {
     };
 }
 
-#[typeshare::typeshare]
+#[cfg_attr(feature = "typeshare", typeshare::typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[allow(dead_code)]
 struct BoardData {

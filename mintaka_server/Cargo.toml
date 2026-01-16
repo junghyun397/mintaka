@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 rusty_renju = { path = "../rusty_renju", features = ["serde"] }
-mintaka = { path = "../mintaka", features = ["serde"] }
+mintaka = { path = "../mintaka", features = ["serde", "compress-tt"] }
 
 typeshare = "1.0"
 

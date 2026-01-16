@@ -4,9 +4,10 @@ use rusty_renju::notation::pos::MaybePos;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::{Display, Formatter};
+#[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
-#[typeshare(serialized_as = "Vec<MaybePos>")]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Vec<MaybePos>"))]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct PrincipalVariation {
     pub line: [MaybePos; MAX_PLY],

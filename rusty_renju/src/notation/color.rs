@@ -5,9 +5,10 @@ use std::fmt::{Display, Formatter};
 use std::ops::Not;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
+#[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
-#[typeshare(serialized_as = "ColorSchema")]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "ColorSchema"))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(std::marker::ConstParamTy, PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]
@@ -153,7 +154,7 @@ macro_rules! impl_color_container {
     };
 }
 
-#[typeshare::typeshare]
+#[cfg_attr(feature = "typeshare", typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct ColorContainer<T>(pub [T; 2]);
