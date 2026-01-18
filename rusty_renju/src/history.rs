@@ -28,6 +28,15 @@ impl Default for History {
     }
 }
 
+impl From<&[MaybePos]> for History {
+    fn from(value: &[MaybePos]) -> Self {
+        let mut history = History::default();
+        history.entries[.. value.len()].copy_from_slice(value);
+        history.top = value.len();
+        history
+    }
+}
+
 impl Index<usize> for History {
     type Output = MaybePos;
 

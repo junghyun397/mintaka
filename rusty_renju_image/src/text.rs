@@ -1,8 +1,8 @@
 // LLM-generated
 
-use crate::TextBitmap;
 use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle};
 use fontdue::Font;
+use crate::renderer::TextBitmap;
 
 pub(crate) fn raster_text(font: &Font, text: &str, size: f32) -> TextBitmap {
     let mut layout = Layout::new(CoordinateSystem::PositiveYDown);

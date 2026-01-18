@@ -27,7 +27,7 @@ pub enum Color {
 ## typeshare and proc_macro attribute bug
 Optimal code:
 ```rust
-#[typeshare::typeshare]
+#[cfg_attr(feature = "typeshare", typeshare)]
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -40,7 +40,7 @@ pub enum Response {
 ```
 Current workaround:
 ```rust
-#[typeshare(serialized_as = "CommandSchema")]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "CommandSchema"))]
 #[cfg_attr(
     feature = "serde", 
     derive(Serialize, Deserialize),
@@ -54,7 +54,7 @@ pub enum Response {
 #[cfg(any())]
 mod typeshare_workaround {
     use super::*;
-    #[typeshare::typeshare]
+    #[cfg_attr(feature = "typeshare", typeshare)]
     #[derive(Serialize, Deserialize)]
     #[serde(tag = "type", content = "content")]
     pub enum ResponseSchema {
