@@ -2,8 +2,7 @@ import { Accessor, createContext, createEffect, createMemo, ParentProps } from "
 import { createStore, reconcile, SetStoreFunction, unwrap } from "solid-js/store"
 import { ForwardMethod } from "./domain/HistoryTree"
 import { BoardDescribe, Config, HashKey, History, Pos } from "./wasm/pkg/mintaka_wasm"
-import { PersistConfig, defaultPersistConfig } from "./stores/persist.config"
-import { makePersisted } from "@solid-primitives/storage"
+import { createPersistConfigStore, defaultPersistConfig, PersistConfig } from "./stores/persist.config"
 import { AppConfig } from "./stores/app.config"
 import { createGameController } from "./controllers/game.controller"
 import { createRuntimeController, MintakaRuntime, RequireProviderReady } from "./controllers/runtime.controller"
@@ -13,14 +12,16 @@ import { flatmap } from "./utils/undefined"
 import { parseUrlParams, setupUrlSync } from "./url"
 import { AppGameState, buildGameStateFromHistorySource } from "./domain/rusty-renju"
 import { setupThemeSync } from "./theme"
+import { assertOk } from "./utils/response"
+import { assertNever } from "./utils/never"
 
 interface AppActions {
     readonly loadWorkerRuntime: () => void,
     readonly switchServerRuntime: () => void,
     readonly loadServerRuntime: () => void,
-    readonly syncConfig: (config: Config) => RequireProviderReady,
-    readonly resetConfig: () => RequireProviderReady,
-    readonly clearAppData: () => void,
+    readonly updateConfig: (config: Config) => RequireProviderReady,
+    readonly restoreDefaultConfig: () => RequireProviderReady,
+    readonly resetAppData: () => void,
 }
 
 interface AppSelectors {
@@ -30,7 +31,9 @@ interface AppSelectors {
 interface RuntimeSelectors {
     readonly runtimeType: Accessor<MintakaRuntime["type"]>,
     readonly runtimeState: Accessor<MintakaRuntimeState | undefined>
+    readonly isReady: Accessor<boolean>,
     readonly inComputing: Accessor<boolean>,
+    readonly config: Accessor<Config | undefined>,
     readonly maxConfig: Accessor<Config | undefined>,
 }
 
@@ -81,12 +84,13 @@ export function AppContextProvider(props: ParentProps) {
         ),
     )
 
-    const [persistConfig, setPersistConfig] = makePersisted(createStore(defaultPersistConfig()))
+    const [persistConfig, setPersistConfig] = createPersistConfigStore()
 
     const gameController = createGameController(appState.gameState, appState.setGameState)
 
     const runtimeController = createRuntimeController(
         appState.mintakaRuntime, appState.setMintakaRuntime, gameController.applyBestMove,
+        appState.config, appState.setConfig, appState.maxConfig, appState.setMaxConfig,
     )
 
     const [appConfig, setAppConfig] = createStore<AppConfig>({ autoLaunch: false, openDashboard: false, viewer: initialUrlParam.viewer })
@@ -115,47 +119,40 @@ export function AppContextProvider(props: ParentProps) {
 
             const playResponse = gameController.play(pos)
 
-            if (playResponse !== "ok") return
+            assertOk(playResponse)
 
             runtimeController.syncPlay(appState.gameState().boardWorker.hashKey(), pos)
 
             if (!appConfig.autoLaunch) return
 
-            runtimeController.launch(appState.gameState().boardWorker.value(), appState.gameState().historyTree)
+            runtimeController.launch(appState.gameState())
         },
         forward: (method) => {
             const response = gameController.forward(method)
 
-            if (response !== "ok")
-                throw new Error(response)
+            assertOk(response)
         },
         bulkForward: (method) => {
             const response = gameController.bulkForward(method)
 
-            if (response !== "ok")
-                throw new Error(response)
+            assertOk(response)
         },
         backward: () => {
             const response = gameController.backward()
 
-            if (response !== "ok")
-                throw new Error(response)
+            assertOk(response)
         },
         bulkBackward: () => {
             const response = gameController.bulkBackward()
 
-            if (response !== "ok")
-                throw new Error(response)
+            assertOk(response)
         },
         start: () => {
-            const response =
-                runtimeController.launch(appState.gameState().boardWorker.value(), appState.gameState().historyTree)
+            const response = runtimeController.launch(appState.gameState())
 
-            if (response === "ok") {
-                setAppConfig("autoLaunch", true)
-            } else {
-                throw new Error(response)
-            }
+            assertOk(response)
+
+            setAppConfig("autoLaunch", true)
         },
         pause: () => {
             setAppConfig("autoLaunch", false)
@@ -163,11 +160,9 @@ export function AppContextProvider(props: ParentProps) {
         abort: () => {
             const result = runtimeController.abort()
 
-            if (result === "ok") {
-                setAppConfig("autoLaunch", false)
-            } else {
-                throw new Error(result)
-            }
+            assertOk(result)
+
+            setAppConfig("autoLaunch", false)
         },
     }
 
@@ -175,7 +170,7 @@ export function AppContextProvider(props: ParentProps) {
         loadWorkerRuntime: () => {
             setPersistConfig("providerType", "worker")
 
-            runtimeController.loadWorkerRuntime(unwrap(persistConfig.config))
+            runtimeController.loadWorkerRuntime()
         },
         switchServerRuntime: () => {
             setPersistConfig("providerType", "server")
@@ -185,23 +180,11 @@ export function AppContextProvider(props: ParentProps) {
         loadServerRuntime: () => {
             if (persistConfig.providerType === "server" || persistConfig.serverConfig === undefined) return
 
-            runtimeController.loadServerRuntime(unwrap(persistConfig.config), unwrap(persistConfig.serverConfig))
+            runtimeController.tryLoadServerRuntime(unwrap(persistConfig.serverConfig))
         },
-        syncConfig: (config: Config) => {
-            setPersistConfig("config", reconcile(config))
-
-            return runtimeController.syncConfig(config)
-        },
-        resetConfig: () => {
-            const runtime = appState.mintakaRuntime()
-
-            if (runtime.type !== "ready") return "provider-not-ready"
-
-            setPersistConfig("config", reconcile(runtime.provider.defaultConfig))
-
-            return runtimeController.syncConfig(runtime.provider.defaultConfig)
-        },
-        clearAppData: () => {
+        updateConfig: runtimeController.updateConfig,
+        restoreDefaultConfig: runtimeController.restoreDefaultConfig,
+        resetAppData: () => {
             setPersistConfig(defaultPersistConfig())
         },
     }
@@ -217,16 +200,18 @@ export function AppContextProvider(props: ParentProps) {
 
             return runtime.type === "ready" ? runtime.state : undefined
         }),
+        isReady: createMemo(() => {
+            const runtime = appState.mintakaRuntime()
+
+            return runtime.type === "ready" && runtime.state.type === "idle"
+        }),
         inComputing: createMemo(() => {
             const runtime = appState.mintakaRuntime()
 
             return runtime.type === "ready" && runtime.state.type !== "idle"
         }),
-        maxConfig: () => {
-            const runtime = appState.mintakaRuntime()
-
-            return runtime.type === "ready" ? runtime.provider.maxConfig : undefined
-        },
+        config: appState.config,
+        maxConfig: appState.maxConfig,
     }
 
     const gameSelectors: GameSelectors = {
@@ -235,7 +220,18 @@ export function AppContextProvider(props: ParentProps) {
         boardDescribe,
     }
 
-    runtimeController.loadWorkerRuntime(unwrap(persistConfig.config))
+    switch (persistConfig.providerType) {
+        case "worker": {
+            runtimeController.loadWorkerRuntime()
+            break
+        }
+        case "server": {
+            if (persistConfig.serverConfig === undefined) break
+            runtimeController.tryLoadServerRuntime(persistConfig.serverConfig)
+            break
+        }
+        default: assertNever(persistConfig.providerType)
+    }
 
     return <AppContext.Provider
         value={{

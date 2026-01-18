@@ -1,5 +1,6 @@
 import { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand, MintakaProviderType } from "./mintaka.provider"
 import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
+import { assertOk } from "../utils/response"
 
 export class MintakaServerConfig {
     readonly address: string
@@ -41,7 +42,17 @@ export async function checkHealth(serverConfig: MintakaServerConfig): Promise<bo
     }
 }
 
-export async function createSession(serverConfig: MintakaServerConfig, config: Config, state: GameState): Promise<MintakaServerSession> {
+export async function fetchConfigs(serverConfig: MintakaServerConfig): Promise<{ defaultConfig: Config, maxConfig: Config }> {
+    const response = await fetch(serverConfig.url + "/config", {
+        headers: serverConfig.headers(),
+    })
+
+    assertOk(response)
+
+    return response.json()
+}
+
+export async function createSession(serverConfig: MintakaServerConfig, state: GameState, config: Config | undefined): Promise<MintakaServerSession> {
     const response = await fetch(serverConfig.url + "/sessions", {
         method: "POST",
         headers: serverConfig.headers({

@@ -1,8 +1,8 @@
-import { MintakaServerConfig } from "../domain/mintaka.server.provider"
+import type { MintakaServerConfig } from "../domain/mintaka.server.provider"
 import type { Config } from "../wasm/pkg/mintaka_wasm"
-import { defaultConfig } from "../wasm/pkg/mintaka_wasm"
-import { MintakaProviderType } from "../domain/mintaka.provider"
-import { duration } from "../domain/mintaka"
+import type { MintakaProviderType } from "../domain/mintaka.provider"
+import { createStore } from "solid-js/store"
+import { makePersisted } from "@solid-primitives/storage"
 
 const Themes = ["system", "dark", "light"] as const
 
@@ -23,7 +23,6 @@ export function nextHistoryDisplay(historyDisplay: HistoryDisplay): HistoryDispl
 export type PersistConfig = {
     providerType: MintakaProviderType,
     serverConfig?: MintakaServerConfig,
-    config: Config,
     theme: Theme,
     zoomBoard: boolean,
     historyDisplay: HistoryDisplay,
@@ -33,16 +32,12 @@ export function defaultPersistConfig(): PersistConfig {
     return {
         providerType: "worker",
         serverConfig: undefined,
-        config: {
-            ...defaultConfig(),
-            "initial_timer": {
-                total_remaining: duration(3000),
-                increment: duration(0),
-                turn: duration(1),
-            },
-        },
         theme: "system",
         zoomBoard: false,
         historyDisplay: "pair",
     }
+}
+
+export function createPersistConfigStore() {
+    return makePersisted(createStore(defaultPersistConfig()))
 }

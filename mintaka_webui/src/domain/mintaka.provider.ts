@@ -1,5 +1,4 @@
-import type { BestMove, Command, CommandResult, Config, HashKey, Response, SearchObjective } from "../wasm/pkg/mintaka_wasm"
-import { MintakaServerConfig } from "./mintaka.server.provider"
+import type { BestMove, Command, CommandResult, HashKey, Response, SearchObjective } from "../wasm/pkg/mintaka_wasm"
 
 export type MintakaProviderType = "server" | "worker"
 
@@ -14,8 +13,6 @@ export type MintakaProviderRuntimeCommand =
 
 export interface MintakaProvider {
     readonly type: MintakaProviderType,
-    readonly defaultConfig: Config,
-    readonly maxConfig: Config,
     subscribeResponse(handler: (response: MintakaProviderResponse) => void): void,
     dispose(): void,
     command(command: Command): void,
