@@ -1,5 +1,4 @@
-import type { Command, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
-import { defaultConfig } from "../wasm/pkg/mintaka_wasm"
+import type { Command, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/rusty_renju_wasm"
 import type { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand, MintakaProviderType } from "./mintaka.provider"
 import { duration, InfiniteDuration } from "./mintaka"
 
@@ -28,18 +27,26 @@ export class MintakaWorkerControl {
     }
 }
 
-export const workerDefaultConfig = () => ({
-    ...defaultConfig(),
-    workers: Math.min(1, navigator.hardwareConcurrency - 1),
+export const DefaultWorkerConfig: Config = {
+    rule_kind: "Renju",
+    draw_condition: 225,
+    max_nodes_in_1k: undefined,
+    max_depth: undefined,
+    max_vcf_depth: undefined,
+    tt_size: 1024 * 1024 * 128,
+    workers: Math.max(1, navigator.hardwareConcurrency - 1),
+    pondering: false,
+    dynamic_time: false,
     initial_timer: {
         total_remaining: undefined,
         increment: duration(0),
-        turn: duration(10),
+        turn: duration(5),
     },
-})
+    spawn_depth_specialist: false,
+}
 
-export const workerMaxConfig = () => ({
-    ...defaultConfig(),
+export const MaxWorkerConfig: Config = {
+    ...DefaultWorkerConfig,
     max_vcf_depth: 225,
     workers: 256,
     tt_size: 1024 * 1024 * 2048, // 2 GiB
@@ -49,7 +56,8 @@ export const workerMaxConfig = () => ({
         increment: InfiniteDuration,
         turn: undefined,
     },
-})
+    spawn_depth_specialist: true,
+}
 
 export class MintakaWorkerProvider implements MintakaProvider {
     readonly type: MintakaProviderType = "worker"

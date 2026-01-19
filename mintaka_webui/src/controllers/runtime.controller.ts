@@ -1,12 +1,13 @@
-import type { BestMove, Board, Config, HashKey, History, MaybePos } from "../wasm/pkg/mintaka_wasm"
-import { defaultBoard } from "../wasm/pkg/mintaka_wasm"
+import type { BestMove, Board, Config, GameState, HashKey, History, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
+import { defaultBoard } from "../wasm/pkg/rusty_renju_wasm"
 import { HistoryTree } from "../domain/HistoryTree"
-import { MintakaWorkerProvider, workerDefaultConfig } from "../domain/mintaka.worker.provider"
+import { DefaultWorkerConfig, MaxWorkerConfig, MintakaWorkerProvider } from "../domain/mintaka.worker.provider"
 import { buildMintakaRuntime, MintakaRuntimeState } from "../domain/mintaka.runtime"
 import { assertNever } from "../utils/never"
-import { createSession, MintakaServerConfig, MintakaServerProvider } from "../domain/mintaka.server.provider"
+import { createSession, fetchConfigs, MintakaServerConfig, MintakaServerProvider } from "../domain/mintaka.server.provider"
 import { MintakaProvider, MintakaProviderType } from "../domain/mintaka.provider"
 import { AppGameState } from "../domain/rusty-renju"
+import { Configs } from "../domain/mintaka"
 
 export type RequireProviderReady = "ok" | "provider-not-ready"
 export type RequireProviderComputing = "ok" | "provider-not-launched"
@@ -26,6 +27,7 @@ export type MintakaReadyRuntime = {
     type: "ready",
     provider: MintakaProvider,
     state: MintakaRuntimeState,
+    configs: Configs,
 }
 
 export type MintakaRuntime =
@@ -40,21 +42,17 @@ export function createRuntimeController(
     mintakaRuntime: () => MintakaRuntime,
     setMintakaRuntime: (runtime: MintakaRuntime) => void,
     onBestMove: (bestMove: BestMove, historySnapShot: HistoryTree) => void,
-    config: () => Config | undefined,
-    setConfig: (config: Config | undefined) => void,
-    maxConfig: () => Config | undefined,
-    setMaxConfig: (config: Config | undefined) => void,
 ): RuntimeController {
     const persistProviderConfigController = createPersistProviderConfigController()
 
-    const syncAll = (board: Board, history: History) => {
+    const syncAll = (gameState: GameState) => {
         const runtime = mintakaRuntime()
         if (runtime.type !== "ready")
             return "provider-not-ready"
 
         runtime.provider.command({
             type: "Sync",
-            content: { board, history },
+            content: gameState,
         })
 
         return "ok"
@@ -115,6 +113,27 @@ export function createRuntimeController(
         setMintakaRuntime({ type: "none" })
     }
 
+    async function loadServerRuntime(serverConfig: MintakaServerConfig) {
+        const board: Board = defaultBoard()
+        const history: History = []
+
+        let storedConfig = persistProviderConfigController.load({ type: "server", config: serverConfig })
+
+        setMintakaRuntime({ type: "loading", providerType: "server" })
+
+        const session = await createSession(serverConfig, { board, history }, storedConfig)
+        const configs = await fetchConfigs(serverConfig, session)
+
+        const provider = new MintakaServerProvider(serverConfig, session)
+
+        const runtimeState = buildMintakaRuntime(board.hash_key)
+        const runtime: MintakaRuntime = { type: "ready", provider, state: runtimeState, configs }
+
+        subscribeRuntime(provider)
+
+        setMintakaRuntime(runtime)
+    }
+
     return {
         unloadRuntime,
         loadWorkerRuntime: () => {
@@ -123,17 +142,13 @@ export function createRuntimeController(
             const board: Board = defaultBoard()
             const history: History = []
 
-            let config = persistProviderConfigController.load({ type: "worker" })
-
-            if (config === undefined) {
-                config = workerDefaultConfig()
-            }
+            let config = persistProviderConfigController.load({ type: "worker" }) ?? DefaultWorkerConfig
+            const configs = { default_config: DefaultWorkerConfig, max_config: MaxWorkerConfig, config: config }
 
             const provider = new MintakaWorkerProvider({ board, history }, config)
 
             const runtimeState = buildMintakaRuntime(board.hash_key)
-
-            const runtime: MintakaRuntime = { type: "ready", provider, state: runtimeState }
+            const runtime: MintakaRuntime = { type: "ready", provider, state: runtimeState, configs }
 
             subscribeRuntime(provider)
 
@@ -142,25 +157,7 @@ export function createRuntimeController(
         tryLoadServerRuntime: (serverConfig: MintakaServerConfig) => {
             unloadRuntime()
 
-            const board: Board = defaultBoard()
-            const history: History = []
-
-            let config = persistProviderConfigController.load({ type: "server", config: serverConfig })
-
-            setMintakaRuntime({ type: "loading", providerType: "server" })
-
-            createSession(serverConfig, { board, history }, config)
-                .then(session => {
-                    const provider = new MintakaServerProvider(serverConfig, session)
-
-                    const runtimeState = buildMintakaRuntime(board.hash_key)
-
-                    const runtime: MintakaRuntime = { type: "ready", provider, state: runtimeState }
-
-                    subscribeRuntime(provider)
-
-                    setMintakaRuntime(runtime)
-                })
+            void loadServerRuntime(serverConfig)
         },
         launch: (snapshot: AppGameState) => {
             const runtime = mintakaRuntime()
@@ -168,7 +165,7 @@ export function createRuntimeController(
                 return "provider-not-ready"
 
             if (runtime.state.snapshot !== snapshot.boardWorker.hashKey())
-                syncAll(snapshot.boardWorker.value(), snapshot.historyTree.toHistory())
+                syncAll({ board: snapshot.boardWorker.value(), history: snapshot.historyTree.toHistory() })
 
             runtime.provider.launch(snapshot.boardWorker.hashKey(), "Best")
 
@@ -212,6 +209,8 @@ export function createRuntimeController(
 
             runtime.provider.command({ type: "Config", content: config })
 
+            persistProviderConfigController.set(runtime.provider.type, "local", config)
+
             return "ok"
         },
         restoreDefaultConfig: () => {
@@ -222,7 +221,7 @@ export function createRuntimeController(
             if (runtime.type !== "ready" || runtime.state.type !== "idle")
                 return "provider-not-ready"
 
-            runtime.provider.command({ type: "Config", content: workerDefaultConfig() })
+            runtime.provider.command({ type: "Config", content: runtime.configs.default_config })
 
             return "ok"
         },

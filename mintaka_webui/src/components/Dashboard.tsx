@@ -1,7 +1,7 @@
 import { AppContext } from "../context"
 import { createMemo, createSignal, Match, Show, Switch, useContext } from "solid-js"
 import { unwrap } from "solid-js/store"
-import type { Config } from "../wasm/pkg/mintaka_wasm"
+import type { Config } from "../wasm/pkg/rusty_renju_wasm"
 import { flatmap } from "../utils/undefined"
 import { SERVER_PROTOCOL, SERVER_URL } from "../config"
 
@@ -77,7 +77,7 @@ function RuntimeConfig() {
                 <input
                     class="radio"
                     type="radio" name="options" id="worker"
-                    checked={persistConfig.providerType === "worker"}
+                    checked={persistConfig.selectedProviderType === "worker"}
                     onChange={appActions.loadWorkerRuntime}
                 />
                 <label for="worker" class="text inline-flex items-center">Web Worker</label>
@@ -86,13 +86,13 @@ function RuntimeConfig() {
                 <input
                     class="radio"
                     type="radio" name="options" id="server"
-                    checked={persistConfig.providerType === "server"}
+                    checked={persistConfig.selectedProviderType === "server"}
                     onChange={appActions.switchServerRuntime}
                 />
                 <label for="server" class="text inline-flex items-center">Server</label>
             </div>
         </div>
-        <Show when={persistConfig.providerType === "server"}>
+        <Show when={persistConfig.selectedProviderType === "server"}>
             <fieldset class="fieldset">
                 <legend class="fieldset-legend">Server Address</legend>
                 <label class="input" classList={{ "input-error": false }}>
@@ -170,47 +170,42 @@ function MintakaConfig(props: { config: Config, maxConfig: Config }) {
         </div>
         <div>
             <h3 class="text-lg">Time Controls</h3>
-            <fieldset class="fieldset">
-                <legend class="fieldset-legend">Total Time</legend>
-                <label class="input">
-                    <input
-                        type="number"
-                        placeholder="unlimited"
-                        min={1}
-                        max={props.maxConfig.initial_timer.total_remaining?.secs}
-                        value={props.config.initial_timer.total_remaining?.secs}
-                    />
-                    <span class="label">seconds</span>
-                </label>
-                <p class="label text-wrap">Max Turn</p>
-            </fieldset>
-            <fieldset class="fieldset">
-                <legend class="fieldset-legend">Increment Time</legend>
-                <label class="input">
-                    <input
-                        type="number"
-                        min={0}
-                        max={props.maxConfig.initial_timer.increment.secs}
-                        value={props.config.initial_timer.increment.secs}
-                    />
-                    <span class="label text-wrap">seconds</span>
-                </label>
-                <p class="label">Max Turn</p>
-            </fieldset>
-            <fieldset class="fieldset">
-                <legend class="fieldset-legend">Max Turn Time</legend>
-                <label class="input">
-                    <input
-                        type="number"
-                        placeholder="unlimited"
-                        min={1}
-                        max={props.maxConfig.initial_timer.turn?.secs}
-                        value={props.config.initial_timer.turn?.secs}
-                    />
-                    <span class="label text-wrap">seconds</span>
-                </label>
-                <p class="label">Max Turn</p>
-            </fieldset>
+            <ConfigSection
+                produce={value => ({ ...{ initial_timer: { total: value } }, ...unwrap(props.config) })}
+                value={props.config.initial_timer.total_remaining?.secs}
+                min={{
+                    type: "optional",
+                    value: undefined,
+                    placeholder: "undefined",
+                }}
+                max={props.maxConfig.initial_timer.total_remaining?.secs}
+                scale={1}
+                legend="Total Time" label="seconds" description="Total time"
+            />
+            <ConfigSection
+                produce={value => ({ ...{ initial_timer: { increment: value } }, ...unwrap(props.config) })}
+                value={props.config.initial_timer.increment.secs}
+                min={{
+                    type: "finite",
+                    value: 0,
+                    placeholder: "0",
+                }}
+                max={props.maxConfig.initial_timer.increment.secs}
+                scale={1}
+                legend="Increment Time" label="seconds" description="Increment time"
+            />
+            <ConfigSection
+                produce={value => ({ ...{ initial_timer: { turn: value } }, ...unwrap(props.config) })}
+                value={props.config.initial_timer.turn?.secs}
+                min={{
+                    type: "optional",
+                    value: undefined,
+                    placeholder: "unlimited",
+                }}
+                max={props.maxConfig.initial_timer.turn?.secs}
+                scale={1}
+                legend="Max Turn Time" label="seconds" description="Max turn"
+            />
         </div>
         <div>
             <h3 class="text-lg">Search Limits</h3>
@@ -237,8 +232,7 @@ function MintakaConfig(props: { config: Config, maxConfig: Config }) {
                 }}
                 max={props.maxConfig.max_depth ?? 225}
                 scale={1}
-                legend="Depth Limit" label="moves"
-                description="Maximum reachable selective depth."
+                legend="Depth Limit" label="moves" description="Maximum reachable selective depth."
             />
         </div>
     </div>

@@ -1,9 +1,7 @@
-import type { Config, HashKey } from "../wasm/pkg/mintaka_wasm"
-import { defaultBoard, BoardWorker } from "../wasm/pkg/mintaka_wasm"
-import { EmptyHistoryTree } from "../domain/HistoryTree"
+import type { HashKey } from "../wasm/pkg/rusty_renju_wasm"
 import { Accessor, createSignal, Setter } from "solid-js"
-import { AppGameState } from "../domain/rusty-renju"
-import { MintakaRuntime } from "../controllers/runtime.controller"
+import type { AppGameState } from "../domain/rusty-renju"
+import type { MintakaRuntime } from "../controllers/runtime.controller"
 
 export type AppState = {
     readonly mintakaRuntime: Accessor<MintakaRuntime>,
@@ -12,30 +10,18 @@ export type AppState = {
     readonly gameState: Accessor<AppGameState>,
     readonly setGameState: Setter<AppGameState>,
 
-    readonly config: Accessor<Config | undefined>,
-    readonly setConfig: Setter<Config | undefined>,
-    readonly maxConfig: Accessor<Config | undefined>,
-    readonly setMaxConfig: Setter<Config | undefined>,
-
     readonly normEvalTable: Map<HashKey, number>,
 }
 
-export function createAppState(initial?: AppGameState): AppState {
-    const appState = initial
-        ?? { boardWorker: new BoardWorker(defaultBoard()), historyTree: EmptyHistoryTree }
-
+export function createAppState(initial: AppGameState): AppState {
     const [mintakaRuntime, setMintakaRuntime] = createSignal<MintakaRuntime>({ type: "none" })
-    const [gameState, setGameState] = createSignal(appState)
-
-    const [config, setConfig] = createSignal<Config | undefined>(undefined)
-    const [maxConfig, setMaxConfig] = createSignal<Config | undefined>(undefined)
+    const [gameState, setGameState] = createSignal(initial)
 
     const normEvalTable = new Map()
 
     return {
         mintakaRuntime, setMintakaRuntime,
         gameState, setGameState,
-        config, setConfig, maxConfig, setMaxConfig,
         normEvalTable,
     }
 }

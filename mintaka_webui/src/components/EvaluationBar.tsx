@@ -1,6 +1,5 @@
 import { createMemo, useContext } from "solid-js"
 import { AppContext } from "../context"
-import { calculateNormEval } from "../wasm/pkg/mintaka_wasm"
 
 export function RootEvaluationBar() {
     const { appSelectors, gameSelectors, runtimeSelectors } = useContext(AppContext)!
@@ -9,7 +8,7 @@ export function RootEvaluationBar() {
         const runtime = runtimeSelectors.runtimeState()
 
         if (runtime !== undefined && runtime.type === "streaming")
-            return calculateNormEval(runtime.lastStatus.score, gameSelectors.boardDescribe.player_color)
+            return 0 // TODO: protocol
 
         return appSelectors.selectNormEval(gameSelectors.boardDescribe.hash_key)
     })

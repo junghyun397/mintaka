@@ -1,6 +1,7 @@
 import { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand, MintakaProviderType } from "./mintaka.provider"
-import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/mintaka_wasm"
+import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/rusty_renju_wasm"
 import { assertOk } from "../utils/response"
+import { Configs } from "./mintaka"
 
 export class MintakaServerConfig {
     readonly address: string
@@ -42,16 +43,6 @@ export async function checkHealth(serverConfig: MintakaServerConfig): Promise<bo
     }
 }
 
-export async function fetchConfigs(serverConfig: MintakaServerConfig): Promise<{ defaultConfig: Config, maxConfig: Config }> {
-    const response = await fetch(serverConfig.url + "/config", {
-        headers: serverConfig.headers(),
-    })
-
-    assertOk(response)
-
-    return response.json()
-}
-
 export async function createSession(serverConfig: MintakaServerConfig, state: GameState, config: Config | undefined): Promise<MintakaServerSession> {
     const response = await fetch(serverConfig.url + "/sessions", {
         method: "POST",
@@ -65,6 +56,14 @@ export async function createSession(serverConfig: MintakaServerConfig, state: Ga
     })
 
     return await response.json()
+}
+
+export async function fetchConfigs(serverConfig: MintakaServerConfig, session: MintakaServerSession): Promise<Configs> {
+    const response = await fetch(serverConfig.url + "/session/config", {
+        headers: serverConfig.headers(),
+    })
+
+    return response.json()
 }
 
 export class MintakaServerProvider implements MintakaProvider {

@@ -1,6 +1,6 @@
-import { EmptyHistoryTree, ForwardMethod, HistoryTree } from "../domain/HistoryTree"
-import { BestMove, BoardWorker, defaultBoard, Pos } from "../wasm/pkg/mintaka_wasm"
-import { AppGameState } from "../domain/rusty-renju"
+import { ForwardMethod, HistoryTree } from "../domain/HistoryTree"
+import { BestMove, BoardWorker, Pos } from "../wasm/pkg/rusty_renju_wasm"
+import { AppGameState, emptyAppGameState } from "../domain/rusty-renju"
 
 interface GameController {
     clear: () => void,
@@ -18,7 +18,7 @@ export function createGameController(
 ): GameController {
     return {
         clear: () => {
-            setGameState({ boardWorker: new BoardWorker(defaultBoard()), historyTree: EmptyHistoryTree })
+            setGameState(emptyAppGameState())
         },
         play: (pos: Pos) => {
             if (pos ? !gameState().boardWorker.isLegalMove(pos) : true)

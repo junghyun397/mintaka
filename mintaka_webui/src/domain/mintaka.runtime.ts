@@ -1,4 +1,4 @@
-import type { BestMove, CommandResult, ComputingResource, HashKey } from "../wasm/pkg/mintaka_wasm"
+import type { BestMove, CommandResult, ComputingResource, HashKey } from "../wasm/pkg/rusty_renju_wasm"
 import { HistoryTree } from "./HistoryTree"
 import { MintakaProvider } from "./mintaka.provider"
 import { StatusResponseBody } from "./mintaka"

@@ -10,7 +10,7 @@ import { createAppState } from "./stores/app.state"
 import { MintakaRuntimeState } from "./domain/mintaka.runtime"
 import { flatmap } from "./utils/undefined"
 import { parseUrlParams, setupUrlSync } from "./url"
-import { AppGameState, buildGameStateFromHistorySource } from "./domain/rusty-renju"
+import { AppGameState, buildGameStateFromHistorySource, emptyAppGameState } from "./domain/rusty-renju"
 import { setupThemeSync } from "./theme"
 import { assertOk } from "./utils/response"
 import { assertNever } from "./utils/never"
@@ -81,7 +81,7 @@ export function AppContextProvider(props: ParentProps) {
                 type: "history",
                 content: history,
             }),
-        ),
+        ) ?? emptyAppGameState(),
     )
 
     const [persistConfig, setPersistConfig] = createPersistConfigStore()
@@ -90,7 +90,6 @@ export function AppContextProvider(props: ParentProps) {
 
     const runtimeController = createRuntimeController(
         appState.mintakaRuntime, appState.setMintakaRuntime, gameController.applyBestMove,
-        appState.config, appState.setConfig, appState.maxConfig, appState.setMaxConfig,
     )
 
     const [appConfig, setAppConfig] = createStore<AppConfig>({ autoLaunch: false, openDashboard: false, viewer: initialUrlParam.viewer })
@@ -168,17 +167,17 @@ export function AppContextProvider(props: ParentProps) {
 
     const appActions: AppActions = {
         loadWorkerRuntime: () => {
-            setPersistConfig("providerType", "worker")
+            setPersistConfig("selectedProviderType", "worker")
 
             runtimeController.loadWorkerRuntime()
         },
         switchServerRuntime: () => {
-            setPersistConfig("providerType", "server")
+            setPersistConfig("selectedProviderType", "server")
 
             runtimeController.unloadRuntime()
         },
         loadServerRuntime: () => {
-            if (persistConfig.providerType === "server" || persistConfig.serverConfig === undefined) return
+            if (persistConfig.selectedProviderType === "server" || persistConfig.serverConfig === undefined) return
 
             runtimeController.tryLoadServerRuntime(unwrap(persistConfig.serverConfig))
         },
@@ -210,8 +209,16 @@ export function AppContextProvider(props: ParentProps) {
 
             return runtime.type === "ready" && runtime.state.type !== "idle"
         }),
-        config: appState.config,
-        maxConfig: appState.maxConfig,
+        config: () => {
+            const runtime = appState.mintakaRuntime()
+
+            return runtime.type === "ready" ? runtime.configs.config : undefined
+        },
+        maxConfig: () => {
+            const runtime = appState.mintakaRuntime()
+
+            return runtime.type === "ready" ? runtime.configs.max_config : undefined
+        },
     }
 
     const gameSelectors: GameSelectors = {
@@ -220,7 +227,7 @@ export function AppContextProvider(props: ParentProps) {
         boardDescribe,
     }
 
-    switch (persistConfig.providerType) {
+    switch (persistConfig.selectedProviderType) {
         case "worker": {
             runtimeController.loadWorkerRuntime()
             break
@@ -230,7 +237,7 @@ export function AppContextProvider(props: ParentProps) {
             runtimeController.tryLoadServerRuntime(persistConfig.serverConfig)
             break
         }
-        default: assertNever(persistConfig.providerType)
+        default: assertNever(persistConfig.selectedProviderType)
     }
 
     return <AppContext.Provider

@@ -1,6 +1,6 @@
-import type { Color, History, Pos } from "../wasm/pkg/mintaka_wasm"
-import { defaultBoard, BoardWorker } from "../wasm/pkg/mintaka_wasm"
-import { type HistoryEntry, HistoryTree } from "./HistoryTree"
+import type { History, Pos } from "../wasm/pkg/rusty_renju_wasm"
+import { BoardWorker } from "../wasm/pkg/rusty_renju_wasm"
+import { EmptyHistoryTree, type HistoryEntry, HistoryTree } from "./HistoryTree"
 import { assertNever } from "../utils/never"
 
 export type HistorySource =
@@ -10,6 +10,10 @@ export type HistorySource =
 export type AppGameState = {
     readonly boardWorker: BoardWorker,
     readonly historyTree: HistoryTree,
+}
+
+export function emptyAppGameState(): AppGameState {
+    return { boardWorker: BoardWorker.empty(), historyTree: EmptyHistoryTree }
 }
 
 export const NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as const
@@ -22,10 +26,6 @@ export const INDEX_TO_POS: Pos[] =
             `${letter}${num}` as const,
         ),
     )
-
-export function flip(color: Color): Color {
-    return color === "Black" ? "White" : "Black"
-}
 
 export function parseHistory(source: string): History | undefined {
     const sequence = source.match(/[A-Oa-o](?:1[0-5]|[1-9])/g)
@@ -47,7 +47,7 @@ export function buildGameStateFromHistorySource(historySource: HistorySource): A
         case "history": {
             const historyEntries: HistoryEntry[] = []
 
-            let boardWorker = new BoardWorker(defaultBoard())
+            let boardWorker = BoardWorker.empty()
             for (const pos of historySource.content) {
                 boardWorker = boardWorker.set(pos)
                 historyEntries.push({ hashKey: boardWorker.hashKey(), pos })

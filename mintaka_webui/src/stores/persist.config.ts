@@ -1,5 +1,5 @@
 import type { MintakaServerConfig } from "../domain/mintaka.server.provider"
-import type { Config } from "../wasm/pkg/mintaka_wasm"
+import type { Config } from "../wasm/pkg/rusty_renju_wasm"
 import type { MintakaProviderType } from "../domain/mintaka.provider"
 import { createStore } from "solid-js/store"
 import { makePersisted } from "@solid-primitives/storage"
@@ -21,7 +21,7 @@ export function nextHistoryDisplay(historyDisplay: HistoryDisplay): HistoryDispl
 }
 
 export type PersistConfig = {
-    providerType: MintakaProviderType,
+    selectedProviderType: MintakaProviderType,
     serverConfig?: MintakaServerConfig,
     theme: Theme,
     zoomBoard: boolean,
@@ -30,7 +30,7 @@ export type PersistConfig = {
 
 export function defaultPersistConfig(): PersistConfig {
     return {
-        providerType: "worker",
+        selectedProviderType: "worker",
         serverConfig: undefined,
         theme: "system",
         zoomBoard: false,

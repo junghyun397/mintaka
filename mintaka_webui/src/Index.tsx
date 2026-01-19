@@ -4,7 +4,7 @@ import { render } from 'solid-js/web'
 import 'solid-devtools'
 import { App } from "./App"
 
-import init from "./wasm/pkg/mintaka_wasm"
+import init from "./wasm/pkg/rusty_renju_wasm"
 
 await init()
 
