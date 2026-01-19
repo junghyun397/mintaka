@@ -57,6 +57,11 @@ impl BoardWorker {
         Ok(Self { inner: board })
     }
 
+    #[wasm_bindgen]
+    pub fn empty() -> Self {
+        Self { inner: rusty_renju::board::Board::EMPTY_BOARD }
+    }
+
     #[wasm_bindgen(js_name = toString)]
     pub fn to_string(&self) -> String {
         self.inner.to_string()

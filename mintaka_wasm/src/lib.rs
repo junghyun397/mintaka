@@ -1,15 +1,19 @@
-pub mod rusty_renju;
-pub mod mintaka;
+pub mod mintaka_worker;
 
+pub use wasm_bindgen_rayon::init_thread_pool;
+
+use mintaka::utils::time::MonotonicClock;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use wasm_bindgen::prelude::*;
+use std::time::Duration;
+use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::{JsCast, JsError, JsValue};
 
 #[wasm_bindgen(typescript_custom_section)]
-const MINTAKA_TYPES: &'static str = include_str!("../../mintaka_wasm/types_ts");
+const MINTAKA_TYPES: &'static str = include_str!("../../rusty_renju_wasm/types_ts");
 
 #[wasm_bindgen(typescript_custom_section)]
-const UNION_TYPES: &'static str = include_str!("../../mintaka_wasm/union_types_ts");
+const UNION_TYPES: &'static str = include_str!("../../rusty_renju_wasm/union_types_ts");
 
 #[wasm_bindgen(start)]
 pub fn start() {
@@ -32,38 +36,22 @@ pub fn try_from_js_value<R: DeserializeOwned>(value: impl Into<JsValue>) -> Resu
         .map_err(to_js_err)
 }
 
-#[macro_export] macro_rules! impl_wrapper {
-    (pub $wrapper:ident { inner: $inner:path } <-> $ts_type:ty) => {
-        #[wasm_bindgen]
-        #[derive(Clone, Copy)]
-        pub struct $wrapper {
-            pub(crate) inner: $inner,
-        }
+#[derive(Clone, Copy)]
+pub struct WebClock(f64);
 
-        impl From<$inner> for $wrapper {
-            fn from(inner: $inner) -> Self {
-                Self { inner: inner }
-            }
-        }
+impl MonotonicClock for WebClock {
+    fn now() -> Self {
+        let performance = js_sys::global()
+            .unchecked_into::<web_sys::WorkerGlobalScope>()
+            .performance()
+            .unwrap();
 
-        impl From<$wrapper> for $inner {
-            fn from(wrapper: $wrapper) -> Self {
-                wrapper.inner
-            }
-        }
+        Self(performance.time_origin() + performance.now())
+    }
 
-        #[wasm_bindgen]
-        impl $wrapper {
+    fn elapsed_since(&self, start: Self) -> Duration {
+        let delta_ms = (Self::now().0 - start.0).max(0.0);
 
-            #[wasm_bindgen(constructor)]
-            pub fn new(value: $ts_type) -> Result<Self, JsError> {
-                Ok(Self { inner: try_from_js_value(value)? })
-            }
-
-            pub fn value(&self) -> $ts_type {
-                to_js_value(&self.inner)
-            }
-
-        }
-    };
+        Duration::from_secs_f64(delta_ms / 1000.0)
+    }
 }
