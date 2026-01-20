@@ -3,10 +3,9 @@ use crate::eval::evaluator::{ActiveEvaluator, Evaluator};
 use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
-use crate::principal_variation::PrincipalVariation;
 use crate::protocol::command::{Command, CompactGameState};
 pub use crate::protocol::response::{ComputingResource, Response, ResponseSender};
-use crate::protocol::results::{CommandResult, GameResult};
+use crate::protocol::results::{BestMove, CommandResult, GameResult};
 use crate::search::iterative_deepening;
 use crate::state::GameState;
 use crate::thread_data::ThreadData;
@@ -17,12 +16,10 @@ use rusty_renju::bitfield::Bitfield;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
-use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::score::Score;
 use rusty_renju::utils::byte_size::ByteSize;
 #[cfg(feature = "serde")]
 use serde::ser::SerializeStruct;
@@ -31,21 +28,6 @@ use serde::{Deserialize, Serialize, Deserializer, Serializer};
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
-
-#[cfg_attr(feature = "typeshare", typeshare::typeshare)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Copy, Clone)]
-pub struct BestMove {
-    pub position_hash: HashKey,
-    pub best_move: MaybePos,
-    pub score: Score,
-    pub selective_depth: u32,
-    pub total_nodes_in_1k: u32,
-    pub pv: PrincipalVariation,
-    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "DurationSchema"))]
-    pub time_elapsed: Duration,
-}
 
 #[derive(Debug)]
 pub enum GameError {

@@ -67,15 +67,9 @@ pub async fn check_session(
         .map(|status| (StatusCode::OK, Json(status)))
 }
 
-pub async fn get_max_config(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
-    (StatusCode::OK, Json(state.max_config()))
-}
-
 #[derive(Deserialize)]
 pub struct CreateSessionRequest {
-    config: Config,
+    config: Option<Config>,
     state: GameState,
 }
 
@@ -86,6 +80,14 @@ pub async fn new_session(
     state.new_session(payload.config, payload.state)
         .await
         .map(|session_key| (StatusCode::CREATED, Json(session_key)))
+}
+
+pub async fn get_session_configs(
+    Path(sid): Path<SessionKey>,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    state.configs_session(sid)
+        .map(|configs| (StatusCode::OK, Json(configs)))
 }
 
 pub async fn command_session(

@@ -64,10 +64,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let mut api = Router::new()
         .route("/status", get(rest::status))
-        .route("/max-config", get(rest::get_max_config))
         .route("/sessions", post(rest::new_session))
         .route("/sessions/{sid}", get(rest::check_session))
         .route("/sessions/{sid}", delete(rest::destroy_session))
+        .route("/sessions/{sid}/configs", get(rest::get_session_configs))
         .route("/sessions/{sid}/commands", post(rest::command_session))
         .route("/sessions/{sid}/launch", post(rest::launch_session))
         .route("/sessions/{sid}/stream", get(rest::subscribe_session_response))

@@ -81,6 +81,7 @@ pub fn iterative_deepening<CLK: MonotonicClock, const R: RuleKind, TH: ThreadTyp
                 score,
                 pv: td.pvs[0],
                 total_nodes_in_1k: td.batch_counter.count_global_in_1k(),
+                time_elapsed: td.thread_type.time_elapsed(),
                 selective_depth: selective_depth as Depth,
             })
         }

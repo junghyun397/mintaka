@@ -8,6 +8,7 @@ use rusty_renju::utils::byte_size::ByteSize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
+use std::time::Duration;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
@@ -93,6 +94,24 @@ impl Ord for Config {
 }
 
 impl Config {
+
+    pub const UNLIMITED_CONFIG: Self = Self {
+        rule_kind: RuleKind::Renju,
+        draw_condition: pos::BOARD_SIZE as u32,
+        max_nodes_in_1k: None,
+        max_depth: None,
+        max_vcf_depth: None,
+        tt_size: ByteSize::from_mib(1024 * 1024 * 1024),
+        workers: 2048,
+        pondering: true,
+        dynamic_time: true,
+        initial_timer: Timer {
+            total_remaining: None,
+            increment: Duration::from_secs(u32::MAX as u64),
+            turn: None,
+        },
+        spawn_depth_specialist: true,
+    };
 
     pub fn max_depth(&self) -> Depth {
         self.max_depth.unwrap_or(Depth::PLY_LIMIT)

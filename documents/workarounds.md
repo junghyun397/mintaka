@@ -54,7 +54,7 @@ pub enum Response {
 #[cfg(any())]
 mod typeshare_workaround {
     use super::*;
-    #[cfg_attr(feature = "typeshare", typeshare)]
+    #[typeshare]
     #[derive(Serialize, Deserialize)]
     #[serde(tag = "type", content = "content")]
     pub enum ResponseSchema {

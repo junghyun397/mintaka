@@ -37,13 +37,14 @@ pub enum Response {
         selective_depth: Depth,
         total_nodes_in_1k: u32,
         pv: PrincipalVariation,
+        time_elapsed: Duration,
     },
 }
 
 #[cfg(any())]
 mod typeshare_workaround {
     use super::*;
-    #[cfg_attr(feature = "typeshare", typeshare)]
+    #[typeshare]
     #[derive(Serialize, Deserialize)]
     #[serde(tag = "type", content = "content")]
     pub enum ResponseSchema {
@@ -55,6 +56,8 @@ mod typeshare_workaround {
             selective_depth: Depth,
             total_nodes_in_1k: u32,
             pv: PrincipalVariation,
+            #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "DurationSchema"))]
+            time_elapsed: Duration,
         },
     }
 }

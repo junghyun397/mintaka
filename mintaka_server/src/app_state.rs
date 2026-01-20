@@ -3,7 +3,6 @@ use crate::preference::Preference;
 use crate::session::{Session, SessionData, SessionKey, SessionResponse, SessionResultResponse, SessionStatus, Sessions};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use mintaka::config::Config;
-use mintaka::game_agent::BestMove;
 use mintaka::protocol::command::Command;
 use mintaka::state::GameState;
 use rusty_renju::utils::byte_size::ByteSize;
@@ -11,10 +10,18 @@ use std::cmp::Reverse;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use mintaka::protocol::results::CommandResult;
+use mintaka::protocol::results::{BestMove, CommandResult};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Configs {
+    pub default_config: Config,
+    pub max_config: Config,
+    pub config: Config,
+}
 
 pub struct WorkerPermit(OwnedSemaphorePermit);
 
@@ -128,12 +135,15 @@ impl AppState {
         }
     }
 
-    pub async fn new_session(&self, config: Config, game_state: GameState) -> Result<SessionKey, AppError> {
-        if let Some(max_config) = self.preference.max_config
+    pub async fn new_session(&self, config: Option<Config>, game_state: GameState) -> Result<SessionKey, AppError> {
+        if let Some(config) = config
+            && let Some(max_config) = self.preference.max_config
             && config > max_config
         {
             return Err(AppError::InvalidConfig);
         }
+
+        let config = config.unwrap_or(self.preference.default_config);
 
         let session_key = SessionKey::new_random();
 
@@ -154,13 +164,17 @@ impl AppState {
         Ok(session_key)
     }
 
-    pub async fn state_session(&self, session_key: SessionKey) -> Result<GameState, AppError> {
-        let game_state = self.sessions.get(&session_key)
+    pub fn configs_session(&self, session_key: SessionKey) -> Result<Configs, AppError> {
+        let config = self.sessions.get(&session_key)
             .ok_or(AppError::SessionNotFound)?
             .game_agent()?
-            .state;
+            .config;
 
-        Ok(game_state)
+        Ok(Configs {
+            default_config: self.preference.default_config,
+            max_config: self.preference.max_config.unwrap_or(Config::UNLIMITED_CONFIG),
+            config,
+        })
     }
 
     pub async fn hibernate_session(&self, session_key: SessionKey) -> Result<(), AppError> {

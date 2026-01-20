@@ -10,12 +10,8 @@ cargo run -p mintaka_server -- --webui
 
 ## TLS encryption
 ```shell
-./mintaka-server \
+cargo run -p mintaka_server -- \
   --tls-cert /etc/letsencrypt/live/example.com/cert.pem \
   --tls-key /etc/letsencrypt/live/example.com/privkey.pem \
   --tls-renew
 ```
-
-## Configuration
-* `mintaka-server --help` to see all options.
-* Set `max_config.toml` to apply max config.

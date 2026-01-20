@@ -1,5 +1,4 @@
 # mintaka-trainer
-Machine learning pipeline for NNUE training
 
 ## arena.py ELO Tester
 ```shell

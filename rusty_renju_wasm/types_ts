@@ -95,6 +95,7 @@ export type ResponseSchema =
 	selective_depth: Depth;
 	total_nodes_in_1k: number;
 	pv: PrincipalVariation;
+	time_elapsed: DurationSchema;
 }};
 
 export type Response = ResponseSchema;

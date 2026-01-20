@@ -5,7 +5,7 @@ edition = "2024"
 
 [features]
 serde = ["dep:serde", "rusty_renju/serde"]
-typeshare = ["dep:typeshare", "rusty_renju/typeshare"]
+typeshare = ["serde", "dep:typeshare", "rusty_renju/typeshare"]
 compress-tt = ["dep:lz4"]
 debug-statics = []
 neural-eval = []

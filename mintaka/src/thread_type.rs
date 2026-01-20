@@ -9,6 +9,8 @@ pub trait ThreadType {
 
     fn make_response(&self, response: Response);
 
+    fn time_elapsed(&self) -> Duration;
+
     fn time_exceeded(&self) -> bool;
 
     fn position_hash(&self) -> HashKey;
@@ -47,6 +49,10 @@ impl<CLK: MonotonicClock, T: ResponseSender> ThreadType for MainThread<CLK, T> {
         self.response_sender.response(response);
     }
 
+    fn time_elapsed(&self) -> Duration {
+        self.start_time.elapsed()
+    }
+
     fn time_exceeded(&self) -> bool {
         self.running_time.is_some_and(|running_time| self.start_time.elapsed() >= running_time)
     }
@@ -62,10 +68,16 @@ pub struct WorkerThread;
 impl ThreadType for WorkerThread {
     const IS_MAIN: bool = false;
 
-    fn make_response(&self, _response: Response) {}
+    fn make_response(&self, _response: Response) {
+        unreachable!();
+    }
+
+    fn time_elapsed(&self) -> Duration {
+        unreachable!();
+    }
 
     fn time_exceeded(&self) -> bool {
-        false
+        unreachable!();
     }
 
     fn position_hash(&self) -> HashKey {

@@ -52,6 +52,8 @@ pub struct Preference {
     #[clap(skip)]
     pub tls_config: Option<TlsConfig>,
     #[clap(skip)]
+    pub default_config: Config,
+    #[clap(skip)]
     pub max_config: Option<Config>
 }
 
@@ -86,9 +88,14 @@ impl Preference {
             });
         }
 
-        self.max_config = std::fs::read_to_string("max_config.toml")
+        self.max_config = Self::parse_config("max_config.toml");
+        self.default_config = Self::parse_config("default_config.toml").unwrap_or(Config::default());
+    }
+
+    fn parse_config(path: &str) -> Option<Config> {
+        std::fs::read_to_string(path)
             .ok()
-            .and_then(|str| toml::from_str(&str).ok());
+            .and_then(|str| toml::from_str(&str).ok())
     }
 
 }

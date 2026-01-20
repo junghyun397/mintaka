@@ -4,8 +4,12 @@ use rusty_renju::notation::color::Color;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
+use std::time::Duration;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
+use rusty_renju::notation::pos::MaybePos;
+use rusty_renju::notation::score::Score;
+use crate::principal_variation::PrincipalVariation;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "GameResultSchema"))]
 #[cfg_attr(
@@ -23,7 +27,7 @@ pub enum GameResult {
 #[cfg(any())]
 mod typeshare_workaround {
     use super::*;
-    #[cfg_attr(feature = "typeshare", typeshare)]
+    #[typeshare]
     #[derive(Serialize, Deserialize)]
     #[serde(tag = "type", content = "content")]
     pub enum GameResultSchema {
@@ -61,4 +65,18 @@ impl CommandResult {
     pub fn hash(hash_key: HashKey) -> Self {
         Self { hash_key, result: None }
     }
+}
+
+#[cfg_attr(feature = "typeshare", typeshare::typeshare)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Copy, Clone)]
+pub struct BestMove {
+    pub position_hash: HashKey,
+    pub best_move: MaybePos,
+    pub score: Score,
+    pub selective_depth: u32,
+    pub total_nodes_in_1k: u32,
+    pub pv: PrincipalVariation,
+    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "DurationSchema"))]
+    pub time_elapsed: Duration,
 }
