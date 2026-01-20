@@ -25,17 +25,17 @@ export function Board() {
                 <rect x="2" y="2" width="28" height="28" fill="none" />
                 <circle cx="16" cy="16" r="0.15"/>
             </g>
-            <g font-family="serif" font-size="0.8" fill="black" text-anchor="middle" dominant-baseline="middle">
+            <g font-family="serif" font-size="0.8" fill="black" text-anchor="middle">
                 <For each={NUMS}>{num => {
                     const letter = LETTERS[num - 1].toUpperCase()
 
                     const numPosition = 32 - num * 2
                     const letterPosition = num * 2
                     return <>
-                        <text x="1" y={numPosition} text-anchor="end">{num}</text>
-                        <text x="31" y={numPosition} text-anchor="start">{num}</text>
-                        <text x={letterPosition} y="0.5">{letter}</text>
-                        <text x={letterPosition} y="31.5">{letter}</text>
+                        <text x="1" y={numPosition} dy="0.32em" text-anchor="end">{num}</text>
+                        <text x="31" y={numPosition} dy="0.32em" text-anchor="start">{num}</text>
+                        <text x={letterPosition} y="0.5" dy="0.32em">{letter}</text>
+                        <text x={letterPosition} y="31.5" dy="0.32em">{letter}</text>
                     </>
                 }}</For>
             </g>
@@ -111,8 +111,8 @@ function Cell(props: {
                                 class="glyph"
                                 font-family="serif"
                                 font-size="50"
-                                text-anchor="middle" dominant-baseline="middle"
-                                x="50" y="54"
+                                text-anchor="middle"
+                                x="50" y="50" dy="0.32em"
                             >
                                 {stone().content.sequence}
                             </text>

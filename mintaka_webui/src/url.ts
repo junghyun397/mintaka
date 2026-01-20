@@ -13,8 +13,8 @@ export function parseUrlParams(): UrlParams {
     const movesSource = params.get("moves")
 
     return {
-        viewer: params.has("viewer"),
         moves: movesSource === null ? undefined : parseHistory(movesSource),
+        viewer: params.has("viewer"),
     }
 }
 
@@ -27,10 +27,10 @@ export function pushUrlParams(params: UrlParams) {
         url.searchParams.delete("viewer")
 
     const stringHistory = params.moves === undefined ? undefined : historyToString(params.moves)
-    if (stringHistory === undefined)
-        url.searchParams.delete("moves")
     if (stringHistory !== undefined)
         url.searchParams.set("moves", stringHistory)
+    else
+        url.searchParams.delete("moves")
 
     window.history.replaceState({}, "", url)
 }

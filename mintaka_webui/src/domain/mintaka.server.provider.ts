@@ -1,66 +1,82 @@
 import { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand, MintakaProviderType } from "./mintaka.provider"
 import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/rusty_renju_wasm"
-import { assertOk } from "../utils/response"
 import { Configs } from "./mintaka"
+import { SERVER_PROTOCOL } from "../config"
 
-export class MintakaServerConfig {
-    readonly address: string
-    private readonly apiPassword?: string
+export type MintakaServerConfig = {
+    readonly address: string,
+    readonly apiPassword?: string,
+}
 
-    constructor(address: string, apiPassword?: string) {
-        this.address = address
-        this.apiPassword = apiPassword
-    }
+function serverUrl(config: MintakaServerConfig) {
+    return `${SERVER_PROTOCOL}://${config.address}`
+}
 
-    get url() {
-        return this.address
-    }
-
-    headers = (extra?: HeadersInit) => {
-        const headers = new Headers(extra)
-
-        if (this.apiPassword) headers.set("Api-Password", this.apiPassword)
-
-        return headers
-    }
+function serverHeaders(config: MintakaServerConfig, extra?: HeadersInit) {
+    const headers = new Headers(extra)
+    if (config.apiPassword) headers.set("Api-Password", config.apiPassword)
+    return headers
 }
 
 export type MintakaServerSession = {
     readonly sid: string,
-    readonly defaultConfig: Config,
-    readonly maxConfig: Config,
 }
 
-export async function checkHealth(serverConfig: MintakaServerConfig): Promise<boolean> {
-    try {
-        const response = await fetch(serverConfig.url + "/status", {
-            headers: serverConfig.headers(),
-        })
+function bitfieldToArray(bitfield: unknown): number[] {
+    if (bitfield instanceof Uint8Array)
+        return Array.from(bitfield)
+    else if (bitfield instanceof ArrayBuffer)
+        return Array.from(new Uint8Array(bitfield))
+    else if (Array.isArray(bitfield))
+        return bitfield.map((value) => Number(value))
+    return []
+}
 
-        return response.ok
-    } catch {
-        return false
+function serializeGameState(state: GameState) {
+    const board = state.board as GameState["board"] & { bitfield: unknown }
+    const encodedBitfield = board.bitfield.map(bitfieldToArray)
+
+    return {
+        ...state,
+        board: {
+            ...board,
+            bitfield: encodedBitfield,
+        },
     }
 }
 
+export async function checkHealth(serverConfig: MintakaServerConfig): Promise<boolean> {
+    const response = await fetch(serverUrl(serverConfig) + "/status", {
+        headers: serverHeaders(serverConfig),
+    })
+
+    return response.ok
+}
+
 export async function createSession(serverConfig: MintakaServerConfig, state: GameState, config: Config | undefined): Promise<MintakaServerSession> {
-    const response = await fetch(serverConfig.url + "/sessions", {
+    const payloadState = serializeGameState(state)
+    const response = await fetch(serverUrl(serverConfig) + "/sessions", {
         method: "POST",
-        headers: serverConfig.headers({
+        headers: serverHeaders(serverConfig, {
             "Content-Type": "application/json",
         }),
         body: JSON.stringify({
             config: config,
-            state: state,
+            state: payloadState,
         }),
     })
 
-    return await response.json()
+    const text = await response.text()
+    if (!response.ok) {
+        throw new Error(text || `Failed to create session: ${response.status}`)
+    }
+
+    return { sid: JSON.parse(text) }
 }
 
 export async function fetchConfigs(serverConfig: MintakaServerConfig, session: MintakaServerSession): Promise<Configs> {
-    const response = await fetch(serverConfig.url + "/session/config", {
-        headers: serverConfig.headers(),
+    const response = await fetch(`${serverUrl(serverConfig)}/sessions/${session.sid}/configs`, {
+        headers: serverHeaders(serverConfig),
     })
 
     return response.json()
@@ -71,19 +87,14 @@ export class MintakaServerProvider implements MintakaProvider {
     private eventSource?: EventSource
 
     private onResponse?: (message: MintakaProviderResponse) => void
-    private onError?: (error: any) => void
 
     readonly type: MintakaProviderType = "server"
 
-    get defaultConfig() {
-        return this.session.defaultConfig
-    }
-
-    get maxConfig() {
-        return this.session.maxConfig
-    }
-
     constructor(private readonly serverConfig: MintakaServerConfig, private readonly session: MintakaServerSession) {}
+
+    get storageKey() {
+        return this.serverConfig.address
+    }
 
     subscribeResponse(handler: (response: MintakaProviderResponse) => void) {
         this.onResponse = handler
@@ -91,8 +102,8 @@ export class MintakaServerProvider implements MintakaProvider {
 
     dispose() {
         this.onResponse = undefined
-        this.onError = undefined
         this.closeStream()
+        void this.disconnect()
     }
 
     command(command: Command) {
@@ -101,7 +112,7 @@ export class MintakaServerProvider implements MintakaProvider {
                 await this.sendCommand(command)
             })
             .catch((error) => {
-                this.onError && this.onError(error)
+                this.onResponse && this.onResponse({ type: "Error", content: error })
             })
     }
 
@@ -111,32 +122,8 @@ export class MintakaServerProvider implements MintakaProvider {
                 await this.sendLaunch(positionHash, objective)
             })
             .catch((error) => {
-                this.onError && this.onError(error)
+                this.onResponse && this.onResponse({ type: "Error", content: error })
             })
-    }
-
-    private sendCommand = async (command: Command) => {
-        const response = await fetch(`${this.serverConfig.url}/sessions/${this.session.sid}/command`, {
-            method: "POST",
-            headers: this.serverConfig.headers({
-                "Content-Type": "application/json",
-            }),
-            body: JSON.stringify(command),
-        })
-
-        const result = await response.json() as CommandResult
-
-        this.onResponse && this.onResponse({ type: "CommandResult", content: result })
-    }
-
-    private sendLaunch = async (hash: HashKey, objective: SearchObjective) => {
-        const response = await fetch(`${this.serverConfig.url}/sessions/${this.session.sid}/launch`, {
-            method: "POST",
-            headers: this.serverConfig.headers(),
-            body: JSON.stringify({ hash, objective }),
-        })
-
-        this.startStream()
     }
 
     control(command: MintakaProviderRuntimeCommand) {
@@ -148,10 +135,34 @@ export class MintakaServerProvider implements MintakaProvider {
         }
     }
 
-    private sendAbort = async () => {
-        const response = await fetch(`${this.serverConfig.url}/sessions/${this.session.sid}/abort`, {
+    private sendCommand = async (command: Command) => {
+        const response = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/command`, {
             method: "POST",
-            headers: this.serverConfig.headers(),
+            headers: serverHeaders(this.serverConfig, {
+                "Content-Type": "application/json",
+            }),
+            body: JSON.stringify(command),
+        })
+
+        const result = await response.json() as CommandResult
+
+        this.onResponse && this.onResponse({ type: "CommandResult", content: result })
+    }
+
+    private sendLaunch = async (hash: HashKey, objective: SearchObjective) => {
+        const _ = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/launch`, {
+            method: "POST",
+            headers: serverHeaders(this.serverConfig),
+            body: JSON.stringify({ hash, objective }),
+        })
+
+        this.startStream()
+    }
+
+    private sendAbort = async () => {
+        const _ = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/abort`, {
+            method: "POST",
+            headers: serverHeaders(this.serverConfig),
         })
     }
 
@@ -165,7 +176,7 @@ export class MintakaServerProvider implements MintakaProvider {
     private startStream = () => {
         this.closeStream()
 
-        const streamUrl = new URL(`${this.serverConfig.url}/sessions/${this.session.sid}/stream`)
+        const streamUrl = new URL(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/stream`)
 
         const eventSource = new EventSource(streamUrl.toString())
         this.eventSource = eventSource
@@ -182,8 +193,15 @@ export class MintakaServerProvider implements MintakaProvider {
 
         eventSource.onerror = (error) => {
             eventSource.close()
-            this.onError && this.onError(error)
+            this.onResponse && this.onResponse({ type: "Error", content: error })
             this.eventSource = undefined
         }
+    }
+
+    private async disconnect() {
+        const _ = fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}`, {
+            method: "DELETE",
+            headers: serverHeaders(this.serverConfig),
+        })
     }
 }

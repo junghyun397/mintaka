@@ -18,7 +18,7 @@ export function Control() {
 }
 
 function ControlButtons() {
-    const { gameActions, appConfig, gameSelectors, runtimeSelectors } = useContext(AppContext)!
+    const { gameActions, appSettings, gameSelectors, runtimeSelectors } = useContext(AppContext)!
 
     const inBranchHead = createMemo(() => gameSelectors.gameState().historyTree.inBranchHead)
     const forwardable = createMemo(() => gameSelectors.gameState().historyTree.forwardable)
@@ -61,7 +61,7 @@ function ControlButtons() {
                     <IconStop />
                 </button>
             </Match>
-            <Match when={appConfig.autoLaunch && runtimeSelectors.isReady()}>
+            <Match when={appSettings.launch && runtimeSelectors.isReady()}>
                 <button
                     class="btn btn-square"
                     onClick={gameActions.pause}
@@ -69,7 +69,7 @@ function ControlButtons() {
                     <IconPause />
                 </button>
             </Match>
-            <Match when={!appConfig.autoLaunch && runtimeSelectors.isReady()}>
+            <Match when={!appSettings.launch && runtimeSelectors.isReady()}>
                 <button
                     class="btn btn-square"
                     onClick={gameActions.start}
@@ -122,16 +122,16 @@ function ControlButtons() {
 }
 
 function DashboardButton() {
-    const { appConfig, setAppConfig } = useContext(AppContext)!
+    const { appSettings, setAppSettings } = useContext(AppContext)!
 
     const toggleDashboard = () => {
-        setAppConfig("openDashboard", !appConfig.openDashboard)
+        setAppSettings("openDashboard", !appSettings.openDashboard)
     }
 
     return <button
         class="btn btn-active btn-square"
         classList={{
-            "btn-active": appConfig.openDashboard,
+            "btn-active": appSettings.openDashboard,
         }}
         onClick={toggleDashboard}
     >

@@ -7,7 +7,7 @@ import { assertNever } from "../utils/never"
 import { createSession, fetchConfigs, MintakaServerConfig, MintakaServerProvider } from "../domain/mintaka.server.provider"
 import { MintakaProvider, MintakaProviderType } from "../domain/mintaka.provider"
 import { AppGameState } from "../domain/rusty-renju"
-import { Configs } from "../domain/mintaka"
+import { Configs, extractStatics, MintakaStatics } from "../domain/mintaka"
 
 export type RequireProviderReady = "ok" | "provider-not-ready"
 export type RequireProviderComputing = "ok" | "provider-not-launched"
@@ -24,18 +24,26 @@ interface RuntimeController {
 }
 
 export type MintakaReadyRuntime = {
-    type: "ready",
-    provider: MintakaProvider,
-    state: MintakaRuntimeState,
-    configs: Configs,
+    readonly type: "ready",
+    readonly provider: MintakaProvider,
+    readonly configs: Configs,
+    readonly state: MintakaRuntimeState,
+    readonly statics?: MintakaStatics,
+}
+
+export type MintakaLoadingRuntime = {
+    type: "loading",
+    progress:
+        | {
+            type: "worker",
+            completionRate: number,
+        }
+        | { type: "server" }
 }
 
 export type MintakaRuntime =
     | { type: "none" }
-    | {
-        type: "loading",
-        providerType: MintakaProviderType,
-    }
+    | MintakaLoadingRuntime
     | MintakaReadyRuntime
 
 export function createRuntimeController(
@@ -81,17 +89,21 @@ export function createRuntimeController(
                     break
                 }
                 case "Status": {
-                    if (!(runtime!.state.type === "begins" || runtime!.state.type === "streaming")) return
+                    if (!(runtime.state.type === "begins" || runtime.state.type === "streaming")) return
 
-                    setMintakaRuntime({ ...runtime, state: runtime.state.status(response.content) })
+                    const statics = extractStatics(response.content)
+
+                    setMintakaRuntime({ ...runtime, state: runtime.state.status(response.content), statics })
                     break
                 }
                 case "BestMove": {
                     if (runtime.state.type === "idle") return
 
+                    const statics = extractStatics(response.content)
+
                     onBestMove(response.content, runtime.state.historySnapshot)
 
-                    setMintakaRuntime({ ...runtime, state: runtime.state.bestMove(response.content) })
+                    setMintakaRuntime({ ...runtime, state: runtime.state.bestMove(response.content), statics })
                     break
                 }
                 case "Error": {
@@ -113,13 +125,13 @@ export function createRuntimeController(
         setMintakaRuntime({ type: "none" })
     }
 
-    async function loadServerRuntime(serverConfig: MintakaServerConfig) {
+    const loadServerRuntime = async (serverConfig: MintakaServerConfig) => {
         const board: Board = defaultBoard()
         const history: History = []
 
         let storedConfig = persistProviderConfigController.load({ type: "server", config: serverConfig })
 
-        setMintakaRuntime({ type: "loading", providerType: "server" })
+        setMintakaRuntime({ type: "loading", progress: { type: "server" } })
 
         const session = await createSession(serverConfig, { board, history }, storedConfig)
         const configs = await fetchConfigs(serverConfig, session)
@@ -209,7 +221,8 @@ export function createRuntimeController(
 
             runtime.provider.command({ type: "Config", content: config })
 
-            persistProviderConfigController.set(runtime.provider.type, "local", config)
+            setMintakaRuntime({ ...runtime, configs: { ...runtime.configs, config } })
+            persistProviderConfigController.set(runtime.provider.type, runtime.provider.storageKey, config)
 
             return "ok"
         },
@@ -221,7 +234,12 @@ export function createRuntimeController(
             if (runtime.type !== "ready" || runtime.state.type !== "idle")
                 return "provider-not-ready"
 
-            runtime.provider.command({ type: "Config", content: runtime.configs.default_config })
+            const config = runtime.configs.default_config
+
+            runtime.provider.command({ type: "Config", content: config })
+
+            setMintakaRuntime({ ...runtime, configs: { ...runtime.configs, config } })
+            persistProviderConfigController.set(runtime.provider.type, runtime.provider.storageKey, config)
 
             return "ok"
         },
@@ -229,7 +247,7 @@ export function createRuntimeController(
 }
 
 function buildPersistProviderConfigLabel(providerType: MintakaProviderType, providerId: string): string {
-    return "provider-config-" + providerType + "-" + providerId
+    return "provider-config-" + providerType + "-" + providerId + "-v1"
 }
 
 function createPersistProviderConfigController(): {
@@ -238,7 +256,7 @@ function createPersistProviderConfigController(): {
 } {
     return {
         load: (source): Config | undefined => {
-            const id = source.type === "worker" ? "local" : source.config.url
+            const id = source.type === "worker" ? "local" : source.config.address
 
             const configString = localStorage.getItem(buildPersistProviderConfigLabel(source.type, id))
 

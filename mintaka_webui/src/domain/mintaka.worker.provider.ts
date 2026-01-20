@@ -61,12 +61,12 @@ export const MaxWorkerConfig: Config = {
 
 export class MintakaWorkerProvider implements MintakaProvider {
     readonly type: MintakaProviderType = "worker"
+    readonly storageKey = "local"
 
     private readonly worker: Worker
     private workerControl?: MintakaWorkerControl
 
     private onResponse?: (message: MintakaProviderResponse) => void
-    private onError?: (error: any) => void
 
     constructor(state: GameState, config: Config) {
         this.worker = new Worker(
@@ -89,7 +89,7 @@ export class MintakaWorkerProvider implements MintakaProvider {
         }
 
         this.worker.onerror = (event) => {
-            this.onError && this.onError(event)
+            this.onResponse && this.onResponse({ type: "Error", content: event.error })
         }
 
         this.postMessage({ type: "init", config, state })
@@ -101,7 +101,6 @@ export class MintakaWorkerProvider implements MintakaProvider {
 
     dispose() {
         this.onResponse = undefined
-        this.onError = undefined
         this.worker.terminate()
     }
 

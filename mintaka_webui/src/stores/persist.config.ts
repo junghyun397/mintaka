@@ -1,5 +1,4 @@
 import type { MintakaServerConfig } from "../domain/mintaka.server.provider"
-import type { Config } from "../wasm/pkg/rusty_renju_wasm"
 import type { MintakaProviderType } from "../domain/mintaka.provider"
 import { createStore } from "solid-js/store"
 import { makePersisted } from "@solid-primitives/storage"
@@ -39,5 +38,5 @@ export function defaultPersistConfig(): PersistConfig {
 }
 
 export function createPersistConfigStore() {
-    return makePersisted(createStore(defaultPersistConfig()))
+    return makePersisted(createStore(defaultPersistConfig()), { name: "persist-config-v1" })
 }

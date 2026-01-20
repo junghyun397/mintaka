@@ -3,7 +3,7 @@ import { createStore, reconcile, SetStoreFunction, unwrap } from "solid-js/store
 import { ForwardMethod } from "./domain/HistoryTree"
 import { BoardDescribe, Config, HashKey, History, Pos } from "./wasm/pkg/mintaka_wasm"
 import { createPersistConfigStore, defaultPersistConfig, PersistConfig } from "./stores/persist.config"
-import { AppConfig } from "./stores/app.config"
+import { AppSettings, createAppSettingsStore } from "./stores/app.settings"
 import { createGameController } from "./controllers/game.controller"
 import { createRuntimeController, MintakaRuntime, RequireProviderReady } from "./controllers/runtime.controller"
 import { createAppState } from "./stores/app.state"
@@ -14,6 +14,7 @@ import { AppGameState, buildGameStateFromHistorySource, emptyAppGameState } from
 import { setupThemeSync } from "./theme"
 import { assertOk } from "./utils/response"
 import { assertNever } from "./utils/never"
+import { Configs, MintakaStatics } from "./domain/mintaka"
 
 interface AppActions {
     readonly loadWorkerRuntime: () => void,
@@ -33,8 +34,8 @@ interface RuntimeSelectors {
     readonly runtimeState: Accessor<MintakaRuntimeState | undefined>
     readonly isReady: Accessor<boolean>,
     readonly inComputing: Accessor<boolean>,
-    readonly config: Accessor<Config | undefined>,
-    readonly maxConfig: Accessor<Config | undefined>,
+    readonly configs: Accessor<Configs | undefined>,
+    readonly statics: Accessor<MintakaStatics | undefined>,
 }
 
 interface GameActions {
@@ -66,8 +67,8 @@ type AppContext = {
     readonly persistConfig: PersistConfig,
     readonly setPersistConfig: SetStoreFunction<PersistConfig>,
 
-    readonly appConfig: AppConfig,
-    readonly setAppConfig: SetStoreFunction<AppConfig>,
+    readonly appSettings: AppSettings,
+    readonly setAppSettings: SetStoreFunction<AppSettings>,
 }
 
 export const AppContext = createContext<AppContext>()
@@ -92,7 +93,7 @@ export function AppContextProvider(props: ParentProps) {
         appState.mintakaRuntime, appState.setMintakaRuntime, gameController.applyBestMove,
     )
 
-    const [appConfig, setAppConfig] = createStore<AppConfig>({ autoLaunch: false, openDashboard: false, viewer: initialUrlParam.viewer })
+    const [appSettings, setAppSettings] = createAppSettingsStore(initialUrlParam)
 
     const history = createMemo(() => appState.gameState().historyTree.toHistory())
 
@@ -108,7 +109,7 @@ export function AppContextProvider(props: ParentProps) {
 
     setupThemeSync(persistConfig)
 
-    setupUrlSync(history, () => appConfig.viewer)
+    setupUrlSync(history, () => appSettings.viewer)
 
     const gameActions: GameActions = {
         clear: gameController.clear,
@@ -122,7 +123,7 @@ export function AppContextProvider(props: ParentProps) {
 
             runtimeController.syncPlay(appState.gameState().boardWorker.hashKey(), pos)
 
-            if (!appConfig.autoLaunch) return
+            if (!appSettings.launch) return
 
             runtimeController.launch(appState.gameState())
         },
@@ -151,17 +152,18 @@ export function AppContextProvider(props: ParentProps) {
 
             assertOk(response)
 
-            setAppConfig("autoLaunch", true)
+            setAppSettings("launch", true)
+            setAppSettings("viewer", false)
         },
         pause: () => {
-            setAppConfig("autoLaunch", false)
+            setAppSettings("launch", false)
         },
         abort: () => {
             const result = runtimeController.abort()
 
             assertOk(result)
 
-            setAppConfig("autoLaunch", false)
+            setAppSettings("launch", false)
         },
     }
 
@@ -177,7 +179,7 @@ export function AppContextProvider(props: ParentProps) {
             runtimeController.unloadRuntime()
         },
         loadServerRuntime: () => {
-            if (persistConfig.selectedProviderType === "server" || persistConfig.serverConfig === undefined) return
+            if (persistConfig.selectedProviderType !== "server" || persistConfig.serverConfig === undefined) return
 
             runtimeController.tryLoadServerRuntime(unwrap(persistConfig.serverConfig))
         },
@@ -193,7 +195,7 @@ export function AppContextProvider(props: ParentProps) {
     }
 
     const runtimeSelectors: RuntimeSelectors = {
-        runtimeType: () => appState.mintakaRuntime().type,
+        runtimeType: createMemo(() => appState.mintakaRuntime().type),
         runtimeState: createMemo(() => {
             const runtime = appState.mintakaRuntime()
 
@@ -209,16 +211,16 @@ export function AppContextProvider(props: ParentProps) {
 
             return runtime.type === "ready" && runtime.state.type !== "idle"
         }),
-        config: () => {
+        configs: createMemo(() => {
             const runtime = appState.mintakaRuntime()
 
-            return runtime.type === "ready" ? runtime.configs.config : undefined
-        },
-        maxConfig: () => {
+            return runtime.type === "ready" ? runtime.configs : undefined
+        }),
+        statics: createMemo(() => {
             const runtime = appState.mintakaRuntime()
 
-            return runtime.type === "ready" ? runtime.configs.max_config : undefined
-        },
+            return runtime.type === "ready" ? runtime.statics : undefined
+        }),
     }
 
     const gameSelectors: GameSelectors = {
@@ -227,17 +229,19 @@ export function AppContextProvider(props: ParentProps) {
         boardDescribe,
     }
 
-    switch (persistConfig.selectedProviderType) {
-        case "worker": {
-            runtimeController.loadWorkerRuntime()
-            break
+    if (!appSettings.viewer) {
+        switch (persistConfig.selectedProviderType) {
+            case "worker": {
+                runtimeController.loadWorkerRuntime()
+                break
+            }
+            case "server": {
+                if (persistConfig.serverConfig !== undefined)
+                    runtimeController.tryLoadServerRuntime(persistConfig.serverConfig)
+                break
+            }
+            default: assertNever(persistConfig.selectedProviderType)
         }
-        case "server": {
-            if (persistConfig.serverConfig === undefined) break
-            runtimeController.tryLoadServerRuntime(persistConfig.serverConfig)
-            break
-        }
-        default: assertNever(persistConfig.selectedProviderType)
     }
 
     return <AppContext.Provider
@@ -252,8 +256,8 @@ export function AppContextProvider(props: ParentProps) {
             persistConfig,
             setPersistConfig,
 
-            appConfig,
-            setAppConfig,
+            appSettings,
+            setAppSettings,
         } as AppContext}
         children={props.children}
     />

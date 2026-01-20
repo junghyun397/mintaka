@@ -1,74 +1,75 @@
 import { AppContext } from "../context"
-import { createMemo, createSignal, Match, Show, Switch, useContext } from "solid-js"
+import { createEffect, createMemo, createResource, createSignal, Match, on, Show, Switch, useContext } from "solid-js"
 import { unwrap } from "solid-js/store"
 import type { Config } from "../wasm/pkg/rusty_renju_wasm"
 import { flatmap } from "../utils/undefined"
 import { SERVER_PROTOCOL, SERVER_URL } from "../config"
+import { formatNodes, nps } from "../domain/mintaka"
+import { checkHealth, MintakaServerConfig } from "../domain/mintaka.server.provider"
 
 export function Dashboard() {
-    const { appConfig, setAppConfig, runtimeSelectors } = useContext(AppContext)!
+    const { appSettings, setAppSettings, runtimeSelectors } = useContext(AppContext)!
 
     const closeDashboard = () => {
-        setAppConfig("openDashboard", false)
+        setAppSettings("openDashboard", false)
     }
 
-    const configSet = createMemo(() => {
-        const config = runtimeSelectors.config()
-        const maxConfig = runtimeSelectors.maxConfig()
-
-        if (config === undefined || maxConfig === undefined) return undefined
-
-        return { config, maxConfig }
-    })
-
-    return (
-        <div
-            class="fixed inset-0 z-999"
-            classList={{ "pointer-events-none": !appConfig.openDashboard }}
+    return <div
+        class="fixed inset-0 z-999"
+        classList={{ "pointer-events-none": !appSettings.openDashboard }}
+    >
+        <button
+            class="absolute inset-0 bg-black/40 transition-opacity"
+            classList={{
+                "opacity-0": !appSettings.openDashboard,
+                "opacity-100": appSettings.openDashboard,
+            }}
+            onClick={closeDashboard}
+        />
+        <aside
+            class="absolute top-0 left-0 h-full w-80 max-w-[85vw] overflow-y-auto bg-base-200 shadow-lg transition-transform"
+            classList={{
+                "-translate-x-full": !appSettings.openDashboard,
+                "translate-x-0": appSettings.openDashboard,
+            }}
         >
             <button
-                class="absolute inset-0 bg-black/40 transition-opacity"
-                classList={{
-                    "opacity-0": !appConfig.openDashboard,
-                    "opacity-100": appConfig.openDashboard,
-                }}
+                class="btn absolute top-4 right-4 btn-xs btn-primary"
                 onClick={closeDashboard}
-            />
-            <aside
-                class="absolute top-0 left-0 h-full w-80 max-w-[85vw] overflow-y-auto bg-base-200 shadow-lg transition-transform"
-                classList={{
-                    "-translate-x-full": !appConfig.openDashboard,
-                    "translate-x-0": appConfig.openDashboard,
-                }}
-            >
-                <button
-                    class="btn absolute top-4 right-4 btn-xs btn-primary"
-                    onClick={closeDashboard}
-                >X</button>
-                <div class="flex flex-col gap-4 p-4">
-                    <h1 class="text-lg">Mintaka WebUI</h1>
-                    <Overview />
-                    <RuntimeConfig />
-                    <Show when={configSet()}>{validConfigs =>
-                        <MintakaConfig config={validConfigs().config} maxConfig={validConfigs().maxConfig} />
-                    }</Show>
-                    <DangerZone />
-                </div>
-            </aside>
-        </div>
-    )
+            >X
+            </button>
+            <div class="flex flex-col gap-4 p-4">
+                <h1 class="text-lg">Mintaka WebUI</h1>
+                <Overview/>
+                <RuntimeConfig/>
+                <Show when={runtimeSelectors.configs()}>{configs =>
+                    <ConfigSections config={configs().config} maxConfig={configs().max_config}/>
+                }</Show>
+                <DataSections/>
+            </div>
+        </aside>
+    </div>
 }
 
 function Overview() {
+    const { runtimeSelectors } = useContext(AppContext)!
+
     return <div class="flex flex-col gap-4">
         <div>
             <h3 class="text-lg">Overview</h3>
+            <Show when={runtimeSelectors.statics()}>{statics =>
+                <div class="flex-col gap-2 text-sm">
+                    <p>Total Nodes: {formatNodes(statics().totalNodesIn1k)} Nodes</p>
+                    <p>Runtime: {statics().totalRuntime.secs} seconds</p>
+                    <p>NPS: {formatNodes(nps(statics()))}N/s</p>
+                </div>
+            }</Show>
         </div>
     </div>
 }
 
 function RuntimeConfig() {
-    const { appActions, persistConfig, runtimeSelectors } = useContext(AppContext)!
+    const { appActions, persistConfig } = useContext(AppContext)!
 
     return <div class="flex flex-col gap-4">
         <h3 class="text-lg">Runtime</h3>
@@ -93,57 +94,94 @@ function RuntimeConfig() {
             </div>
         </div>
         <Show when={persistConfig.selectedProviderType === "server"}>
-            <fieldset class="fieldset">
-                <legend class="fieldset-legend">Server Address</legend>
-                <label class="input" classList={{ "input-error": false }}>
-                    <span class="label">{SERVER_PROTOCOL}://</span>
-                    <input
-                        type="text"
-                        placeholder="localhost:8080"
-                        value={SERVER_URL}
-                        onChange={event => {
-                        }}
-                    />
-                </label>
-                <p class="label text-wrap">Self-hosted mintaka-server</p>
-            </fieldset>
-            <Switch>
-                <Match when={runtimeSelectors.runtimeType() === "none"}>
-                    <button
-                        class="btn"
-                        classList={{
-                            "btn-success": true,
-                            "btn-disabled": false,
-                        }}
-                        onClick={appActions.loadServerRuntime}
-                    >
-                        Connect
-                    </button>
-                </Match>
-                <Match when={runtimeSelectors.runtimeType() === "loading"}>
-                    <span class="flex gap-2">
-                        <span class="loading loading-sm loading-ring"/>
-                        <p class="text">Connecting...</p>
-                    </span>
-                </Match>
-                <Match when={runtimeSelectors.runtimeType() === "ready"}>
-                    <button
-                        class="btn btn-error"
-                        onClick={appActions.switchServerRuntime}
-                    >
-                        Disconnect
-                    </button>
-                </Match>
-            </Switch>
+            <ServerConfigSections />
         </Show>
     </div>
 }
 
-function MintakaConfig(props: { config: Config, maxConfig: Config }) {
+function ServerConfigSections() {
+    const { runtimeSelectors, appActions, persistConfig, setPersistConfig } = useContext(AppContext)!
+
+    const [address, setAddress] = createSignal(persistConfig.serverConfig?.address ?? SERVER_URL)
+
+    const candidateServerConfig = createMemo<MintakaServerConfig | undefined>(() =>
+        /^((([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+)|(\d{1,3}(\.\d{1,3}){3})):[0-9]+$/
+            .test(address()) ? { address: address() } : undefined,
+    )
+
+    const [serverConfig, { mutate }] = createResource(candidateServerConfig, async (currentConfig) => {
+        try {
+            if (await checkHealth(currentConfig))
+                return currentConfig
+        } catch (e) {}
+
+        return undefined
+    })
+
+    createEffect(on(candidateServerConfig, (config) => {
+        if (config === undefined) mutate(undefined)
+    }))
+
+    createEffect(on(serverConfig, config => {
+        setPersistConfig("serverConfig", config)
+    }))
+
+    return <>
+        <fieldset class="fieldset">
+            <legend class="fieldset-legend">Server Address</legend>
+            <label class="input" classList={{ "input-error": candidateServerConfig() === undefined }}>
+                <span class="label">{SERVER_PROTOCOL}://</span>
+                <input
+                    type="text"
+                    placeholder="localhost:8080"
+                    disabled={runtimeSelectors.runtimeType() === "ready"}
+                    value={address()}
+                    onChange={event => {
+                        if (!(event.target instanceof HTMLInputElement)) return
+
+                        setAddress(event.target.value)
+                    }}
+                />
+            </label>
+            <p class="label text-wrap">Self-hosted mintaka-server</p>
+        </fieldset>
+        <Switch>
+            <Match when={runtimeSelectors.runtimeType() === "none"}>
+                <button
+                    class="btn"
+                    classList={{
+                        "btn-success": serverConfig() !== undefined,
+                        "btn-disabled": serverConfig() === undefined,
+                    }}
+                    onClick={appActions.loadServerRuntime}
+                >
+                    Connect
+                </button>
+            </Match>
+            <Match when={runtimeSelectors.runtimeType() === "loading"}>
+                <button
+                    class="btn btn-disabled btn-success"
+                >
+                    Connecting
+                </button>
+            </Match>
+            <Match when={runtimeSelectors.runtimeType() === "ready"}>
+                <button
+                    class="btn btn-error"
+                    onClick={appActions.switchServerRuntime}
+                >
+                    Disconnect
+                </button>
+            </Match>
+        </Switch>
+    </>
+}
+
+function ConfigSections(props: { config: Config, maxConfig: Config }) {
     return <div class="flex flex-col gap-4">
         <div>
             <h3 class="text-lg">Resources</h3>
-            <ConfigSection
+            <NumericConfigSection
                 produce={value => ({ ...unwrap(props.config), workers: value })}
                 value={props.config.workers}
                 min={{
@@ -155,7 +193,7 @@ function MintakaConfig(props: { config: Config, maxConfig: Config }) {
                 legend="Workers" label="Cores"
                 description="CPU core allocation. Must be less than the number of logical CPUs."
             />
-            <ConfigSection
+            <NumericConfigSection
                 produce={value => ({ ...unwrap(props.config), tt_size: value })}
                 value={props.config.tt_size}
                 min={{
@@ -170,7 +208,7 @@ function MintakaConfig(props: { config: Config, maxConfig: Config }) {
         </div>
         <div>
             <h3 class="text-lg">Time Controls</h3>
-            <ConfigSection
+            <NumericConfigSection
                 produce={value => ({ ...{ initial_timer: { total: value } }, ...unwrap(props.config) })}
                 value={props.config.initial_timer.total_remaining?.secs}
                 min={{
@@ -182,7 +220,7 @@ function MintakaConfig(props: { config: Config, maxConfig: Config }) {
                 scale={1}
                 legend="Total Time" label="seconds" description="Total time"
             />
-            <ConfigSection
+            <NumericConfigSection
                 produce={value => ({ ...{ initial_timer: { increment: value } }, ...unwrap(props.config) })}
                 value={props.config.initial_timer.increment.secs}
                 min={{
@@ -194,7 +232,7 @@ function MintakaConfig(props: { config: Config, maxConfig: Config }) {
                 scale={1}
                 legend="Increment Time" label="seconds" description="Increment time"
             />
-            <ConfigSection
+            <NumericConfigSection
                 produce={value => ({ ...{ initial_timer: { turn: value } }, ...unwrap(props.config) })}
                 value={props.config.initial_timer.turn?.secs}
                 min={{
@@ -209,7 +247,7 @@ function MintakaConfig(props: { config: Config, maxConfig: Config }) {
         </div>
         <div>
             <h3 class="text-lg">Search Limits</h3>
-            <ConfigSection
+            <NumericConfigSection
                 produce={value => ({ ...unwrap(props.config), max_nodes_in_1k: value })}
                 value={props.config.max_nodes_in_1k}
                 min={{
@@ -222,7 +260,7 @@ function MintakaConfig(props: { config: Config, maxConfig: Config }) {
                 legend="Node Limit" label="×1000 nodes"
                 description="Maximum reachable nodes. Specify when maintaining a constant level regardless of time or hardware."
             />
-            <ConfigSection
+            <NumericConfigSection
                 produce={value => ({ ...unwrap(props.config), max_depth: value })}
                 value={props.config.max_depth}
                 min={{
@@ -238,7 +276,7 @@ function MintakaConfig(props: { config: Config, maxConfig: Config }) {
     </div>
 }
 
-function DangerZone() {
+function DataSections() {
     const { appActions } = useContext(AppContext)!
 
     return <div class="flex flex-col gap-2">
@@ -262,7 +300,7 @@ type MinValue =
     | { type: "finite", value: number, }
     | { type: "optional", value: undefined, placeholder: string }
 
-function ConfigSection<M extends MinValue, V = number | M["value"]>(props: {
+function NumericConfigSection<M extends MinValue, V = number | M["value"]>(props: {
     produce: (value: V) => Config,
     value: V,
     min: M,
@@ -272,7 +310,7 @@ function ConfigSection<M extends MinValue, V = number | M["value"]>(props: {
     label: string,
     description: string,
 }) {
-    const { appActions, persistConfig } = useContext(AppContext)!
+    const { appActions } = useContext(AppContext)!
 
     const [isValid, setIsValid] = createSignal(true)
 

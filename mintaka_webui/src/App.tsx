@@ -9,6 +9,7 @@ import { Dashboard } from "./components/Dashboard"
 export function App() {
     return <AppContextProvider>
         <AppLayout />
+        <Dashboard />
     </AppContextProvider>
 }
 
@@ -44,6 +45,5 @@ function AppLayout() {
                 <StatusMessage />
             </div>
         </div>
-        <Dashboard />
     </div>
 }

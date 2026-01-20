@@ -13,6 +13,7 @@ export type MintakaProviderRuntimeCommand =
 
 export interface MintakaProvider {
     readonly type: MintakaProviderType,
+    readonly storageKey: string,
     subscribeResponse(handler: (response: MintakaProviderResponse) => void): void,
     dispose(): void,
     command(command: Command): void,

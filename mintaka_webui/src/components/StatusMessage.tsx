@@ -1,10 +1,13 @@
 import { createMemo, useContext } from "solid-js"
 import { AppContext } from "../context"
+import { formatNodes } from "../domain/mintaka"
+import { flatmap } from "../utils/undefined"
 
 export function StatusMessage() {
-    const { appConfig, runtimeSelectors } = useContext(AppContext)!
+    const { appSettings, runtimeSelectors } = useContext(AppContext)!
 
-    const nodes = createMemo(() => 0)
+    const nodes = () =>
+        flatmap(runtimeSelectors.statics()?.totalNodesIn1k, valid => formatNodes(valid))
 
     const remainingTime = createMemo(() => 0)
 
@@ -15,7 +18,7 @@ export function StatusMessage() {
             return ""
 
         if (status === "idle")
-            if (appConfig.autoLaunch)
+            if (appSettings.launch)
                 return "Mintaka engine is waiting for your move."
             else
                 return ""
@@ -24,7 +27,7 @@ export function StatusMessage() {
             return "Engine is started thinking..."
 
         if (status === "streaming")
-            return `Thinking: ${nodes()}K nodes visited, up to ${remainingTime()}s remaining...`
+            return `Thinking: ${nodes()} nodes visited, up to ${remainingTime()}s remaining...`
 
         if (status === "aborting")
             return "Engine is stopping the current analysis..."
