@@ -1,7 +1,7 @@
 import { Accessor, createContext, createEffect, createMemo, ParentProps } from "solid-js"
-import { createStore, reconcile, SetStoreFunction, unwrap } from "solid-js/store"
+import { createStore, reconcile, SetStoreFunction, Store, unwrap } from "solid-js/store"
 import { ForwardMethod } from "./domain/HistoryTree"
-import { BoardDescribe, Config, HashKey, History, Pos } from "./wasm/pkg/mintaka_wasm"
+import type { BoardDescribe, Config, HashKey, History, Pos } from "./wasm/pkg/mintaka_wasm"
 import { createPersistConfigStore, defaultPersistConfig, PersistConfig } from "./stores/persist.config"
 import { AppSettings, createAppSettingsStore } from "./stores/app.settings"
 import { createGameController } from "./controllers/game.controller"
@@ -15,6 +15,7 @@ import { setupThemeSync } from "./theme"
 import { assertOk } from "./utils/response"
 import { assertNever } from "./utils/never"
 import { Configs, MintakaStatics } from "./domain/mintaka"
+import { WEB_WORKER_READY } from "./config"
 
 interface AppActions {
     readonly loadWorkerRuntime: () => void,
@@ -26,7 +27,7 @@ interface AppActions {
 }
 
 interface AppSelectors {
-    readonly selectNormEval: (hash: HashKey) => number | undefined,
+    readonly winRateTable: Store<Record<HashKey, number>>,
 }
 
 interface RuntimeSelectors {
@@ -90,7 +91,9 @@ export function AppContextProvider(props: ParentProps) {
     const gameController = createGameController(appState.gameState, appState.setGameState)
 
     const runtimeController = createRuntimeController(
-        appState.mintakaRuntime, appState.setMintakaRuntime, gameController.applyBestMove,
+        appState.mintakaRuntime, appState.setMintakaRuntime,
+        appState.setWinRateTable,
+        gameController.applyBestMove,
     )
 
     const [appSettings, setAppSettings] = createAppSettingsStore(initialUrlParam)
@@ -169,6 +172,8 @@ export function AppContextProvider(props: ParentProps) {
 
     const appActions: AppActions = {
         loadWorkerRuntime: () => {
+            if (!WEB_WORKER_READY) return
+
             setPersistConfig("selectedProviderType", "worker")
 
             runtimeController.loadWorkerRuntime()
@@ -191,7 +196,7 @@ export function AppContextProvider(props: ParentProps) {
     }
 
     const appSelectors: AppSelectors = {
-        selectNormEval: (hash) => appState.normEvalTable.get(hash),
+        winRateTable: appState.winRateTable,
     }
 
     const runtimeSelectors: RuntimeSelectors = {

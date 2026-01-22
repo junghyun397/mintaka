@@ -1,7 +1,8 @@
 import type { MintakaServerConfig } from "../domain/mintaka.server.provider"
 import type { MintakaProviderType } from "../domain/mintaka.provider"
-import { createStore } from "solid-js/store"
+import { createStore, SetStoreFunction } from "solid-js/store"
 import { makePersisted } from "@solid-primitives/storage"
+import { PERSIST_CONFIG_VERSION, WEB_WORKER_READY } from "../config"
 
 const Themes = ["system", "dark", "light"] as const
 
@@ -37,6 +38,14 @@ export function defaultPersistConfig(): PersistConfig {
     }
 }
 
-export function createPersistConfigStore() {
-    return makePersisted(createStore(defaultPersistConfig()), { name: "persist-config-v1" })
+export function createPersistConfigStore(): [PersistConfig, SetStoreFunction<PersistConfig>] {
+    const [persistConfig, setPersistConfig] = makePersisted(createStore(defaultPersistConfig()),
+        { name: "persist-config-" + PERSIST_CONFIG_VERSION },
+    )
+
+    if (!WEB_WORKER_READY && persistConfig.selectedProviderType === "worker") {
+        setPersistConfig("selectedProviderType", "server")
+    }
+
+    return [persistConfig, setPersistConfig]
 }

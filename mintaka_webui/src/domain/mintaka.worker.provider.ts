@@ -60,8 +60,7 @@ export const MaxWorkerConfig: Config = {
 }
 
 export class MintakaWorkerProvider implements MintakaProvider {
-    readonly type: MintakaProviderType = "worker"
-    readonly storageKey = "local"
+    readonly type: "worker" = "worker"
 
     private readonly worker: Worker
     private workerControl?: MintakaWorkerControl

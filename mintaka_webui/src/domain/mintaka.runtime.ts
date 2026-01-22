@@ -1,6 +1,5 @@
 import type { BestMove, CommandResult, ComputingResource, HashKey } from "../wasm/pkg/rusty_renju_wasm"
 import { HistoryTree } from "./HistoryTree"
-import { MintakaProvider } from "./mintaka.provider"
 import { StatusResponseBody } from "./mintaka"
 
 class IdleState {
@@ -59,7 +58,7 @@ class BeginsComputingState extends StreamableComputingState {
     ) { super(snapshot, historySnapshot) }
 
     status(response: StatusResponseBody): StreamingComputingState {
-        return new StreamingComputingState(this.snapshot, this.historySnapshot, response)
+        return new StreamingComputingState(this.snapshot, this.historySnapshot, response, this.resource)
     }
 }
 
@@ -69,10 +68,11 @@ class StreamingComputingState extends StreamableComputingState {
     constructor(
         snapshot: HashKey, historySnapshot: HistoryTree,
         readonly lastStatus: StatusResponseBody,
+        readonly resource?: ComputingResource,
     ) { super(snapshot, historySnapshot) }
 
     status(response: StatusResponseBody): StreamingComputingState {
-        return new StreamingComputingState(this.snapshot, this.historySnapshot, response)
+        return new StreamingComputingState(this.snapshot, this.historySnapshot, response, this.resource)
     }
 }
 
@@ -81,7 +81,8 @@ class AbortingComputingState extends BaseComputingState {
 
     constructor(
         snapshot: HashKey, historySnapshot: HistoryTree,
-        readonly resource?: ComputingResource, readonly lastStatus?: StatusResponseBody,
+        readonly resource?: ComputingResource,
+        readonly lastStatus?: StatusResponseBody,
     ) { super(snapshot, historySnapshot) }
 }
 

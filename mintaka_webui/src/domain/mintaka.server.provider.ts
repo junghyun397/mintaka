@@ -1,7 +1,7 @@
-import { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand, MintakaProviderType } from "./mintaka.provider"
+import { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand } from "./mintaka.provider"
 import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/rusty_renju_wasm"
-import { Configs } from "./mintaka"
 import { SERVER_PROTOCOL } from "../config"
+import { Configs } from "./mintaka"
 
 export type MintakaServerConfig = {
     readonly address: string,
@@ -74,26 +74,22 @@ export async function createSession(serverConfig: MintakaServerConfig, state: Ga
     return { sid: JSON.parse(text) }
 }
 
-export async function fetchConfigs(serverConfig: MintakaServerConfig, session: MintakaServerSession): Promise<Configs> {
-    const response = await fetch(`${serverUrl(serverConfig)}/sessions/${session.sid}/configs`, {
-        headers: serverHeaders(serverConfig),
-    })
-
-    return response.json()
-}
-
 export class MintakaServerProvider implements MintakaProvider {
     private chain: Promise<void> = Promise.resolve()
     private eventSource?: EventSource
 
     private onResponse?: (message: MintakaProviderResponse) => void
 
-    readonly type: MintakaProviderType = "server"
+    readonly type: "server" = "server"
 
-    constructor(private readonly serverConfig: MintakaServerConfig, private readonly session: MintakaServerSession) {}
+    constructor(readonly serverConfig: MintakaServerConfig, readonly session: MintakaServerSession) {}
 
-    get storageKey() {
-        return this.serverConfig.address
+    async configs(): Promise<Configs> {
+        const response = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/configs`, {
+            headers: serverHeaders(this.serverConfig),
+        })
+
+        return response.json()
     }
 
     subscribeResponse(handler: (response: MintakaProviderResponse) => void) {
@@ -112,7 +108,7 @@ export class MintakaServerProvider implements MintakaProvider {
                 await this.sendCommand(command)
             })
             .catch((error) => {
-                this.onResponse && this.onResponse({ type: "Error", content: error })
+                this.onError(error)
             })
     }
 
@@ -122,7 +118,7 @@ export class MintakaServerProvider implements MintakaProvider {
                 await this.sendLaunch(positionHash, objective)
             })
             .catch((error) => {
-                this.onResponse && this.onResponse({ type: "Error", content: error })
+                this.onError(error)
             })
     }
 
@@ -136,7 +132,7 @@ export class MintakaServerProvider implements MintakaProvider {
     }
 
     private sendCommand = async (command: Command) => {
-        const response = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/command`, {
+        const response = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/commands`, {
             method: "POST",
             headers: serverHeaders(this.serverConfig, {
                 "Content-Type": "application/json",
@@ -199,9 +195,13 @@ export class MintakaServerProvider implements MintakaProvider {
     }
 
     private async disconnect() {
-        const _ = fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}`, {
+        const _ = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}`, {
             method: "DELETE",
             headers: serverHeaders(this.serverConfig),
         })
+    }
+
+    private onError = (error: unknown) => {
+        this.onResponse && this.onResponse({ type: "Error", content: error })
     }
 }

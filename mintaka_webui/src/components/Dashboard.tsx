@@ -3,8 +3,8 @@ import { createEffect, createMemo, createResource, createSignal, Match, on, Show
 import { unwrap } from "solid-js/store"
 import type { Config } from "../wasm/pkg/rusty_renju_wasm"
 import { flatmap } from "../utils/undefined"
-import { SERVER_PROTOCOL, SERVER_URL } from "../config"
-import { formatNodes, nps } from "../domain/mintaka"
+import { SERVER_PROTOCOL, SERVER_URL, WEB_WORKER_READY } from "../config"
+import { duration, formatNodes, nps } from "../domain/mintaka"
 import { checkHealth, MintakaServerConfig } from "../domain/mintaka.server.provider"
 
 export function Dashboard() {
@@ -73,26 +73,28 @@ function RuntimeConfig() {
 
     return <div class="flex flex-col gap-4">
         <h3 class="text-lg">Runtime</h3>
-        <div class="btn-group flex gap-4">
-            <div class="flex gap-2">
-                <input
-                    class="radio"
-                    type="radio" name="options" id="worker"
-                    checked={persistConfig.selectedProviderType === "worker"}
-                    onChange={appActions.loadWorkerRuntime}
-                />
-                <label for="worker" class="text inline-flex items-center">Web Worker</label>
+        <Show when={WEB_WORKER_READY}>
+            <div class="btn-group flex gap-4">
+                <div class="flex gap-2">
+                    <input
+                        class="radio"
+                        type="radio" name="options" id="worker"
+                        checked={persistConfig.selectedProviderType === "worker"}
+                        onChange={appActions.loadWorkerRuntime}
+                    />
+                    <label for="worker" class="text inline-flex items-center">Web Worker</label>
+                </div>
+                <div class="flex gap-2">
+                    <input
+                        class="radio"
+                        type="radio" name="options" id="server"
+                        checked={persistConfig.selectedProviderType === "server"}
+                        onChange={appActions.switchServerRuntime}
+                    />
+                    <label for="server" class="text inline-flex items-center">Server</label>
+                </div>
             </div>
-            <div class="flex gap-2">
-                <input
-                    class="radio"
-                    type="radio" name="options" id="server"
-                    checked={persistConfig.selectedProviderType === "server"}
-                    onChange={appActions.switchServerRuntime}
-                />
-                <label for="server" class="text inline-flex items-center">Server</label>
-            </div>
-        </div>
+        </Show>
         <Show when={persistConfig.selectedProviderType === "server"}>
             <ServerConfigSections />
         </Show>
@@ -162,7 +164,7 @@ function ServerConfigSections() {
                 <button
                     class="btn btn-disabled btn-success"
                 >
-                    Connecting
+                    <span class="loading loading-spinner" />Connecting
                 </button>
             </Match>
             <Match when={runtimeSelectors.runtimeType() === "ready"}>
@@ -191,7 +193,7 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                 max={props.maxConfig.workers ?? 1}
                 scale={1}
                 legend="Workers" label="Cores"
-                description="CPU core allocation. Must be less than the number of logical CPUs."
+                description="CPU cores. Must be less than the number of logical CPUs."
             />
             <NumericConfigSection
                 produce={value => ({ ...unwrap(props.config), tt_size: value })}
@@ -203,13 +205,22 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                 max={props.maxConfig.tt_size ?? 1024 * 1024 * 1024 * 8}
                 scale={1024 * 1024}
                 legend="TT Size" label="MiB"
-                description="Shared memory size. Should be properly sized relative to computational volume."
+                description="Shared memory size. Should be properly sized relative to other resources."
             />
         </div>
         <div>
             <h3 class="text-lg">Time Controls</h3>
             <NumericConfigSection
-                produce={value => ({ ...{ initial_timer: { total: value } }, ...unwrap(props.config) })}
+                produce={value => {
+                    const config = unwrap(props.config)
+                    return {
+                        ...config,
+                        initial_timer: {
+                            ...config.initial_timer,
+                            total_remaining: flatmap(value, valid => duration(valid)),
+                        },
+                    }
+                }}
                 value={props.config.initial_timer.total_remaining?.secs}
                 min={{
                     type: "optional",
@@ -221,7 +232,16 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                 legend="Total Time" label="seconds" description="Total time"
             />
             <NumericConfigSection
-                produce={value => ({ ...{ initial_timer: { increment: value } }, ...unwrap(props.config) })}
+                produce={value => {
+                    const config = unwrap(props.config)
+                    return {
+                        ...config,
+                        initial_timer: {
+                            ...config.initial_timer,
+                            increment: duration(value),
+                        },
+                    }
+                }}
                 value={props.config.initial_timer.increment.secs}
                 min={{
                     type: "finite",
@@ -233,7 +253,16 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                 legend="Increment Time" label="seconds" description="Increment time"
             />
             <NumericConfigSection
-                produce={value => ({ ...{ initial_timer: { turn: value } }, ...unwrap(props.config) })}
+                produce={value => {
+                    const config = unwrap(props.config)
+                    return {
+                        ...config,
+                        initial_timer: {
+                            ...config.initial_timer,
+                            turn: flatmap(value, valid => duration(valid)),
+                        },
+                    }
+                }}
                 value={props.config.initial_timer.turn?.secs}
                 min={{
                     type: "optional",
@@ -324,32 +353,31 @@ function NumericConfigSection<M extends MinValue, V = number | M["value"]>(props
         >
             <input
                 type="number"
-                value={flatmap(props.value as number | undefined, valid => Math.trunc(valid / props.scale))}
-                max={props.max}
+                value={flatmap(props.value as number | undefined, valid => Math.trunc(valid / props.scale)) ?? ""}
+                min={flatmap(props.min.value, valid => Math.trunc(valid / props.scale))}
+                max={flatmap(props.max, valid => Math.trunc(valid / props.scale))}
                 placeholder={props.min.type === "optional" ? props.min.placeholder : undefined}
                 onChange={event => {
-                    const newValue = event.target instanceof HTMLInputElement
-                        ? event.target.valueAsNumber * props.scale
-                        : undefined
-
-                    if (newValue === undefined && props.min.type === "optional") {
-                        setIsValid(true)
-                        appActions.updateConfig(props.produce(newValue as V))
+                    const { value, valueAsNumber } = event.currentTarget
+                    if (value === "") {
+                        const valid = props.min.type === "optional"
+                        setIsValid(valid)
+                        if (valid)
+                            appActions.updateConfig(props.produce(undefined as V))
                         return
                     }
 
-                    if (newValue === undefined) {
+                    if (Number.isNaN(valueAsNumber)) {
                         setIsValid(false)
                         return
                     }
 
-                    if ((props.min.value === undefined || props.min.value <= newValue)
+                    const newValue = valueAsNumber * props.scale
+                    const valid = (props.min.value === undefined || props.min.value <= newValue)
                         && (props.max === undefined || newValue <= props.max)
-                    ) {
-                        setIsValid(true)
+                    setIsValid(valid)
+                    if (valid)
                         appActions.updateConfig(props.produce(newValue as V))
-                        return
-                    }
                 }}
             />
             <span class="label">{props.label}</span>

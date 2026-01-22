@@ -1,5 +1,6 @@
 import { ForwardMethod, HistoryTree } from "../domain/HistoryTree"
-import { BestMove, BoardWorker, Pos } from "../wasm/pkg/rusty_renju_wasm"
+import type { BestMove, HashKey, Pos } from "../wasm/pkg/rusty_renju_wasm"
+import { BoardWorker } from "../wasm/pkg/rusty_renju_wasm"
 import { AppGameState, emptyAppGameState } from "../domain/rusty-renju"
 
 interface GameController {
@@ -9,7 +10,7 @@ interface GameController {
     bulkForward: (method: ForwardMethod) => "ok" | "illegal",
     backward: () => "ok" | "illegal",
     bulkBackward: () => "ok" | "illegal",
-    applyBestMove: (bestMove: BestMove, historySnapshot: HistoryTree) => void,
+    applyBestMove: (bestMove: BestMove, historySnapshot: HistoryTree) => HashKey,
 }
 
 export function createGameController(
@@ -93,6 +94,8 @@ export function createGameController(
             historyTree = historyTree.push({ hashKey: boardWorker.hashKey(), pos: bestMove.best_move })
 
             setGameState({ boardWorker, historyTree })
+
+            return boardWorker.hashKey()
         },
     }
 }

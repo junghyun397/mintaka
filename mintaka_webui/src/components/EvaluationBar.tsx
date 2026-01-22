@@ -1,27 +1,21 @@
-import { createMemo, useContext } from "solid-js"
+import { useContext } from "solid-js"
 import { AppContext } from "../context"
+import { flatmap } from "../utils/undefined"
+import { HashKey } from "../wasm/pkg/rusty_renju_wasm"
 
 export function RootEvaluationBar() {
-    const { appSelectors, gameSelectors, runtimeSelectors } = useContext(AppContext)!
-
-    const currentNormEval = createMemo(() => {
-        const runtime = runtimeSelectors.runtimeState()
-
-        if (runtime !== undefined && runtime.type === "streaming")
-            return 0 // TODO: protocol
-
-        return appSelectors.selectNormEval(gameSelectors.boardDescribe.hash_key)
-    })
+    const { gameSelectors } = useContext(AppContext)!
 
     return <div class="mx-auto w-full max-w-90">
-        <EvaluationBar normEval={currentNormEval()} />
+        <EvaluationBar hash={gameSelectors.boardDescribe.hash_key} />
     </div>
 }
 
-export function EvaluationBar(props: { normEval: number | undefined }) {
-    const whitePercent = createMemo(() =>
-        props.normEval !== undefined ? (-props.normEval + 1) / 2 * 100 : undefined,
-    )
+export function EvaluationBar(props: { hash: HashKey }) {
+    const { appSelectors } = useContext(AppContext)!
+
+    const whitePercent = () =>
+        flatmap(appSelectors.winRateTable[props.hash], valid => (-valid + 1) / 2 * 100)
 
     return <div
         class="h-4 overflow-hidden rounded-full border-3 border-base-300 bg-black transition-opacity duration-200 ease-out"
@@ -31,9 +25,7 @@ export function EvaluationBar(props: { normEval: number | undefined }) {
     >
         <div
             class="ml-auto h-full bg-white transition-[width] duration-300 ease-out"
-            style={{
-                width: `${whitePercent() ?? 50}%`,
-            }}
+            style={{ width: `${whitePercent() ?? 50}%` }}
         />
     </div>
 }

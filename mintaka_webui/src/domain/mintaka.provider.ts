@@ -6,14 +6,13 @@ export type MintakaProviderResponse =
     | { type: "CommandResult", content: CommandResult }
     | Response
     | { type: "BestMove", content: BestMove }
-    | { type: "Error", content: any }
+    | { type: "Error", content: unknown }
 
 export type MintakaProviderRuntimeCommand =
     { type: "abort" }
 
 export interface MintakaProvider {
     readonly type: MintakaProviderType,
-    readonly storageKey: string,
     subscribeResponse(handler: (response: MintakaProviderResponse) => void): void,
     dispose(): void,
     command(command: Command): void,
