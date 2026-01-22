@@ -58,7 +58,6 @@ impl SessionKey {
     }
 }
 
-#[typeshare(serialized_as = "String")]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SessionStatus {
     Idle,

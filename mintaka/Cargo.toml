@@ -4,7 +4,7 @@ version = "0.1.0-pre-alpha"
 edition = "2024"
 
 [features]
-serde = ["dep:serde", "rusty_renju/serde"]
+serde = ["dep:serde", "dep:serde_with", "rusty_renju/serde"]
 typeshare = ["serde", "dep:typeshare", "rusty_renju/typeshare"]
 compress-tt = ["dep:lz4"]
 debug-statics = []
@@ -16,6 +16,7 @@ rusty_renju = {path = "../rusty_renju" }
 rayon = { version = "1.11", optional = true }
 
 serde = { version = "1.0", features = ["derive"], optional = true }
+serde_with = { version = "3.16", optional = true }
 typeshare = { version = "1.0", optional = true }
 
 lz4 = { version = "1.28", optional = true }

@@ -20,11 +20,8 @@ pub enum BoardIterItem {
 }
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "BoardExportItemSchema"))]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(tag = "type", content = "content"),
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "content"))]
 #[derive(Debug, Copy, Clone)]
 pub enum BoardExportItem {
     Stone(BoardExportStone),

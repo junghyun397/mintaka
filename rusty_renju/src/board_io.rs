@@ -44,10 +44,7 @@ pub struct BoardDescribe {
             deserialize_with = "crate::utils::serde::deserialize_array"
         ),
     )]
-    #[cfg_attr(
-        feature = "typeshare",
-        typeshare(serialized_as = "Vec<BoardExportItem>")
-    )]
+    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Vec<BoardExportItem>"))]
     pub field: [BoardExportItem; pos::BOARD_SIZE],
 }
 

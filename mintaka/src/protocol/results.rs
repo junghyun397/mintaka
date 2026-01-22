@@ -12,11 +12,8 @@ use rusty_renju::notation::score::Score;
 use crate::principal_variation::PrincipalVariation;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "GameResultSchema"))]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(tag = "type", content = "content"),
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "content"))]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum GameResult {
     Win(Color),
@@ -51,6 +48,7 @@ impl_debug_from_display!(GameResult);
 
 #[cfg_attr(feature = "typeshare", typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde_with::skip_serializing_none)]
 #[derive(Debug, Copy, Clone)]
 pub struct CommandResult {
     pub hash_key: HashKey,

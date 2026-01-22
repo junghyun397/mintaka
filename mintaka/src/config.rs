@@ -22,11 +22,8 @@ pub enum SearchObjective {
 }
 
 #[cfg_attr(feature = "typeshare", typeshare)]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(default),
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde_with::skip_serializing_none)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Config {
     pub rule_kind: RuleKind,

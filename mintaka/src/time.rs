@@ -7,6 +7,7 @@ use rusty_renju::utils::lang::DurationSchema;
 
 #[cfg_attr(feature = "typeshare", typeshare::typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde_with::skip_serializing_none)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Timer {
     #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Option<DurationSchema>"))]

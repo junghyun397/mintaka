@@ -106,8 +106,6 @@ export type Score = number;
 
 export type SearchObjective = string;
 
-export type SessionStatus = string;
-
 export interface DurationSchema {
 	secs: number;
 	nanos: number;

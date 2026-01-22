@@ -23,11 +23,9 @@ pub struct CompactGameState {
 }
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "CommandSchema"))]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(tag = "type", content = "content"),
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "content"))]
+#[cfg_attr(feature = "serde", serde_with::skip_serializing_none)]
 #[derive(Debug, Clone)]
 pub enum Command {
     Clear,

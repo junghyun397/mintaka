@@ -12,6 +12,7 @@ use rusty_renju::utils::byte_size::ByteSize;
 
 #[cfg_attr(feature = "typeshare", typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde_with::skip_serializing_none)]
 #[derive(Debug, Copy, Clone)]
 pub struct ComputingResource {
     pub workers: u32,
@@ -22,11 +23,8 @@ pub struct ComputingResource {
 }
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "ResponseSchema"))]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(tag = "type", content = "content"),
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "content"))]
 #[derive(Debug, Clone)]
 pub enum Response {
     Begins(ComputingResource),
