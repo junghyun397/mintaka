@@ -201,7 +201,8 @@ impl Serialize for Pos {
 impl<'de> Deserialize<'de> for Pos {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         if deserializer.is_human_readable() {
-            Self::from_str(&String::deserialize(deserializer)?).map_err(de::Error::custom)
+            Self::from_str(&String::deserialize(deserializer)?)
+                .map_err(de::Error::custom)
         } else {
             Ok(Self::from_index(u8::deserialize(deserializer)?))
         }
@@ -210,7 +211,6 @@ impl<'de> Deserialize<'de> for Pos {
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Option<Pos>"))]
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
-#[repr(transparent)]
 pub struct MaybePos(Pos);
 
 impl MaybePos {

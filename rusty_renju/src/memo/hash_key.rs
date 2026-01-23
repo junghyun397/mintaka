@@ -8,16 +8,13 @@ use crate::{cartesian_to_index, impl_debug_from_display};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
+use std::str::FromStr;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
-#[cfg_attr(feature = "typeshare", typeshare)]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
 #[derive(Eq, PartialEq, Copy, Clone)]
-#[repr(C)]
-pub struct HashKey(
-    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
-    u64
-);
+pub struct HashKey(u64);
 
 impl HashKey {
 
@@ -76,7 +73,15 @@ impl From<HashKey> for u64 {
 
 impl Display for HashKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "0x{:16x}", self.0)
+        write!(f, "0x{:016x}", self.0)
+    }
+}
+
+impl FromStr for HashKey {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        u64::from_str_radix(&s[2 ..], 16).map(Self)
     }
 }
 
@@ -97,9 +102,7 @@ impl Serialize for HashKey {
 impl<'de> Deserialize<'de> for HashKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         if deserializer.is_human_readable() {
-            let source = String::deserialize(deserializer)?;
-            u64::from_str_radix(&source[2 ..], 16)
-                .map(Self)
+            Self::from_str(&String::deserialize(deserializer)?)
                 .map_err(de::Error::custom)
         } else {
             Ok(Self(u64::deserialize(deserializer)?))

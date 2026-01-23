@@ -15,7 +15,7 @@ wasm-opt = [
 crate-type = ["cdylib"]
 
 [features]
-console_error_panic_hook = ["dep:console_error_panic_hook"]
+panic_hook = ["dep:console_error_panic_hook"]
 default = []
 
 [dependencies]

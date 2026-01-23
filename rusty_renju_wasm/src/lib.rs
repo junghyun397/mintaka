@@ -12,7 +12,7 @@ const UNION_TYPES: &'static str = include_str!("../union_types_ts");
 
 #[wasm_bindgen(start)]
 pub fn start() {
-    #[cfg(feature = "console_error_panic_hook")]
+    #[cfg(feature = "panic_hook")]
     console_error_panic_hook::set_once();
 }
 

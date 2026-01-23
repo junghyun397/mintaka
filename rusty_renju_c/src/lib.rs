@@ -16,6 +16,17 @@ pub extern "C" fn rusty_renju_rule_gomoku() -> u8 { rusty_renju::notation::rule:
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_rule_renju() -> u8 { rusty_renju::notation::rule::RuleKind::Renju as u8 }
 
+const FORBIDDEN_KIND_NONE: u8 = 0;
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rusty_renju_forbidden_kind_none() -> u8 { 0 }
+#[unsafe(no_mangle)]
+pub extern "C" fn rusty_renju_forbidden_kind_double_three() -> u8 { rusty_renju::notation::rule::ForbiddenKind::DoubleThree as u8 }
+#[unsafe(no_mangle)]
+pub extern "C" fn rusty_renju_forbidden_kind_double_four() -> u8 { rusty_renju::notation::rule::ForbiddenKind::DoubleFour as u8 }
+#[unsafe(no_mangle)]
+pub extern "C" fn rusty_renju_forbidden_kind_double_overline() -> u8 { rusty_renju::notation::rule::ForbiddenKind::Overline as u8 }
+
 pub const MAYBE_POS_NONE: u8 = rusty_renju::notation::pos::MaybePos::INVALID_POS.idx();
 
 #[unsafe(no_mangle)]
@@ -28,11 +39,8 @@ pub struct BoardExportStone {
     pub sequence: u8,
 }
 
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union BoardExportItemData {
-    pub stone: BoardExportStone,
-    pub forbidden_kind: u8,
+impl BoardExportStone {
+    const EMPTY: Self = Self { color: COLOR_NONE, sequence: 0 };
 }
 
 const BOARD_EXPORT_ITEM_EMPTY: u8 = 0;
@@ -52,7 +60,9 @@ type Patterns = rusty_renju::notation::color::ColorContainer<[rusty_renju::patte
 #[derive(Copy, Clone)]
 pub struct BoardExportItem {
     pub kind: u8,
-    pub data: BoardExportItemData,
+    pub stone: BoardExportStone,
+    pub forbidden_kind: u8,
+
 }
 
 impl From<rusty_renju::board_iter::BoardExportItem> for BoardExportItem {
@@ -60,17 +70,18 @@ impl From<rusty_renju::board_iter::BoardExportItem> for BoardExportItem {
         match value {
             rusty_renju::board_iter::BoardExportItem::Empty => BoardExportItem {
                 kind: BOARD_EXPORT_ITEM_EMPTY,
-                data: BoardExportItemData { forbidden_kind: 0 },
+                stone: BoardExportStone::EMPTY,
+                forbidden_kind: 0,
             },
             rusty_renju::board_iter::BoardExportItem::Stone(stone) => BoardExportItem {
                 kind: BOARD_EXPORT_ITEM_STONE,
-                data: BoardExportItemData {
-                    stone: BoardExportStone { color: stone.color as u8, sequence: stone.sequence },
-                },
+                stone: BoardExportStone { color: stone.color as u8, sequence: stone.sequence },
+                forbidden_kind: 0
             },
             rusty_renju::board_iter::BoardExportItem::Forbidden(kind) => BoardExportItem {
                 kind: BOARD_EXPORT_ITEM_FORBIDDEN,
-                data: BoardExportItemData { forbidden_kind: kind as u8 },
+                stone: BoardExportStone::EMPTY,
+                forbidden_kind: kind as u8,
             },
         }
     }
