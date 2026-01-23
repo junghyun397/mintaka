@@ -1,4 +1,4 @@
-import { HashKey, History, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
+import { Color, HashKey, History, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
 
 export type HistoryEntry = {
     hashKey: HashKey,
@@ -32,6 +32,10 @@ export class HistoryTree {
 
     get inBranchHead(): boolean {
         return this.root != undefined && this.top === 0
+    }
+
+    get playerColor(): Color {
+        return this.length % 2 === 0 ? "Black" : "White"
     }
 
     linear(): HistoryEntry[] {

@@ -1,6 +1,5 @@
-import type { BestMove, Board, Config, GameState, HashKey, History, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
-import { calculateWinRate } from "../wasm/pkg/rusty_renju_wasm"
-import { defaultBoard } from "../wasm/pkg/rusty_renju_wasm"
+import type { BestMove, Board, Color, Config, GameState, HashKey, History, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
+import { defaultBoard, calculateWinRate } from "../wasm/pkg/rusty_renju_wasm"
 import { HistoryTree } from "../domain/HistoryTree"
 import { DefaultWorkerConfig, MaxWorkerConfig, MintakaWorkerProvider } from "../domain/mintaka.worker.provider"
 import { buildMintakaRuntime, MintakaRuntimeState } from "../domain/mintaka.runtime"
@@ -53,12 +52,13 @@ export type MintakaRuntime =
 export function createRuntimeController(
     mintakaRuntime: () => MintakaRuntime,
     setMintakaRuntime: (runtime: MintakaRuntime) => void,
-    upsertWinRate: (hash: HashKey, winRate: number) => void,
+    upsertWinRate: (hash: HashKey, color: Color, winRate: number) => void,
     handleBestMove: (bestMove: BestMove, historySnapShot: HistoryTree) => HashKey,
 ): RuntimeController {
     const persistProviderConfigController = createPersistProviderConfigController()
 
     const syncAll = (gameState: GameState) => {
+        console.log("syncall")
         const runtime = mintakaRuntime()
         if (runtime.type !== "ready")
             return "provider-not-ready"
@@ -98,9 +98,11 @@ export function createRuntimeController(
 
                     const statics = extractStatics(response.content)
 
+                    console.log(response.content.hash, runtime.state.snapshot)
+
                     setMintakaRuntime({ ...runtime, state: runtime.state.status(response.content), statics })
 
-                    upsertWinRate(response.content.hash, calculateWinRate(response.content.score))
+                    upsertWinRate(response.content.hash, runtime.state.historySnapshot.playerColor, calculateWinRate(response.content.score))
                     break
                 }
                 case "BestMove": {
@@ -110,10 +112,14 @@ export function createRuntimeController(
 
                     const afterHash = handleBestMove(response.content, runtime.state.historySnapshot)
 
+                    console.log(response.content.position_hash, runtime.state.snapshot)
+
                     setMintakaRuntime({ ...runtime, state: runtime.state.bestMove(response.content), statics })
 
-                    upsertWinRate(response.content.position_hash, calculateWinRate(response.content.score))
-                    upsertWinRate(afterHash, calculateWinRate(response.content.score))
+                    const snapshotColor = runtime.state.historySnapshot.playerColor
+
+                    upsertWinRate(response.content.position_hash, snapshotColor, calculateWinRate(response.content.score))
+                    upsertWinRate(afterHash, snapshotColor, calculateWinRate(response.content.score))
                     break
                 }
                 case "Error": {

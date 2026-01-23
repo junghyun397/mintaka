@@ -27,7 +27,7 @@ const ctx = {
         abort: JsAbortHandle
     } | undefined,
     post: (data: MintakaWorkerResponse) => self.postMessage(data),
-    postError: (error: any) => self.postMessage({ type: "Error", error: error }),
+    postError: (error: unknown) => self.postMessage({ type: "Error", content: error } as MintakaWorkerResponse),
 }
 
 self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage>) => {
@@ -52,7 +52,7 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
             case "command": {
                 const result = ctx.state!.agent.command(event.data.command)
 
-                ctx.post({ type: "CommandResult", content: result })
+                ctx.post({ type: "CommandResult", id: event.data.id, content: result })
                 break
             }
             case "launch": {
@@ -72,7 +72,7 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
                 break
             }
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         ctx.postError(error)
     }
 })

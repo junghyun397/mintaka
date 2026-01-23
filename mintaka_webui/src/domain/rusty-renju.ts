@@ -1,4 +1,4 @@
-import type { History, Pos } from "../wasm/pkg/rusty_renju_wasm"
+import type { Color, History, Pos } from "../wasm/pkg/rusty_renju_wasm"
 import { BoardWorker } from "../wasm/pkg/rusty_renju_wasm"
 import { EmptyHistoryTree, type HistoryEntry, HistoryTree } from "./HistoryTree"
 import { assertNever } from "../utils/never"
@@ -14,6 +14,10 @@ export type AppGameState = {
 
 export function emptyAppGameState(): AppGameState {
     return { boardWorker: BoardWorker.empty(), historyTree: EmptyHistoryTree }
+}
+
+export function flip(color: Color): Color {
+    return color === "Black" ? "White" : "Black"
 }
 
 export const NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as const

@@ -3,7 +3,7 @@ import type { BestMove, Command, CommandResult, HashKey, Response, SearchObjecti
 export type MintakaProviderType = "server" | "worker"
 
 export type MintakaProviderResponse =
-    | { type: "CommandResult", content: CommandResult }
+    | { type: "CommandResult", id: number, content: CommandResult }
     | Response
     | { type: "BestMove", content: BestMove }
     | { type: "Error", content: unknown }

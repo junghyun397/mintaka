@@ -142,7 +142,7 @@ export class MintakaServerProvider implements MintakaProvider {
 
         const result = await response.json() as CommandResult
 
-        this.onResponse && this.onResponse({ type: "CommandResult", content: result })
+        this.onResponse && this.onResponse({ type: "CommandResult", id: 0, content: result })
     }
 
     private sendLaunch = async (hash: HashKey, objective: SearchObjective) => {

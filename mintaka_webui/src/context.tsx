@@ -1,7 +1,7 @@
 import { Accessor, createContext, createEffect, createMemo, ParentProps } from "solid-js"
 import { createStore, reconcile, SetStoreFunction, Store, unwrap } from "solid-js/store"
 import { ForwardMethod } from "./domain/HistoryTree"
-import type { BoardDescribe, Config, HashKey, History, Pos } from "./wasm/pkg/mintaka_wasm"
+import type { BoardDescribe, Config, HashKey, History, Pos } from "./wasm/pkg/rusty_renju_wasm"
 import { createPersistConfigStore, defaultPersistConfig, PersistConfig } from "./stores/persist.config"
 import { AppSettings, createAppSettingsStore } from "./stores/app.settings"
 import { createGameController } from "./controllers/game.controller"
@@ -16,6 +16,7 @@ import { assertOk } from "./utils/response"
 import { assertNever } from "./utils/never"
 import { Configs, MintakaStatics } from "./domain/mintaka"
 import { WEB_WORKER_READY } from "./config"
+import { Color } from "./wasm/pkg/rusty_renju_wasm"
 
 interface AppActions {
     readonly loadWorkerRuntime: () => void,
@@ -90,9 +91,13 @@ export function AppContextProvider(props: ParentProps) {
 
     const gameController = createGameController(appState.gameState, appState.setGameState)
 
+    const setWinRateTable = (hash: HashKey, color: Color, winRate: number) => {
+        appState.setWinRateTable(hash, color === "Black" ? winRate : -winRate)
+    }
+
     const runtimeController = createRuntimeController(
         appState.mintakaRuntime, appState.setMintakaRuntime,
-        appState.setWinRateTable,
+        setWinRateTable,
         gameController.applyBestMove,
     )
 

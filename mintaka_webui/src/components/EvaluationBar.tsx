@@ -2,6 +2,7 @@ import { useContext } from "solid-js"
 import { AppContext } from "../context"
 import { flatmap } from "../utils/undefined"
 import { HashKey } from "../wasm/pkg/rusty_renju_wasm"
+import {useStableSignal} from "../utils/signal";
 
 export function RootEvaluationBar() {
     const { gameSelectors } = useContext(AppContext)!
@@ -14,13 +15,16 @@ export function RootEvaluationBar() {
 export function EvaluationBar(props: { hash: HashKey }) {
     const { appSelectors } = useContext(AppContext)!
 
-    const whitePercent = () =>
-        flatmap(appSelectors.winRateTable[props.hash], valid => (-valid + 1) / 2 * 100)
+    const winRate = () => appSelectors.winRateTable[props.hash]
+
+    const whitePercent = useStableSignal(50.0, () =>
+        flatmap(winRate(), valid => (-valid + 1) / 2 * 100)
+    )
 
     return <div
         class="h-4 overflow-hidden rounded-full border-3 border-base-300 bg-black transition-opacity duration-200 ease-out"
         classList={{
-            "opacity-0": whitePercent() === undefined,
+            "opacity-0": winRate() === undefined,
         }}
     >
         <div

@@ -1,4 +1,4 @@
-import { History } from "./wasm/pkg/mintaka_wasm"
+import type { History } from "./wasm/pkg/rusty_renju_wasm"
 import { historyToString, parseHistory } from "./domain/rusty-renju"
 import { Accessor, createEffect } from "solid-js"
 

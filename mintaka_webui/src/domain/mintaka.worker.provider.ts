@@ -1,9 +1,9 @@
 import type { Command, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/rusty_renju_wasm"
-import type { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand, MintakaProviderType } from "./mintaka.provider"
+import type { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand } from "./mintaka.provider"
 import { duration, InfiniteDuration } from "./mintaka"
 
 export type MintakaWorkerMessage =
-    | { type: "command", command: Command }
+    | { type: "command", id: number, command: Command }
     | { type: "launch", positionHash: HashKey, objective: SearchObjective }
     | { type: "init", config: Config, state: GameState }
 
@@ -64,6 +64,9 @@ export class MintakaWorkerProvider implements MintakaProvider {
 
     private readonly worker: Worker
     private workerControl?: MintakaWorkerControl
+    private commandId = 0
+    private chain: Promise<void> = Promise.resolve()
+    private readonly pendingCommands = new Map<number, () => void>()
 
     private onResponse?: (message: MintakaProviderResponse) => void
 
@@ -84,11 +87,22 @@ export class MintakaWorkerProvider implements MintakaProvider {
                 }
             }
 
+            if (event.data.type === "CommandResult") {
+                const resolver = this.pendingCommands.get(event.data.id)
+                if (resolver) {
+                    this.pendingCommands.delete(event.data.id)
+                }
+
+                this.onResponse && this.onResponse(event.data)
+                resolver && resolver()
+                return
+            }
+
             this.onResponse && this.onResponse(event.data)
         }
 
         this.worker.onerror = (event) => {
-            this.onResponse && this.onResponse({ type: "Error", content: event.error })
+            this.onResponse && this.onResponse({ type: "Error", content: event.message })
         }
 
         this.postMessage({ type: "init", config, state })
@@ -104,11 +118,19 @@ export class MintakaWorkerProvider implements MintakaProvider {
     }
 
     command(command: Command) {
-        this.postMessage({ type: "command", command: command })
+        this.chain = this.chain
+            .then(() => this.sendCommand(command))
+            .catch((error) => {
+                this.onError(error)
+            })
     }
 
     launch(positionHash: HashKey, objective: SearchObjective) {
-        this.postMessage({ type: "launch", positionHash, objective })
+        this.chain = this.chain
+            .then(() => this.sendLaunch(positionHash, objective))
+            .catch((error) => {
+                this.onError(error)
+            })
     }
 
     control(command: MintakaProviderRuntimeCommand) {
@@ -120,7 +142,26 @@ export class MintakaWorkerProvider implements MintakaProvider {
         }
     }
 
+    private newId() {
+        this.commandId += 1
+        return this.commandId
+    }
+
+    private sendCommand(command: Command) {
+        const id = this.newId()
+        this.postMessage({ type: "command", id, command: command })
+        return new Promise<void>((resolve) => this.pendingCommands.set(id, resolve))
+    }
+
+    private sendLaunch(positionHash: HashKey, objective: SearchObjective) {
+        this.postMessage({ type: "launch", positionHash, objective })
+    }
+
     private postMessage(message: MintakaWorkerMessage) {
         this.worker.postMessage(message)
+    }
+
+    private onError = (error: unknown) => {
+        this.onResponse && this.onResponse({ type: "Error", content: error })
     }
 }
