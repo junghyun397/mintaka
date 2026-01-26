@@ -5,7 +5,7 @@ import type { BoardDescribe, Config, HashKey, History, Pos } from "./wasm/pkg/ru
 import { createPersistConfigStore, defaultPersistConfig, PersistConfig } from "./stores/persist.config"
 import { AppSettings, createAppSettingsStore } from "./stores/app.settings"
 import { createGameController } from "./controllers/game.controller"
-import { createRuntimeController, MintakaRuntime, RequireProviderReady } from "./controllers/runtime.controller"
+import { createRuntimeController, MintakaRuntime } from "./controllers/runtime.controller"
 import { createAppState } from "./stores/app.state"
 import { MintakaRuntimeState } from "./domain/mintaka.runtime"
 import { flatmap } from "./utils/undefined"
@@ -22,8 +22,8 @@ interface AppActions {
     readonly loadWorkerRuntime: () => void,
     readonly switchServerRuntime: () => void,
     readonly loadServerRuntime: () => void,
-    readonly updateConfig: (config: Config) => RequireProviderReady,
-    readonly restoreDefaultConfig: () => RequireProviderReady,
+    readonly updateConfig: (config: Config) => void,
+    readonly restoreDefaultConfig: () => void,
     readonly resetAppData: () => void,
 }
 
@@ -156,9 +156,7 @@ export function AppContextProvider(props: ParentProps) {
             assertOk(response)
         },
         start: () => {
-            const response = runtimeController.launch(appState.gameState())
-
-            assertOk(response)
+            runtimeController.launch(appState.gameState())
 
             setAppSettings("launch", true)
             setAppSettings("viewer", false)
@@ -167,9 +165,7 @@ export function AppContextProvider(props: ParentProps) {
             setAppSettings("launch", false)
         },
         abort: () => {
-            const result = runtimeController.abort()
-
-            assertOk(result)
+            runtimeController.abort()
 
             setAppSettings("launch", false)
         },

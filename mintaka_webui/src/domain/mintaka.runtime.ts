@@ -2,7 +2,7 @@ import type { BestMove, CommandResult, ComputingResource, HashKey } from "../was
 import { HistoryTree } from "./HistoryTree"
 import { StatusResponseBody } from "./mintaka"
 
-class IdleState {
+export class IdleState {
     readonly type: "idle" = "idle"
 
     constructor(readonly snapshot: HashKey, readonly lastBestMove?: BestMove) {}

@@ -46,7 +46,7 @@ function serializeGameState(state: GameState) {
 }
 
 export async function checkHealth(serverConfig: MintakaServerConfig): Promise<boolean> {
-    const response = await fetch(serverUrl(serverConfig) + "/status", {
+    const response = await fetch(`${serverUrl(serverConfig)}/status`, {
         headers: serverHeaders(serverConfig),
     })
 
@@ -55,7 +55,7 @@ export async function checkHealth(serverConfig: MintakaServerConfig): Promise<bo
 
 export async function createSession(serverConfig: MintakaServerConfig, state: GameState, config: Config | undefined): Promise<MintakaServerSession> {
     const payloadState = serializeGameState(state)
-    const response = await fetch(serverUrl(serverConfig) + "/sessions", {
+    const response = await fetch(`${serverUrl(serverConfig)}/sessions`, {
         method: "POST",
         headers: serverHeaders(serverConfig, {
             "Content-Type": "application/json",
@@ -75,7 +75,6 @@ export async function createSession(serverConfig: MintakaServerConfig, state: Ga
 }
 
 export class MintakaServerProvider implements MintakaProvider {
-    private chain: Promise<void> = Promise.resolve()
     private eventSource?: EventSource
 
     private onResponse?: (message: MintakaProviderResponse) => void
@@ -102,24 +101,12 @@ export class MintakaServerProvider implements MintakaProvider {
         void this.disconnect()
     }
 
-    command(command: Command) {
-        this.chain = this.chain
-            .then(async () => {
-                await this.sendCommand(command)
-            })
-            .catch((error) => {
-                this.onError(error)
-            })
+    async command(command: Command) {
+        return await this.sendCommand(command)
     }
 
-    launch(positionHash: HashKey, objective: SearchObjective) {
-        this.chain = this.chain
-            .then(async () => {
-                await this.sendLaunch(positionHash, objective)
-            })
-            .catch((error) => {
-                this.onError(error)
-            })
+    async launch(positionHash: HashKey, objective: SearchObjective) {
+        return await this.sendLaunch(positionHash, objective)
     }
 
     control(command: MintakaProviderRuntimeCommand) {
@@ -131,7 +118,7 @@ export class MintakaServerProvider implements MintakaProvider {
         }
     }
 
-    private sendCommand = async (command: Command) => {
+    private async sendCommand(command: Command) {
         const response = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/commands`, {
             method: "POST",
             headers: serverHeaders(this.serverConfig, {
@@ -140,13 +127,11 @@ export class MintakaServerProvider implements MintakaProvider {
             body: JSON.stringify(command),
         })
 
-        const result = await response.json() as CommandResult
-
-        this.onResponse && this.onResponse({ type: "CommandResult", id: 0, content: result })
+        return await response.json() as CommandResult
     }
 
-    private sendLaunch = async (hash: HashKey, objective: SearchObjective) => {
-        const _ = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/launch`, {
+    private async sendLaunch(hash: HashKey, objective: SearchObjective) {
+        const response = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/launch`, {
             method: "POST",
             headers: serverHeaders(this.serverConfig),
             body: JSON.stringify({ hash, objective }),

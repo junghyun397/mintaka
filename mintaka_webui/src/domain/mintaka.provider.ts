@@ -3,7 +3,6 @@ import type { BestMove, Command, CommandResult, HashKey, Response, SearchObjecti
 export type MintakaProviderType = "server" | "worker"
 
 export type MintakaProviderResponse =
-    | { type: "CommandResult", id: number, content: CommandResult }
     | Response
     | { type: "BestMove", content: BestMove }
     | { type: "Error", content: unknown }
@@ -15,7 +14,7 @@ export interface MintakaProvider {
     readonly type: MintakaProviderType,
     subscribeResponse(handler: (response: MintakaProviderResponse) => void): void,
     dispose(): void,
-    command(command: Command): void,
-    launch(positionHash: HashKey, objective: SearchObjective): void
+    command(command: Command): Promise<CommandResult>,
+    launch(positionHash: HashKey, objective: SearchObjective): Promise<void>,
     control(command: MintakaProviderRuntimeCommand): void,
 }
