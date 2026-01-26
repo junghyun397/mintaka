@@ -1,27 +1,25 @@
-import type { BestMove, Board, Color, Config, GameState, HashKey, History, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
+import type { BestMove, Board, Color, CommandResult, Config, GameState, HashKey, History, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
 import { defaultBoard, calculateWinRate } from "../wasm/pkg/rusty_renju_wasm"
 import { HistoryTree } from "../domain/HistoryTree"
 import { DefaultWorkerConfig, MaxWorkerConfig, MintakaWorkerProvider } from "../domain/mintaka.worker.provider"
-import { buildMintakaRuntime, MintakaRuntimeState } from "../domain/mintaka.runtime"
+import { buildMintakaRuntime, IdleState, MintakaRuntimeState } from "../domain/mintaka.runtime"
 import { assertNever } from "../utils/never"
 import { createSession, MintakaServerConfig, MintakaServerProvider } from "../domain/mintaka.server.provider"
 import { MintakaProvider } from "../domain/mintaka.provider"
 import { AppGameState } from "../domain/rusty-renju"
 import { Configs, extractStatics, MintakaStatics } from "../domain/mintaka"
 import { MINTAKA_CONFIG_VERSION } from "../config"
-
-export type RequireProviderReady = "ok" | "provider-not-ready"
-export type RequireProviderComputing = "ok" | "provider-not-launched"
+import { Mutex } from "../utils/mutex"
 
 interface RuntimeController {
     unloadRuntime: () => void,
     loadWorkerRuntime: () => void,
     tryLoadServerRuntime: (serverConfig: MintakaServerConfig) => void,
-    launch: (snapshot: AppGameState) => RequireProviderReady,
-    abort: () => RequireProviderComputing,
-    syncPlay: (snapshot: HashKey, pos: MaybePos) => RequireProviderReady | "desynced",
-    updateConfig: (config: Config) => RequireProviderReady,
-    restoreDefaultConfig: () => RequireProviderReady,
+    launch: (snapshot: AppGameState) => void,
+    abort: () => void,
+    syncPlay: (snapshot: HashKey, pos: MaybePos) => void,
+    updateConfig: (config: Config) => void,
+    restoreDefaultConfig: () => void,
 }
 
 type MintakaProviderInstance = MintakaWorkerProvider | MintakaServerProvider
@@ -45,9 +43,9 @@ export type MintakaLoadingRuntime = {
 }
 
 export type MintakaRuntime =
-    | { type: "none" }
     | MintakaLoadingRuntime
     | MintakaReadyRuntime
+    | undefined
 
 export function createRuntimeController(
     mintakaRuntime: () => MintakaRuntime,
@@ -55,12 +53,14 @@ export function createRuntimeController(
     upsertWinRate: (hash: HashKey, color: Color, winRate: number) => void,
     handleBestMove: (bestMove: BestMove, historySnapShot: HistoryTree) => HashKey,
 ): RuntimeController {
+    let mutex = new Mutex()
+
     const persistProviderConfigController = createPersistProviderConfigController()
 
     const syncAll = (gameState: GameState) => {
         console.log("syncall")
         const runtime = mintakaRuntime()
-        if (runtime.type !== "ready")
+        if (runtime?.type !== "ready")
             return "provider-not-ready"
 
         runtime.provider.command({
@@ -71,22 +71,20 @@ export function createRuntimeController(
         return "ok"
     }
 
+    const handleCommandResult = (runtime: MintakaReadyRuntime, state: IdleState, commandResult: CommandResult) => {
+        setMintakaRuntime({ ...runtime, state: state.commandResult(commandResult) })
+    }
+
     const subscribeRuntime = (provider: MintakaProvider) => {
         provider.subscribeResponse(response => {
             const runtime = mintakaRuntime()
 
-            if (runtime.type !== "ready") {
+            if (runtime?.type !== "ready") {
                 provider.dispose()
                 return
             }
 
             switch (response.type) {
-                case "CommandResult": {
-                    if (runtime.state.type !== "idle") return
-
-                    setMintakaRuntime({ ...runtime, state: runtime.state.commandResult(response.content) })
-                    break
-                }
                 case "Begins": {
                     if (runtime.state.type !== "launched") return
 
@@ -132,13 +130,13 @@ export function createRuntimeController(
     }
 
     const unloadRuntime = () => {
-        const previousRuntime = mintakaRuntime()
+        const runtime = mintakaRuntime()
 
-        if (previousRuntime.type === "ready") {
-            previousRuntime.provider.dispose()
+        if (runtime?.type === "ready") {
+            runtime.provider.dispose()
         }
 
-        setMintakaRuntime({ type: "none" })
+        setMintakaRuntime(undefined)
     }
 
     const loadServerRuntime = async (serverConfig: MintakaServerConfig) => {
@@ -163,19 +161,27 @@ export function createRuntimeController(
         setMintakaRuntime(runtime)
     }
 
-    const storeConfig = (provider: MintakaProviderInstance, config: Config) => {
-        switch (provider.type) {
+    const isReadyIdleRuntime = (runtime: MintakaRuntime): runtime is MintakaReadyRuntime & { state: IdleState } =>
+        runtime !== undefined && runtime.type === "ready" && runtime.state.type === "idle"
+
+    const storeConfig = async (runtime: MintakaReadyRuntime & { state: IdleState }, config: Config) => {
+        const commandResult = await runtime.provider.command({ type: "Config", content: config })
+
+        handleCommandResult(runtime, runtime.state, commandResult)
+
+        setMintakaRuntime({ ...runtime, configs: { ...runtime.configs, config } })
+
+        switch (runtime.provider.type) {
             case "worker": {
                 persistProviderConfigController.set({ type: "worker" }, config)
                 break
             }
             case "server": {
-                persistProviderConfigController.set({ type: "server", config: provider.serverConfig }, config)
+                persistProviderConfigController.set({ type: "server", config: runtime.provider.serverConfig }, config)
                 break
             }
-            default: assertNever(provider)
+            default: assertNever(runtime.provider)
         }
-
     }
 
     return {
@@ -204,78 +210,67 @@ export function createRuntimeController(
             void loadServerRuntime(serverConfig)
         },
         launch: (snapshot: AppGameState) => {
-            const runtime = mintakaRuntime()
-            if (runtime.type !== "ready" || runtime.state.type !== "idle")
-                return "provider-not-ready"
+            void mutex.run(async () => {
+                const runtime = mintakaRuntime()
 
-            if (runtime.state.snapshot !== snapshot.boardWorker.hashKey())
-                syncAll({ board: snapshot.boardWorker.value(), history: snapshot.historyTree.toHistory() })
+                if (runtime?.type !== "ready" || runtime?.state.type !== "idle")
+                    return
 
-            runtime.provider.launch(snapshot.boardWorker.hashKey(), "Best")
+                if (runtime.state.snapshot !== snapshot.boardWorker.hashKey())
+                    syncAll({ board: snapshot.boardWorker.value(), history: snapshot.historyTree.toHistory() })
 
-            setMintakaRuntime({ ...runtime, state: runtime.state.launch(snapshot.historyTree) })
+                setMintakaRuntime({ ...runtime, state: runtime.state.launch(snapshot.historyTree) })
 
-            return "ok"
+                await runtime.provider.launch(snapshot.boardWorker.hashKey(), "Best")
+            })
         },
         abort: () => {
             const runtime = mintakaRuntime()
-            if (runtime.type !== "ready" || runtime.state.type === "idle")
-                return "provider-not-launched"
+
+            if (runtime?.type !== "ready" || runtime?.state.type === "idle")
+                return
 
             runtime.provider.control({ type: "abort" })
 
             setMintakaRuntime({ ...runtime, state: runtime.state.abort() })
-
-            return "ok"
         },
         syncPlay: (snapshot: HashKey, pos: MaybePos) => {
-            const runtime = mintakaRuntime()
-            if (runtime.type === "none")
-                return "ok"
+            void mutex.run(async () => {
+                const runtime = mintakaRuntime()
 
-            if (runtime.type !== "ready" || runtime.state.type !== "idle")
-                return "provider-not-ready"
+                if (runtime === undefined)
+                    return
 
-            if (runtime.state.snapshot !== snapshot)
-                return "desynced"
+                if (runtime?.type !== "ready" || runtime?.state.type !== "idle")
+                    return
 
-            runtime.provider.command({ type: "Play", content: pos })
+                if (runtime.state.snapshot !== snapshot)
+                    return
 
-            return "ok"
+                const commandResult = await runtime.provider.command({ type: "Play", content: pos })
+
+                handleCommandResult(runtime, runtime.state, commandResult)
+            })
         },
         updateConfig: (config: Config) => {
-            const runtime = mintakaRuntime()
-            if (runtime.type === "none")
-                return "ok"
+            void mutex.run(async () => {
+                const runtime = mintakaRuntime()
 
-            if (runtime.type !== "ready" || runtime.state.type !== "idle")
-                return "provider-not-ready"
+                if (!isReadyIdleRuntime(runtime))
+                    return
 
-            runtime.provider.command({ type: "Config", content: config })
-
-            setMintakaRuntime({ ...runtime, configs: { ...runtime.configs, config } })
-
-            storeConfig(runtime.provider, config)
-
-            return "ok"
+                await storeConfig(runtime, config)
+            })
         },
         restoreDefaultConfig: () => {
-            const runtime = mintakaRuntime()
-            if (runtime.type === "none")
-                return "ok"
+            void mutex.run(async () => {
+                const runtime = mintakaRuntime()
 
-            if (runtime.type !== "ready" || runtime.state.type !== "idle")
-                return "provider-not-ready"
+                if (!isReadyIdleRuntime(runtime))
+                    return
 
-            const config = runtime.configs.default_config
-
-            runtime.provider.command({ type: "Config", content: config })
-
-            setMintakaRuntime({ ...runtime, configs: { ...runtime.configs, config } })
-
-            storeConfig(runtime.provider, config)
-
-            return "ok"
+                await storeConfig(runtime, runtime.configs.default_config)
+            })
         },
     }
 }
