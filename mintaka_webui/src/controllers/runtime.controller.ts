@@ -1,8 +1,8 @@
-import type { BestMove, Board, Color, Config, GameState, HashKey, History, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
+import type { BestMove, Board, Color, CommandResult, Config, GameState, HashKey, History, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
 import { defaultBoard, calculateWinRate } from "../wasm/pkg/rusty_renju_wasm"
 import { HistoryTree } from "../domain/HistoryTree"
 import { DefaultWorkerConfig, MaxWorkerConfig, MintakaWorkerProvider } from "../domain/mintaka.worker.provider"
-import { buildMintakaRuntime, MintakaRuntimeState } from "../domain/mintaka.runtime"
+import { buildMintakaRuntime, IdleState, MintakaRuntimeState } from "../domain/mintaka.runtime"
 import { assertNever } from "../utils/never"
 import { createSession, MintakaServerConfig, MintakaServerProvider } from "../domain/mintaka.server.provider"
 import { MintakaProvider } from "../domain/mintaka.provider"
@@ -71,6 +71,10 @@ export function createRuntimeController(
         return "ok"
     }
 
+    const handleCommandResult = (runtime: MintakaReadyRuntime, state: IdleState, commandResult: CommandResult) => {
+        setMintakaRuntime({ ...runtime, state: state.commandResult(commandResult) })
+    }
+
     const subscribeRuntime = (provider: MintakaProvider) => {
         provider.subscribeResponse(response => {
             const runtime = mintakaRuntime()
@@ -81,12 +85,6 @@ export function createRuntimeController(
             }
 
             switch (response.type) {
-                case "CommandResult": {
-                    if (runtime.state.type !== "idle") return
-
-                    setMintakaRuntime({ ...runtime, state: runtime.state.commandResult(response.content) })
-                    break
-                }
                 case "Begins": {
                     if (runtime.state.type !== "launched") return
 
@@ -211,9 +209,12 @@ export function createRuntimeController(
             if (runtime.state.snapshot !== snapshot.boardWorker.hashKey())
                 syncAll({ board: snapshot.boardWorker.value(), history: snapshot.historyTree.toHistory() })
 
-            runtime.provider.launch(snapshot.boardWorker.hashKey(), "Best")
+            void runtime.provider.launch(snapshot.boardWorker.hashKey(), "Best")
+                .then(() => {
+                    if (runtime.type !== "ready" || runtime.state.type !== "idle") return
 
-            setMintakaRuntime({ ...runtime, state: runtime.state.launch(snapshot.historyTree) })
+                    setMintakaRuntime({ ...runtime, state: runtime.state.launch(snapshot.historyTree) })
+                })
 
             return "ok"
         },
@@ -239,7 +240,14 @@ export function createRuntimeController(
             if (runtime.state.snapshot !== snapshot)
                 return "desynced"
 
-            runtime.provider.command({ type: "Play", content: pos })
+            void runtime.provider.command({ type: "Play", content: pos })
+                .then(commandResult => {
+                    const runtime = mintakaRuntime()
+
+                    if (runtime.type !== "ready" || runtime.state.type !== "idle") throw "unreachable"
+
+                    handleCommandResult(runtime, runtime.state, commandResult)
+                })
 
             return "ok"
         },
@@ -251,11 +259,18 @@ export function createRuntimeController(
             if (runtime.type !== "ready" || runtime.state.type !== "idle")
                 return "provider-not-ready"
 
-            runtime.provider.command({ type: "Config", content: config })
+            void runtime.provider.command({ type: "Config", content: config })
+                .then(commandResult => {
+                    const runtime = mintakaRuntime()
 
-            setMintakaRuntime({ ...runtime, configs: { ...runtime.configs, config } })
+                    if (runtime.type !== "ready" || runtime.state.type !== "idle") throw "unreachable"
 
-            storeConfig(runtime.provider, config)
+                    handleCommandResult(runtime, runtime.state, commandResult)
+
+                    setMintakaRuntime({ ...runtime, configs: { ...runtime.configs, config } })
+
+                    storeConfig(runtime.provider, config)
+                })
 
             return "ok"
         },
@@ -269,11 +284,18 @@ export function createRuntimeController(
 
             const config = runtime.configs.default_config
 
-            runtime.provider.command({ type: "Config", content: config })
+            void runtime.provider.command({ type: "Config", content: config })
+                .then(commandResult => {
+                    const runtime = mintakaRuntime()
 
-            setMintakaRuntime({ ...runtime, configs: { ...runtime.configs, config } })
+                    if (runtime.type !== "ready" || runtime.state.type !== "idle") throw "unreachable"
 
-            storeConfig(runtime.provider, config)
+                    handleCommandResult(runtime, runtime.state, commandResult)
+
+                    setMintakaRuntime({ ...runtime, configs: { ...runtime.configs, config } })
+
+                    storeConfig(runtime.provider, config)
+                })
 
             return "ok"
         },
