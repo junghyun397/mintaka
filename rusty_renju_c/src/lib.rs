@@ -56,6 +56,19 @@ pub extern "C" fn rusty_renju_board_export_item_forbidden() -> u8 { BOARD_EXPORT
 
 type Patterns = rusty_renju::notation::color::ColorContainer<[rusty_renju::pattern::Pattern; rusty_renju::pattern::PATTERN_SIZE]>;
 
+#[unsafe(no_mangle)]
+pub extern "C" fn rusty_renju_closed_four_mask() -> u32 { rusty_renju::pattern::UNIT_CLOSED_FOUR_MASK }
+#[unsafe(no_mangle)]
+pub extern "C" fn rusty_renju_open_four_mask() -> u32 { rusty_renju::pattern::UNIT_OPEN_FOUR_MASK }
+#[unsafe(no_mangle)]
+pub extern "C" fn rusty_renju_five_mask() -> u32 { rusty_renju::pattern::UNIT_FIVE_MASK }
+#[unsafe(no_mangle)]
+pub extern "C" fn rusty_renju_open_three_mask() -> u32 { rusty_renju::pattern::UNIT_OPEN_THREE_MASK }
+#[unsafe(no_mangle)]
+pub extern "C" fn rusty_renju_close_three_mask() -> u32 { rusty_renju::pattern::UNIT_CLOSE_THREE_MASK }
+#[unsafe(no_mangle)]
+pub extern "C" fn rusty_renju_potential_mask() -> u32 { rusty_renju::pattern::UNIT_POTENTIAL_MASK }
+
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct BoardExportItem {
