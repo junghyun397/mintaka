@@ -6,49 +6,25 @@ import { flatmap } from "../utils/undefined"
 import { SERVER_PROTOCOL, SERVER_URL, WEB_WORKER_READY } from "../config"
 import { duration, formatNodes, nps } from "../domain/mintaka"
 import { checkHealth, MintakaServerConfig } from "../domain/mintaka.server.provider"
+import { Modal } from "./Modal"
 
 export function Dashboard() {
     const { appSettings, setAppSettings, runtimeSelectors } = useContext(AppContext)!
 
-    const closeDashboard = () => {
-        setAppSettings("openDashboard", false)
-    }
-
-    return <div
-        class="fixed inset-0 z-999"
-        classList={{ "pointer-events-none": !appSettings.openDashboard }}
+    return <Modal
+        id="dashboard_modal"
+        titleId="dashboard-title"
+        title="mintaka WebUI"
+        open={appSettings.openDashboard}
+        onClose={() => setAppSettings("openDashboard", false)}
     >
-        <button
-            class="absolute inset-0 bg-black/40 transition-opacity"
-            classList={{
-                "opacity-0": !appSettings.openDashboard,
-                "opacity-100": appSettings.openDashboard,
-            }}
-            onClick={closeDashboard}
-        />
-        <aside
-            class="absolute top-0 left-0 h-full w-80 max-w-[85vw] overflow-y-auto bg-base-200 shadow-lg transition-transform"
-            classList={{
-                "-translate-x-full": !appSettings.openDashboard,
-                "translate-x-0": appSettings.openDashboard,
-            }}
-        >
-            <button
-                class="btn absolute top-4 right-4 btn-xs btn-primary"
-                onClick={closeDashboard}
-            >X
-            </button>
-            <div class="flex flex-col gap-4 p-4">
-                <h1 class="text-lg">Mintaka WebUI</h1>
-                <Overview/>
-                <RuntimeConfig/>
-                <Show when={runtimeSelectors.configs()}>{configs =>
-                    <ConfigSections config={configs().config} maxConfig={configs().max_config}/>
-                }</Show>
-                <DataSections/>
-            </div>
-        </aside>
-    </div>
+        <Overview/>
+        <RuntimeConfig/>
+        <Show when={runtimeSelectors.configs()}>{configs =>
+            <ConfigSections config={configs().config} maxConfig={configs().max_config}/>
+        }</Show>
+        <DataSections/>
+    </Modal>
 }
 
 function Overview() {
@@ -56,12 +32,12 @@ function Overview() {
 
     return <div class="flex flex-col gap-4">
         <div>
-            <h3 class="text-lg">Overview</h3>
+            <h3 class="text font-bold">Overview</h3>
             <Show when={runtimeSelectors.statics()}>{statics =>
                 <div class="flex-col gap-2 text-sm">
                     <p>Total Nodes: {formatNodes(statics().totalNodesIn1k)} Nodes</p>
                     <p>Runtime: {statics().totalRuntime.secs} seconds</p>
-                    <p>NPS: {formatNodes(nps(statics()))}N/s</p>
+                    <p>NPS: {formatNodes(nps(statics()))} N/s</p>
                 </div>
             }</Show>
         </div>
@@ -72,7 +48,7 @@ function RuntimeConfig() {
     const { appActions, persistConfig } = useContext(AppContext)!
 
     return <div class="flex flex-col gap-4">
-        <h3 class="text-lg">Runtime</h3>
+        <h3 class="text font-bold">Runtime</h3>
         <Show when={WEB_WORKER_READY}>
             <div class="btn-group flex gap-4">
                 <div class="flex gap-2">
@@ -148,18 +124,6 @@ function ServerConfigSections() {
             <p class="label text-wrap">Self-hosted mintaka-server</p>
         </fieldset>
         <Switch>
-            <Match when={runtimeSelectors.runtimeType() === "none"}>
-                <button
-                    class="btn"
-                    classList={{
-                        "btn-success": serverConfig() !== undefined,
-                        "btn-disabled": serverConfig() === undefined,
-                    }}
-                    onClick={appActions.loadServerRuntime}
-                >
-                    Connect
-                </button>
-            </Match>
             <Match when={runtimeSelectors.runtimeType() === "loading"}>
                 <button
                     class="btn btn-disabled btn-success"
@@ -175,6 +139,18 @@ function ServerConfigSections() {
                     Disconnect
                 </button>
             </Match>
+            <Match when={false}>
+                <button
+                    class="btn"
+                    classList={{
+                        "btn-success": serverConfig() !== undefined,
+                        "btn-disabled": serverConfig() === undefined,
+                    }}
+                    onClick={appActions.loadServerRuntime}
+                >
+                    Connect
+                </button>
+            </Match>
         </Switch>
     </>
 }
@@ -182,7 +158,7 @@ function ServerConfigSections() {
 function ConfigSections(props: { config: Config, maxConfig: Config }) {
     return <div class="flex flex-col gap-4">
         <div>
-            <h3 class="text-lg">Resources</h3>
+            <h3 class="text font-bold">Resources</h3>
             <NumericConfigSection
                 produce={value => ({ ...unwrap(props.config), workers: value })}
                 value={props.config.workers}
@@ -209,7 +185,7 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
             />
         </div>
         <div>
-            <h3 class="text-lg">Time Controls</h3>
+            <h3 class="text font-bold">Time Controls</h3>
             <NumericConfigSection
                 produce={value => {
                     const config = unwrap(props.config)
@@ -229,7 +205,8 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                 }}
                 max={props.maxConfig.initial_timer.total_remaining?.secs}
                 scale={1}
-                legend="Total Time" label="seconds" description="Total time"
+                legend="Total Time" label="seconds"
+                description="Default time limit."
             />
             <NumericConfigSection
                 produce={value => {
@@ -250,7 +227,8 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                 }}
                 max={props.maxConfig.initial_timer.increment.secs}
                 scale={1}
-                legend="Increment Time" label="seconds" description="Increment time"
+                legend="Increment Time" label="seconds"
+                description="Time added after each move."
             />
             <NumericConfigSection
                 produce={value => {
@@ -271,11 +249,12 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                 }}
                 max={props.maxConfig.initial_timer.turn?.secs}
                 scale={1}
-                legend="Max Turn Time" label="seconds" description="Max turn"
+                legend="Max Turn Time" label="seconds"
+                description="Maximum time for each move."
             />
         </div>
         <div>
-            <h3 class="text-lg">Search Limits</h3>
+            <h3 class="text font-bold">Search Limits</h3>
             <NumericConfigSection
                 produce={value => ({ ...unwrap(props.config), max_nodes_in_1k: value })}
                 value={props.config.max_nodes_in_1k}
@@ -299,7 +278,8 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                 }}
                 max={props.maxConfig.max_depth ?? 225}
                 scale={1}
-                legend="Depth Limit" label="moves" description="Maximum reachable selective depth."
+                legend="Depth Limit" label="moves"
+                description="Maximum reachable selective depth."
             />
         </div>
     </div>

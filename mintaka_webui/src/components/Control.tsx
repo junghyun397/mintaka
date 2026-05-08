@@ -3,11 +3,11 @@ import { AppContext } from "../context"
 import {
     IconArrowUturnRight, IconChevronDoubleLeft, IconChevronDoubleRight, IconChevronLeft, IconChevronRight,
     IconCog8Tooth, IconCpuChip,
-    IconDocument, IconGitBranch, IconInformationCircle, IconMagnifyingGlassMinus, IconMagnifyingGlassPlus,
+    IconDocument, IconGitBranch, IconMagnifyingGlassMinus, IconMagnifyingGlassPlus,
     IconMoon, IconPause, IconPlay, IconStop, IconSun, IconThemeAuto,
 } from "./icons"
 import { nextHistoryDisplay, nextTheme } from "../stores/persist.config"
-import { Portal } from "solid-js/web"
+import { AboutButton } from "./About"
 
 export function Control() {
     return <div class="flex gap-2 rounded-box bg-base-100 p-2 max-xs:gap-1 max-xs:p-1">
@@ -228,33 +228,4 @@ function ConfigButton() {
             </li>
         </ul>
     </div>
-}
-
-function AboutButton() {
-    let dialogRef: HTMLDialogElement | undefined
-
-    return <>
-        <button
-            class="btn btn-square"
-            onClick={() => dialogRef?.showModal()}
-        >
-            <IconInformationCircle />
-        </button>
-        <Portal>
-            <dialog ref={ref => dialogRef = ref} id="about_modal" class="modal">
-                <div class="modal-box p-2">
-                    <form method="dialog">
-                        <button class="btn absolute top-2 right-2 btn-xs btn-primary">X</button>
-                    </form>
-                    <h3 class="text-lg">Mintaka WebUI</h3>
-                    <a class="link" target="_blank" rel="noopener" href="https://github.com/junghyun397/mintaka">
-                        github.com/junghyun397/mintaka
-                    </a>
-                </div>
-                <form method="dialog" class="modal-backdrop">
-                    <button aria-label="Close"></button>
-                </form>
-            </dialog>
-        </Portal>
-    </>
 }
