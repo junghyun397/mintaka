@@ -3,7 +3,6 @@ use rusty_renju::assert_struct_sizes;
 use rusty_renju::memo::abstract_transposition_table::AbstractTTEntry;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
-use rusty_renju::notation::score::{Score, Scores};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const KEY_SIZE: usize = 21;
@@ -38,7 +37,8 @@ impl TTFlag {
 
     const DEFAULT: Self = Self(0);
 
-    pub const MAX_TT_ENDGAME_DEPTH: Depth = 0b11111;
+    pub const TT_ENDGAME_WIN_MASK: u8 = 0b11111 << 3;
+    pub const MAX_TT_ENDGAME_DEPTH: Depth = 0b11110;
 
     pub fn new(maybe_score_kind: Option<ScoreKind>, is_pv: bool, endgame_depth: Depth) -> Self {
         let score_kind = maybe_score_kind.map_or(0, ScoreKind::into);
@@ -75,6 +75,10 @@ impl TTFlag {
 
     pub fn set_pv(&mut self, is_pv: bool) {
         self.0 = (self.0 & !(0b1 << 2)) | ((is_pv as u8) << 2);
+    }
+
+    pub fn set_endgame_win(&mut self) {
+        self.0 = self.0 & Self::TT_ENDGAME_WIN_MASK
     }
 
     pub fn set_endgame_depth(&mut self, endgame_depth: Depth) {
@@ -129,12 +133,6 @@ impl TTEntry {
         score: 0,
     };
 
-    pub fn eval(&self) -> Score {
-        let eval = self.eval as Score;
-
-        if eval == Score::NAN { 0 } else { eval }
-    }
-
 }
 
 #[derive(Debug)]
@@ -178,6 +176,10 @@ impl TTEntryBucket {
         u64::from(key) & KEY_MASK
     }
 
+    fn shuffle_pack_entry(entry: u64) -> u64 {
+        entry.wrapping_mul(11400714819323198549) & KEY_MASK // fibonacci hashing
+    }
+
     fn calculate_slot_index(packed_key: u64) -> usize {
         ((packed_key * Self::BUCKET_SIZE) >> KEY_SIZE) as usize
     }
@@ -193,28 +195,32 @@ impl TTEntryBucket {
         let keys_idx = slot_idx / 3;
         let lane_shift = Self::calculate_lane_shift(slot_idx);
 
-        let keys = self.keys[keys_idx].load(Ordering::Relaxed);
-        (((keys >> lane_shift) & KEY_MASK) == packed_key)
-            .then(|| self.entries[slot_idx].load(Ordering::Relaxed).into())
+        let stored_key = (self.keys[keys_idx].load(Ordering::Relaxed) >> lane_shift) & KEY_MASK;
+        let stored_entry = self.entries[slot_idx].load(Ordering::Relaxed);
+
+        (stored_key ^ Self::shuffle_pack_entry(stored_entry) == packed_key)
+            .then(|| stored_entry.into())
     }
 
-    fn store_key(&self, slot_idx: usize, masked_key: u64) {
+    fn store_key(&self, slot_idx: usize, shuffle_packed_key: u64) {
         let keys_idx = slot_idx / 3;
         let lane_shift = Self::calculate_lane_shift(slot_idx);
 
-        let mut keys = self.keys[keys_idx].load(Ordering::Acquire);
-        keys = (keys & !(KEY_MASK << lane_shift)) | (masked_key << lane_shift);
-
-        self.keys[keys_idx].store(keys, Ordering::Release);
+        self.keys[keys_idx]
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |keys|
+                Some((keys & !(KEY_MASK << lane_shift)) | (shuffle_packed_key << lane_shift))
+            )
+            .ok();
     }
 
     pub(crate) fn store(&self, key: HashKey, entry: TTEntry) {
+        let entry: u64 = entry.into();
         let packed_key = Self::pack_hash_key(key);
 
         let slot_idx = Self::calculate_slot_index(packed_key);
 
-        self.store_key(slot_idx, packed_key);
-        self.entries[slot_idx].store(entry.into(), Ordering::Relaxed);
+        self.store_key(slot_idx, packed_key ^ Self::shuffle_pack_entry(entry));
+        self.entries[slot_idx].store(entry, Ordering::Relaxed);
     }
 
 }

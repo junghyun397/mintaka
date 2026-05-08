@@ -163,7 +163,7 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
 
     pub fn lookup_lmr_table(&self, depth_left: Depth, moves_made: usize) -> Depth {
         let depth_clamped = depth_left.clamp(0, 63) as usize;
-        let moves_made_clamped = moves_made.clamp(0, 63);
+        let moves_made_clamped = moves_made.clamp(0, value::MAX_PLY);
 
         self.lmr_table[depth_clamped][moves_made_clamped]
     }
@@ -214,10 +214,12 @@ fn build_lmr_table(config: Config) -> [[Depth; value::MAX_PLY_SLOTS]; 64] {
     let worker_factor = 1.0 + (config.workers.min(16) as f64) / 100.0;
     let lmr_div = params::LMR_DIV * worker_factor;
 
-    for depth in 0 .. 64 {
-        for played in 0 .. 64 {
-            let ln_depth = (depth as f64).ln();
-            lmr_table[depth][played] = (params::LMR_BASE + ln_depth * ln_depth / lmr_div) as Depth;
+    for depth in 1 .. 64 {
+        for played in 1 .. value::MAX_PLY_SLOTS {
+            lmr_table[depth][played] = (
+                params::LMR_BASE +
+                    (depth as f64).ln() * (played as f64).ln() / lmr_div
+            ) as Depth;
         }
     }
 

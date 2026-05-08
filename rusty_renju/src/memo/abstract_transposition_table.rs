@@ -41,7 +41,9 @@ pub trait AbstractTranspositionTable {
             }
         } else {
             std::thread::scope(|s| {
-                for chunk in self.internal_table().chunks(threads as usize) {
+                let chunk_size = self.internal_table().len().div_ceil(threads.max(1) as usize);
+
+                for chunk in self.internal_table().chunks(chunk_size) {
                     s.spawn(|| {
                         for entry in chunk.iter() {
                             entry.clear_mut();

@@ -146,12 +146,6 @@ impl TranspositionTable {
 
 }
 
-pub enum TTHit {
-    Entry(TTEntry),
-    Eval(Score),
-    None
-}
-
 #[derive(Debug, Copy, Clone)]
 pub struct TTView<'a> {
     table: &'a [TTEntryBucket],
@@ -164,20 +158,9 @@ impl TTView<'_> {
         ((u64::from(key) as u128 * (self.table.len() as u128)) >> 64) as usize
     }
 
-    pub fn probe_entry(&self, key: HashKey) -> Option<TTEntry> {
+    pub fn probe(&self, key: HashKey) -> Option<TTEntry> {
         let idx = self.calculate_index(key);
         self.table[idx].probe(key)
-    }
-
-    pub fn probe(&self, key: HashKey) -> TTHit {
-        match self.probe_entry(key) {
-            Some(entry) => match (entry.tt_flag.maybe_score_kind(), entry.score as Score) {
-                (Some(_), _) => TTHit::Entry(entry),
-                (None, Score::NAN) => TTHit::None, // endgame entry
-                (None, _) => TTHit::Eval(entry.eval as Score),
-            },
-            None => TTHit::None
-        }
     }
 
     pub fn store_entry(&self, key: HashKey, entry: TTEntry) {
@@ -191,7 +174,7 @@ impl TTView<'_> {
         key: HashKey,
         best_move: MaybePos,
         maybe_score_kind: Option<ScoreKind>,
-        vcf_depth: Depth,
+        endgame_depth: Depth,
         depth: Depth,
         eval: Score,
         score: Score,
@@ -219,7 +202,7 @@ impl TTView<'_> {
                     entry.best_move = best_move;
                 }
 
-                entry.tt_flag = TTFlag::new(maybe_score_kind, is_pv, vcf_depth);
+                entry.tt_flag = TTFlag::new(maybe_score_kind, is_pv, endgame_depth);
                 entry.age = self.age as u8;
                 entry.depth = depth;
                 entry.eval = eval;
@@ -230,7 +213,7 @@ impl TTView<'_> {
         } else {
             let entry = TTEntry {
                 best_move,
-                tt_flag: TTFlag::new(maybe_score_kind, is_pv, vcf_depth),
+                tt_flag: TTFlag::new(maybe_score_kind, is_pv, endgame_depth),
                 age: self.age as u8,
                 depth,
                 eval,

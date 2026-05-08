@@ -1,0 +1,1 @@
+cp target/release/mintaka_text_protocol_target target/release/mintaka_text_protocol_baseline

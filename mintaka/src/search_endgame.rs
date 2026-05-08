@@ -412,7 +412,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                 continue 'position_search;
             }
 
-            if let Some(entry) = td.tt.probe_entry(tt_key) {
+            if let Some(entry) = td.tt.probe(tt_key) {
                 let mut abort = false;
 
                 let tt_vcf_depth = entry.tt_flag.endgame_depth();
@@ -483,7 +483,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
             continue 'vcf_search;
         }
 
-        if let Some(mut entry) = td.tt.probe_entry(state.board.hash_key)
+        if let Some(mut entry) = td.tt.probe(state.board.hash_key)
             && entry.tt_flag.endgame_depth() <= vcf_depth_left
         {
             entry.tt_flag.set_endgame_depth(vcf_depth_left);

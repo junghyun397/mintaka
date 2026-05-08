@@ -1,6 +1,7 @@
 .idea
 /target
 /sessions
+/temp
 max_config.toml
 /.venv
 **/playground.rs

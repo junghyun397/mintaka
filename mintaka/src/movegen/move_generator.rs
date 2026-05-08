@@ -38,8 +38,8 @@ pub fn generate_endgame_moves<const VCT: bool>(board: &Board, distance_window: u
     };
 
     let end_idx = {
-        let end_row = (recent_move_row + distance_window as usize).max(pos::U_BOARD_WIDTH);
-        let end_col = (recent_move_col + distance_window as usize).max(pos::U_BOARD_WIDTH);
+        let end_row = (recent_move_row + distance_window as usize).min(pos::U_BOARD_WIDTH);
+        let end_col = (recent_move_col + distance_window as usize).min(pos::U_BOARD_WIDTH);
 
         let end_idx = cartesian_to_index!(end_row, end_col);
         (end_idx + platform::U32_WIDE_LANE_N).min(pattern::PATTERN_SIZE) - end_idx % platform::U32_WIDE_LANE_N

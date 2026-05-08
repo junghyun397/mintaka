@@ -7,6 +7,7 @@ mod bench_forbidden_moves {
     use rusty_renju::board::Board;
     use rusty_renju::notation::pos::pos_unchecked;
     use test::Bencher;
+    use rusty_renju::notation::color::Color;
 
     #[bench]
     fn clean_position(b: &mut Bencher) {
@@ -35,7 +36,7 @@ mod bench_forbidden_moves {
 
         b.iter(|| {
             let board = board.set(pos);
-            assert_eq!(board.patterns.field.white[validate_pos.idx_usize()].has_three(), false);
+            assert_eq!(board.patterns.field[Color::White][validate_pos.idx_usize()].has_three(), false);
         })
     }
 
@@ -62,7 +63,6 @@ mod bench_forbidden_moves {
 
         let board = case.parse::<Board>().unwrap();
         let pos = pos_unchecked("h11");
-        let validate_pos = pos_unchecked("g8");
 
         b.iter(|| {
             let board = board.set(pos);
@@ -93,7 +93,6 @@ mod bench_forbidden_moves {
 
         let board = case.parse::<Board>().unwrap();
         let pos = pos_unchecked("d8");
-        let validate_pos = pos_unchecked("d7");
 
         b.iter(|| {
             let board = board.set(pos);

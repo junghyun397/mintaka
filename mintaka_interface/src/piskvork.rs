@@ -72,7 +72,7 @@ fn main() -> Result<(), impl Error> {
                     message_sender.result(result);
                 }
 
-                PiskvorkResponse::Pos(best_move.best_move.unwrap());
+                stdio_out(PiskvorkResponse::Pos(best_move.best_move.unwrap()));
             },
             _ => unreachable!()
         }

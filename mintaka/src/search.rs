@@ -1,6 +1,5 @@
 use crate::eval::evaluator::Evaluator;
 use crate::memo::history_table::{QuietPlied, TacticalPlied};
-use crate::memo::transposition_table::TTHit;
 use crate::memo::tt_entry::ScoreKind;
 use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker;
@@ -107,7 +106,6 @@ fn aspiration<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType>(
     max_depth: Depth,
     prev_score: Score,
 ) -> Score {
-    let min_depth = (max_depth / 2).max(1);
     let mut depth = max_depth;
 
     let mut delta = params::ASPIRATION_DELTA_BASE + prev_score.pow(2) / params::ASPIRATION_DELTA_DIV;
@@ -127,7 +125,7 @@ fn aspiration<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType>(
             depth = max_depth;
         } else if score >= beta { // fail-high
             beta = (score + delta).min(Score::INF);
-            depth = (depth - 1).max(min_depth);
+            depth = max_depth;
         } else { // exact
             return score;
         }
@@ -240,22 +238,15 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
     let static_eval: Score;
     let tt_move: MaybePos;
     let tt_pv: bool;
-    let tt_vcf_depth: Depth;
+    let tt_endgame_depth: Depth;
 
     match td.tt.probe(state.board.hash_key) {
-        TTHit::Eval(tt_eval) => {
-            tt_move = MaybePos::NONE;
-            tt_pv = false;
-            tt_vcf_depth = 0;
-
-            static_eval = tt_eval;
-        }
-        TTHit::Entry(entry) => {
+        Some(entry) if entry.tt_flag.maybe_score_kind().is_some() => {
             let tt_score = entry.score as Score;
 
             tt_move = entry.best_move;
             tt_pv = entry.tt_flag.is_pv();
-            tt_vcf_depth = entry.tt_flag.endgame_depth();
+            tt_endgame_depth = entry.tt_flag.endgame_depth();
 
             // tt-cutoff
             if !NT::IS_PV
@@ -269,12 +260,30 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 return tt_score;
             }
 
-            static_eval = entry.eval();
-        },
-        TTHit::None => {
+            static_eval = entry.eval as Score;
+        }
+        Some(entry) => {
             tt_move = MaybePos::NONE;
             tt_pv = false;
-            tt_vcf_depth = 0;
+            tt_endgame_depth = entry.tt_flag.endgame_depth();
+
+            static_eval = td.evaluator.eval_value(state);
+
+            td.tt.store(
+                state.board.hash_key,
+                MaybePos::NONE,
+                None,
+                tt_endgame_depth,
+                0,
+                static_eval,
+                0,
+                false,
+            );
+        }
+        None => {
+            tt_move = MaybePos::NONE;
+            tt_pv = false;
+            tt_endgame_depth = 0;
 
             static_eval = td.evaluator.eval_value(state);
 
@@ -403,7 +412,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
             let mut score = -pvs::<CLK, R, TH, OffPVNode>(td, state, reduced_depth_left, -alpha - 1, -alpha, true);
 
             if score > alpha { // zero-window failed, full-window search
-                score = -pvs::<CLK, R, TH, NT::NextType>(td, state, reduced_depth_left, -beta, -alpha, false);
+                score = -pvs::<CLK, R, TH, NT::NextType>(td, state, depth_left - 1, -beta, -alpha, false);
             }
 
             score
@@ -476,7 +485,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
         state.board.hash_key,
         best_move,
         Some(score_kind),
-        tt_vcf_depth,
+        tt_endgame_depth,
         depth_left,
         static_eval,
         best_score,
