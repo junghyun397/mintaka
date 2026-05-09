@@ -38,6 +38,10 @@ export class HistoryTree {
         return this.length % 2 === 0 ? "Black" : "White"
     }
 
+    get opponentColor(): Color {
+        return this.length % 2 === 1 ? "Black" : "White"
+    }
+
     linear(): HistoryEntry[] {
         const acc = [this.history.slice(0, this.top)]
 

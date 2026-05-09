@@ -5,10 +5,10 @@ import type { BoardDescribe, Config, HashKey, History, Pos } from "./wasm/pkg/ru
 import { createPersistConfigStore, defaultPersistConfig, PersistConfig } from "./stores/persist.config"
 import { AppSettings, createAppSettingsStore } from "./stores/app.settings"
 import { createGameController } from "./controllers/game.controller"
-import { createRuntimeController, MintakaRuntime } from "./controllers/runtime.controller"
+import { createRuntimeController, MintakaRuntimeType } from "./controllers/runtime.controller"
 import { createAppState } from "./stores/app.state"
 import { MintakaRuntimeState } from "./domain/mintaka.runtime"
-import { flatmap } from "./utils/undefined"
+import { filter, flatmap } from "./utils/undefined"
 import { parseUrlParams, setupUrlSync } from "./url"
 import { AppGameState, buildGameStateFromHistorySource, emptyAppGameState } from "./domain/rusty-renju"
 import { setupThemeSync } from "./theme"
@@ -32,7 +32,7 @@ interface AppSelectors {
 }
 
 interface RuntimeSelectors {
-    readonly runtimeType: Accessor<MintakaRuntime["type"]>,
+    readonly runtimeType: Accessor<MintakaRuntimeType | undefined>,
     readonly runtimeState: Accessor<MintakaRuntimeState | undefined>
     readonly isReady: Accessor<boolean>,
     readonly inComputing: Accessor<boolean>,
@@ -56,6 +56,7 @@ interface GameSelectors {
     readonly gameState: Accessor<AppGameState>,
     readonly history: Accessor<History>,
     readonly boardDescribe: BoardDescribe,
+    readonly finished: Accessor<boolean>,
 }
 
 type AppContext = {
@@ -109,6 +110,10 @@ export function AppContextProvider(props: ParentProps) {
         appState.gameState().boardWorker.describe(appState.gameState().historyTree.toHistory()),
     )
 
+    const finished = createMemo(() =>
+        boardDescribe.winner !== undefined,
+    )
+
     createEffect(() => {
         setBoardDescribe(reconcile(
             appState.gameState().boardWorker.describe(appState.gameState().historyTree.toHistory()),
@@ -119,21 +124,30 @@ export function AppContextProvider(props: ParentProps) {
 
     setupUrlSync(history, () => appSettings.viewer)
 
+    const continuePlay = async (beforeHash: HashKey, pos: Pos) => {
+        await runtimeController.syncPlay(beforeHash, pos)
+
+        if (finished() || !appSettings.launch) return
+
+        runtimeController.launch(appState.gameState())
+    }
+
     const gameActions: GameActions = {
         clear: gameController.clear,
         play: (pos) => {
+            if (gameSelectors.boardDescribe.winner !== undefined)
+                return
+
             if (!appState.gameState().boardWorker.isLegalMove(pos))
                 return
+
+            const beforeHash = appState.gameState().boardWorker.hashKey()
 
             const playResponse = gameController.play(pos)
 
             assertOk(playResponse)
 
-            runtimeController.syncPlay(appState.gameState().boardWorker.hashKey(), pos)
-
-            if (!appSettings.launch) return
-
-            runtimeController.launch(appState.gameState())
+            void continuePlay(beforeHash, pos)
         },
         forward: (method) => {
             const response = gameController.forward(method)
@@ -201,38 +215,29 @@ export function AppContextProvider(props: ParentProps) {
     }
 
     const runtimeSelectors: RuntimeSelectors = {
-        runtimeType: createMemo(() => appState.mintakaRuntime().type),
-        runtimeState: createMemo(() => {
-            const runtime = appState.mintakaRuntime()
-
-            return runtime.type === "ready" ? runtime.state : undefined
-        }),
-        isReady: createMemo(() => {
-            const runtime = appState.mintakaRuntime()
-
-            return runtime.type === "ready" && runtime.state.type === "idle"
-        }),
-        inComputing: createMemo(() => {
-            const runtime = appState.mintakaRuntime()
-
-            return runtime.type === "ready" && runtime.state.type !== "idle"
-        }),
-        configs: createMemo(() => {
-            const runtime = appState.mintakaRuntime()
-
-            return runtime.type === "ready" ? runtime.configs : undefined
-        }),
-        statics: createMemo(() => {
-            const runtime = appState.mintakaRuntime()
-
-            return runtime.type === "ready" ? runtime.statics : undefined
-        }),
+        runtimeType: createMemo(() => appState.mintakaRuntime()?.type),
+        runtimeState: createMemo(() =>
+            flatmap(appState.mintakaRuntime(), runtime => runtime.type === "ready" ? runtime.state : undefined),
+        ),
+        isReady: createMemo(() =>
+            flatmap(appState.mintakaRuntime(), runtime => runtime.type === "ready" && runtime.state.type === "idle" && !finished()) ?? false,
+        ),
+        inComputing: createMemo(() =>
+            flatmap(appState.mintakaRuntime(), runtime => runtime.type === "ready" && runtime.state.type !== "idle") ?? false,
+        ),
+        configs: createMemo(() =>
+            filter(appState.mintakaRuntime(), runtime => runtime.type === "ready")?.configs,
+        ),
+        statics: createMemo(() =>
+            filter(appState.mintakaRuntime(), runtime => runtime.type === "ready")?.statics,
+        ),
     }
 
     const gameSelectors: GameSelectors = {
         gameState: appState.gameState,
         history,
         boardDescribe,
+        finished,
     }
 
     if (!appSettings.viewer) {

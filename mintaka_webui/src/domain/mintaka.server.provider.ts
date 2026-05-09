@@ -1,4 +1,9 @@
-import { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand } from "./mintaka.provider"
+import {
+    MintakaLaunchResponse,
+    MintakaProvider,
+    MintakaProviderResponse,
+    MintakaProviderRuntimeCommand,
+} from "./mintaka.provider"
 import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/rusty_renju_wasm"
 import { SERVER_PROTOCOL } from "../config"
 import { Configs } from "./mintaka"
@@ -105,8 +110,8 @@ export class MintakaServerProvider implements MintakaProvider {
         return await this.sendCommand(command)
     }
 
-    async launch(positionHash: HashKey, objective: SearchObjective) {
-        return await this.sendLaunch(positionHash, objective)
+    async launch(expectedHash: HashKey, objective: SearchObjective): Promise<MintakaLaunchResponse> {
+        throw new Error("NI")
     }
 
     control(command: MintakaProviderRuntimeCommand) {

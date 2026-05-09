@@ -13,7 +13,6 @@ export function Dashboard() {
 
     return <Modal
         id="dashboard_modal"
-        titleId="dashboard-title"
         title="mintaka WebUI"
         open={appSettings.openDashboard}
         onClose={() => setAppSettings("openDashboard", false)}

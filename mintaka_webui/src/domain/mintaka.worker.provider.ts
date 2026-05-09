@@ -1,30 +1,38 @@
 import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/rusty_renju_wasm"
-import type { MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand } from "./mintaka.provider"
+import type { MintakaLaunchResponse, MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand } from "./mintaka.provider"
 import { duration, InfiniteDuration } from "./mintaka"
 
 export type MintakaWorkerMessage =
     | { type: "command", id: number, command: Command }
-    | { type: "launch", positionHash: HashKey, objective: SearchObjective }
+    | { type: "launch", id: number, expectedHash: HashKey, objective: SearchObjective }
     | { type: "init", config: Config, state: GameState }
 
 export type MintakaWorkerResponse =
     | MintakaProviderResponse
     | { type: "CommandResult", id: number, content: CommandResult }
+    | { type: "LaunchResult", id: number, content: MintakaLaunchResponse }
     | { type: "Load" }
-    | { type: "Ready", sab: SharedArrayBuffer, controlPtr: number }
+    | { type: "Ready", sab: SharedArrayBuffer, counterPtr: number, abortPtr: number }
 
 export class MintakaWorkerControl {
     readonly sab: SharedArrayBuffer
-    readonly controlPtr: number
+    readonly counterPtr: number
+    readonly abortPtr: number
 
-    constructor(sab: SharedArrayBuffer, control_ptr: number) {
+    constructor(sab: SharedArrayBuffer, counterPtr: number, abortPtr: number) {
         this.sab = sab
-        this.controlPtr = control_ptr
+        this.counterPtr = counterPtr
+        this.abortPtr = abortPtr
+    }
+
+    get global_nodes_in_1k() {
+        const mem = new Uint32Array(this.sab)
+        return Atomics.load(mem, this.counterPtr / Uint32Array.BYTES_PER_ELEMENT)
     }
 
     abort() {
         const mem = new Uint8Array(this.sab)
-        Atomics.store(mem, this.controlPtr, 1)
+        Atomics.store(mem, this.abortPtr, 1)
     }
 }
 
@@ -63,9 +71,15 @@ export const MaxWorkerConfig: Config = {
 export class MintakaWorkerProvider implements MintakaProvider {
     readonly type: "worker" = "worker"
 
+    private static readonly NodesPollingIntervalMs = 100
+
     private readonly worker: Worker
     private workerControl?: MintakaWorkerControl
+    private nodesPollingInterval?: ReturnType<typeof setInterval>
+
     private commandId = 0
+    private readonly pendingCommands = new Map<number, PendingRequest<CommandResult>>()
+    private readonly pendingLaunches = new Map<number, PendingRequest<MintakaLaunchResponse>>()
 
     private onResponse?: (message: MintakaProviderResponse) => void
 
@@ -81,22 +95,39 @@ export class MintakaWorkerProvider implements MintakaProvider {
                     return
                 }
                 case "Ready": {
-                    this.workerControl = new MintakaWorkerControl(event.data.sab, event.data.controlPtr)
+                    this.workerControl = new MintakaWorkerControl(event.data.sab, event.data.counterPtr, event.data.abortPtr)
                     return
                 }
                 case "CommandResult": {
+                    this.resolvePending(this.pendingCommands, event.data.id, event.data.content)
                     return
+                }
+                case "LaunchResult": {
+                    this.resolvePending(this.pendingLaunches, event.data.id, event.data.content)
+                    return
+                }
+                case "Begins": {
+                    this.startNodesPolling()
+                    break
+                }
+                case "BestMove": {
+                    this.stopNodesPolling()
+                    break
                 }
                 case "Error": {
-                    this.onResponse && this.onResponse(event.data)
-                    return
+                    this.rejectAllPending(event.data.content)
+                    break
                 }
-                default: this.onResponse && this.onResponse(event.data)
             }
+
+            this.onResponse && this.onResponse(event.data)
         }
 
         this.worker.onerror = (event) => {
-            this.onResponse && this.onResponse({ type: "Error", content: event.message })
+            const error = event.error ?? event.message
+            this.stopNodesPolling()
+            this.rejectAllPending(error)
+            this.onResponse && this.onResponse({ type: "Error", content: error })
         }
 
         this.postMessage({ type: "init", config, state })
@@ -108,21 +139,21 @@ export class MintakaWorkerProvider implements MintakaProvider {
 
     dispose() {
         this.onResponse = undefined
+        this.stopNodesPolling()
+        this.rejectAllPending(new Error("worker provider disposed"))
         this.worker.terminate()
     }
 
     async command(command: Command) {
         const id = this.nextId()
 
-        this.postMessage({ type: "command", id, command })
-
-        return Promise.reject()
+        return this.postMessageForResponse(this.pendingCommands, id, { type: "command", id, command })
     }
 
-    async launch(positionHash: HashKey, objective: SearchObjective) {
-        this.postMessage({ type: "launch", positionHash, objective })
+    async launch(expectedHash: HashKey, objective: SearchObjective): Promise<MintakaLaunchResponse> {
+        const id = this.nextId()
 
-        return Promise.reject()
+        return this.postMessageForResponse(this.pendingLaunches, id, { type: "launch", expectedHash, objective, id })
     }
 
     control(command: MintakaProviderRuntimeCommand) {
@@ -143,4 +174,57 @@ export class MintakaWorkerProvider implements MintakaProvider {
         this.worker.postMessage(message)
     }
 
+    private startNodesPolling() {
+        this.stopNodesPolling()
+        this.nodesPollingInterval = setInterval(() => {
+            if (this.workerControl === undefined)
+                return
+
+            this.onResponse && this.onResponse({ type: "Nodes", content: this.workerControl.global_nodes_in_1k })
+        }, MintakaWorkerProvider.NodesPollingIntervalMs)
+    }
+
+    private stopNodesPolling() {
+        if (this.nodesPollingInterval === undefined)
+            return
+
+        clearInterval(this.nodesPollingInterval)
+        this.nodesPollingInterval = undefined
+    }
+
+    private postMessageForResponse<T>(pending: Map<number, PendingRequest<T>>, id: number, message: MintakaWorkerMessage) {
+        return new Promise<T>((resolve, reject) => {
+            pending.set(id, { resolve, reject })
+
+            try {
+                this.postMessage(message)
+            } catch (error: unknown) {
+                pending.delete(id)
+                reject(error)
+            }
+        })
+    }
+
+    private resolvePending<T>(pending: Map<number, PendingRequest<T>>, id: number, content: T) {
+        const request = pending.get(id)
+        if (request === undefined)
+            return
+
+        pending.delete(id)
+        request.resolve(content)
+    }
+
+    private rejectAllPending(error: unknown) {
+        this.pendingCommands.forEach(request => request.reject(error))
+        this.pendingCommands.clear()
+
+        this.pendingLaunches.forEach(request => request.reject(error))
+        this.pendingLaunches.clear()
+    }
+
+}
+
+type PendingRequest<T> = {
+    readonly resolve: (value: T) => void,
+    readonly reject: (reason?: unknown) => void,
 }

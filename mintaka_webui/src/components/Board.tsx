@@ -2,15 +2,21 @@ import { createMemo, createSelector, For, Index, Match, Switch, useContext } fro
 import { AppContext } from "../context"
 import { INDEX_TO_POS, LETTERS, NUMS } from "../domain/rusty-renju"
 import { range } from "../utils/array"
-import { filter } from "../utils/undefined"
+import { filter, flatmap } from "../utils/undefined"
+import { Pos } from "../wasm/pkg/rusty_renju_wasm"
 
 export function Board() {
     const { gameSelectors, runtimeSelectors } = useContext(AppContext)!
 
     const lastSequence = createMemo(() => gameSelectors.history().length)
     const prevSequence = createMemo(() => lastSequence() - 1)
+    const winningSequence = createMemo(() => flatmap(gameSelectors.boardDescribe.winner, _ =>
+        gameSelectors.gameState().boardWorker.winningSequence()!,
+    ) ?? [])
+
     const isLastSequence = createSelector(lastSequence)
     const isPrevSequence = createSelector(prevSequence)
+    const inWinningSequence = createSelector(winningSequence, (pos: Pos, sequence) => sequence.includes(pos))
 
     // 1+2x15+1 = 32
     return <div class="relative h-full w-full rounded-box bg-[#efb072]">
@@ -49,10 +55,12 @@ export function Board() {
                 grid-cols-15 grid-rows-15
                 stroke-gray-500
                 [&_button.stone]:cursor-auto
-                [&_button.stone.black]:fill-black [&_button.stone.black_.glyph]:fill-white
-                [&_button.stone.white]:fill-white [&_button.stone.white_.glyph]:fill-black
+                [&_button.stone.black]:fill-black
+                [&_button.stone.black_.glyph]:fill-white [&_button.stone.white]:fill-white
+                [&_button.stone.white_.glyph]:fill-black [&_button.winning]:stroke-green-500
                 "
                 classList={{
+                    "[&_button]:cursor-not-allowed": gameSelectors.finished(),
                     "[&_button.forbidden]:cursor-not-allowed": gameSelectors.boardDescribe.player_color === "Black",
                     "[&_button]:cursor-wait": runtimeSelectors.inComputing(),
                     "[&_button]:cursor-crosshair": !runtimeSelectors.inComputing(),
@@ -63,6 +71,7 @@ export function Board() {
                         position={position()}
                         isLastSequence={isLastSequence}
                         isPrevSequence={isPrevSequence}
+                        inWinningSequence={inWinningSequence}
                     />
                 }</Index>
             </div>
@@ -74,6 +83,7 @@ function Cell(props: {
     position: number,
     isLastSequence: (sequence: number) => boolean,
     isPrevSequence: (sequence: number) => boolean,
+    inWinningSequence: (pos: Pos) => boolean,
 }) {
     const { gameActions, persistConfig, gameSelectors } = useContext(AppContext)!
 
@@ -91,6 +101,7 @@ function Cell(props: {
             "black": stone()?.content.color === "Black",
             "white": stone()?.content.color === "White",
             "forbidden": cell().type === "Forbidden",
+            "winning": props.inWinningSequence(pos),
         }}
         style={{
             "grid-row": 15 - Math.trunc(props.position / 15),

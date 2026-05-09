@@ -1,8 +1,8 @@
 import { createEffect, type JSX, ParentProps } from "solid-js"
+import { IconXMark } from "./icons"
 
 export function Modal(props: ParentProps & {
     id: string,
-    titleId: string,
     title: JSX.Element,
     open: boolean,
     onClose: () => void,
@@ -21,15 +21,16 @@ export function Modal(props: ParentProps & {
     return <dialog
         ref={ref => dialogRef = ref}
         id={props.id}
-        aria-labelledby={props.titleId}
         class="modal"
         onClose={props.onClose}
     >
         <div class="modal-box flex max-h-[calc(100dvh-10rem)] max-w-lg flex-col bg-base-200 p-0">
             <div class="flex items-center justify-between px-4 pt-3 pb-2">
-                <h1 id={props.titleId} class="text leading-none font-bold">{props.title}</h1>
+                <h1 class="text font-bold">{props.title}</h1>
                 <form method="dialog" class="flex items-center">
-                    <button class="btn btn-xs btn-primary" aria-label="Close">X</button>
+                    <button class="btn btn-square p-0.5 btn-xs btn-primary">
+                        <IconXMark />
+                    </button>
                 </form>
             </div>
             <div class="divider my-0" />
@@ -37,8 +38,6 @@ export function Modal(props: ParentProps & {
                 {props.children}
             </div>
         </div>
-        <form method="dialog" class="modal-backdrop">
-            <button aria-label="Close"></button>
-        </form>
+        <form method="dialog" class="modal-backdrop"><button /></form>
     </dialog>
 }

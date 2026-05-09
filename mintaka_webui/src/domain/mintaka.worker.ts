@@ -1,4 +1,4 @@
-import init, { GameAgent, initThreadPool, JsAbortHandle } from "../wasm/pkg/mintaka_wasm"
+import init, { GameAgent, initThreadPool, JsAbortHandle, JsCounterHandle } from "../wasm/pkg/mintaka_wasm"
 import type { MintakaWorkerMessage, MintakaWorkerResponse } from "./mintaka.worker.provider"
 
 let readyPromise: Promise<void> | undefined
@@ -24,7 +24,8 @@ export function initWorker() {
 const ctx = {
     state: undefined as {
         agent: GameAgent,
-        abort: JsAbortHandle
+        counter: JsCounterHandle,
+        abort: JsAbortHandle,
     } | undefined,
     post: (data: MintakaWorkerResponse) => self.postMessage(data),
     postError: (error: unknown) => self.postMessage({ type: "Error", content: error } as MintakaWorkerResponse),
@@ -39,14 +40,18 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
                 const { config, state } = event.data
 
                 const abortHandle = new JsAbortHandle()
-                const ptr = abortHandle.ptr()
+                const abortPtr = abortHandle.ptr()
+
+                const counterHandle = new JsCounterHandle()
+                const counterPtr = counterHandle.ptr()
 
                 ctx.state = {
                     agent: new GameAgent(config, state),
+                    counter: counterHandle,
                     abort: abortHandle,
                 }
 
-                ctx.post({ type: "Ready", sab: memory!, controlPtr: ptr })
+                ctx.post({ type: "Ready", sab: memory!, counterPtr: counterPtr, abortPtr: abortPtr })
                 break
             }
             case "command": {
@@ -61,12 +66,14 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
                     break
                 }
 
-                if (ctx.state?.agent?.hashKey() !== event.data.positionHash) {
-                    ctx.postError("snapshot missmatch")
+                if (ctx.state?.agent?.hashKey() !== event.data.expectedHash) {
+                    ctx.post({ type: "LaunchResult", id: event.data.id, content: "snapshot-mismatch" })
                     break
                 }
 
-                const bestMove = ctx.state.agent.launch(event.data.objective, ctx.state.abort)
+                ctx.post({ type: "LaunchResult", id: event.data.id, content: "launched" })
+
+                const bestMove = ctx.state.agent.launch(event.data.objective, ctx.state.counter, ctx.state.abort)
 
                 ctx.post({ type: "BestMove", content: bestMove })
                 break

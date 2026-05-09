@@ -1,19 +1,20 @@
-import { createMemo, Match, Show, Switch, useContext } from "solid-js"
+import { createMemo, createSignal, Match, Show, Switch, useContext } from "solid-js"
 import { AppContext } from "../context"
 import {
     IconArrowUturnRight, IconChevronDoubleLeft, IconChevronDoubleRight, IconChevronLeft, IconChevronRight,
-    IconCog8Tooth, IconCpuChip,
-    IconDocument, IconGitBranch, IconMagnifyingGlassMinus, IconMagnifyingGlassPlus,
+    IconCog8Tooth, IconDocument, IconGitBranch, IconInformationCircle, IconMagnifyingGlassMinus, IconMagnifyingGlassPlus, IconBars3,
     IconMoon, IconPause, IconPlay, IconStop, IconSun, IconThemeAuto,
 } from "./icons"
 import { nextHistoryDisplay, nextTheme } from "../stores/persist.config"
-import { AboutButton } from "./About"
+import { About } from "./About"
+import { Portal } from "solid-js/web"
+import { Branch } from "./Branch"
 
 export function Control() {
     return <div class="flex gap-2 rounded-box bg-base-100 p-2 max-xs:gap-1 max-xs:p-1">
-        <DashboardButton />
-        <ControlButtons />
         <ConfigButton />
+        <ControlButtons />
+        <DashboardButton />
     </div>
 }
 
@@ -135,7 +136,7 @@ function DashboardButton() {
         }}
         onClick={toggleDashboard}
     >
-        <IconCpuChip />
+        <IconCog8Tooth />
     </button>
 }
 
@@ -152,13 +153,36 @@ function ConfigButton() {
         setPersistConfig("zoomBoard", !persistConfig.zoomBoard)
     }
 
+    const [openBranch, setOpenBranch] = createSignal(false)
+
+    const [openAbout, setOpenAbout] = createSignal(false)
+
     return <div class="dropdown dropdown-center dropdown-top">
         <div tabindex="0" role="button" class="btn btn-square">
-            <IconCog8Tooth />
+            <IconBars3 />
         </div>
         <ul tabindex="-1" class="dropdown-content menu z-1 gap-2 rounded-box bg-base-100 p-2 max-xs:gap-1 max-xs:p-1">
             <li>
-                <AboutButton />
+                <button
+                    class="btn btn-square"
+                    onClick={() => setOpenAbout(true)}
+                >
+                    <IconInformationCircle />
+                </button>
+                <Portal>
+                    <About open={openAbout()} onClose={() => setOpenAbout(false)} />
+                </Portal>
+            </li>
+            <li>
+                <button
+                    class="btn btn-square"
+                    onClick={() => setOpenBranch(true)}
+                >
+                    <IconGitBranch />
+                </button>
+                <Portal>
+                    <Branch open={openBranch()} onClose={() => setOpenBranch(false)} />
+                </Portal>
             </li>
             <li>
                 <button

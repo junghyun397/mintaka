@@ -16,7 +16,7 @@ export type AppState = {
 }
 
 export function createAppState(initial: AppGameState): AppState {
-    const [mintakaRuntime, setMintakaRuntime] = createSignal<MintakaRuntime>({ type: "none" })
+    const [mintakaRuntime, setMintakaRuntime] = createSignal<MintakaRuntime>(undefined)
     const [gameState, setGameState] = createSignal(initial)
 
     const [winRateTable, setWinRateTable] = createStore<Record<HashKey, number>>({})

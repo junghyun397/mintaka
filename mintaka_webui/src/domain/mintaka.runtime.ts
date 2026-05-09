@@ -1,4 +1,4 @@
-import type { BestMove, CommandResult, ComputingResource, HashKey } from "../wasm/pkg/rusty_renju_wasm"
+import { BestMove, CommandResult, ComputingResource, HashKey } from "../wasm/pkg/rusty_renju_wasm"
 import { HistoryTree } from "./HistoryTree"
 import { StatusResponseBody } from "./mintaka"
 
@@ -12,28 +12,29 @@ export class IdleState {
     }
 
     launch(historySnapshot: HistoryTree): LaunchedComputingState {
-        return new LaunchedComputingState(this.snapshot, historySnapshot)
+        return new LaunchedComputingState(this.snapshot, historySnapshot, 0)
     }
 }
 
 abstract class BaseComputingState {
-    protected constructor(readonly snapshot: HashKey, readonly historySnapshot: HistoryTree) {
+    protected constructor(readonly snapshot: HashKey, readonly historySnapshot: HistoryTree, readonly nodes: number) {
         this.snapshot = snapshot
         this.historySnapshot = historySnapshot
+        this.nodes = nodes
     }
 
-    bestMove(bestMove: BestMove): IdleState {
-        return new IdleState(this.snapshot, bestMove)
+    bestMove(hash: HashKey, bestMove: BestMove): IdleState {
+        return new IdleState(hash, bestMove)
     }
 
     abort(): AbortingComputingState {
-        return new AbortingComputingState(this.snapshot, this.historySnapshot)
+        return new AbortingComputingState(this.snapshot, this.historySnapshot, this.nodes)
     }
 }
 
 abstract class StreamableComputingState extends BaseComputingState {
     status(response: StatusResponseBody): StreamingComputingState {
-        return new StreamingComputingState(this.snapshot, this.historySnapshot, response)
+        return new StreamingComputingState(this.snapshot, this.historySnapshot, this.nodes, response)
     }
 }
 
@@ -41,11 +42,11 @@ class LaunchedComputingState extends BaseComputingState {
     readonly type: "launched" = "launched"
 
     constructor(
-        snapshot: HashKey, historySnapshot: HistoryTree,
-    ) { super(snapshot, historySnapshot) }
+        snapshot: HashKey, historySnapshot: HistoryTree, nodes: number,
+    ) { super(snapshot, historySnapshot, nodes) }
 
     begins(response: ComputingResource): BeginsComputingState {
-        return new BeginsComputingState(this.snapshot, this.historySnapshot, response)
+        return new BeginsComputingState(this.snapshot, this.historySnapshot, this.nodes, response)
     }
 }
 
@@ -53,12 +54,12 @@ class BeginsComputingState extends StreamableComputingState {
     readonly type: "begins" = "begins"
 
     constructor(
-        snapshot: HashKey, historySnapshot: HistoryTree,
+        snapshot: HashKey, historySnapshot: HistoryTree, nodes: number,
         readonly resource: ComputingResource,
-    ) { super(snapshot, historySnapshot) }
+    ) { super(snapshot, historySnapshot, nodes) }
 
     status(response: StatusResponseBody): StreamingComputingState {
-        return new StreamingComputingState(this.snapshot, this.historySnapshot, response, this.resource)
+        return new StreamingComputingState(this.snapshot, this.historySnapshot, this.nodes, response, this.resource)
     }
 }
 
@@ -66,13 +67,17 @@ class StreamingComputingState extends StreamableComputingState {
     readonly type: "streaming" = "streaming"
 
     constructor(
-        snapshot: HashKey, historySnapshot: HistoryTree,
+        snapshot: HashKey, historySnapshot: HistoryTree, nodes: number,
         readonly lastStatus: StatusResponseBody,
         readonly resource?: ComputingResource,
-    ) { super(snapshot, historySnapshot) }
+    ) { super(snapshot, historySnapshot, nodes) }
+
+    update(nodes: number): StreamingComputingState {
+        return new StreamingComputingState(this.snapshot, this.historySnapshot, nodes, this.lastStatus, this.resource)
+    }
 
     status(response: StatusResponseBody): StreamingComputingState {
-        return new StreamingComputingState(this.snapshot, this.historySnapshot, response, this.resource)
+        return new StreamingComputingState(this.snapshot, this.historySnapshot, this.nodes, response, this.resource)
     }
 }
 
@@ -80,10 +85,10 @@ class AbortingComputingState extends BaseComputingState {
     readonly type: "aborting" = "aborting"
 
     constructor(
-        snapshot: HashKey, historySnapshot: HistoryTree,
+        snapshot: HashKey, historySnapshot: HistoryTree, nodes: number,
         readonly resource?: ComputingResource,
         readonly lastStatus?: StatusResponseBody,
-    ) { super(snapshot, historySnapshot) }
+    ) { super(snapshot, historySnapshot, nodes) }
 }
 
 export type MintakaRuntimeState = IdleState | LaunchedComputingState | BeginsComputingState | StreamingComputingState | AbortingComputingState
