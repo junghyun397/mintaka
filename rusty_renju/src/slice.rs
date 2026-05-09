@@ -100,6 +100,10 @@ impl Slice {
         }
     }
 
+    pub fn winner_idx<const C: Color>(&self) -> Option<u32> {
+        slice_pattern::five_in_a_row_idx(self.stones[C])
+    }
+
     pub fn blocks<const C: Color>(&self) -> u16 {
         u16::MAX << self.length | self.stones[!C]
     }

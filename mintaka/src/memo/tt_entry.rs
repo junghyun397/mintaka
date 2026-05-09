@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 const KEY_SIZE: usize = 21;
 const KEY_MASK: u64 = !(u64::MAX << KEY_SIZE as u64);
+const KEY_SHIFT: u64 = 64 - KEY_SIZE as u64;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
@@ -177,7 +178,7 @@ impl TTEntryBucket {
     }
 
     fn shuffle_pack_entry(entry: u64) -> u64 {
-        entry.wrapping_mul(11400714819323198549) & KEY_MASK // fibonacci hashing
+        entry.wrapping_mul(11400714819323198549) >> KEY_SHIFT // fibonacci hashing
     }
 
     fn calculate_slot_index(packed_key: u64) -> usize {

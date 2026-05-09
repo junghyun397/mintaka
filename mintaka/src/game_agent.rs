@@ -294,14 +294,15 @@ impl GameAgent {
         &mut self,
         search_objective: SearchObjective,
         response_sender: impl ResponseSender,
-        aborted: Arc<AtomicBool>
+        global_counter_in_1k: Arc<AtomicU32>,
+        aborted: Arc<AtomicBool>,
     ) -> BestMove {
         let computing_resource = self.next_computing_resource();
 
         let started_time = CLK::now();
 
+        global_counter_in_1k.store(0, Ordering::Relaxed);
         aborted.store(false, Ordering::Relaxed);
-        let global_counter_in_1k = Arc::new(AtomicU32::new(0));
 
         response_sender.response(Response::Begins(computing_resource));
 

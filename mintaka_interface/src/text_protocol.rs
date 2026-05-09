@@ -11,7 +11,7 @@ use rusty_renju::notation::color::UnknownColorError;
 use rusty_renju::notation::pos::{Pos, PosError};
 use rusty_renju::utils::byte_size::ByteSize;
 use std::io::BufRead;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
@@ -79,6 +79,7 @@ fn text_protocol(config: Config, state: GameState, command_sequence: Vec<String>
                 let best_move = game_agent.launch::<Instant>(
                     objective,
                     CallBackResponseSender::new(response_printer),
+                    Arc::new(AtomicU32::new(0)),
                     aborted.clone(),
                 );
 

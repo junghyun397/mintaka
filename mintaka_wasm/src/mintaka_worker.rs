@@ -1,7 +1,7 @@
 use crate::{to_js_err, to_js_value, try_from_js_value, WebClock};
 use mintaka::protocol::response::ResponseSender;
 use std::cell::RefCell;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::sync::Arc;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsError};
@@ -61,6 +61,7 @@ impl GameAgent {
     pub fn launch(
         &mut self,
         search_objective: SearchObjective,
+        counter_handle: &JsCounterHandle,
         abort_handle: &JsAbortHandle,
     ) -> Result<BestMove, JsError> {
         let inner = Arc::clone(&self.inner);
@@ -69,6 +70,7 @@ impl GameAgent {
         let best_move = inner.borrow_mut().launch::<WebClock>(
             search_objective,
             JsResponseSender,
+            counter_handle.inner.clone(),
             abort_handle.inner.clone(),
         );
 
@@ -104,6 +106,26 @@ impl JsAbortHandle {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self { inner: Arc::new(AtomicBool::new(false)) }
+    }
+
+    pub fn ptr(&self) -> u32 {
+        self.inner.as_ptr() as usize as u32
+    }
+
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct JsCounterHandle {
+    inner: Arc<AtomicU32>
+}
+
+#[wasm_bindgen]
+impl JsCounterHandle {
+
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self { inner: Arc::new(AtomicU32::new(0)) }
     }
 
     pub fn ptr(&self) -> u32 {

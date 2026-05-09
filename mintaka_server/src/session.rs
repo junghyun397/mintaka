@@ -15,7 +15,7 @@ use std::collections::BinaryHeap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc::UnboundedSender;
@@ -185,6 +185,7 @@ impl Session {
             let best_move = game_agent.launch::<Instant>(
                 SearchObjective::Best,
                 response_sender,
+                Arc::new(AtomicU32::new(0)),
                 abort_flag
             );
 

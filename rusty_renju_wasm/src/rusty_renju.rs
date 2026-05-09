@@ -121,6 +121,17 @@ impl BoardWorker {
             .map(to_js_value)
     }
 
+    #[wasm_bindgen(js_name = winningSequence)]
+    pub fn winning_sequence(&self) -> Option<Vec<Pos>> {
+        self.inner.find_global_winner_location()
+            .map(|(_, pos, direction)| {
+                Vec::from_iter(
+                    (0 .. 5)
+                        .map(|i| to_js_value(&pos.directional_offset_unchecked(direction, i)))
+                )
+            })
+    }
+
     pub fn set(self, pos: MaybePos) -> Self {
         let maybe_pos: rusty_renju::notation::pos::MaybePos = try_from_js_value(pos).unwrap();
 

@@ -53,6 +53,7 @@ mod template {
         let best_move = agent.launch::<Instant>(
             SearchObjective::Best,
             NullResponseSender,
+            Arc::new(AtomicU32::new(0)),
             Arc::new(AtomicBool::new(false))
         );
 

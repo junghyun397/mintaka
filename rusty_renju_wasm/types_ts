@@ -125,6 +125,7 @@ export interface BoardDescribe {
 	hash_key: HashKey;
 	player_color: Color;
 	field: BoardExportItem[];
+	winner?: Color;
 }
 
 export interface BoardExportStone {

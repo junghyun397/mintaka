@@ -46,6 +46,7 @@ pub struct BoardDescribe {
     )]
     #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Vec<BoardExportItem>"))]
     pub field: [BoardExportItem; pos::BOARD_SIZE],
+    pub winner: Option<Color>,
 }
 
 fn match_symbol(c: char) -> Option<BoardElement> {
@@ -267,7 +268,8 @@ impl Board {
         BoardDescribe {
             hash_key: self.hash_key,
             player_color: self.player_color,
-            field: self.export_items(history)
+            field: self.export_items(history),
+            winner: self.find_global_winner(),
         }
     }
 

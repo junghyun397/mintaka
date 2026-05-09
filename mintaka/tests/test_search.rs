@@ -6,7 +6,7 @@ mod test_search {
     use mintaka::state::GameState;
     use mintaka::protocol::response::NullResponseSender;
     use rusty_renju::board;
-    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::{AtomicBool, AtomicU32};
     use std::sync::Arc;
     use std::time::Instant;
 
@@ -15,7 +15,6 @@ mod test_search {
             let mut agent = {
                 let mut config = Config::default();
                 config.max_nodes_in_1k = Some(100);
-                config.max_depth = Some(5);
 
                 let state: GameState = $source.into();
 
@@ -25,6 +24,7 @@ mod test_search {
             let best_move = agent.launch::<Instant>(
                 SearchObjective::Best,
                 NullResponseSender,
+                Arc::new(AtomicU32::new(0)),
                 Arc::new(AtomicBool::new(false))
             );
 

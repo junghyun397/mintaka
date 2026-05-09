@@ -131,6 +131,12 @@ pub fn contains_five_in_a_row(stones: u16) -> bool {
     calculate_five_in_a_rows(stones) != 0
 }
 
+pub fn five_in_a_row_idx(stones: u16) -> Option<u32> {
+    let five = calculate_five_in_a_rows(stones);
+
+    (five != 0).then_some(five.trailing_zeros())
+}
+
 const VECTOR_MATCH_LUT_SIZE: usize = u16::MAX as usize + 1;
 
 // attempted 3^8 + 1 lookup table using base-3 and nibble-based indexing,

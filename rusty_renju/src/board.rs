@@ -475,6 +475,20 @@ impl Board {
             .find_map(Slice::winner)
     }
 
+    pub fn find_global_winner_location(&self) -> Option<(Color, Pos, Direction)> {
+        self.slices.horizontal_slices.iter().map(|slice| (Direction::Horizontal, slice))
+            .chain(self.slices.vertical_slices.iter().map(|slice| (Direction::Vertical, slice)))
+            .chain(self.slices.ascending_slices.iter().map(|slice| (Direction::Ascending, slice)))
+            .chain(self.slices.descending_slices.iter().map(|slice| (Direction::Descending, slice)))
+            .find_map(|(direction, slice)| {
+                slice.winner_idx::<{ Color::Black }>().map(|idx| (Color::Black, idx))
+                    .or(slice.winner_idx::<{ Color::White }>().map(|idx| (Color::White, idx)))
+                    .map(|(color, idx)|
+                        (color, slice.start_pos.directional_offset_unchecked(direction, idx as isize), direction)
+                    )
+            })
+    }
+
     pub fn is_forced_defense(&self) -> bool {
         self.effective_open_fours(self.player_color) != 0
     }
