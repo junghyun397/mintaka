@@ -9,12 +9,15 @@ use rusty_renju::utils::byte_size::ByteSize;
 use std::cmp::Reverse;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_stream::wrappers::UnboundedReceiverStream;
+use mintaka::game_agent::GameError;
 use mintaka::protocol::results::{BestMove, CommandResult};
+use rusty_renju::memo::hash_key::HashKey;
+use crate::app_error::AppError::SessionInComputing;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Configs {
@@ -32,6 +35,12 @@ impl WorkerPermit {
 }
 
 pub struct MemoryPermit(OwnedSemaphorePermit);
+
+impl MemoryPermit {
+    pub fn release(self) {
+        drop(self.0);
+    }
+}
 
 #[derive(Debug)]
 pub struct SessionResource {
@@ -247,25 +256,28 @@ impl AppState {
         session_key: SessionKey,
         command: Command,
     ) -> Result<CommandResult, AppError> {
-        let mut session = self.sessions.get_mut_with_touch(&session_key)
-            .ok_or(AppError::SessionNotFound)?;
-
-        let command_message = command.to_brief_debug();
-
-        let result = session.command(command);
-
-        tracing::info!("session command executed; command={command_message}");
-
-        result
+        self.sessions.get_mut_with_touch(&session_key)
+            .ok_or(AppError::SessionNotFound)?
+            .command(command)
     }
 
     pub async fn launch_session(
         &self,
         session_key: SessionKey,
         timeout: Duration,
+        position_hash: HashKey,
+        nodes_polling_interval_ms: Option<u32>,
     ) -> Result<(), AppError> {
         let mut session = self.sessions.get_mut_with_touch(&session_key)
             .ok_or(AppError::SessionNotFound)?;
+
+        if session.status() != SessionStatus::Idle {
+            return Err(SessionInComputing)
+        }
+
+        if position_hash != session.game_agent()?.state.board.hash_key {
+            return Err(AppError::GameError(GameError::HashMismatch))
+        }
 
         let worker_permit = self.acquire_workers(session.game_agent()?.config.workers, timeout).await?;
 
@@ -276,7 +288,8 @@ impl AppState {
         session.launch(
             StreamSessionResponseSender::new(response_sender.clone()),
             result_tx,
-            worker_permit
+            worker_permit,
+            nodes_polling_interval_ms,
         )?;
 
         let sessions = self.sessions.clone();

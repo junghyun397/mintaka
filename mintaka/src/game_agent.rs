@@ -29,9 +29,36 @@ use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
+#[cfg(not(feature = "rayon"))]
+macro_rules! search_scope {
+    ($body:expr) => {
+        std::thread::scope($body)
+    };
+}
+
+#[cfg(feature = "rayon")]
+macro_rules! search_scope {
+    ($body:expr) => {
+        rayon::in_place_scope($body)
+    };
+}
+
+#[cfg(not(feature = "rayon"))]
+fn spawn_search_worker<'scope, 'env, F>(scope: &'scope std::thread::Scope<'scope, 'env>, worker: F)
+where F: FnOnce() + Send + 'scope {
+    scope.spawn(worker);
+}
+
+#[cfg(feature = "rayon")]
+fn spawn_search_worker<'scope, F>(scope: &rayon::Scope<'scope>, worker: F)
+where F: FnOnce() + Send + 'scope {
+    scope.spawn(move |_| worker());
+}
+
 #[derive(Debug)]
 pub enum GameError {
     InvalidConfig,
+    HashMismatch,
     StoneAlreadyExist,
     StoneDoesNotExist,
     StoneColorMismatch,
@@ -44,6 +71,7 @@ impl Display for GameError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             GameError::InvalidConfig => write!(f, "invalid config"),
+            GameError::HashMismatch => write!(f, "hash mismatch"),
             GameError::StoneAlreadyExist => write!(f, "stone already exist"),
             GameError::StoneDoesNotExist => write!(f, "stone does not exist"),
             GameError::StoneColorMismatch => write!(f, "stone color mismatch"),
@@ -88,8 +116,12 @@ impl GameAgent {
 
     pub fn command(&mut self, command: Command) -> Result<CommandResult, GameError> {
         match command {
-            Command::Play(action) => {
-                match action {
+            Command::Play { hash, pos } => {
+                if hash != self.state.board.hash_key {
+                    return Err(GameError::HashMismatch);
+                }
+
+                match pos {
                     MaybePos::NONE => self.state.pass_mut(),
                     pos => {
                         let pos = pos.unwrap();
@@ -117,7 +149,11 @@ impl GameAgent {
                     return Ok(CommandResult::finished(self.state.board.hash_key, GameResult::Draw));
                 }
             },
-            Command::Undo => {
+            Command::Undo { hash } => {
+                if hash != self.state.board.hash_key {
+                    return Err(GameError::HashMismatch);
+                }
+
                 match self.state.history.pop_mut() {
                     None => return Err(GameError::NoHistoryToUndo),
                     Some(action) => {
@@ -142,7 +178,11 @@ impl GameAgent {
                     }
                 }
             },
-            Command::Set { pos, color } => {
+            Command::Set { hash, pos, color } => {
+                if hash != self.state.board.hash_key {
+                    return Err(GameError::HashMismatch);
+                }
+
                 if !self.state.board.is_pos_empty(pos) {
                     return Err(GameError::StoneAlreadyExist);
                 }
@@ -157,7 +197,11 @@ impl GameAgent {
                     self.state.board.set_mut(pos);
                 }
             },
-            Command::Unset { pos, color } => {
+            Command::Unset { hash, pos, color } => {
+                if hash != self.state.board.hash_key {
+                    return Err(GameError::HashMismatch);
+                }
+
                 match self.state.board.stone_kind(pos) {
                     Some(stone_color) if stone_color == color => {
                         if self.state.board.player_color == color {
@@ -233,7 +277,7 @@ impl GameAgent {
             },
             Command::Pondering(enable) => {
                 self.config.pondering = enable;
-            }
+            },
             Command::MaxNodes { in_1k } => {
                 self.config.max_nodes_in_1k = Some(in_1k);
             },
@@ -308,8 +352,7 @@ impl GameAgent {
 
         let tt_view = self.tt.view();
 
-        #[cfg(not(feature = "rayon"))]
-        let (main_td, score, best_move) = std::thread::scope(|s| {
+        let (main_td, score, best_move) = search_scope!(|s| {
             let state = self.state;
 
             for tid in 1 .. self.config.workers {
@@ -323,52 +366,7 @@ impl GameAgent {
                     &aborted, &global_counter_in_1k
                 );
 
-                s.spawn(move || {
-                    iterative_deepening::<CLK, { RuleKind::Renju }, WorkerThread>(
-                        &mut worker_td, state
-                    );
-                });
-            }
-
-            let mut main_td = ThreadData::new(
-                MainThread::<CLK, _>::new(
-                    state.board.hash_key,
-                    response_sender,
-                    started_time,
-                    computing_resource.time,
-                ),
-                0,
-                search_objective,
-                self.config,
-                self.evaluator.clone(),
-                tt_view,
-                self.ht,
-                &aborted, &global_counter_in_1k,
-            );
-
-            let (score, best_move) = iterative_deepening::<CLK, { RuleKind::Renju }, MainThread<_, _>>(
-                &mut main_td, state
-            );
-
-            (main_td, score, best_move)
-        });
-
-        #[cfg(feature = "rayon")]
-        let (main_td, score, best_move) = rayon::in_place_scope(|s| {
-            let state = self.state;
-
-            for tid in 1 .. self.config.workers {
-                let mut worker_td = ThreadData::new(
-                    WorkerThread, tid,
-                    search_objective,
-                    self.config,
-                    self.evaluator.clone(),
-                    tt_view,
-                    self.ht,
-                    &aborted, &global_counter_in_1k
-                );
-
-                s.spawn(move |_| {
+                spawn_search_worker(s, move || {
                     iterative_deepening::<CLK, { RuleKind::Renju }, WorkerThread>(
                         &mut worker_td, state
                     );
@@ -423,6 +421,8 @@ impl GameAgent {
 
     fn sync_state(&mut self, compact_state: CompactGameState) {
         self.state = GameState::from_board_and_history(compact_state.board, compact_state.history);
+        self.evaluator = ActiveEvaluator::from_state(&self.state);
+        self.executed_moves = Bitfield::default();
     }
 
     fn reinit_from_state(&mut self, compact_state: CompactGameState) {

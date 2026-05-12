@@ -71,6 +71,12 @@ impl From<HashKey> for u64 {
     }
 }
 
+impl From<u64> for HashKey {
+    fn from(value: u64) -> HashKey {
+        HashKey(value)
+    }
+}
+
 impl Display for HashKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "0x{:016x}", self.0)

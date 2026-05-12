@@ -31,16 +31,23 @@ export type CommandSchema =
 	| { type: "Clear", content?: undefined }
 	| { type: "Load", content: CompactGameState }
 	| { type: "Sync", content: CompactGameState }
-	| { type: "Play", content: MaybePos }
+	| { type: "Play", content: {
+	hash: HashKey;
+	pos: MaybePos;
+}}
 	| { type: "Set", content: {
+	hash: HashKey;
 	pos: Pos;
 	color: Color;
 }}
 	| { type: "Unset", content: {
+	hash: HashKey;
 	pos: Pos;
 	color: Color;
 }}
-	| { type: "Undo", content?: undefined }
+	| { type: "Undo", content: {
+	hash: HashKey;
+}}
 	| { type: "BatchSet", content: {
 	player_moves: Pos[];
 	opponent_moves: Pos[];

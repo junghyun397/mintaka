@@ -22,20 +22,29 @@ pub enum AppError {
 impl Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InvalidSessionId => write!(f, "invalid session id"),
-            Self::InvalidConfig => write!(f, "invalid config"),
-            Self::SessionNotFound => write!(f, "session not found"),
-            Self::SessionInComputing => write!(f, "session is in computing"),
-            Self::SessionIdle => write!(f, "session is idle"),
-            Self::SessionNeverLaunched => write!(f, "session never launched"),
-            Self::StreamAlreadyAcquired => write!(f, "stream is already acquired"),
-            Self::StreamNotAcquired => write!(f, "stream is not acquired"),
-            Self::SessionFileAlreadyExists => write!(f, "session file already exists"),
-            Self::SessionFileNotFound => write!(f, "session file not found"),
-            Self::MemoryAcquireTimeout => write!(f, "memory acquisition timed out"),
-            Self::WorkerAcquireTimeout => write!(f, "worker acquisition timed out"),
-            Self::GameError(err) => write!(f, "{err}"),
-            Self::InternalError(err) => write!(f, "{err}"),
+            Self::InvalidSessionId => write!(f, "INVALID_SESSION_ID"),
+            Self::InvalidConfig => write!(f, "INVALID_CONFIG"),
+            Self::SessionNotFound => write!(f, "SESSION_NOT_FOUND"),
+            Self::SessionInComputing => write!(f, "SESSION_IN_COMPUTING"),
+            Self::SessionIdle => write!(f, "SESSION_IDLE"),
+            Self::SessionNeverLaunched => write!(f, "SESSION_NEVER_LAUNCHED"),
+            Self::StreamAlreadyAcquired => write!(f, "STREAM_ALREADY_ACQUIRED"),
+            Self::StreamNotAcquired => write!(f, "STREAM_NOT_ACQUIRED"),
+            Self::SessionFileAlreadyExists => write!(f, "SESSION_FILE_ALREADY_EXISTS"),
+            Self::SessionFileNotFound => write!(f, "SESSION_FILE_NOT_FOUND"),
+            Self::MemoryAcquireTimeout => write!(f, "MEMORY_ACQUIRE_TIMEOUT"),
+            Self::WorkerAcquireTimeout => write!(f, "WORKER_ACQUIRE_TIMEOUT"),
+            Self::GameError(err) => match err {
+                GameError::InvalidConfig => write!(f, "INVALID_CONFIG"),
+                GameError::HashMismatch => write!(f, "HASH_MISMATCH"),
+                GameError::StoneAlreadyExist => write!(f, "STONE_ALREADY_EXIST"),
+                GameError::StoneDoesNotExist => write!(f, "STONE_DOES_NOT_EXIST"),
+                GameError::StoneColorMismatch => write!(f, "STONE_COLOR_MISMATCH"),
+                GameError::ForbiddenMove => write!(f, "FORBIDDEN_MOVE"),
+                GameError::NoHistoryToUndo => write!(f, "NO_HISTORY_TO_UNDO"),
+                GameError::NoTimeManagement => write!(f, "NO_TIME_MANAGEMENT"),
+            },
+            Self::InternalError(_) => write!(f, "INTERNAL_ERROR"),
         }
     }
 }
@@ -52,9 +61,7 @@ impl From<GameError> for AppError {
 }
 
 impl AppError {
-
     pub fn from_general_error(error: impl std::error::Error) -> Self {
         Self::InternalError(error.to_string())
     }
-
 }

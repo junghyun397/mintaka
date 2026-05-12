@@ -1,4 +1,4 @@
-pub mod mintaka_worker;
+pub mod mintaka_bindings;
 
 pub use wasm_bindgen_rayon::init_thread_pool;
 
@@ -19,6 +19,11 @@ const UNION_TYPES: &'static str = include_str!("../../rusty_renju_wasm/union_typ
 pub fn start() {
     #[cfg(feature = "panic_hook")]
     console_error_panic_hook::set_once();
+}
+
+#[wasm_bindgen(js_name = mintakaVersion)]
+pub fn mintaka_version() -> JsValue {
+    JsValue::from_str(mintaka::VERSION)
 }
 
 pub fn to_js_err(err: impl ToString) -> JsError {

@@ -3,13 +3,13 @@ use crate::value::Depth;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
-use rusty_renju::notation::score::{Score, Scores};
+use rusty_renju::notation::score::Score;
 use rusty_renju::utils::byte_size::ByteSize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize, Serializer};
-use std::sync::atomic::{AtomicU32, Ordering};
 #[cfg(feature = "compress-tt")]
 use std::io::{Read, Write};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 #[cfg(feature = "compress-tt")]
 fn tt_compress(bytes: &[u8], compression_level: u32) -> Vec<u8> {
@@ -31,8 +31,8 @@ fn tt_compress(bytes: &[u8], _compression_level: u32) -> Vec<u8> {
 
 #[cfg(feature = "compress-tt")]
 fn tt_decompress(source: Vec<u8>) -> Result<Vec<u8>, &'static str> {
-    let mut decoder = lz4::Decoder::new(std::io::Cursor::new(source))
-        .map_err(|_| "failed to build decoder")?;
+    let mut decoder =
+        lz4::Decoder::new(std::io::Cursor::new(source)).map_err(|_| "failed to build decoder")?;
     let mut decompressed = Vec::new();
     decoder
         .read_to_end(&mut decompressed)
@@ -47,11 +47,10 @@ fn tt_decompress(source: Vec<u8>) -> Result<Vec<u8>, &'static str> {
 
 pub struct TranspositionTable {
     table: Vec<TTEntryBucket>,
-    age: AtomicU32
+    age: AtomicU32,
 }
 
 impl AbstractTranspositionTable for TranspositionTable {
-
     type EntryType = TTEntryBucket;
 
     fn internal_table(&self) -> &Vec<TTEntryBucket> {
@@ -73,11 +72,9 @@ impl AbstractTranspositionTable for TranspositionTable {
     fn clear_age(&self) {
         self.age.store(0, Ordering::Relaxed);
     }
-
 }
 
 impl TranspositionTable {
-
     pub fn new_with_size(size: ByteSize) -> Self {
         let mut new = Self {
             table: Vec::new(),
@@ -114,12 +111,12 @@ impl TranspositionTable {
     pub fn import(source: Vec<u8>) -> Result<Self, &'static str> {
         let decompressed = tt_decompress(source)?;
 
-        let age: u32 = (&decompressed[0 .. 4])
+        let age: u32 = (&decompressed[0..4])
             .try_into()
             .map(u32::from_be_bytes)
             .unwrap_or_default();
 
-        let payload = &decompressed[4 ..];
+        let payload = &decompressed[4..];
 
         if !payload.len().is_multiple_of(size_of::<TTEntryBucket>()) {
             return Err("illegal payload size");
@@ -134,7 +131,7 @@ impl TranspositionTable {
             std::ptr::copy_nonoverlapping(
                 payload.as_ptr(),
                 table.as_mut_ptr() as *mut u8,
-                payload.len()
+                payload.len(),
             );
         }
 
@@ -143,7 +140,6 @@ impl TranspositionTable {
             age: AtomicU32::new(age),
         })
     }
-
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -153,7 +149,6 @@ pub struct TTView<'a> {
 }
 
 impl TTView<'_> {
-
     fn calculate_index(&self, key: HashKey) -> usize {
         ((u64::from(key) as u128 * (self.table.len() as u128)) >> 64) as usize
     }
@@ -195,7 +190,8 @@ impl TTView<'_> {
             let keep_score = entry.depth + entry_score_kind.map_or(0, ScoreKind::into);
 
             if self.age > entry.age as u32
-                || (maybe_score_kind == Some(ScoreKind::Exact) && entry_score_kind != Some(ScoreKind::Exact))
+                || (maybe_score_kind == Some(ScoreKind::Exact)
+                    && entry_score_kind != Some(ScoreKind::Exact))
                 || replace_score > keep_score
             {
                 if best_move.is_some() {
@@ -227,35 +223,41 @@ impl TTView<'_> {
     pub fn prefetch(&self, key: HashKey) {
         #[cfg(target_arch = "x86_64")]
         unsafe {
-            use std::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
+            use std::arch::x86_64::{_MM_HINT_T0, _mm_prefetch};
             let idx = self.calculate_index(key);
             let entry = &self.table[idx];
             _mm_prefetch::<_MM_HINT_T0>((entry as *const TTEntryBucket).cast());
         }
         #[cfg(target_arch = "aarch64")]
         unsafe {
-            use std::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY3, _PREFETCH_READ};
+            use std::arch::aarch64::{_PREFETCH_LOCALITY3, _PREFETCH_READ, _prefetch};
             let idx = self.calculate_index(key);
             let entry = &self.table[idx];
-            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY3>((entry as *const TTEntryBucket).cast());
+            _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY3>(
+                (entry as *const TTEntryBucket).cast(),
+            );
         }
     }
-
 }
 
 #[cfg(feature = "serde")]
 impl Serialize for TranspositionTable {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
         serializer.serialize_bytes(&self.export(9))
     }
 }
 
 #[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for TranspositionTable {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
         let bytes = Vec::<u8>::deserialize(deserializer)?;
 
-        Self::import(bytes)
-            .map_err(serde::de::Error::custom)
+        Self::import(bytes).map_err(serde::de::Error::custom)
     }
 }

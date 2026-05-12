@@ -1,6 +1,7 @@
 use crate::config::Config;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
+use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
@@ -31,16 +32,23 @@ pub enum Command {
     Clear,
     Load(Box<CompactGameState>),
     Sync(Box<CompactGameState>),
-    Play(MaybePos),
+    Play {
+        hash: HashKey,
+        pos: MaybePos,
+    },
     Set {
+        hash: HashKey,
         pos: Pos,
         color: Color,
     },
     Unset {
+        hash: HashKey,
         pos: Pos,
         color: Color,
     },
-    Undo,
+    Undo {
+        hash: HashKey,
+    },
     BatchSet {
         player_moves: Vec<Pos>,
         opponent_moves: Vec<Pos>,
@@ -50,11 +58,13 @@ pub enum Command {
     TotalTime(Duration),
     ConsumeTime(Duration),
     Pondering(bool),
-    MaxNodes { in_1k: u32 },
+    MaxNodes {
+        in_1k: u32,
+    },
     Workers(u32),
     MaxMemory(ByteSize),
     Rule(RuleKind),
-    Config(Config)
+    Config(Config),
 }
 
 #[cfg(any())]
@@ -67,16 +77,23 @@ mod typeshare_workaround {
         Clear,
         Load(Box<CompactGameState>),
         Sync(Box<CompactGameState>),
-        Play(MaybePos),
+        Play {
+            hash: HashKey,
+            pos: MaybePos,
+        },
         Set {
+            hash: HashKey,
             pos: Pos,
             color: Color,
         },
         Unset {
+            hash: HashKey,
             pos: Pos,
             color: Color,
         },
-        Undo,
+        Undo {
+            hash: HashKey,
+        },
         BatchSet {
             player_moves: Vec<Pos>,
             opponent_moves: Vec<Pos>,
@@ -86,21 +103,12 @@ mod typeshare_workaround {
         TotalTime(#[typeshare(serialized_as = "DurationSchema")] Duration),
         ConsumeTime(#[typeshare(serialized_as = "DurationSchema")] Duration),
         Pondering(bool),
-        MaxNodes { in_1k: u32 },
+        MaxNodes {
+            in_1k: u32,
+        },
         Workers(u32),
         MaxMemory(ByteSize),
         Rule(RuleKind),
-        Config(Config)
+        Config(Config),
     }
-}
-
-impl Command {
-
-    pub fn to_brief_debug(&self) -> String {
-        match self {
-            Self::Load(_) => "Load".to_string(),
-            _ => format!("{:?}", self)
-        }
-    }
-
 }

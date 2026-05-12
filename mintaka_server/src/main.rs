@@ -1,19 +1,15 @@
-use axum::body::Body;
-use axum::extract::{ConnectInfo, FromRequestParts, Path, State};
-use axum::http::request::Parts;
-use axum::http::{HeaderName, HeaderValue, Method, Request, StatusCode};
+use axum::extract::{ConnectInfo, State};
+use axum::http::{HeaderName, HeaderValue, Method, StatusCode};
 use axum::middleware::Next;
 use axum::response::IntoResponse;
 use axum::routing::{delete, get, post};
-use axum::{middleware, RequestExt, Router};
+use axum::{middleware, Router};
 use axum_server::tls_rustls::RustlsConfig;
-use mintaka_server::app_error::AppError;
 use mintaka_server::app_state::AppState;
 use mintaka_server::preference::{Preference, TlsConfig};
 use mintaka_server::rest;
-use mintaka_server::session::{SessionData, SessionKey, SessionStatus};
+use mintaka_server::session::{SessionKey, SessionStatus};
 use std::error::Error;
-use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -22,8 +18,8 @@ use tokio::signal::unix::SignalKind;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
-use tower_http::trace::{DefaultOnFailure, TraceLayer};
-use tracing::{field, Span};
+use tower_http::trace::TraceLayer;
+use tracing::field;
 
 async fn auth(
     State(state): State<Arc<AppState>>,
@@ -50,7 +46,7 @@ async fn auth(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let mut pref = Preference::parse();
+    let pref = Preference::parse();
 
     tracing_subscriber::fmt()
         .with_target(false)

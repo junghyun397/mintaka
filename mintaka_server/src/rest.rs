@@ -15,6 +15,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_stream::StreamExt;
+use rusty_renju::memo::hash_key::HashKey;
 
 #[derive(Serialize)]
 pub struct Health {
@@ -93,16 +94,23 @@ pub async fn get_session_configs(
 pub async fn command_session(
     Path(sid): Path<SessionKey>,
     State(state): State<Arc<AppState>>,
-    Json(command): Json<Command>
+    Json(payload): Json<Command>
 ) -> impl IntoResponse {
-    state.command_session(sid, command.into())
+    state.command_session(sid, payload)
         .map(|response| (StatusCode::ACCEPTED, Json(response)))
+}
+
+#[derive(Deserialize)]
+pub struct LaunchSessionRequest {
+    position_hash: HashKey,
+    nodes_polling_interval_in_ms: Option<u32>,
 }
 
 pub async fn launch_session(
     headers: HeaderMap,
     Path(sid): Path<SessionKey>,
-    State(state): State<Arc<AppState>>
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<LaunchSessionRequest>
 ) -> impl IntoResponse {
     let timeout = headers.get("Timeout")
         .and_then(|timeout| timeout.to_str().ok())
@@ -110,7 +118,7 @@ pub async fn launch_session(
         .map(Duration::from_secs)
         .unwrap_or(Duration::from_secs(3));
 
-    state.launch_session(sid, timeout)
+    state.launch_session(sid, timeout, payload.position_hash, payload.nodes_polling_interval_in_ms)
         .await
         .map(|computing_resource| (StatusCode::OK, Json(computing_resource)))
 }

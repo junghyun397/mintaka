@@ -94,6 +94,7 @@ pub struct Session {
     state: AgentState,
     pub response_sender: SessionResponseSender,
     pub response_receiver: Option<SessionResponseReceiver>,
+    #[allow(dead_code)]
     memory_permit: MemoryPermit,
     best_move: Option<BestMove>,
     abort_handle: Arc<AtomicBool>,
@@ -145,14 +146,14 @@ impl Session {
     pub fn game_agent(&self) -> Result<&GameAgent, AppError> {
         match &self.state {
             AgentState::Agent(agent) => Ok(agent),
-            AgentState::Permit(_) => Err(AppError::SessionInComputing),
+            AgentState::Permit { .. } => Err(AppError::SessionInComputing),
         }
     }
 
     pub fn game_agent_mut(&mut self) -> Result<&mut GameAgent, AppError> {
         match &mut self.state {
             AgentState::Agent(agent) => Ok(agent),
-            AgentState::Permit(_) => Err(AppError::SessionInComputing),
+            AgentState::Permit { .. } => Err(AppError::SessionInComputing),
         }
     }
 
@@ -173,6 +174,7 @@ impl Session {
         response_sender: StreamSessionResponseSender,
         result_sender: tokio::sync::oneshot::Sender<SessionResultResponse>,
         worker_permit: WorkerPermit,
+        nodes_polling_interval_ms: Option<u32>,
     ) -> Result<(), AppError> {
         let AgentState::Agent(mut game_agent)
             = std::mem::replace(&mut self.state, AgentState::Permit(worker_permit))

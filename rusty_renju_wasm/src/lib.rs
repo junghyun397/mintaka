@@ -1,4 +1,4 @@
-pub mod rusty_renju;
+pub mod rusty_renju_bindings;
 
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -14,6 +14,11 @@ const UNION_TYPES: &'static str = include_str!("../union_types_ts");
 pub fn start() {
     #[cfg(feature = "panic_hook")]
     console_error_panic_hook::set_once();
+}
+
+#[wasm_bindgen(js_name = rustyRenjuVersion)]
+pub fn rusty_renju_version() -> JsValue {
+    JsValue::from_str(rusty_renju::VERSION)
 }
 
 pub fn to_js_err(err: impl ToString) -> JsError {
