@@ -2,7 +2,7 @@ import { createMemo, createSelector, For, Index, Match, Switch, useContext } fro
 import { AppContext } from "../context"
 import { INDEX_TO_POS, LETTERS, NUMS } from "../domain/rusty-renju"
 import { range } from "../utils/array"
-import { filter, flatmap } from "../utils/undefined"
+import { filter } from "../utils/undefined"
 import { Pos } from "../wasm/pkg/rusty_renju_wasm"
 
 export function Board() {
@@ -10,9 +10,9 @@ export function Board() {
 
     const lastSequence = createMemo(() => gameSelectors.history().length)
     const prevSequence = createMemo(() => lastSequence() - 1)
-    const winningSequence = createMemo(() => flatmap(gameSelectors.boardDescribe.winner, _ =>
-        gameSelectors.gameState().boardWorker.winningSequence()!,
-    ) ?? [])
+    const winningSequence = createMemo(() =>
+        gameSelectors.boardDescribe.winner ? gameSelectors.gameState().boardWorker.winningSequence()! : [],
+    )
 
     const isLastSequence = createSelector(lastSequence)
     const isPrevSequence = createSelector(prevSequence)

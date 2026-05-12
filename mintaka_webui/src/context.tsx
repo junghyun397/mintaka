@@ -38,6 +38,7 @@ interface RuntimeSelectors {
     readonly inComputing: Accessor<boolean>,
     readonly configs: Accessor<Configs | undefined>,
     readonly statics: Accessor<MintakaStatics | undefined>,
+    readonly version: Accessor<string | undefined>,
 }
 
 interface GameActions {
@@ -230,6 +231,9 @@ export function AppContextProvider(props: ParentProps) {
         ),
         statics: createMemo(() =>
             filter(appState.mintakaRuntime(), runtime => runtime.type === "ready")?.statics,
+        ),
+        version: createMemo(() =>
+            filter(appState.mintakaRuntime(), runtime => runtime.type === "ready")?.provider.version,
         ),
     }
 

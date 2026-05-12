@@ -12,7 +12,7 @@ export type MintakaWorkerResponse =
     | { type: "CommandResult", id: number, content: CommandResult }
     | { type: "LaunchResult", id: number, content: MintakaLaunchResponse }
     | { type: "Load" }
-    | { type: "Ready", sab: SharedArrayBuffer, counterPtr: number, abortPtr: number }
+    | { type: "Ready", version: string, sab: SharedArrayBuffer, counterPtr: number, abortPtr: number }
 
 export class MintakaWorkerControl {
     readonly sab: SharedArrayBuffer
@@ -70,6 +70,7 @@ export const MaxWorkerConfig: Config = {
 
 export class MintakaWorkerProvider implements MintakaProvider {
     readonly type: "worker" = "worker"
+    readonly version = "0.0.0"
 
     private static readonly NodesPollingIntervalMs = 100
 

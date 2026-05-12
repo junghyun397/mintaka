@@ -1,6 +1,6 @@
-import { Modal } from "./Modal"
+import { Modal, ModalControlProps } from "./Modal"
 
-export function Branch(props: { open: boolean, onClose: () => void }) {
+export function Branch(props: ModalControlProps) {
     return <Modal
         id="history_modal"
         title="History"

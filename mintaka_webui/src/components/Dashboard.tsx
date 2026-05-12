@@ -6,47 +6,47 @@ import { flatmap } from "../utils/undefined"
 import { SERVER_PROTOCOL, SERVER_URL, WEB_WORKER_READY } from "../config"
 import { duration, formatNodes, nps } from "../domain/mintaka"
 import { checkHealth, MintakaServerConfig } from "../domain/mintaka.server.provider"
-import { Modal } from "./Modal"
+import { Modal, ModalControlProps } from "./Modal"
 
-export function Dashboard() {
-    const { appSettings, setAppSettings, runtimeSelectors } = useContext(AppContext)!
+export function Dashboard(props: ModalControlProps) {
+    const { runtimeSelectors } = useContext(AppContext)!
 
     return <Modal
         id="dashboard_modal"
         title="mintaka WebUI"
-        open={appSettings.openDashboard}
-        onClose={() => setAppSettings("openDashboard", false)}
+        open={props.open}
+        onClose={props.onClose}
     >
-        <Overview/>
-        <RuntimeConfig/>
-        <Show when={runtimeSelectors.configs()}>{configs =>
-            <ConfigSections config={configs().config} maxConfig={configs().max_config}/>
-        }</Show>
-        <DataSections/>
+        <div class="flex flex-col gap-4">
+            <Overview />
+            <RuntimeConfig />
+            <Show when={runtimeSelectors.configs()}>{configs =>
+                <ConfigSections config={configs().config} maxConfig={configs().max_config} />
+            }</Show>
+            <DataSections />
+        </div>
     </Modal>
 }
 
 function Overview() {
     const { runtimeSelectors } = useContext(AppContext)!
 
-    return <div class="flex flex-col gap-4">
-        <div>
+    return <Show when={runtimeSelectors.statics()}>{statics =>
+        <div class="flex flex-col gap-4">
             <h3 class="text font-bold">Overview</h3>
-            <Show when={runtimeSelectors.statics()}>{statics =>
                 <div class="flex-col gap-2 text-sm">
                     <p>Total Nodes: {formatNodes(statics().totalNodesIn1k)} Nodes</p>
                     <p>Runtime: {statics().totalRuntime.secs} seconds</p>
                     <p>NPS: {formatNodes(nps(statics()))} N/s</p>
                 </div>
-            }</Show>
         </div>
-    </div>
+    }</Show>
 }
 
 function RuntimeConfig() {
     const { appActions, persistConfig } = useContext(AppContext)!
 
-    return <div class="flex flex-col gap-4">
+    return <div class="flex flex-col gap-2">
         <h3 class="text font-bold">Runtime</h3>
         <Show when={WEB_WORKER_READY}>
             <div class="btn-group flex gap-4">
@@ -161,10 +161,7 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
             <NumericConfigSection
                 produce={value => ({ ...unwrap(props.config), workers: value })}
                 value={props.config.workers}
-                min={{
-                    type: "finite",
-                    value: 1,
-                }}
+                min={1}
                 max={props.maxConfig.workers ?? 1}
                 scale={1}
                 legend="Workers" label="Cores"
@@ -173,10 +170,7 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
             <NumericConfigSection
                 produce={value => ({ ...unwrap(props.config), tt_size: value })}
                 value={props.config.tt_size}
-                min={{
-                    type: "finite",
-                    value: 1024 * 1024 * 16,
-                }}
+                min={1024 * 1024 * 16}
                 max={props.maxConfig.tt_size ?? 1024 * 1024 * 1024 * 8}
                 scale={1024 * 1024}
                 legend="TT Size" label="MiB"
@@ -197,11 +191,8 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                     }
                 }}
                 value={props.config.initial_timer.total_remaining?.secs}
-                min={{
-                    type: "optional",
-                    value: undefined,
-                    placeholder: "undefined",
-                }}
+                optional
+                placeholder="undefined"
                 max={props.maxConfig.initial_timer.total_remaining?.secs}
                 scale={1}
                 legend="Total Time" label="seconds"
@@ -219,11 +210,7 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                     }
                 }}
                 value={props.config.initial_timer.increment.secs}
-                min={{
-                    type: "finite",
-                    value: 0,
-                    placeholder: "0",
-                }}
+                min={0}
                 max={props.maxConfig.initial_timer.increment.secs}
                 scale={1}
                 legend="Increment Time" label="seconds"
@@ -241,11 +228,8 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                     }
                 }}
                 value={props.config.initial_timer.turn?.secs}
-                min={{
-                    type: "optional",
-                    value: undefined,
-                    placeholder: "unlimited",
-                }}
+                optional
+                placeholder="unlimited"
                 max={props.maxConfig.initial_timer.turn?.secs}
                 scale={1}
                 legend="Max Turn Time" label="seconds"
@@ -257,11 +241,8 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
             <NumericConfigSection
                 produce={value => ({ ...unwrap(props.config), max_nodes_in_1k: value })}
                 value={props.config.max_nodes_in_1k}
-                min={{
-                    type: "optional",
-                    value: undefined,
-                    placeholder: "unlimited",
-                }}
+                optional
+                placeholder="unlimited"
                 scale={1000}
                 max={props.maxConfig.max_nodes_in_1k}
                 legend="Node Limit" label="×1000 nodes"
@@ -270,11 +251,8 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
             <NumericConfigSection
                 produce={value => ({ ...unwrap(props.config), max_depth: value })}
                 value={props.config.max_depth}
-                min={{
-                    type: "optional",
-                    value: undefined,
-                    placeholder: "unlimited",
-                }}
+                optional
+                placeholder="unlimited"
                 max={props.maxConfig.max_depth ?? 225}
                 scale={1}
                 legend="Depth Limit" label="moves"
@@ -304,20 +282,35 @@ function DataSections() {
     </div>
 }
 
-type MinValue =
-    | { type: "finite", value: number, }
-    | { type: "optional", value: undefined, placeholder: string }
-
-function NumericConfigSection<M extends MinValue, V = number | M["value"]>(props: {
-    produce: (value: V) => Config,
-    value: V,
-    min: M,
-    max: number | undefined,
+type NumericConfigSectionBaseProps = {
+    max?: number,
     scale: number,
     legend: string,
     label: string,
     description: string,
-}) {
+}
+
+type RequiredNumericConfigSectionProps = NumericConfigSectionBaseProps & {
+    optional?: false,
+    placeholder?: never,
+    value: number,
+    min: number,
+    produce: (value: number) => Config,
+}
+
+type OptionalNumericConfigSectionProps = NumericConfigSectionBaseProps & {
+    optional: true,
+    value: number | undefined,
+    min?: number,
+    placeholder: string,
+    produce: (value: number | undefined) => Config,
+}
+
+type NumericConfigSectionProps =
+    | RequiredNumericConfigSectionProps
+    | OptionalNumericConfigSectionProps
+
+function NumericConfigSection(props: NumericConfigSectionProps) {
     const { appActions } = useContext(AppContext)!
 
     const [isValid, setIsValid] = createSignal(true)
@@ -332,17 +325,20 @@ function NumericConfigSection<M extends MinValue, V = number | M["value"]>(props
         >
             <input
                 type="number"
-                value={flatmap(props.value as number | undefined, valid => Math.trunc(valid / props.scale)) ?? ""}
-                min={flatmap(props.min.value, valid => Math.trunc(valid / props.scale))}
-                max={flatmap(props.max, valid => Math.trunc(valid / props.scale))}
-                placeholder={props.min.type === "optional" ? props.min.placeholder : undefined}
+                value={flatmap(props.value, valid => scaled(valid, props.scale)) ?? ""}
+                min={flatmap(props.min, valid => scaled(valid, props.scale))}
+                max={flatmap(props.max, valid => scaled(valid, props.scale))}
+                placeholder={props.optional ? props.placeholder : undefined}
                 onChange={event => {
                     const { value, valueAsNumber } = event.currentTarget
                     if (value === "") {
-                        const valid = props.min.type === "optional"
-                        setIsValid(valid)
-                        if (valid)
-                            appActions.updateConfig(props.produce(undefined as V))
+                        if (!props.optional) {
+                            setIsValid(false)
+                            return
+                        }
+
+                        setIsValid(true)
+                        appActions.updateConfig(props.produce(undefined))
                         return
                     }
 
@@ -352,15 +348,19 @@ function NumericConfigSection<M extends MinValue, V = number | M["value"]>(props
                     }
 
                     const newValue = valueAsNumber * props.scale
-                    const valid = (props.min.value === undefined || props.min.value <= newValue)
+                    const valid = (props.min === undefined || props.min <= newValue)
                         && (props.max === undefined || newValue <= props.max)
                     setIsValid(valid)
                     if (valid)
-                        appActions.updateConfig(props.produce(newValue as V))
+                        appActions.updateConfig(props.produce(newValue))
                 }}
             />
             <span class="label">{props.label}</span>
         </label>
         <p class="label text-wrap">{props.description}</p>
     </fieldset>
+}
+
+function scaled(value: number, scale: number) {
+    return Math.trunc(value / scale)
 }

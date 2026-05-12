@@ -15,9 +15,10 @@ export type MintakaLaunchResponse = "launched" | "snapshot-mismatch"
 
 export interface MintakaProvider {
     readonly type: MintakaProviderType,
+    readonly version: string,
     subscribeResponse(handler: (response: MintakaProviderResponse) => void): void,
-    dispose(): void,
     command(command: Command): Promise<CommandResult>,
     launch(expectedHash: HashKey, objective: SearchObjective): Promise<MintakaLaunchResponse>,
     control(command: MintakaProviderRuntimeCommand): void,
+    dispose(): void,
 }

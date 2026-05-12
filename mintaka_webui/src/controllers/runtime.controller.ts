@@ -88,7 +88,7 @@ export function createRuntimeController(
         if (runtime.state.snapshot !== snapshot)
             return
 
-        const commandResult = await runtime.provider.command({ type: "Play", content: pos })
+        const commandResult = await runtime.provider.command({ type: "Play", content: { hash: snapshot, pos } })
 
         handleCommandResult(runtime, runtime.state, commandResult)
     }
@@ -140,7 +140,10 @@ export function createRuntimeController(
                     upsertWinRate(response.content.position_hash, snapshotColor, calculateWinRate(response.content.score))
                     upsertWinRate(afterHash, snapshotColor, calculateWinRate(response.content.score))
 
-                    runtime.provider.command({ type: "Play", content: response.content.best_move }).then(result => {
+                    runtime.provider.command({
+                        type: "Play",
+                        content: { hash: response.content.position_hash, pos: response.content.best_move } },
+                    ).then(result => {
                         handleCommandResult(nextRuntime, nextRuntime.state, result)
                     })
 

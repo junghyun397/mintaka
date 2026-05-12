@@ -20,7 +20,7 @@ export function StatusMessage() {
                 :undefined
             : undefined
 
-        return flatmap(time, valid => Math.round(valid))
+        return time !== undefined ? Math.round(time) : undefined
     })
 
     const statusMessage = () => {

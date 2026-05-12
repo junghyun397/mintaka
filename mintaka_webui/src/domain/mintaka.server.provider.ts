@@ -25,16 +25,20 @@ function serverHeaders(config: MintakaServerConfig, extra?: HeadersInit) {
 
 export type MintakaServerSession = {
     readonly sid: string,
+    readonly hash: HashKey,
+    readonly version?: string,
 }
 
 function bitfieldToArray(bitfield: unknown): number[] {
-    if (bitfield instanceof Uint8Array)
-        return Array.from(bitfield)
+    if (ArrayBuffer.isView(bitfield))
+        return Array.from(new Uint8Array(bitfield.buffer, bitfield.byteOffset, bitfield.byteLength))
     else if (bitfield instanceof ArrayBuffer)
         return Array.from(new Uint8Array(bitfield))
     else if (Array.isArray(bitfield))
         return bitfield.map((value) => Number(value))
-    return []
+    else if (bitfield !== null && typeof bitfield === "object")
+        return Object.values(bitfield).map((value) => Number(value))
+    throw new Error("unsupported bitfield format")
 }
 
 function serializeGameState(state: GameState) {
@@ -76,22 +80,32 @@ export async function createSession(serverConfig: MintakaServerConfig, state: Ga
         throw new Error(text || `Failed to create session: ${response.status}`)
     }
 
-    return { sid: JSON.parse(text) }
+    return parseSession(text, state)
 }
 
 export class MintakaServerProvider implements MintakaProvider {
-    private eventSource?: EventSource
+    private stream?: MintakaServerStream
+
+    private currentHash: HashKey
 
     private onResponse?: (message: MintakaProviderResponse) => void
 
     readonly type: "server" = "server"
 
-    constructor(readonly serverConfig: MintakaServerConfig, readonly session: MintakaServerSession) {}
+    get version() {
+        return this.session.version ?? "server"
+    }
+
+    constructor(readonly serverConfig: MintakaServerConfig, readonly session: MintakaServerSession) {
+        this.currentHash = session.hash
+    }
 
     async configs(): Promise<Configs> {
         const response = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/configs`, {
             headers: serverHeaders(this.serverConfig),
         })
+
+        await assertResponseOk(response, "Failed to load session configs")
 
         return response.json()
     }
@@ -111,7 +125,12 @@ export class MintakaServerProvider implements MintakaProvider {
     }
 
     async launch(expectedHash: HashKey, objective: SearchObjective): Promise<MintakaLaunchResponse> {
-        throw new Error("NI")
+        if (this.currentHash !== expectedHash)
+            return "snapshot-mismatch"
+
+        await this.startStream()
+
+        return await this.sendLaunch(expectedHash, objective)
     }
 
     control(command: MintakaProviderRuntimeCommand) {
@@ -132,17 +151,35 @@ export class MintakaServerProvider implements MintakaProvider {
             body: JSON.stringify(command),
         })
 
-        return await response.json() as CommandResult
+        await assertResponseOk(response, "Failed to send command")
+
+        const result = await response.json() as CommandResult
+        this.currentHash = result.hash_key
+
+        return result
     }
 
-    private async sendLaunch(hash: HashKey, objective: SearchObjective) {
+    private async sendLaunch(positionHash: HashKey, objective: SearchObjective) {
         const response = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/launch`, {
             method: "POST",
-            headers: serverHeaders(this.serverConfig),
-            body: JSON.stringify({ hash, objective }),
+            headers: serverHeaders(this.serverConfig, {
+                "Content-Type": "application/json",
+            }),
+            body: JSON.stringify({
+                position_hash: positionHash,
+                objective,
+            }),
         })
 
-        this.startStream()
+        if (!response.ok) {
+            const text = await response.text()
+            if (text === "HASH_MISMATCH")
+                return "snapshot-mismatch"
+
+            throw new Error(text || `Failed to launch ${objective} search: ${response.status}`)
+        }
+
+        return "launched"
     }
 
     private sendAbort = async () => {
@@ -153,35 +190,100 @@ export class MintakaServerProvider implements MintakaProvider {
     }
 
     private closeStream() {
-        if (this.eventSource) {
-            this.eventSource.close()
-            this.eventSource = undefined
+        if (this.stream) {
+            this.stream.abortController.abort()
+            this.stream = undefined
         }
     }
 
     private startStream = () => {
-        this.closeStream()
+        if (this.stream)
+            return this.stream.ready
 
-        const streamUrl = new URL(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/stream`)
-
-        const eventSource = new EventSource(streamUrl.toString())
-        this.eventSource = eventSource
-
-        eventSource.addEventListener("Response", (event) => {
-            this.onResponse && this.onResponse(JSON.parse(event.data))
-        })
-
-        eventSource.addEventListener("BestMove", (event) => {
-            eventSource.close()
-            this.onResponse && this.onResponse({ type: "BestMove", content: JSON.parse(event.data) })
-            this.eventSource = undefined
-        })
-
-        eventSource.onerror = (error) => {
-            eventSource.close()
-            this.onResponse && this.onResponse({ type: "Error", content: error })
-            this.eventSource = undefined
+        const abortController = new AbortController()
+        const stream: MintakaServerStream = {
+            abortController,
+            ready: Promise.resolve(),
         }
+
+        this.stream = stream
+
+        stream.ready = (async () => {
+            const response = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/stream`, {
+                headers: serverHeaders(this.serverConfig),
+                signal: abortController.signal,
+            })
+
+            await assertResponseOk(response, "Failed to subscribe session stream")
+
+            if (response.body === null)
+                throw new Error("session stream response has no body")
+
+            void this.consumeStream(stream, response.body)
+        })()
+
+        stream.ready.catch(error => this.handleStreamError(stream, error))
+
+        return stream.ready
+    }
+
+    private async consumeStream(stream: MintakaServerStream, body: ReadableStream<Uint8Array>) {
+        const reader = body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+
+        try {
+            while (true) {
+                const { value, done } = await reader.read()
+                if (done) break
+
+                buffer += decoder.decode(value, { stream: true })
+                buffer = this.consumeStreamBuffer(buffer)
+            }
+
+            buffer += decoder.decode()
+            this.consumeStreamBuffer(buffer)
+        } catch (error: unknown) {
+            this.handleStreamError(stream, error)
+        } finally {
+            reader.releaseLock()
+            if (this.stream === stream)
+                this.stream = undefined
+        }
+    }
+
+    private consumeStreamBuffer(buffer: string) {
+        const chunks = buffer.split(/\r?\n\r?\n/)
+        const rest = chunks.pop() ?? ""
+
+        chunks
+            .map(parseServerSentEvent)
+            .forEach(event => event !== undefined && this.handleStreamEvent(event))
+
+        return rest
+    }
+
+    private handleStreamEvent(event: ServerSentEvent) {
+        switch (event.event) {
+            case "Response": {
+                this.onResponse && this.onResponse(JSON.parse(event.data))
+                break
+            }
+            case "BestMove": {
+                this.onResponse && this.onResponse({ type: "BestMove", content: JSON.parse(event.data) })
+                break
+            }
+        }
+    }
+
+    private handleStreamError(stream: MintakaServerStream, error: unknown) {
+        if (stream.abortController.signal.aborted)
+            return
+
+        if (this.stream === stream)
+            this.stream = undefined
+
+        this.onError(error)
     }
 
     private async disconnect() {
@@ -194,4 +296,71 @@ export class MintakaServerProvider implements MintakaProvider {
     private onError = (error: unknown) => {
         this.onResponse && this.onResponse({ type: "Error", content: error })
     }
+}
+
+type MintakaServerStream = {
+    readonly abortController: AbortController,
+    ready: Promise<void>,
+}
+
+type RawMintakaServerSession = string | {
+    readonly sid: string,
+    readonly hash?: HashKey,
+    readonly version?: string,
+}
+
+function parseSession(text: string, state: GameState): MintakaServerSession {
+    const raw = JSON.parse(text) as RawMintakaServerSession
+
+    if (typeof raw === "string")
+        return { sid: raw, hash: state.board.hash_key }
+
+    return {
+        sid: raw.sid,
+        hash: raw.hash ?? state.board.hash_key,
+        version: raw.version,
+    }
+}
+
+type ServerSentEvent = {
+    readonly event: string,
+    readonly data: string,
+}
+
+function parseServerSentEvent(chunk: string): ServerSentEvent | undefined {
+    let event = "message"
+    const data: string[] = []
+
+    chunk.split(/\r?\n/).forEach(line => {
+        if (line.startsWith(":"))
+            return
+
+        const delimiter = line.indexOf(":")
+        const field = delimiter === -1 ? line : line.slice(0, delimiter)
+        const value = delimiter === -1 ? "" : line.slice(delimiter + 1).replace(/^ /, "")
+
+        switch (field) {
+            case "event": {
+                event = value
+                break
+            }
+            case "data": {
+                data.push(value)
+                break
+            }
+        }
+    })
+
+    if (data.length === 0)
+        return undefined
+
+    return { event, data: data.join("\n") }
+}
+
+async function assertResponseOk(response: Response, message: string) {
+    if (response.ok)
+        return
+
+    const text = await response.text()
+    throw new Error(text || `${message}: ${response.status}`)
 }
