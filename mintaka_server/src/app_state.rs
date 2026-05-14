@@ -1,12 +1,13 @@
 pub(crate) use crate::app_error::AppError;
 use crate::preference::Preference;
-use crate::session::{Session, SessionData, SessionKey, SessionResponse, SessionResultResponse, SessionStatus, Sessions};
+use crate::session::{Session, SessionData, SessionKey, SessionResponse, SessionResultResponse, SessionStatus, SessionToken, SessionTokenCipher, Sessions};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use mintaka::config::Config;
 use mintaka::protocol::command::Command;
 use mintaka::state::GameState;
 use rusty_renju::utils::byte_size::ByteSize;
 use std::cmp::Reverse;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -24,6 +25,12 @@ pub struct Configs {
     pub default_config: Config,
     pub max_config: Config,
     pub config: Config,
+}
+
+pub struct CreatedSession {
+    pub key: SessionKey,
+    pub token: SessionToken,
+    pub hash: HashKey,
 }
 
 pub struct WorkerPermit(OwnedSemaphorePermit);
@@ -59,6 +66,7 @@ impl From<&Config> for SessionResource {
 
 pub struct AppState {
     pub sessions: Arc<Sessions>,
+    token_cipher: SessionTokenCipher,
     worker_resource: Arc<Semaphore>,
     memory_resource: Arc<Semaphore>,
     pub preference: Preference,
@@ -66,21 +74,22 @@ pub struct AppState {
 
 impl AppState {
 
-    pub fn new(preference: Preference) -> Self {
-        Self {
+    pub fn new(preference: Preference) -> Result<Self, AppError> {
+        Ok(Self {
             sessions: Arc::new(Sessions::default()),
+            token_cipher: SessionTokenCipher::new(&preference.session_token_secret),
             worker_resource: Arc::new(Semaphore::new(preference.cores)),
             memory_resource: Arc::new(Semaphore::new(preference.memory_limit.mib() as usize)),
             preference,
-        }
+        })
     }
 
     pub fn max_config(&self) -> Option<Config> {
         self.preference.max_config
     }
 
-    pub fn available_workers(&self) -> usize {
-        self.worker_resource.available_permits()
+    pub fn available_workers(&self) -> u32 {
+        self.worker_resource.available_permits() as u32
     }
 
     pub async fn acquire_workers(&self, workers: u32, timeout: Duration) -> Result<WorkerPermit, AppError> {
@@ -144,7 +153,7 @@ impl AppState {
         }
     }
 
-    pub async fn new_session(&self, config: Option<Config>, game_state: GameState) -> Result<SessionKey, AppError> {
+    pub async fn new_session(&self, config: Option<Config>, game_state: GameState) -> Result<CreatedSession, AppError> {
         if let Some(config) = config
             && let Some(max_config) = self.preference.max_config
             && config > max_config
@@ -155,6 +164,7 @@ impl AppState {
         let config = config.unwrap_or(self.preference.default_config);
 
         let session_key = SessionKey::new_random();
+        let session_token = self.token_cipher.seal_session_key(session_key)?;
 
         let memory_permit = self.acquire_memory(config.tt_size, true)
             .await?;
@@ -164,13 +174,36 @@ impl AppState {
             (tx, UnboundedReceiverStream::new(rx))
         };
 
+        let hash_key = game_state.board.hash_key;
+
         let session = Session::new(config, game_state, None, memory_permit, tx, rx, false);
 
         self.sessions.insert(session_key, session);
 
         tracing::info!("session created; sid={session_key}");
 
-        Ok(session_key)
+        Ok(CreatedSession {
+            key: session_key,
+            token: session_token,
+            hash: hash_key,
+        })
+    }
+
+    pub async fn authorize_session(&self, session_key: SessionKey, session_token: SessionToken) -> Result<(), AppError> {
+        let token_session_key = self.token_cipher.open_session_token(&session_token)?;
+
+        if token_session_key != session_key {
+            return Err(AppError::Unauthorized);
+        }
+
+        if self.sessions.get(&session_key).is_some() {
+            return Ok(());
+        }
+
+        self.check_hibernated_session(session_key)
+            .await
+            .then_some(())
+            .ok_or(AppError::SessionNotFound)
     }
 
     pub fn configs_session(&self, session_key: SessionKey) -> Result<Configs, AppError> {
@@ -219,18 +252,15 @@ impl AppState {
     }
 
     pub async fn check_hibernated_session(&self, session_key: SessionKey) -> bool {
-        tokio::fs::try_exists(format!("{}/{session_key}", self.preference.sessions_directory))
+        self.hibernated_session_path(session_key)
             .await
-            .unwrap_or(false)
+            .ok()
+            .flatten()
+            .is_some()
     }
 
     pub async fn wakeup_session(&self, session_key: SessionKey) -> Result<(), AppError> {
-        let buf = tokio::fs::read(format!("{}/{session_key}", self.preference.sessions_directory))
-            .await
-            .map_err(|_| AppError::SessionFileNotFound)?;
-
-        let session_data: SessionData = rmp_serde::from_slice(&buf)
-            .map_err(AppError::from_general_error)?;
+        let session_data = self.load_hibernated_session(session_key).await?;
 
         let memory_permit = self.acquire_memory(session_data.agent.config.tt_size, true)
             .await?;
@@ -249,6 +279,45 @@ impl AppState {
         tracing::info!("session woken up");
 
         Ok(())
+    }
+
+    async fn load_hibernated_session(&self, session_key: SessionKey) -> Result<SessionData, AppError> {
+        let file_path = self.hibernated_session_path(session_key)
+            .await?
+            .ok_or(AppError::SessionFileNotFound)?;
+
+        let buf = tokio::fs::read(file_path)
+            .await
+            .map_err(|_| AppError::SessionFileNotFound)?;
+
+        rmp_serde::from_slice(&buf)
+            .map_err(AppError::from_general_error)
+    }
+
+    async fn hibernated_session_path(&self, session_key: SessionKey) -> Result<Option<PathBuf>, AppError> {
+        let expected_sid = session_key.to_string();
+
+        let mut read_dir = tokio::fs::read_dir(&self.preference.sessions_directory)
+            .await
+            .map_err(AppError::from_general_error)?;
+
+        while let Some(entry) = read_dir.next_entry()
+            .await
+            .map_err(AppError::from_general_error)?
+        {
+            let file_name = entry.file_name();
+            let file_name = file_name.to_string_lossy();
+
+            let Some((sid_str, _)) = file_name.split_once('_') else {
+                continue;
+            };
+
+            if sid_str == expected_sid {
+                return Ok(Some(entry.path()));
+            }
+        }
+
+        Ok(None)
     }
 
     pub fn command_session(

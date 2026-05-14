@@ -1,4 +1,4 @@
-import { Color, HashKey, History, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
+import type { Color, HashKey, History, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
 
 export type HistoryEntry = {
     hashKey: HashKey,

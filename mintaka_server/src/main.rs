@@ -1,47 +1,80 @@
-use axum::extract::{ConnectInfo, State};
+use axum::extract::{ConnectInfo, Path, Request, State};
 use axum::http::{HeaderName, HeaderValue, Method, StatusCode};
 use axum::middleware::Next;
 use axum::response::IntoResponse;
-use axum::routing::{delete, get, post};
+use axum::routing::{get, post};
 use axum::{middleware, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use mintaka_server::app_state::AppState;
 use mintaka_server::preference::{Preference, TlsConfig};
 use mintaka_server::rest;
-use mintaka_server::session::{SessionKey, SessionStatus};
+use mintaka_server::session::{SessionKey, SessionStatus, SessionToken};
 use std::error::Error;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::signal::unix::SignalKind;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tracing::field;
 
-async fn auth(
+async fn auth_with_header(
     State(state): State<Arc<AppState>>,
-    request: axum::extract::Request,
+    Path(session_key): Path<String>,
+    request: Request,
     next: Next
-) -> impl IntoResponse {
-    if request.method() == Method::OPTIONS {
-        return Ok(next.run(request).await);
-    }
+) -> Result<impl IntoResponse, StatusCode> {
+    auth_session(state, session_key, session_token_from_header(&request), request, next).await
+}
 
-    if let Some(expected_password) = &state.preference.api_password {
-        let password = request.headers()
-            .get("Api-Password")
-            .and_then(|h| h.to_str().ok())
-            .ok_or(StatusCode::UNAUTHORIZED)?;
+async fn auth_with_query(
+    State(state): State<Arc<AppState>>,
+    Path(session_key): Path<String>,
+    request: Request,
+    next: Next
+) -> Result<impl IntoResponse, StatusCode> {
+    auth_session(state, session_key, session_token_from_query(&request), request, next).await
+}
 
-        if password != expected_password {
-            return Err(StatusCode::UNAUTHORIZED);
-        }
+async fn auth_session(
+    state: Arc<AppState>,
+    session_key: String,
+    session_token: Option<SessionToken>,
+    request: Request,
+    next: Next
+) -> Result<impl IntoResponse, StatusCode> {
+    if request.method() != Method::OPTIONS {
+        let session_key = SessionKey::from_str(&session_key)
+            .map_err(|_| StatusCode::BAD_REQUEST)?;
+        let session_token = session_token
+            .ok_or(StatusCode::NOT_FOUND)?;
+
+        state.authorize_session(session_key, session_token)
+            .await
+            .map_err(|_| StatusCode::NOT_FOUND)?;
     }
 
     Ok(next.run(request).await)
+}
+
+fn session_token_from_header(request: &Request) -> Option<SessionToken> {
+    request.headers()
+        .get(rest::SESSION_TOKEN_HEADER_NAME)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|value| SessionToken::from_str(value).ok())
+}
+
+fn session_token_from_query(request: &Request) -> Option<SessionToken> {
+    request.uri().query()?
+        .split('&')
+        .filter_map(|param| param.split_once('='))
+        .find_map(|(name, value)| {
+            (name == rest::SESSION_TOKEN_QUERY_NAME)
+                .then(|| SessionToken::from_str(value).ok())?
+        })
 }
 
 #[tokio::main]
@@ -56,35 +89,36 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let addr: SocketAddr = pref.address.parse()?;
 
-    let state = Arc::new(AppState::new(pref.clone()));
+    let state = Arc::new(AppState::new(pref.clone())?);
+
+    let session_routes = Router::new()
+        .route("/{sid}", get(rest::check_session).delete(rest::destroy_session))
+        .route("/{sid}/configs", get(rest::get_session_configs))
+        .route("/{sid}/commands", post(rest::command_session))
+        .route("/{sid}/launch", post(rest::launch_session))
+        .route("/{sid}/abort", post(rest::abort_session))
+        .route("/{sid}/result", get(rest::get_session_result))
+        .route("/{sid}/hibernate", post(rest::hibernate_session))
+        .route("/{sid}/wakeup", post(rest::wakeup_session))
+        .route_layer(middleware::from_fn_with_state(state.clone(), auth_with_header));
+
+    let session_stream_routes = Router::new()
+        .route("/{sid}/stream", get(rest::subscribe_session_response))
+        .route_layer(middleware::from_fn_with_state(state.clone(), auth_with_query));
 
     let mut api = Router::new()
         .route("/status", get(rest::status))
         .route("/sessions", post(rest::new_session))
-        .route("/sessions/{sid}", get(rest::check_session))
-        .route("/sessions/{sid}", delete(rest::destroy_session))
-        .route("/sessions/{sid}/configs", get(rest::get_session_configs))
-        .route("/sessions/{sid}/commands", post(rest::command_session))
-        .route("/sessions/{sid}/launch", post(rest::launch_session))
-        .route("/sessions/{sid}/stream", get(rest::subscribe_session_response))
-        .route("/sessions/{sid}/abort", post(rest::abort_session))
-        .route("/sessions/{sid}/result", get(rest::get_session_result))
-        .route("/sessions/{sid}/hibernate", post(rest::hibernate_session))
-        .route("/sessions/{sid}/wakeup", post(rest::wakeup_session))
-        .layer(
-            CorsLayer::new()
-                .allow_origin(Any)
-                .allow_methods(Any)
-                .allow_headers(Any)
-        )
+        .nest("/sessions", session_routes.merge(session_stream_routes))
+        .layer(CorsLayer::very_permissive())
         .layer(
             TraceLayer::new_for_http()
-                .make_span_with(|req: &axum::extract::Request| {
+                .make_span_with(|req: &Request| {
                     let span = tracing::info_span!(
                         "http",
                         ip = field::Empty,
                         method = %req.method(),
-                        uri = %req.uri(),
+                        uri = %req.uri().path(),
                     );
 
                     if let Some(ConnectInfo(addr)) = req.extensions().get::<ConnectInfo<SocketAddr>>() {
@@ -94,13 +128,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     span
                 })
         )
-        .layer(middleware::from_fn_with_state(state.clone(), auth))
         .with_state(state.clone());
 
     if pref.api_password.is_some() {
-        tracing::info!("password protected; use Api-Password header to authenticate");
+        tracing::info!("password protected; use api_password in POST /sessions body to create a session");
     } else {
-        tracing::warn!("API is not password protected; set MINTAKA_API_PASSWORD environment variable to enable protection");
+        tracing::warn!("session creation is not password protected; set MINTAKA_API_PASSWORD environment variable to enable protection");
     }
 
     state.wakeup_all_sessions().await?;
@@ -285,7 +318,9 @@ fn spawn_hibernation_cleaner(directory: &str) {
 
                 let file_path = entry.path();
 
-                if let Err(err) = tokio::fs::remove_file(&file_path).await {
+                let result = tokio::fs::remove_file(&file_path).await;
+
+                if let Err(err) = result {
                     tracing::warn!("failed to remove expired hibernated session: path={}, err={err}",file_path.display());
 
                     continue;

@@ -27,26 +27,28 @@ fn version_str() -> &'static str {
     long_about = None)
 ]
 pub struct Preference {
-    #[arg(long, default_value = "false")]
+    #[arg(long, env = "WEBUI", default_value = "false")]
     pub webui: bool,
     #[arg(long, default_value = "false")]
     pub open_webui: bool,
-    #[arg(short, long, default_value = "default")]
+    #[arg(short, env = "ADDRESS", long, default_value = "default")]
     pub address: String,
     #[arg(short, long, default_value_t = num_cpus::get_physical())]
     pub cores: usize,
-    #[arg(short, long, help = "Total memory limit in MiB")]
+    #[arg(short, env = "MEMORY_LIMIT_MIB", long, help = "Total memory limit in MiB")]
     memory_limit_mib: Option<u64>,
-    #[arg(long, requires = "tls_key", help = "TLS certificate file path")]
+    #[arg(long, env = "TLS_CERT", requires = "tls_key", help = "TLS certificate file path")]
     tls_cert: Option<String>,
-    #[arg(long, requires = "tls_cert", help = "TLS key file path")]
+    #[arg(long, env = "TLS_KEY", requires = "tls_cert", help = "TLS key file path")]
     tls_key: Option<String>,
-    #[arg(long, help = "Reload TLS certificate on SIGHUP")]
+    #[arg(long, env = "TLS_RENEW", help = "Reload TLS certificate on SIGHUP")]
     tls_renew: bool,
     #[arg(short, default_value = "sessions", help = "Session storage directory")]
     pub sessions_directory: String,
-    #[arg(long, env = "MINTAKA_API_PASSWORD", default_value = None)]
+    #[arg(long, env = "API_PASSWORD", default_value = None)]
     pub api_password: Option<String>,
+    #[arg(long, env = "TOKEN_SECRET", default_value = "verycomplexedsecret")]
+    pub session_token_secret: String,
     #[clap(skip)]
     pub memory_limit: ByteSize,
     #[clap(skip)]
@@ -74,9 +76,9 @@ impl Preference {
 
         if &self.address == "default" {
             if self.tls_cert.is_some() {
-                self.address = "127.0.0.1:8443".to_string();
+                self.address = "127.0.0.1:8445".to_string();
             } else {
-                self.address = "127.0.0.1:8080".to_string();
+                self.address = "127.0.0.1:8085".to_string();
             }
         }
 

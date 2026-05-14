@@ -18,14 +18,16 @@ use tokio_stream::StreamExt;
 use rusty_renju::memo::hash_key::HashKey;
 
 #[derive(Serialize)]
+#[typeshare::typeshare]
 pub struct Health {
-    available_workers: usize,
+    available_workers: u32,
 }
 
 impl From<&AppError> for StatusCode {
     fn from(error: &AppError) -> Self {
         match error {
             AppError::InvalidSessionId => StatusCode::BAD_REQUEST,
+            AppError::Unauthorized => StatusCode::UNAUTHORIZED,
             AppError::InvalidConfig => StatusCode::INSUFFICIENT_STORAGE,
             AppError::SessionNotFound => StatusCode::NOT_FOUND,
             AppError::SessionInComputing => StatusCode::CONFLICT,
@@ -69,18 +71,46 @@ pub async fn check_session(
 }
 
 #[derive(Deserialize)]
+#[typeshare::typeshare]
 pub struct CreateSessionRequest {
+    api_password: Option<String>,
     config: Option<Config>,
     state: GameState,
 }
 
+#[derive(Serialize)]
+#[typeshare::typeshare]
+pub struct CreateSessionResponse {
+    sid: String,
+    token: String,
+    hash: String,
+    version: &'static str,
+}
+
+pub const SESSION_TOKEN_HEADER_NAME: &str = "mintaka-session-token";
+pub const SESSION_TOKEN_QUERY_NAME: &str = "token";
+
 pub async fn new_session(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<CreateSessionRequest>
-) -> impl IntoResponse {
-    state.new_session(payload.config, payload.state)
-        .await
-        .map(|session_key| (StatusCode::CREATED, Json(session_key)))
+) -> Result<impl IntoResponse, AppError> {
+    if let Some(expected_password) = &state.preference.api_password
+        && payload.api_password.as_deref() != Some(expected_password.as_str())
+    {
+        return Err(AppError::Unauthorized);
+    }
+
+    let session = state.new_session(payload.config, payload.state).await?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateSessionResponse {
+            sid: session.key.to_string(),
+            token: session.token.to_string(),
+            hash: session.hash.to_string(),
+            version: mintaka::VERSION,
+        })
+    ))
 }
 
 pub async fn get_session_configs(
@@ -101,6 +131,7 @@ pub async fn command_session(
 }
 
 #[derive(Deserialize)]
+#[typeshare::typeshare]
 pub struct LaunchSessionRequest {
     position_hash: HashKey,
     nodes_polling_interval_in_ms: Option<u32>,

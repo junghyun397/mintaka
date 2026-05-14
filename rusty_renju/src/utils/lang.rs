@@ -74,7 +74,7 @@ pub const fn repeat_16x(source: u8) -> u128 {
 #[allow(dead_code)]
 #[cfg_attr(feature = "typeshare", typeshare)]
 pub struct DurationSchema {
-    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "number"))]
+    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "LongInt"))]
     secs: u64,
     nanos: u32,
 }

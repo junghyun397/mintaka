@@ -177,3 +177,25 @@ export interface Config {
 	spawn_depth_specialist: boolean;
 }
 
+export interface CreateSessionRequest {
+	api_password?: string;
+	config?: Config;
+	state: GameState;
+}
+
+export interface CreateSessionResponse {
+	sid: string;
+	token: string;
+	hash: string;
+	version: string;
+}
+
+export interface Health {
+	available_workers: number;
+}
+
+export interface LaunchSessionRequest {
+	position_hash: HashKey;
+	nodes_polling_interval_in_ms?: number;
+}
+

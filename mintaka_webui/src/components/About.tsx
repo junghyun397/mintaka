@@ -1,4 +1,4 @@
-import { Modal, ModalControlProps, Section } from "./Modal"
+import { Modal, Section, type ModalControlProps } from "./Modal"
 import { rustyRenjuVersion } from "../wasm/pkg/rusty_renju_wasm"
 import pkg from '../../package.json'
 import { useContext } from "solid-js"

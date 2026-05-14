@@ -5,8 +5,8 @@ import type { Config } from "../wasm/pkg/rusty_renju_wasm"
 import { flatmap } from "../utils/undefined"
 import { SERVER_PROTOCOL, SERVER_URL, WEB_WORKER_READY } from "../config"
 import { duration, formatNodes, nps } from "../domain/mintaka"
-import { checkHealth, MintakaServerConfig } from "../domain/mintaka.server.provider"
-import { Modal, ModalControlProps } from "./Modal"
+import { checkHealth, type MintakaServerConfig } from "../domain/mintaka.server.provider"
+import { Modal, type ModalControlProps } from "./Modal"
 
 export function Dashboard(props: ModalControlProps) {
     const { runtimeSelectors } = useContext(AppContext)!
@@ -34,10 +34,10 @@ function Overview() {
     return <Show when={runtimeSelectors.statics()}>{statics =>
         <div class="flex flex-col gap-4">
             <h3 class="text font-bold">Overview</h3>
-                <div class="flex-col gap-2 text-sm">
-                    <p>Total Nodes: {formatNodes(statics().totalNodesIn1k)} Nodes</p>
-                    <p>Runtime: {statics().totalRuntime.secs} seconds</p>
-                    <p>NPS: {formatNodes(nps(statics()))} N/s</p>
+                <div class="flex-col gap-2">
+                    <p class="text"><b>Total</b> {formatNodes(statics().totalNodesIn1k)} <span class="text-sm">nodes</span></p>
+                    <p class="text"><b>Runtime</b> {statics().totalRuntime.secs} <span class="text-sm">seconds</span></p>
+                    <p class="text"><b>NPS</b> {formatNodes(nps(statics()))} <span class="text-sm">nodes/s</span></p>
                 </div>
         </div>
     }</Show>
@@ -80,11 +80,17 @@ function ServerConfigSections() {
     const { runtimeSelectors, appActions, persistConfig, setPersistConfig } = useContext(AppContext)!
 
     const [address, setAddress] = createSignal(persistConfig.serverConfig?.address ?? SERVER_URL)
+    const [apiPassword, setApiPassword] = createSignal(persistConfig.serverConfig?.apiPassword ?? "")
 
-    const candidateServerConfig = createMemo<MintakaServerConfig | undefined>(() =>
-        /^((([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+)|(\d{1,3}(\.\d{1,3}){3})):[0-9]+$/
-            .test(address()) ? { address: address() } : undefined,
-    )
+    const candidateServerConfig = createMemo<MintakaServerConfig | undefined>(() => {
+        if (!/^((([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+)|(\d{1,3}(\.\d{1,3}){3})):[0-9]+$/.test(address()))
+            return undefined
+
+        return {
+            address: address(),
+            apiPassword: apiPassword() || undefined,
+        }
+    })
 
     const [serverConfig, { mutate }] = createResource(candidateServerConfig, async (currentConfig) => {
         try {
@@ -110,7 +116,7 @@ function ServerConfigSections() {
                 <span class="label">{SERVER_PROTOCOL}://</span>
                 <input
                     type="text"
-                    placeholder="localhost:8080"
+                    placeholder="localhost:8085"
                     disabled={runtimeSelectors.runtimeType() === "ready"}
                     value={address()}
                     onChange={event => {
@@ -121,6 +127,23 @@ function ServerConfigSections() {
                 />
             </label>
             <p class="label text-wrap">Self-hosted mintaka-server</p>
+        </fieldset>
+        <fieldset class="fieldset">
+            <legend class="fieldset-legend">API Password</legend>
+            <label class="input">
+                <input
+                    type="password"
+                    autocomplete="current-password"
+                    disabled={runtimeSelectors.runtimeType() === "ready"}
+                    value={apiPassword()}
+                    placeholder="No password required"
+                    onChange={event => {
+                        if (!(event.target instanceof HTMLInputElement)) return
+
+                        setApiPassword(event.target.value)
+                    }}
+                />
+            </label>
         </fieldset>
         <Switch>
             <Match when={runtimeSelectors.runtimeType() === "loading"}>
@@ -192,7 +215,7 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                 }}
                 value={props.config.initial_timer.total_remaining?.secs}
                 optional
-                placeholder="undefined"
+                placeholder="unlimited"
                 max={props.maxConfig.initial_timer.total_remaining?.secs}
                 scale={1}
                 legend="Total Time" label="seconds"

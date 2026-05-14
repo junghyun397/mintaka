@@ -1,12 +1,11 @@
-import {
-    MintakaLaunchResponse,
-    MintakaProvider,
-    MintakaProviderResponse,
-    MintakaProviderRuntimeCommand,
-} from "./mintaka.provider"
-import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/rusty_renju_wasm"
+import { MintakaLaunchResponse, MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand } from "./mintaka.provider"
+import type {
+    BestMove, Command, CommandResult, Config,
+    CreateSessionRequest, CreateSessionResponse, GameState, HashKey,
+    Health, LaunchSessionRequest, Response as MintakaResponse, SearchObjective,
+} from "../wasm/pkg/rusty_renju_wasm"
 import { SERVER_PROTOCOL } from "../config"
-import { Configs } from "./mintaka"
+import type { Configs } from "./mintaka"
 
 export type MintakaServerConfig = {
     readonly address: string,
@@ -17,16 +16,15 @@ function serverUrl(config: MintakaServerConfig) {
     return `${SERVER_PROTOCOL}://${config.address}`
 }
 
-function serverHeaders(config: MintakaServerConfig, extra?: HeadersInit) {
-    const headers = new Headers(extra)
-    if (config.apiPassword) headers.set("Api-Password", config.apiPassword)
-    return headers
-}
+const SESSION_TOKEN_HEADER_NAME = "mintaka-session-token"
+const SESSION_TOKEN_QUERY_NAME = "token"
 
-export type MintakaServerSession = {
-    readonly sid: string,
-    readonly hash: HashKey,
-    readonly version?: string,
+export type MintakaServerSession = CreateSessionResponse
+
+function sessionHeaders(session: MintakaServerSession, extra?: HeadersInit) {
+    const headers = new Headers(extra)
+    headers.set(SESSION_TOKEN_HEADER_NAME, session.token)
+    return headers
 }
 
 function bitfieldToArray(bitfield: unknown): number[] {
@@ -41,7 +39,7 @@ function bitfieldToArray(bitfield: unknown): number[] {
     throw new Error("unsupported bitfield format")
 }
 
-function serializeGameState(state: GameState) {
+function serializeGameState(state: GameState): CreateSessionRequest["state"] {
     const board = state.board as GameState["board"] & { bitfield: unknown }
     const encodedBitfield = board.bitfield.map(bitfieldToArray)
 
@@ -51,40 +49,42 @@ function serializeGameState(state: GameState) {
             ...board,
             bitfield: encodedBitfield,
         },
-    }
+    } as unknown as CreateSessionRequest["state"]
 }
 
 export async function checkHealth(serverConfig: MintakaServerConfig): Promise<boolean> {
-    const response = await fetch(`${serverUrl(serverConfig)}/status`, {
-        headers: serverHeaders(serverConfig),
-    })
+    const response = await fetch(`${serverUrl(serverConfig)}/status`)
 
-    return response.ok
+    if (!response.ok)
+        return false
+
+    const health = await response.json() as Health
+
+    return Number.isFinite(health.available_workers)
 }
 
 export async function createSession(serverConfig: MintakaServerConfig, state: GameState, config: Config | undefined): Promise<MintakaServerSession> {
-    const payloadState = serializeGameState(state)
-    const response = await fetch(`${serverUrl(serverConfig)}/sessions`, {
-        method: "POST",
-        headers: serverHeaders(serverConfig, {
-            "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({
-            config: config,
-            state: payloadState,
-        }),
-    })
-
-    const text = await response.text()
-    if (!response.ok) {
-        throw new Error(text || `Failed to create session: ${response.status}`)
+    const payload: CreateSessionRequest = {
+        api_password: serverConfig.apiPassword,
+        config: config,
+        state: serializeGameState(state),
     }
 
-    return parseSession(text, state)
+    const response = await fetch(`${serverUrl(serverConfig)}/sessions`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+    })
+
+    await assertResponseOk(response, "Failed to create session")
+
+    return await response.json() as CreateSessionResponse
 }
 
 export class MintakaServerProvider implements MintakaProvider {
-    private stream?: MintakaServerStream
+    private stream?: EventSource
 
     private currentHash: HashKey
 
@@ -93,7 +93,7 @@ export class MintakaServerProvider implements MintakaProvider {
     readonly type: "server" = "server"
 
     get version() {
-        return this.session.version ?? "server"
+        return this.session.version
     }
 
     constructor(readonly serverConfig: MintakaServerConfig, readonly session: MintakaServerSession) {
@@ -102,7 +102,7 @@ export class MintakaServerProvider implements MintakaProvider {
 
     async configs(): Promise<Configs> {
         const response = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/configs`, {
-            headers: serverHeaders(this.serverConfig),
+            headers: sessionHeaders(this.session),
         })
 
         await assertResponseOk(response, "Failed to load session configs")
@@ -128,7 +128,7 @@ export class MintakaServerProvider implements MintakaProvider {
         if (this.currentHash !== expectedHash)
             return "snapshot-mismatch"
 
-        await this.startStream()
+        this.startStream()
 
         return await this.sendLaunch(expectedHash, objective)
     }
@@ -145,7 +145,7 @@ export class MintakaServerProvider implements MintakaProvider {
     private async sendCommand(command: Command) {
         const response = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/commands`, {
             method: "POST",
-            headers: serverHeaders(this.serverConfig, {
+            headers: sessionHeaders(this.session, {
                 "Content-Type": "application/json",
             }),
             body: JSON.stringify(command),
@@ -160,15 +160,16 @@ export class MintakaServerProvider implements MintakaProvider {
     }
 
     private async sendLaunch(positionHash: HashKey, objective: SearchObjective) {
+        const payload: LaunchSessionRequest = {
+            position_hash: positionHash,
+        }
+
         const response = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/launch`, {
             method: "POST",
-            headers: serverHeaders(this.serverConfig, {
+            headers: sessionHeaders(this.session, {
                 "Content-Type": "application/json",
             }),
-            body: JSON.stringify({
-                position_hash: positionHash,
-                objective,
-            }),
+            body: JSON.stringify(payload),
         })
 
         if (!response.ok) {
@@ -183,178 +184,55 @@ export class MintakaServerProvider implements MintakaProvider {
     }
 
     private sendAbort = async () => {
-        const _ = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/abort`, {
+        void fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/abort`, {
             method: "POST",
-            headers: serverHeaders(this.serverConfig),
+            headers: sessionHeaders(this.session),
         })
     }
 
     private closeStream() {
         if (this.stream) {
-            this.stream.abortController.abort()
+            this.stream.close()
             this.stream = undefined
         }
     }
 
-    private startStream = () => {
-        if (this.stream)
-            return this.stream.ready
+    private startStream() {
+        this.closeStream()
 
-        const abortController = new AbortController()
-        const stream: MintakaServerStream = {
-            abortController,
-            ready: Promise.resolve(),
-        }
+        const streamUrl = new URL(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/stream`)
+        streamUrl.searchParams.set(SESSION_TOKEN_QUERY_NAME, this.session.token)
 
-        this.stream = stream
+        const eventSource = new EventSource(streamUrl.toString())
+        this.stream = eventSource
 
-        stream.ready = (async () => {
-            const response = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/stream`, {
-                headers: serverHeaders(this.serverConfig),
-                signal: abortController.signal,
-            })
+        eventSource.addEventListener("Response", (event) => {
+            this.onResponse && this.onResponse(JSON.parse(event.data) as MintakaResponse)
+        })
 
-            await assertResponseOk(response, "Failed to subscribe session stream")
-
-            if (response.body === null)
-                throw new Error("session stream response has no body")
-
-            void this.consumeStream(stream, response.body)
-        })()
-
-        stream.ready.catch(error => this.handleStreamError(stream, error))
-
-        return stream.ready
-    }
-
-    private async consumeStream(stream: MintakaServerStream, body: ReadableStream<Uint8Array>) {
-        const reader = body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ""
-
-        try {
-            while (true) {
-                const { value, done } = await reader.read()
-                if (done) break
-
-                buffer += decoder.decode(value, { stream: true })
-                buffer = this.consumeStreamBuffer(buffer)
-            }
-
-            buffer += decoder.decode()
-            this.consumeStreamBuffer(buffer)
-        } catch (error: unknown) {
-            this.handleStreamError(stream, error)
-        } finally {
-            reader.releaseLock()
-            if (this.stream === stream)
-                this.stream = undefined
-        }
-    }
-
-    private consumeStreamBuffer(buffer: string) {
-        const chunks = buffer.split(/\r?\n\r?\n/)
-        const rest = chunks.pop() ?? ""
-
-        chunks
-            .map(parseServerSentEvent)
-            .forEach(event => event !== undefined && this.handleStreamEvent(event))
-
-        return rest
-    }
-
-    private handleStreamEvent(event: ServerSentEvent) {
-        switch (event.event) {
-            case "Response": {
-                this.onResponse && this.onResponse(JSON.parse(event.data))
-                break
-            }
-            case "BestMove": {
-                this.onResponse && this.onResponse({ type: "BestMove", content: JSON.parse(event.data) })
-                break
-            }
-        }
-    }
-
-    private handleStreamError(stream: MintakaServerStream, error: unknown) {
-        if (stream.abortController.signal.aborted)
-            return
-
-        if (this.stream === stream)
+        eventSource.addEventListener("BestMove", (event) => {
+            eventSource.close()
+            this.onResponse && this.onResponse({ type: "BestMove", content: JSON.parse(event.data) as BestMove })
             this.stream = undefined
+        })
 
-        this.onError(error)
+        eventSource.onerror = (error) => {
+            eventSource.close()
+            this.stream = undefined
+            this.onError(error)
+        }
     }
 
     private async disconnect() {
-        const _ = await fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}`, {
+        void fetch(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}`, {
             method: "DELETE",
-            headers: serverHeaders(this.serverConfig),
+            headers: sessionHeaders(this.session),
         })
     }
 
     private onError = (error: unknown) => {
         this.onResponse && this.onResponse({ type: "Error", content: error })
     }
-}
-
-type MintakaServerStream = {
-    readonly abortController: AbortController,
-    ready: Promise<void>,
-}
-
-type RawMintakaServerSession = string | {
-    readonly sid: string,
-    readonly hash?: HashKey,
-    readonly version?: string,
-}
-
-function parseSession(text: string, state: GameState): MintakaServerSession {
-    const raw = JSON.parse(text) as RawMintakaServerSession
-
-    if (typeof raw === "string")
-        return { sid: raw, hash: state.board.hash_key }
-
-    return {
-        sid: raw.sid,
-        hash: raw.hash ?? state.board.hash_key,
-        version: raw.version,
-    }
-}
-
-type ServerSentEvent = {
-    readonly event: string,
-    readonly data: string,
-}
-
-function parseServerSentEvent(chunk: string): ServerSentEvent | undefined {
-    let event = "message"
-    const data: string[] = []
-
-    chunk.split(/\r?\n/).forEach(line => {
-        if (line.startsWith(":"))
-            return
-
-        const delimiter = line.indexOf(":")
-        const field = delimiter === -1 ? line : line.slice(0, delimiter)
-        const value = delimiter === -1 ? "" : line.slice(delimiter + 1).replace(/^ /, "")
-
-        switch (field) {
-            case "event": {
-                event = value
-                break
-            }
-            case "data": {
-                data.push(value)
-                break
-            }
-        }
-    })
-
-    if (data.length === 0)
-        return undefined
-
-    return { event, data: data.join("\n") }
 }
 
 async function assertResponseOk(response: Response, message: string) {

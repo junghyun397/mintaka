@@ -1,5 +1,5 @@
 import { createStore } from "solid-js/store"
-import { UrlParams } from "../url"
+import type { UrlParams } from "../url"
 
 export type AppSettings = {
     viewer: boolean,

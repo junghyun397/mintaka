@@ -145,7 +145,7 @@ function DashboardButton() {
     return <>
         <button
             title="Settings"
-            class="btn btn-active btn-square"
+            class="btn btn-square"
             onClick={() => setOpenDashboard(true)}
         >
             <IconCog8Tooth />

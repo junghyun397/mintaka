@@ -1,10 +1,14 @@
 use crate::app_state::{AppError, MemoryPermit, WorkerPermit};
 use crate::stream_response_sender::StreamSessionResponseSender;
+use aes_gcm::aead::{Aead, AeadCore, KeyInit, OsRng};
+use aes_gcm::{Aes256Gcm, Key, Nonce};
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use dashmap::DashMap;
 use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::GameAgent;
 use mintaka::protocol::command::Command;
-use mintaka::protocol::results::{BestMove, CommandResult, GameResult};
+use mintaka::protocol::results::{BestMove, CommandResult};
 use mintaka::protocol::response::Response;
 use mintaka::state::GameState;
 use rusty_renju::memo::hash_key::HashKey;
@@ -20,7 +24,6 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use typeshare::typeshare;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,9 +55,86 @@ impl FromStr for SessionKey {
     }
 }
 
+impl From<[u8; 16]> for SessionKey {
+    fn from(bytes: [u8; 16]) -> Self {
+        Self(Uuid::from_bytes(bytes))
+    }
+}
+
+impl From<SessionKey> for [u8; 16] {
+    fn from(key: SessionKey) -> Self {
+        *key.0.as_bytes()
+    }
+}
+
 impl SessionKey {
     pub fn new_random() -> Self {
         Self(Uuid::new_v4())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionToken(String);
+
+impl Display for SessionToken {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl FromStr for SessionToken {
+    type Err = AppError;
+
+    fn from_str(source: &str) -> Result<Self, Self::Err> {
+        if source.is_empty() {
+            Err(AppError::Unauthorized)
+        } else {
+            Ok(Self(source.to_string()))
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct SessionTokenCipher {
+    cipher: Aes256Gcm,
+}
+
+impl SessionTokenCipher {
+    const NONCE_LEN: usize = 12;
+
+    pub fn new(secret: &str) -> Self {
+        let digest = ring::digest::digest(&ring::digest::SHA256, secret.as_bytes());
+        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(digest.as_ref()));
+
+        Self { cipher }
+    }
+
+    pub fn seal_session_key(&self, session_key: SessionKey) -> Result<SessionToken, AppError> {
+        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+        let session_key = Into::<[u8; 16]>::into(session_key);
+        let ciphertext = self.cipher.encrypt(&nonce, session_key.as_slice()).unwrap();
+
+        let mut token = Vec::with_capacity(Self::NONCE_LEN + ciphertext.len());
+        token.extend_from_slice(&nonce);
+        token.extend_from_slice(&ciphertext);
+
+        Ok(SessionToken(URL_SAFE_NO_PAD.encode(token)))
+    }
+
+    pub fn open_session_token(&self, session_token: &SessionToken) -> Result<SessionKey, AppError> {
+        let token = URL_SAFE_NO_PAD.decode(session_token.0.as_str())
+            .map_err(|_| AppError::Unauthorized)?;
+
+        let (nonce, text) = token.split_at_checked(Self::NONCE_LEN)
+            .ok_or(AppError::Unauthorized)?;
+
+        let session_key = self.cipher.decrypt(Nonce::from_slice(nonce), text)
+            .map_err(|_| AppError::Unauthorized)?;
+
+        let session_key = <[u8; 16]>::try_from(session_key.as_slice())
+            .map_err(|_| AppError::Unauthorized)?;
+
+        Ok(SessionKey::from(session_key))
     }
 }
 
@@ -174,7 +254,7 @@ impl Session {
         response_sender: StreamSessionResponseSender,
         result_sender: tokio::sync::oneshot::Sender<SessionResultResponse>,
         worker_permit: WorkerPermit,
-        nodes_polling_interval_ms: Option<u32>,
+        _nodes_polling_interval_ms: Option<u32>,
     ) -> Result<(), AppError> {
         let AgentState::Agent(mut game_agent)
             = std::mem::replace(&mut self.state, AgentState::Permit(worker_permit))
@@ -329,11 +409,11 @@ impl Default for Sessions {
 
 impl Sessions {
 
-    pub fn get(&self, key: &SessionKey) -> Option<dashmap::mapref::one::Ref<SessionKey, Session>> {
+    pub fn get(&self, key: &SessionKey) -> Option<dashmap::mapref::one::Ref<'_, SessionKey, Session>> {
         self.map.get(key)
     }
 
-    pub fn get_with_touch(&self, key: &SessionKey) -> Option<dashmap::mapref::one::Ref<SessionKey, Session>> {
+    pub fn get_with_touch(&self, key: &SessionKey) -> Option<dashmap::mapref::one::Ref<'_, SessionKey, Session>> {
         if let Some(mut session) = self.map.get_mut(key) {
             session.touch_last_active();
         };
@@ -341,7 +421,7 @@ impl Sessions {
         self.map.get(key)
     }
 
-    pub fn get_mut_with_touch(&self, key: &SessionKey) -> Option<dashmap::mapref::one::RefMut<SessionKey, Session>> {
+    pub fn get_mut_with_touch(&self, key: &SessionKey) -> Option<dashmap::mapref::one::RefMut<'_, SessionKey, Session>> {
         if let Some(mut session) = self.map.get_mut(key) {
             session.touch_last_active();
 

@@ -1,6 +1,6 @@
 import type { History } from "./wasm/pkg/rusty_renju_wasm"
 import { historyToString, parseHistory } from "./domain/rusty-renju"
-import { Accessor, createEffect } from "solid-js"
+import { createEffect, type Accessor } from "solid-js"
 
 export type UrlParams = {
     readonly moves: History | undefined,

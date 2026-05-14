@@ -1,0 +1,18 @@
+services:
+  mintaka-server:
+    container_name: mintaka-server
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mintaka-server:latest
+    environment:
+      WEBUI: ${WEBUI:-true}
+      ADDRESS: 0.0.0.0:${MINTAKA_PORT:-8085}
+      CORES: ${CORES:-8}
+      MEMORY_LIMIT_MIB: ${MEMORY_LIMIT_MIB:-4096}
+      API_PASSWORD: ${API_PASSWORD:-verycomplexedpassword}
+      SESSION_TOKEN_SECRET: ${SESSION_TOKEN_SECRET:-verycomplexedsecret}
+    ports:
+      - "${MINTAKA_PORT:-8085}:${MINTAKA_PORT:-8085}"
+    volumes:
+      - ./sessions:/var/lib/mintaka/sessions

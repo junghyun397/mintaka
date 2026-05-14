@@ -3,7 +3,7 @@ import { AppContext } from "../context"
 import { INDEX_TO_POS, LETTERS, NUMS } from "../domain/rusty-renju"
 import { range } from "../utils/array"
 import { filter } from "../utils/undefined"
-import { Pos } from "../wasm/pkg/rusty_renju_wasm"
+import type { Pos } from "../wasm/pkg/rusty_renju_wasm"
 
 export function Board() {
     const { gameSelectors, runtimeSelectors } = useContext(AppContext)!

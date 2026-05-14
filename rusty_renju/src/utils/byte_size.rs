@@ -6,7 +6,7 @@ use std::ops::{Add, AddAssign, Sub, SubAssign};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
-#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "number"))]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "LongInt"))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Default)]
 pub struct ByteSize(u64);

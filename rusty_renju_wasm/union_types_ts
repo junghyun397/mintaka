@@ -5,3 +5,5 @@ type Letter = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 
 export type PosSchema = `${Letter}${Num}`
 
 export type ColorSchema = "Black" | "White"
+
+export type LongInt = number

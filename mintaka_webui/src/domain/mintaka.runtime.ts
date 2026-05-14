@@ -1,6 +1,6 @@
-import { BestMove, CommandResult, ComputingResource, HashKey } from "../wasm/pkg/rusty_renju_wasm"
-import { HistoryTree } from "./HistoryTree"
-import { StatusResponseBody } from "./mintaka"
+import type { BestMove, CommandResult, ComputingResource, HashKey } from "../wasm/pkg/rusty_renju_wasm"
+import type { HistoryTree } from "./HistoryTree"
+import type { StatusResponseBody } from "./mintaka"
 
 export class IdleState {
     readonly type: "idle" = "idle"

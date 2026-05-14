@@ -1,0 +1,13 @@
+.git
+.idea
+.DS_Store
+.env
+**/.env
+
+target
+temp
+sessions
+
+mintaka_webui/*
+!mintaka_webui/dist
+!mintaka_webui/dist/**

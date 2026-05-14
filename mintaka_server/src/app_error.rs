@@ -3,6 +3,7 @@ use std::fmt::{Debug, Display};
 
 #[derive(Debug)]
 pub enum AppError {
+    Unauthorized,
     InvalidSessionId,
     InvalidConfig,
     SessionNotFound,
@@ -22,6 +23,7 @@ pub enum AppError {
 impl Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Unauthorized => write!(f, "UNAUTHORIZED"),
             Self::InvalidSessionId => write!(f, "INVALID_SESSION_ID"),
             Self::InvalidConfig => write!(f, "INVALID_CONFIG"),
             Self::SessionNotFound => write!(f, "SESSION_NOT_FOUND"),

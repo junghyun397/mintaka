@@ -1,6 +1,6 @@
 import type { MintakaServerConfig } from "../domain/mintaka.server.provider"
 import type { MintakaProviderType } from "../domain/mintaka.provider"
-import { createStore, SetStoreFunction } from "solid-js/store"
+import { createStore, type SetStoreFunction } from "solid-js/store"
 import { makePersisted } from "@solid-primitives/storage"
 import { PERSIST_CONFIG_VERSION, WEB_WORKER_READY } from "../config"
 

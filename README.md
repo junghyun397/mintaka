@@ -21,6 +21,19 @@ and plans to integrate an AlphaZero-based value and policy network.
   - [NNUE](https://en.wikipedia.org/wiki/Efficiently_updatable_neural_network)-based evaluation with separate networks for black/white pieces
   - Opening book support for early game optimization
 
+## Getting Started
+[WebUI](https://renju.do1ph.in)(WASM) or native machine:
+
+```shell
+cd mintaka_webui
+pnpm requirements
+pnpm build
+```
+
+```shell
+docker compose up --build
+```
+
 ## Project Structure
 
 ### rusty-renju

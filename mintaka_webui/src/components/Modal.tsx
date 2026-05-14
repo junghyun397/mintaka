@@ -1,4 +1,4 @@
-import { createEffect, type JSX, ParentProps } from "solid-js"
+import { createEffect, type JSX, type ParentProps } from "solid-js"
 import { IconXMark } from "./icons"
 
 export type ModalControlProps = {

@@ -1,4 +1,4 @@
-import { Accessor, createEffect, createSignal } from "solid-js"
+import { createEffect, createSignal, type Accessor } from "solid-js"
 
 export function useStableSignal<T>(initial: NonNullable<T>, source: () => NonNullable<T> | undefined): Accessor<NonNullable<T>> {
     const [value, setValue] = createSignal<NonNullable<T>>(initial)

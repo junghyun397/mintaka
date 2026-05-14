@@ -1,4 +1,4 @@
-import { Modal, ModalControlProps } from "./Modal"
+import { Modal, type ModalControlProps } from "./Modal"
 
 export function Branch(props: ModalControlProps) {
     return <Modal

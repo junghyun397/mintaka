@@ -1,5 +1,5 @@
 import { createEffect, onCleanup, onMount } from "solid-js"
-import { PersistConfig, Theme } from "./stores/persist.config"
+import type { PersistConfig, Theme } from "./stores/persist.config"
 
 const removeTheme = () =>
     document.documentElement.removeAttribute("data-theme")

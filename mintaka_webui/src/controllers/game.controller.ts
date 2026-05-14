@@ -1,7 +1,7 @@
-import { ForwardMethod, HistoryTree } from "../domain/HistoryTree"
+import type { ForwardMethod, HistoryTree } from "../domain/HistoryTree"
 import type { BestMove, HashKey, Pos } from "../wasm/pkg/rusty_renju_wasm"
 import { BoardWorker } from "../wasm/pkg/rusty_renju_wasm"
-import { AppGameState, emptyAppGameState } from "../domain/rusty-renju"
+import { emptyAppGameState, type AppGameState } from "../domain/rusty-renju"
 
 interface GameController {
     clear: () => void,
