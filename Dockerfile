@@ -16,6 +16,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 
 FROM alpine AS runtime
 
+RUN apk --no-cache add curl
+
 WORKDIR /var/lib/mintaka
 
 COPY --from=builder /tmp/mintaka_server /usr/local/bin/mintaka_server

@@ -22,8 +22,7 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tokio::sync::mpsc::UnboundedSender;
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio::sync::broadcast;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -145,7 +144,7 @@ pub enum SessionStatus {
     Hibernating
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SessionResponse {
     Response(Response),
     BestMove(BestMove),
@@ -167,13 +166,12 @@ pub enum AgentState {
     Permit(WorkerPermit)
 }
 
-pub type SessionResponseSender = UnboundedSender<SessionResponse>;
-pub type SessionResponseReceiver = UnboundedReceiverStream<SessionResponse>;
+pub type SessionResponseSender = broadcast::Sender<SessionResponse>;
+pub type SessionResponseReceiver = broadcast::Receiver<SessionResponse>;
 
 pub struct Session {
     state: AgentState,
     pub response_sender: SessionResponseSender,
-    pub response_receiver: Option<SessionResponseReceiver>,
     #[allow(dead_code)]
     memory_permit: MemoryPermit,
     best_move: Option<BestMove>,
@@ -193,11 +191,10 @@ pub struct SessionData {
 
 impl Session {
 
-    pub fn new(config: Config, game_state: GameState, time_to_live: Option<Duration>, memory_permit: MemoryPermit, response_sender: SessionResponseSender, response_receiver: SessionResponseReceiver, persistence: bool) -> Self {
+    pub fn new(config: Config, game_state: GameState, time_to_live: Option<Duration>, memory_permit: MemoryPermit, response_sender: SessionResponseSender, persistence: bool) -> Self {
         Self {
             state: AgentState::Agent(GameAgent::from_state(config, game_state)),
             response_sender,
-            response_receiver: Some(response_receiver),
             memory_permit,
             best_move: None,
             abort_handle: Arc::new(AtomicBool::new(false)),
@@ -208,11 +205,10 @@ impl Session {
         }
     }
 
-    pub fn from_data(data: SessionData, memory_permit: MemoryPermit, response_sender: SessionResponseSender, response_receiver: SessionResponseReceiver) -> Self {
+    pub fn from_data(data: SessionData, memory_permit: MemoryPermit, response_sender: SessionResponseSender) -> Self {
         Self {
             state: AgentState::Agent(data.agent),
             response_sender,
-            response_receiver: Some(response_receiver),
             memory_permit,
             best_move: data.best_move,
             abort_handle: Arc::new(AtomicBool::new(false)),

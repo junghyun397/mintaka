@@ -1,6 +1,6 @@
 pub(crate) use crate::app_error::AppError;
 use crate::preference::Preference;
-use crate::session::{Session, SessionData, SessionKey, SessionResponse, SessionResultResponse, SessionStatus, SessionToken, SessionTokenCipher, Sessions};
+use crate::session::{Session, SessionData, SessionKey, SessionResponse, SessionResponseReceiver, SessionResponseSender, SessionResultResponse, SessionStatus, SessionToken, SessionTokenCipher, Sessions};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use mintaka::config::Config;
 use mintaka::protocol::command::Command;
@@ -14,11 +14,12 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
-use tokio_stream::wrappers::UnboundedReceiverStream;
 use mintaka::game_agent::GameError;
 use mintaka::protocol::results::{BestMove, CommandResult};
 use rusty_renju::memo::hash_key::HashKey;
 use crate::app_error::AppError::SessionInComputing;
+
+const SESSION_RESPONSE_CHANNEL_CAPACITY: usize = 4;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Configs {
@@ -70,6 +71,11 @@ pub struct AppState {
     worker_resource: Arc<Semaphore>,
     memory_resource: Arc<Semaphore>,
     pub preference: Preference,
+}
+
+fn new_session_response_sender() -> SessionResponseSender {
+    let (tx, _) = tokio::sync::broadcast::channel(SESSION_RESPONSE_CHANNEL_CAPACITY);
+    tx
 }
 
 impl AppState {
@@ -169,14 +175,11 @@ impl AppState {
         let memory_permit = self.acquire_memory(config.tt_size, true)
             .await?;
 
-        let (tx, rx) = {
-            let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-            (tx, UnboundedReceiverStream::new(rx))
-        };
+        let response_sender = new_session_response_sender();
 
         let hash_key = game_state.board.hash_key;
 
-        let session = Session::new(config, game_state, None, memory_permit, tx, rx, false);
+        let session = Session::new(config, game_state, None, memory_permit, response_sender, false);
 
         self.sessions.insert(session_key, session);
 
@@ -265,12 +268,9 @@ impl AppState {
         let memory_permit = self.acquire_memory(session_data.agent.config.tt_size, true)
             .await?;
 
-        let (tx, rx) = {
-            let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-            (tx, UnboundedReceiverStream::new(rx))
-        };
+        let response_sender = new_session_response_sender();
 
-        let session = tokio::task::spawn_blocking(move || Session::from_data(session_data, memory_permit, tx, rx))
+        let session = tokio::task::spawn_blocking(move || Session::from_data(session_data, memory_permit, response_sender))
             .await
             .map_err(AppError::from_general_error)?;
 
@@ -417,23 +417,13 @@ impl AppState {
         Ok(resource)
     }
 
-    pub fn acquire_session_stream(&self, session_key: SessionKey) -> Result<UnboundedReceiverStream<SessionResponse>, AppError> {
-        let session_stream_receiver = self.sessions.get_mut_with_touch(&session_key)
+    pub fn subscribe_session_response(&self, session_key: SessionKey) -> Result<SessionResponseReceiver, AppError> {
+        let response_receiver = self.sessions.get_with_touch(&session_key)
             .ok_or(AppError::SessionNotFound)?
-            .response_receiver
-            .take()
-            .ok_or(AppError::StreamAlreadyAcquired)?;
+            .response_sender
+            .subscribe();
 
-        Ok(session_stream_receiver)
-    }
-
-    pub fn restore_session_stream(&self, session_key: SessionKey, session_stream_receiver: UnboundedReceiverStream<SessionResponse>) -> Result<(), AppError> {
-        self.sessions.get_mut_with_touch(&session_key)
-            .ok_or(AppError::StreamNotAcquired)?
-            .response_receiver
-            = Some(session_stream_receiver);
-
-        Ok(())
+        Ok(response_receiver)
     }
 
     pub async fn hibernate_all_sessions(&self) -> Result<(), AppError> {

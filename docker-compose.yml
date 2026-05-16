@@ -16,3 +16,9 @@ services:
       - "${MINTAKA_PORT:-8085}:${MINTAKA_PORT:-8085}"
     volumes:
       - ./sessions:/var/lib/mintaka/sessions
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${MINTAKA_PORT:-8085}/status"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 1s

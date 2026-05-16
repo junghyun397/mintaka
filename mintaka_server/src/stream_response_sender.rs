@@ -3,11 +3,11 @@ use mintaka::protocol::response::{Response, ResponseSender};
 
 #[derive(Clone)]
 pub struct StreamSessionResponseSender {
-    tx: tokio::sync::mpsc::UnboundedSender<SessionResponse>,
+    tx: tokio::sync::broadcast::Sender<SessionResponse>,
 }
 
 impl StreamSessionResponseSender {
-    pub fn new(tx: tokio::sync::mpsc::UnboundedSender<SessionResponse>) -> Self {
+    pub fn new(tx: tokio::sync::broadcast::Sender<SessionResponse>) -> Self {
         Self { tx }
     }
 }

@@ -14,7 +14,6 @@ use std::convert::Infallible;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio_stream::StreamExt;
 use rusty_renju::memo::hash_key::HashKey;
 
 #[derive(Serialize)]
@@ -32,8 +31,6 @@ impl From<&AppError> for StatusCode {
             AppError::SessionNotFound => StatusCode::NOT_FOUND,
             AppError::SessionInComputing => StatusCode::CONFLICT,
             AppError::SessionIdle => StatusCode::CONFLICT,
-            AppError::StreamAlreadyAcquired => StatusCode::CONFLICT,
-            AppError::StreamNotAcquired => StatusCode::CONFLICT,
             AppError::SessionNeverLaunched => StatusCode::NO_CONTENT,
             AppError::SessionFileAlreadyExists => StatusCode::CONFLICT,
             AppError::SessionFileNotFound => StatusCode::NOT_FOUND,
@@ -158,33 +155,31 @@ pub async fn subscribe_session_response(
     Path(sid): Path<SessionKey>,
     State(state): State<Arc<AppState>>
 ) -> Result<Sse<impl Stream<Item = Result<sse::Event, Infallible>>>, AppError> {
-    let session_stream = state.acquire_session_stream(sid)?;
-    let state = state.clone();
+    let mut receiver = state.subscribe_session_response(sid)?;
 
     let sse_stream = stream! {
-        let mut receiver = session_stream;
-
-        while let Some(session_response) = receiver.next().await {
-            match session_response {
-                SessionResponse::Response(response) => {
+        loop {
+            match receiver.recv().await {
+                Ok(SessionResponse::Response(response)) => {
                     yield Ok(sse::Event::default()
                         .event("Response")
                         .json_data(response)
                         .unwrap());
                 },
-                SessionResponse::BestMove(best_move) => {
+                Ok(SessionResponse::BestMove(best_move)) => {
                     yield Ok(sse::Event::default()
                         .event("BestMove")
                         .json_data(best_move)
                         .unwrap());
                 },
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {},
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
             }
         }
-
-        state.restore_session_stream(sid, receiver).unwrap();
     };
 
-    Ok(Sse::new(sse_stream))
+    Ok(Sse::new(sse_stream)
+        .keep_alive(sse::KeepAlive::new().interval(Duration::from_secs(15))))
 }
 
 pub async fn get_session_result(
