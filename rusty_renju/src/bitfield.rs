@@ -2,7 +2,9 @@ use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::{assert_struct_sizes, impl_debug_from_display};
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{de, Deserialize, Serialize, Serializer};
+#[cfg(feature = "serde")]
+use base64::engine::{general_purpose, Engine as _};
 use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
 use std::simd::u8x32;
@@ -106,7 +108,12 @@ impl Bitfield {
     }
 
     pub fn to_chunks(self) -> [u64; 4] {
-        unsafe { std::mem::transmute::<[u8; 32], [u64; 4]>(self.0) }
+        [
+            u64::from_le_bytes(self.0[0..8].try_into().unwrap()),
+            u64::from_le_bytes(self.0[8..16].try_into().unwrap()),
+            u64::from_le_bytes(self.0[16..24].try_into().unwrap()),
+            u64::from_le_bytes(self.0[24..32].try_into().unwrap()),
+        ]
     }
 
 }
@@ -285,13 +292,16 @@ impl_debug_from_display!(Bitfield);
 #[cfg(feature = "serde")]
 impl Serialize for Bitfield {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        serializer.serialize_bytes(&self.0)
+        serializer.serialize_str(&general_purpose::URL_SAFE_NO_PAD.encode(&self.0))
     }
 }
 
 #[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Bitfield {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
-        Ok(Self(Deserialize::deserialize(deserializer)?))
+        general_purpose::URL_SAFE_NO_PAD.decode(&String::deserialize(deserializer)?)
+            .map_err(de::Error::custom)?
+            .try_into()
+            .map_err(|_| de::Error::custom("invalid bitfield binary"))
     }
 }

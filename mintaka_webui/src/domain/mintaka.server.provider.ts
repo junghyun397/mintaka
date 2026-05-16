@@ -27,31 +27,6 @@ function sessionHeaders(session: MintakaServerSession, extra?: HeadersInit) {
     return headers
 }
 
-function bitfieldToArray(bitfield: unknown): number[] {
-    if (ArrayBuffer.isView(bitfield))
-        return Array.from(new Uint8Array(bitfield.buffer, bitfield.byteOffset, bitfield.byteLength))
-    else if (bitfield instanceof ArrayBuffer)
-        return Array.from(new Uint8Array(bitfield))
-    else if (Array.isArray(bitfield))
-        return bitfield.map((value) => Number(value))
-    else if (bitfield !== null && typeof bitfield === "object")
-        return Object.values(bitfield).map((value) => Number(value))
-    throw new Error("unsupported bitfield format")
-}
-
-function serializeGameState(state: GameState): CreateSessionRequest["state"] {
-    const board = state.board as GameState["board"] & { bitfield: unknown }
-    const encodedBitfield = board.bitfield.map(bitfieldToArray)
-
-    return {
-        ...state,
-        board: {
-            ...board,
-            bitfield: encodedBitfield,
-        },
-    } as unknown as CreateSessionRequest["state"]
-}
-
 export async function checkHealth(serverConfig: MintakaServerConfig): Promise<boolean> {
     const response = await fetch(`${serverUrl(serverConfig)}/status`)
 
@@ -67,7 +42,7 @@ export async function createSession(serverConfig: MintakaServerConfig, state: Ga
     const payload: CreateSessionRequest = {
         api_password: serverConfig.apiPassword,
         config: config,
-        state: serializeGameState(state),
+        state,
     }
 
     const response = await fetch(`${serverUrl(serverConfig)}/sessions`, {

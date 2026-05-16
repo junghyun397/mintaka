@@ -4,7 +4,7 @@ version = "1.0.0"
 edition = "2024"
 
 [features]
-serde = ["dep:serde"]
+serde = ["dep:serde", "dep:base64"]
 typeshare = ["serde", "dep:typeshare"]
 default = []
 
@@ -13,6 +13,7 @@ name = "rusty_renju"
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
+base64 = { version = "0.22", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
 typeshare = { version = "1.0", optional = true }
 
