@@ -98,10 +98,8 @@ impl BoardWorker {
         self.inner.patterns.field[color][pos.idx_usize()].into()
     }
 
-    pub fn describe(&self, history: &History) -> BoardDescribe {
-        let history: rusty_renju::history::History = try_from_js_value(history).unwrap();
-
-        to_js_value(&self.inner.describe(&history))
+    pub fn describe(&self) -> BoardDescribe {
+        to_js_value(&self.inner.describe())
     }
 
     #[wasm_bindgen(js_name = isPosEmpty)]
@@ -119,17 +117,6 @@ impl BoardWorker {
         self.inner.stone_kind(try_from_js_value(pos).unwrap())
             .as_ref()
             .map(to_js_value)
-    }
-
-    #[wasm_bindgen(js_name = winningSequence)]
-    pub fn winning_sequence(&self) -> Option<Vec<Pos>> {
-        self.inner.find_global_winner_location()
-            .map(|(_, pos, direction)| {
-                Vec::from_iter(
-                    (0 .. 5)
-                        .map(|i| to_js_value(&pos.directional_offset_unchecked(direction, i)))
-                )
-            })
     }
 
     pub fn set(self, pos: MaybePos) -> Self {

@@ -11,6 +11,7 @@ use std::simd::u8x32;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
+// serialization format: base64url-safe no padding
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
 #[derive(Copy, Clone, PartialEq, Eq)]
 #[repr(align(32))]

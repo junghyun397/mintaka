@@ -1,5 +1,4 @@
 use crate::board::Board;
-use crate::history::History;
 use crate::notation::color::{Color, ColorContainer};
 use crate::notation::pos;
 use crate::notation::pos::Pos;
@@ -24,7 +23,7 @@ pub enum BoardIterItem {
 #[cfg_attr(feature = "serde", serde(tag = "type", content = "content"))]
 #[derive(Debug, Copy, Clone)]
 pub enum BoardExportItem {
-    Stone(BoardExportStone),
+    Stone(Color),
     Empty,
     Forbidden(ForbiddenKind)
 }
@@ -36,18 +35,10 @@ mod typeshare_workaround {
     #[derive(Serialize, Deserialize)]
     #[serde(tag = "type", content = "content")]
     pub enum BoardExportItemSchema {
-        Stone(BoardExportStone),
+        Stone(Color),
         Empty,
         Forbidden(ForbiddenKind)
     }
-}
-
-#[cfg_attr(feature = "typeshare", typeshare)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Copy, Clone)]
-pub struct BoardExportStone {
-    pub color: Color,
-    pub sequence: u8,
 }
 
 impl Board {
@@ -71,15 +62,13 @@ impl Board {
             )
     }
 
-    pub fn export_items(&self, history: &History) -> [BoardExportItem; pos::BOARD_SIZE] {
+    pub fn export_items(&self) -> [BoardExportItem; pos::BOARD_SIZE] {
         array::from_fn(|idx| {
             let pos = Pos::from_index(idx as u8);
 
-            let inverted_index = history.inverted_sequence();
-
             self.stone_kind(pos)
                 .map(|color|
-                    BoardExportItem::Stone(BoardExportStone { color, sequence: inverted_index[pos.idx_usize()] })
+                    BoardExportItem::Stone(color)
                 )
                 .or_else(||
                     self.patterns.forbidden_kind(pos)

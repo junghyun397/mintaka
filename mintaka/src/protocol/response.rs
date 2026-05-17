@@ -17,7 +17,7 @@ use rusty_renju::utils::byte_size::ByteSize;
 pub struct ComputingResource {
     pub workers: u32,
     pub tt_size: ByteSize,
-    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "DurationSchema"))]
+    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Option<DurationSchema>"))]
     pub time: Option<Duration>,
     pub nodes_in_1k: Option<u32>,
 }

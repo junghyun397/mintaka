@@ -11,12 +11,14 @@ export function Board() {
     const lastSequence = createMemo(() => gameSelectors.history().length)
     const prevSequence = createMemo(() => lastSequence() - 1)
     const winningSequence = createMemo(() =>
-        gameSelectors.boardDescribe.winner ? gameSelectors.gameState().boardWorker.winningSequence()! : [],
+        gameSelectors.boardDescribe.winner?.moves,
     )
 
     const isLastSequence = createSelector(lastSequence)
     const isPrevSequence = createSelector(prevSequence)
-    const inWinningSequence = createSelector(winningSequence, (pos: Pos, sequence) => sequence.includes(pos))
+    const inWinningSequence = createSelector(winningSequence, (pos: Pos, sequence) =>
+        sequence ? sequence.includes(pos) : false,
+    )
 
     // 1+2x15+1 = 32
     return <div class="relative h-full w-full rounded-box bg-[#efb072]">
@@ -92,14 +94,15 @@ function Cell(props: {
     const cell = createMemo(() => gameSelectors.boardDescribe.field[props.position])
 
     const stone = createMemo(() => filter(cell(), valid => valid.type === "Stone"))
+    const sequence = createMemo(() => gameSelectors.sequenceMap().get(pos))
 
     return <button
         id={pos}
         title={pos}
         classList={{
             "stone": cell().type === "Stone",
-            "black": stone()?.content.color === "Black",
-            "white": stone()?.content.color === "White",
+            "black": stone()?.content === "Black",
+            "white": stone()?.content === "White",
             "forbidden": cell().type === "Forbidden",
             "winning": props.inWinningSequence(pos),
         }}
@@ -125,12 +128,12 @@ function Cell(props: {
                                 text-anchor="middle"
                                 x="50" y="50" dy="0.32em"
                             >
-                                {stone().content.sequence}
+                                {sequence()}
                             </text>
                         </Match>
                         <Match when={
                             (persistConfig.historyDisplay === "pair" || persistConfig.historyDisplay === "last")
-                            && props.isLastSequence(stone().content.sequence)
+                            && props.isLastSequence(sequence()!)
                         }>
                             <circle
                                 class="glyph"
@@ -139,7 +142,7 @@ function Cell(props: {
                         </Match>
                         <Match when={
                             persistConfig.historyDisplay === "pair"
-                            && props.isPrevSequence(stone().content.sequence)
+                            && props.isPrevSequence(sequence()!)
                         }>
                             <g class="glyph">
                                 <rect x="35" y="48" width="30" height="4"/>

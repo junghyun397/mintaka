@@ -6,7 +6,7 @@ use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::RuleKind;
 use crate::pattern;
 use crate::pattern::Patterns;
-use crate::slice::{Slice, Slices};
+use crate::slice::Slices;
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
@@ -453,40 +453,6 @@ impl Board {
         } as u32;
 
         (((stones << 2) >> slice_idx) & 0b11111) as u8 // 0[00V00]0
-    }
-
-    pub fn find_winner(&self, pos: Pos) -> Option<Color> {
-        [
-            Some(&self.slices.horizontal_slices[pos.row_usize()]),
-            Some(&self.slices.vertical_slices[pos.col_usize()]),
-            self.slices.ascending_slice(pos),
-            self.slices.descending_slice(pos),
-        ].iter()
-            .find_map(|maybe_slice| maybe_slice
-                .and_then(Slice::winner)
-            )
-    }
-
-    pub fn find_global_winner(&self) -> Option<Color> {
-        self.slices.horizontal_slices.iter()
-            .chain(self.slices.vertical_slices.iter())
-            .chain(self.slices.ascending_slices.iter())
-            .chain(self.slices.descending_slices.iter())
-            .find_map(Slice::winner)
-    }
-
-    pub fn find_global_winner_location(&self) -> Option<(Color, Pos, Direction)> {
-        self.slices.horizontal_slices.iter().map(|slice| (Direction::Horizontal, slice))
-            .chain(self.slices.vertical_slices.iter().map(|slice| (Direction::Vertical, slice)))
-            .chain(self.slices.ascending_slices.iter().map(|slice| (Direction::Ascending, slice)))
-            .chain(self.slices.descending_slices.iter().map(|slice| (Direction::Descending, slice)))
-            .find_map(|(direction, slice)| {
-                slice.winner_idx::<{ Color::Black }>().map(|idx| (Color::Black, idx))
-                    .or(slice.winner_idx::<{ Color::White }>().map(|idx| (Color::White, idx)))
-                    .map(|(color, idx)|
-                        (color, slice.start_pos.directional_offset_unchecked(direction, idx as isize), direction)
-                    )
-            })
     }
 
     pub fn is_forced_defense(&self) -> bool {

@@ -55,6 +55,7 @@ interface GameActions {
 interface GameSelectors {
     readonly gameState: Accessor<AppGameState>,
     readonly history: Accessor<History>,
+    readonly sequenceMap: Accessor<Map<Pos, number>>,
     readonly boardDescribe: BoardDescribe,
     readonly finished: Accessor<boolean>,
 }
@@ -106,8 +107,14 @@ export function AppContextProvider(props: ParentProps) {
 
     const history = createMemo(() => appState.gameState().historyTree.toHistory())
 
+    const sequenceMap = createMemo(() => new Map(
+        history()
+            .filter(maybePos => maybePos !== undefined)
+            .map((pos, index) => [pos!, index + 1] as const),
+    ))
+
     const [boardDescribe, setBoardDescribe] = createStore<BoardDescribe>(
-        appState.gameState().boardWorker.describe(appState.gameState().historyTree.toHistory()),
+        appState.gameState().boardWorker.describe(),
     )
 
     const finished = createMemo(() =>
@@ -116,7 +123,7 @@ export function AppContextProvider(props: ParentProps) {
 
     createEffect(() => {
         setBoardDescribe(reconcile(
-            appState.gameState().boardWorker.describe(appState.gameState().historyTree.toHistory()),
+            appState.gameState().boardWorker.describe(),
         ))
     })
 
@@ -239,6 +246,7 @@ export function AppContextProvider(props: ParentProps) {
     const gameSelectors: GameSelectors = {
         gameState: appState.gameState,
         history,
+        sequenceMap,
         boardDescribe,
         finished,
     }

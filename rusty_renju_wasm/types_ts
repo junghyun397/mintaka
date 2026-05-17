@@ -19,13 +19,13 @@ export interface BoardData {
 export type Board = BoardData;
 
 export type BoardExportItemSchema = 
-	| { type: "Stone", content: BoardExportStone }
+	| { type: "Stone", content: Color }
 	| { type: "Empty", content?: undefined }
 	| { type: "Forbidden", content: ForbiddenKind };
 
 export type BoardExportItem = BoardExportItemSchema;
 
-export type ByteSize = number;
+export type ByteSize = LongInt;
 
 export type CommandSchema = 
 	| { type: "Clear", content?: undefined }
@@ -114,7 +114,7 @@ export type Score = number;
 export type SearchObjective = string;
 
 export interface DurationSchema {
-	secs: number;
+	secs: LongInt;
 	nanos: number;
 }
 
@@ -128,16 +128,16 @@ export interface BestMove {
 	time_elapsed: DurationSchema;
 }
 
+export interface BoardWinner {
+	color: Color;
+	moves: [Pos, Pos, Pos, Pos, Pos];
+}
+
 export interface BoardDescribe {
 	hash_key: HashKey;
 	player_color: Color;
 	field: BoardExportItem[];
-	winner?: Color;
-}
-
-export interface BoardExportStone {
-	color: Color;
-	sequence: number;
+	winner?: BoardWinner;
 }
 
 export interface CommandResult {

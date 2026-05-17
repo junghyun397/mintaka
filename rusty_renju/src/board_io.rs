@@ -16,6 +16,7 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
+use crate::board_utils::BoardWinner;
 
 pub const SYMBOL_BLACK: char = 'X';
 pub const SYMBOL_WHITE: char = 'O';
@@ -46,7 +47,7 @@ pub struct BoardDescribe {
     )]
     #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Vec<BoardExportItem>"))]
     pub field: [BoardExportItem; pos::BOARD_SIZE],
-    pub winner: Option<Color>,
+    pub winner: Option<BoardWinner>,
 }
 
 fn match_symbol(c: char) -> Option<BoardElement> {
@@ -264,12 +265,12 @@ impl Board {
         )
     }
 
-    pub fn describe(&self, history: &History) -> BoardDescribe {
+    pub fn describe(&self) -> BoardDescribe {
         BoardDescribe {
             hash_key: self.hash_key,
             player_color: self.player_color,
-            field: self.export_items(history),
-            winner: self.find_global_winner(),
+            field: self.export_items(),
+            winner: self.find_global_winning_moves(),
         }
     }
 

@@ -1,5 +1,5 @@
 /*
-Converted from the Java AWT version with the help of a LLM coding agent.
+Converted from the Java AWT version with the help of a coding agent.
 Original source = https://github.com/junghyun397/GomokuBot/blob/fbfc977210fbe238ecdd9e1b172d88203951b00c/core/src/main/kotlin/core/interact/message/graphics/ImageBoardRenderer.kt
 */
 
@@ -22,11 +22,6 @@ pub fn render_pixmap(board: &Board, opts: RenderPayloads) -> Pixmap {
     draw_board(&mut canvas, board, &opts, res);
 
     canvas
-}
-
-fn cell_center(pos: Pos) -> (u32, u32) {
-    let cell = &resources().cells[pos.idx_usize()];
-    (cell.center.0.round() as u32, cell.center.1.round() as u32)
 }
 
 const POINT_SIZE: u32 = 60;
@@ -366,9 +361,9 @@ fn draw_positions(canvas: &mut Pixmap, res: &Resources, sprite: &Pixmap, positio
 }
 
 fn draw_board(canvas: &mut Pixmap, board: &Board, opts: &RenderPayloads, res: &Resources) {
-    for (cell, item) in res.cells.iter().zip(board.export_items(&opts.history)) {
+    for (cell, item) in res.cells.iter().zip(board.export_items()) {
         match item {
-            BoardExportItem::Stone(stone) => blit_cell(canvas, &res.lut.stone[stone.color], cell),
+            BoardExportItem::Stone(color) => blit_cell(canvas, &res.lut.stone[color], cell),
             BoardExportItem::Forbidden(_) if opts.enable_forbidden => blit_cell(canvas, &res.lut.forbidden, cell),
             _ => {}
         }

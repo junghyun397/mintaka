@@ -75,6 +75,12 @@ impl From<Pattern> for u32 {
     }
 }
 
+impl From<u32> for Pattern {
+    fn from(value: u32) -> Self {
+        unsafe { std::mem::transmute::<u32, Pattern>(value) }
+    }
+}
+
 impl Pattern {
 
     pub fn is_empty(&self) -> bool {
@@ -232,12 +238,12 @@ impl Patterns {
         self.is_forbidden(pos).then(|| {
             let pattern = self.field[Color::Black][pos.idx_usize()];
 
-            if pattern.has_threes() {
-                ForbiddenKind::DoubleThree
+            if pattern.has_overline() {
+                ForbiddenKind::Overline
             } else if pattern.has_fours() {
                 ForbiddenKind::DoubleFour
             } else {
-                ForbiddenKind::Overline
+                ForbiddenKind::DoubleThree
             }
         })
     }
