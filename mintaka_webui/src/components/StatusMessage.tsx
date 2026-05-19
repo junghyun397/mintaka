@@ -1,6 +1,6 @@
-import { createMemo, useContext } from "solid-js"
+import { useContext } from "solid-js"
 import { AppContext } from "../context"
-import { durationSeconds, formatNodes } from "../domain/mintaka"
+import { formatNodes } from "../domain/mintaka"
 import { flatmap } from "../utils/undefined"
 
 export function StatusMessage() {
@@ -8,20 +8,6 @@ export function StatusMessage() {
 
     const nodes = () =>
         flatmap(runtimeSelectors.statics()?.totalNodesIn1k, valid => formatNodes(valid))
-
-    const remainingTime = createMemo(() => {
-        const state = runtimeSelectors.runtimeState()
-
-        const time = state?.type !== undefined && state.type !== "idle" && state.type !== "launched"
-            ? state.resource !== undefined
-                ? state.type === "streaming"
-                    ? durationSeconds(state.resource.time) - durationSeconds(state.lastStatus.time_elapsed)
-                    : durationSeconds(state.resource.time)
-                :undefined
-            : undefined
-
-        return time !== undefined ? Math.round(time) : undefined
-    })
 
     const statusMessage = () => {
         const status = runtimeSelectors.runtimeState()?.type
@@ -39,7 +25,7 @@ export function StatusMessage() {
             return "Engine is started thinking..."
 
         if (status === "streaming")
-            return `Thinking: ${nodes()} nodes visited, up to ${remainingTime()}s remaining...`
+            return `Thinking: ${nodes()} nodes visited...`
 
         if (status === "aborting")
             return "Engine is stopping the current analysis..."

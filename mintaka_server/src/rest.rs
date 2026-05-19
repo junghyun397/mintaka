@@ -16,12 +16,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use rusty_renju::memo::hash_key::HashKey;
 
-#[derive(Serialize)]
-#[typeshare::typeshare]
-pub struct Health {
-    available_workers: u32,
-}
-
 impl From<&AppError> for StatusCode {
     fn from(error: &AppError) -> Self {
         match error {
@@ -51,11 +45,19 @@ impl IntoResponse for AppError {
     }
 }
 
+#[derive(Serialize)]
+#[typeshare::typeshare]
+pub struct Health {
+    available_workers: u32,
+    available_memory_in_mib: u32,
+}
+
 pub async fn status(
     State(state): State<Arc<AppState>>
 ) -> impl IntoResponse {
     Json(Health {
         available_workers: state.available_workers(),
+        available_memory_in_mib: state.available_memory().mib() as u32,
     })
 }
 
@@ -121,7 +123,7 @@ pub async fn get_session_configs(
 pub async fn command_session(
     Path(sid): Path<SessionKey>,
     State(state): State<Arc<AppState>>,
-    Json(payload): Json<Command>
+    Json(payload): Json<Command>,
 ) -> impl IntoResponse {
     state.command_session(sid, payload)
         .map(|response| (StatusCode::ACCEPTED, Json(response)))
@@ -203,6 +205,7 @@ pub async fn destroy_session(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
     state.destroy_session(sid)
+        .await
         .map(|_| StatusCode::NO_CONTENT)
 }
 
@@ -211,15 +214,6 @@ pub async fn hibernate_session(
     State(state): State<Arc<AppState>>
 ) -> impl IntoResponse {
     state.hibernate_session(sid)
-        .await
-        .map(|_| StatusCode::NO_CONTENT)
-}
-
-pub async fn wakeup_session(
-    Path(sid): Path<SessionKey>,
-    State(state): State<Arc<AppState>>
-) -> impl IntoResponse {
-    state.wakeup_session(sid)
         .await
         .map(|_| StatusCode::NO_CONTENT)
 }

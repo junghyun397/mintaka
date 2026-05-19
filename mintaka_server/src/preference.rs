@@ -1,3 +1,4 @@
+use std::time::Duration;
 use clap::Parser;
 use mintaka::config::Config;
 use rusty_renju::utils::byte_size::ByteSize;
@@ -49,6 +50,10 @@ pub struct Preference {
     pub api_password: Option<String>,
     #[arg(long, env = "TOKEN_SECRET", default_value = "verycomplexedsecret")]
     pub session_token_secret: String,
+    #[arg(long, env = "HIBERNATE_TIMEOUT", default_value = "None")]
+    pub hibernate_timeout_secs: Option<u64>,
+    #[clap(skip)]
+    pub hibernate_timeout: Option<Duration>,
     #[clap(skip)]
     pub memory_limit: ByteSize,
     #[clap(skip)]
@@ -89,6 +94,8 @@ impl Preference {
                 observe_sighup: self.tls_renew,
             });
         }
+
+        self.hibernate_timeout = self.hibernate_timeout_secs.map(Duration::from_secs);
 
         self.max_config = Self::parse_config("max_config.toml");
         self.default_config = Self::parse_config("default_config.toml").unwrap_or(Config::default());

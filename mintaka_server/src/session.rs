@@ -177,7 +177,6 @@ pub struct Session {
     best_move: Option<BestMove>,
     abort_handle: Arc<AtomicBool>,
     time_to_live: Option<Duration>,
-    pub persistence: bool,
     pub last_active: Instant,
     pub last_active_seq: u32,
 }
@@ -191,7 +190,7 @@ pub struct SessionData {
 
 impl Session {
 
-    pub fn new(config: Config, game_state: GameState, time_to_live: Option<Duration>, memory_permit: MemoryPermit, response_sender: SessionResponseSender, persistence: bool) -> Self {
+    pub fn new(config: Config, game_state: GameState, time_to_live: Option<Duration>, memory_permit: MemoryPermit, response_sender: SessionResponseSender) -> Self {
         Self {
             state: AgentState::Agent(GameAgent::from_state(config, game_state)),
             response_sender,
@@ -199,7 +198,6 @@ impl Session {
             best_move: None,
             abort_handle: Arc::new(AtomicBool::new(false)),
             time_to_live,
-            persistence,
             last_active: Instant::now(),
             last_active_seq: 0,
         }
@@ -213,7 +211,6 @@ impl Session {
             best_move: data.best_move,
             abort_handle: Arc::new(AtomicBool::new(false)),
             time_to_live: data.time_to_live,
-            persistence: true,
             last_active: Instant::now(),
             last_active_seq: 0,
         }
@@ -268,8 +265,6 @@ impl Session {
             );
 
             let _ = result_sender.send(SessionResultResponse { game_agent, best_move });
-
-            tracing::info!("session finished")
         });
 
         Ok(())
@@ -331,12 +326,13 @@ impl Session {
         }
     }
 
-    pub fn live_until_epoch_secs(&self) -> u64 {
+    pub fn live_until_epoch_secs(&self) -> Option<u64> {
+        let time_to_live = self.time_to_live?;
         let live_time = SystemTime::now()
             - Instant::now().duration_since(self.last_active)
-            + self.time_to_live.unwrap();
+            + time_to_live;
 
-        live_time.duration_since(UNIX_EPOCH).unwrap().as_secs()
+        Some(live_time.duration_since(UNIX_EPOCH).unwrap().as_secs())
     }
 
 }
@@ -404,6 +400,14 @@ impl Default for Sessions {
 }
 
 impl Sessions {
+    fn push_eviction_entry(&self, key: SessionKey, last_active: Instant, last_active_seq: u32) {
+        let mut queue = self.eviction_queue.lock().unwrap();
+        queue.push(Reverse(EvictionEntry {
+            last_active,
+            last_active_seq,
+            key,
+        }));
+    }
 
     pub fn get(&self, key: &SessionKey) -> Option<dashmap::mapref::one::Ref<'_, SessionKey, Session>> {
         self.map.get(key)
@@ -412,6 +416,8 @@ impl Sessions {
     pub fn get_with_touch(&self, key: &SessionKey) -> Option<dashmap::mapref::one::Ref<'_, SessionKey, Session>> {
         if let Some(mut session) = self.map.get_mut(key) {
             session.touch_last_active();
+
+            self.push_eviction_entry(*session.key(), session.last_active, session.last_active_seq);
         };
 
         self.map.get(key)
@@ -421,12 +427,7 @@ impl Sessions {
         if let Some(mut session) = self.map.get_mut(key) {
             session.touch_last_active();
 
-            let mut queue = self.eviction_queue.lock().unwrap();
-            queue.push(Reverse(EvictionEntry {
-                last_active: session.last_active,
-                last_active_seq: session.last_active_seq,
-                key: *session.key()
-            }));
+            self.push_eviction_entry(*session.key(), session.last_active, session.last_active_seq);
 
             Some(session)
         } else {
@@ -434,12 +435,41 @@ impl Sessions {
         }
     }
 
-    pub fn remove(&self, key: &SessionKey) -> Option<Session> {
-        self.map.remove(&key).map(|(_, session)| session)
+    pub fn remove_idle(&self, key: &SessionKey, last_active_seq: Option<u32>) -> Result<Session, AppError> {
+        if let Some((_, session)) = self.map.remove_if(key, |_, session|
+            session.status() == SessionStatus::Idle
+                && last_active_seq.map_or(true, |seq| session.last_active_seq == seq)
+        ) {
+            return Ok(session);
+        }
+
+        match self.map.get(key) {
+            Some(_) => Err(AppError::SessionInComputing),
+            None => Err(AppError::SessionNotFound),
+        }
     }
 
     pub fn insert(&self, key: SessionKey, session: Session) {
+        let last_active = session.last_active;
+        let last_active_seq = session.last_active_seq;
+
         self.map.insert(key, session);
+        self.push_eviction_entry(key, last_active, last_active_seq);
+    }
+
+    pub fn try_insert(&self, key: SessionKey, session: Session) -> Result<(), Session> {
+        let last_active = session.last_active;
+        let last_active_seq = session.last_active_seq;
+
+        match self.map.entry(key) {
+            dashmap::mapref::entry::Entry::Occupied(_) => Err(session),
+            dashmap::mapref::entry::Entry::Vacant(entry) => {
+                entry.insert(session);
+                self.push_eviction_entry(key, last_active, last_active_seq);
+
+                Ok(())
+            }
+        }
     }
 
     pub fn keys(&self) -> Vec<SessionKey> {

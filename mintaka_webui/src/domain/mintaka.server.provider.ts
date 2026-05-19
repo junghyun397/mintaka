@@ -61,6 +61,8 @@ export async function createSession(serverConfig: MintakaServerConfig, state: Ga
 export class MintakaServerProvider implements MintakaProvider {
     private stream?: EventSource
 
+    private streamOpenReject?: (reason?: unknown) => void
+
     private currentHash: HashKey
 
     private onResponse?: (message: MintakaProviderResponse) => void
@@ -103,9 +105,19 @@ export class MintakaServerProvider implements MintakaProvider {
         if (this.currentHash !== expectedHash)
             return "snapshot-mismatch"
 
-        this.startStream()
+        await this.openStream()
 
-        return await this.sendLaunch(expectedHash, objective)
+        try {
+            const response = await this.sendLaunch(expectedHash, objective)
+
+            if (response !== "launched")
+                this.closeStream()
+
+            return response
+        } catch (error) {
+            this.closeStream()
+            throw error
+        }
     }
 
     control(command: MintakaProviderRuntimeCommand) {
@@ -166,13 +178,18 @@ export class MintakaServerProvider implements MintakaProvider {
     }
 
     private closeStream() {
+        if (this.streamOpenReject !== undefined) {
+            this.streamOpenReject(new Error("SSE stream closed before opening"))
+            this.streamOpenReject = undefined
+        }
+
         if (this.stream) {
             this.stream.close()
             this.stream = undefined
         }
     }
 
-    private startStream() {
+    private openStream() {
         this.closeStream()
 
         const streamUrl = new URL(`${serverUrl(this.serverConfig)}/sessions/${this.session.sid}/stream`)
@@ -181,21 +198,64 @@ export class MintakaServerProvider implements MintakaProvider {
         const eventSource = new EventSource(streamUrl.toString())
         this.stream = eventSource
 
-        eventSource.addEventListener("Response", (event) => {
-            this.onResponse && this.onResponse(JSON.parse(event.data) as MintakaResponse)
-        })
+        return new Promise<void>((resolve, reject) => {
+            let openSettled = false
 
-        eventSource.addEventListener("BestMove", (event) => {
-            eventSource.close()
-            this.onResponse && this.onResponse({ type: "BestMove", content: JSON.parse(event.data) as BestMove })
-            this.stream = undefined
-        })
+            const clearOpenReject = () => {
+                if (this.streamOpenReject === rejectOpen)
+                    this.streamOpenReject = undefined
+            }
 
-        eventSource.onerror = (error) => {
-            eventSource.close()
-            this.stream = undefined
-            this.onError(error)
-        }
+            const resolveOpen = () => {
+                if (openSettled)
+                    return
+
+                openSettled = true
+                clearOpenReject()
+                resolve()
+            }
+
+            const rejectOpen = (reason?: unknown) => {
+                if (openSettled)
+                    return
+
+                openSettled = true
+                clearOpenReject()
+                reject(reason)
+            }
+
+            this.streamOpenReject = rejectOpen
+
+            eventSource.onopen = () => {
+                resolveOpen()
+            }
+
+            eventSource.addEventListener("Response", (event) => {
+                this.onResponse && this.onResponse(JSON.parse(event.data) as MintakaResponse)
+            })
+
+            eventSource.addEventListener("BestMove", (event) => {
+                eventSource.close()
+                this.onResponse && this.onResponse({ type: "BestMove", content: JSON.parse(event.data) as BestMove })
+
+                if (this.stream === eventSource)
+                    this.stream = undefined
+            })
+
+            eventSource.onerror = (error) => {
+                eventSource.close()
+
+                if (this.stream === eventSource)
+                    this.stream = undefined
+
+                if (!openSettled) {
+                    rejectOpen(error)
+                    return
+                }
+
+                this.onError(error)
+            }
+        })
     }
 
     private async disconnect() {

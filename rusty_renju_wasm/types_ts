@@ -153,7 +153,7 @@ export interface CompactGameState {
 export interface ComputingResource {
 	workers: number;
 	tt_size: ByteSize;
-	time: DurationSchema;
+	time?: DurationSchema;
 	nodes_in_1k?: number;
 }
 
@@ -192,6 +192,7 @@ export interface CreateSessionResponse {
 
 export interface Health {
 	available_workers: number;
+	available_memory_in_mib: number;
 }
 
 export interface LaunchSessionRequest {

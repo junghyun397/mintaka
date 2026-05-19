@@ -99,7 +99,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .route("/{sid}/abort", post(rest::abort_session))
         .route("/{sid}/result", get(rest::get_session_result))
         .route("/{sid}/hibernate", post(rest::hibernate_session))
-        .route("/{sid}/wakeup", post(rest::wakeup_session))
         .route_layer(middleware::from_fn_with_state(state.clone(), auth_with_header));
 
     let session_stream_routes = Router::new()
@@ -136,10 +135,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tracing::warn!("session creation is not password protected; set MINTAKA_API_PASSWORD environment variable to enable protection");
     }
 
-    state.wakeup_all_sessions().await?;
-
     spawn_session_cleaner(&state);
-    spawn_hibernation_watcher(&state);
+    spawn_sigterm_watcher(&state);
     spawn_hibernation_cleaner(&pref.sessions_directory);
 
     let url = if pref.tls_config.is_some() {
@@ -234,21 +231,22 @@ fn spawn_tls_watcher(shared_rustls_config: RustlsConfig, tls_config: TlsConfig) 
     });
 }
 
-fn spawn_hibernation_watcher(state: &Arc<AppState>) {
-    tracing::info!("watching SIGUSR1 for hibernate all sessions and exit");
+fn spawn_sigterm_watcher(state: &Arc<AppState>) {
+    tracing::info!("watching SIGTERM for hibernate all sessions and exit");
 
     let state = state.clone();
 
     tokio::spawn(async move {
-        let mut signal_stream = tokio::signal::unix::signal(SignalKind::user_defined1()).unwrap();
+        let mut sigterm = tokio::signal::unix::signal(SignalKind::terminate()).unwrap();
 
-        if let Some(_) = signal_stream.recv().await {
-            tracing::info!("received SIGUSR1 signal; hibernate all sessions and exit");
+        sigterm.recv().await;
+        tracing::info!("received SIGTERM signal; hibernate all sessions and exit");
 
-            state.hibernate_all_sessions().await.unwrap();
-
-            std::process::exit(0);
+        if let Err(err) = state.hibernate_all_sessions().await {
+            tracing::warn!("failed to hibernate all sessions: {err}");
         }
+
+        std::process::exit(0);
     });
 }
 
@@ -262,16 +260,29 @@ fn spawn_session_cleaner(state: &Arc<AppState>) {
             interval.tick().await;
 
             let now = Instant::now();
+            let hibernate_timeout = state.preference.hibernate_timeout;
 
-            let expired_keys: Vec<SessionKey> = state.sessions.map.iter()
-                .filter(|session|
-                    session.status() == SessionStatus::Idle && session.is_expired(now)
-                )
-                .map(|session| *session.key())
-                .collect();
+            let mut hibernation_keys = vec![];
+            let mut expired_keys = vec![];
+
+            for session in state.sessions.map.iter()
+                .filter(|session| session.status() == SessionStatus::Idle)
+            {
+                if session.is_expired(now) {
+                    expired_keys.push(*session.key());
+                } else if hibernate_timeout
+                    .is_some_and(|timeout| now.duration_since(session.last_active) > timeout)
+                {
+                    hibernation_keys.push(*session.key());
+                }
+            }
+
+            for session_key in hibernation_keys {
+                let _ = state.hibernate_session(session_key).await;
+            }
 
             for session_key in expired_keys {
-                let _ = state.destroy_session(session_key);
+                let _ = state.destroy_session(session_key).await;
             }
         }
     });
@@ -308,11 +319,15 @@ fn spawn_hibernation_cleaner(directory: &str) {
                     continue;
                 };
 
-                let Ok(expiry_epoch_secs) = expiry_str.parse::<u64>() else {
-                    continue;
+                let expiry_epoch_secs = match expiry_str {
+                    "none" => None,
+                    value => Some(match value.parse::<u64>() {
+                        Ok(expiry) => expiry,
+                        Err(_) => continue,
+                    }),
                 };
 
-                if expiry_epoch_secs < now_epoch_secs {
+                if expiry_epoch_secs.is_none_or(|expiry| expiry >= now_epoch_secs) {
                     continue;
                 }
 
