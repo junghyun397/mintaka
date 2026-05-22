@@ -140,7 +140,10 @@ export function AppContextProvider(props: ParentProps) {
     }
 
     const gameActions: GameActions = {
-        clear: gameController.clear,
+        clear: () => {
+            gameController.clear()
+            void runtimeController.clear()
+        },
         play: (pos) => {
             if (gameSelectors.boardDescribe.winner !== undefined)
                 return

@@ -16,6 +16,7 @@ interface RuntimeController {
     tryLoadServerRuntime: (serverConfig: MintakaServerConfig) => void,
     launch: (snapshot: AppGameState) => void,
     abort: () => void,
+    clear: () => Promise<void>,
     syncPlay: (beforeHash: HashKey, pos: MaybePos) => Promise<void>,
     updateConfig: (config: Config) => void,
     restoreDefaultConfig: () => void,
@@ -89,6 +90,20 @@ export function createRuntimeController(
             return
 
         const commandResult = await runtime.provider.command({ type: "Play", content: { hash: snapshot, pos } })
+
+        handleCommandResult(runtime, runtime.state, commandResult)
+    }
+
+    const clear = async () => {
+        const runtime = mintakaRuntime()
+
+        if (runtime === undefined)
+            return
+
+        if (runtime?.type !== "ready" || runtime?.state.type !== "idle")
+            return
+
+        const commandResult = await runtime.provider.command({ type: "Clear" })
 
         handleCommandResult(runtime, runtime.state, commandResult)
     }
@@ -290,6 +305,7 @@ export function createRuntimeController(
 
             setMintakaRuntime({ ...runtime, state: runtime.state.abort() })
         },
+        clear,
         syncPlay,
         updateConfig: (config: Config) => {
             void updateConfig(config)
