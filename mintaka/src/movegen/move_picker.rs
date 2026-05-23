@@ -1,6 +1,6 @@
 use crate::eval::evaluator::Evaluator;
 use crate::state::GameState;
-use crate::movegen::move_generator::generate_defend_open_four_moves;
+use crate::movegen::move_generator::generate_defend_open_three_moves;
 use crate::movegen::move_list::{MoveEntry, MoveList};
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
@@ -15,23 +15,30 @@ pub const KILLER_MOVE_SCORE: i16 = Score::INF as i16 - 1000;
 pub const COUNTER_MOVE_SCORE: i16 = Score::INF as i16 - 2000;
 pub const MAX_HISTORY_MOVE_SCORE: i16 = 10000;
 
-#[derive(Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 enum MoveStage {
     TT,
     Killer,
     Counter,
-    GenerateAllMoves,
-    AllMoves,
+    Generate(MoveKind),
+    Moves(MoveKind),
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum MoveKind {
+    All,
+    DefendOpenThree,
+    ExtendFour,
 }
 
 pub struct MovePicker {
     stage: MoveStage,
-    forced: bool,
+    forced_defend_three: bool,
     moves_buffer: MoveList,
+    fours_buffer: Bitfield,
     tt_move: MaybePos,
     killer_moves: [MaybePos; KILLER_MOVE_SLOTS],
     occupied_moves: Bitfield,
-    neural_scored: bool,
 }
 
 impl MovePicker {
@@ -39,16 +46,16 @@ impl MovePicker {
     pub fn init_new(
         tt_move: MaybePos,
         killer_moves: [MaybePos; KILLER_MOVE_SLOTS],
-        forced: bool
+        forced_defend_three: bool
     ) -> Self {
         Self {
             stage: MoveStage::TT,
-            forced,
-            moves_buffer: MoveList::default(),
+            forced_defend_three,
+            moves_buffer: MoveList::EMPTY,
+            fours_buffer: Bitfield::ZERO_FILLED,
             tt_move,
             killer_moves,
             occupied_moves: Bitfield::ZERO_FILLED,
-            neural_scored: false,
         }
     }
 
@@ -60,11 +67,13 @@ impl MovePicker {
         if self.stage == MoveStage::TT {
             self.stage = MoveStage::Killer;
 
-            if self.tt_move.is_some() {
-                self.occupied_moves.set(self.tt_move.unwrap());
+            if let Some(tt_move) = self.tt_move.ok()
+                && self.is_forced_legal(state, tt_move)
+            {
+                self.occupied_moves.set(tt_move);
 
                 return Some(MoveEntry {
-                    pos: self.tt_move.unwrap(),
+                    pos: tt_move,
                     move_score: TT_MOVE_SCORE
                 });
             }
@@ -72,20 +81,16 @@ impl MovePicker {
 
         if self.stage == MoveStage::Killer {
             loop {
-                if self.killer_moves[0].is_none() {
+                let Some(killer_move) = self.killer_moves[0].ok() else {
                     self.stage = MoveStage::Counter;
                     break;
-                }
+                };
 
-                let killer_move = self.killer_moves[0];
                 self.killer_moves[0] = self.killer_moves[1];
                 self.killer_moves[1] = MaybePos::NONE;
 
-                if killer_move != self.tt_move
-                    && let killer_move = killer_move.unwrap()
-                    && (!self.forced
-                        || state.board.patterns.field[state.board.player_color][killer_move.idx_usize()].has_close_three()
-                    )
+                if self.occupied_moves.is_cold(killer_move)
+                    && self.is_forced_legal(state, killer_move)
                 {
                     self.occupied_moves.set(killer_move);
 
@@ -98,15 +103,17 @@ impl MovePicker {
         }
 
         if self.stage == MoveStage::Counter {
-            self.stage = MoveStage::GenerateAllMoves;
+            if self.forced_defend_three {
+                self.stage = MoveStage::Generate(MoveKind::DefendOpenThree);
+            } else {
+                self.stage = MoveStage::Generate(MoveKind::All);
+            }
 
-            if !self.forced
-                && state.history.len() > 1
-                && let Some(prev_move) = state.history.recent_player_action().ok()
-                && let maybe_counter_move = td.ht.counter[state.board.player_color][prev_move.idx_usize()]
-                && maybe_counter_move.is_some()
-                && let counter_move = maybe_counter_move.unwrap()
+            if state.history.len() > 1
+                && let Some(prev_move) = state.history.last_action().ok()
+                && let Some(counter_move) = td.ht.counter[state.board.player_color][prev_move.idx_usize()].ok()
                 && self.occupied_moves.is_cold(counter_move)
+                && self.is_forced_legal(state, counter_move)
             {
                 self.occupied_moves.set(counter_move);
 
@@ -117,55 +124,88 @@ impl MovePicker {
             }
         }
 
-        if self.stage == MoveStage::GenerateAllMoves {
-            self.stage = MoveStage::AllMoves;
-
-            if self.forced {
-                generate_defend_open_four_moves(state, &mut self.moves_buffer);
-            } else {
-                self.score_and_push_all_moves(td, state);
-            }
-        }
-
-        if self.stage == MoveStage::AllMoves {
+        if let MoveStage::Moves(kind) = self.stage {
             while let Some(next_move) = self.moves_buffer.consume_best() {
                 if self.occupied_moves.is_hot(next_move.pos) {
                     continue;
                 }
 
+                self.occupied_moves.set(next_move.pos);
+
                 return Some(next_move);
             }
+
+            match kind {
+                MoveKind::DefendOpenThree => self.stage = MoveStage::Generate(MoveKind::ExtendFour),
+                _ => {}
+            }
+        }
+
+        if let MoveStage::Generate(kind) = self.stage {
+            match kind {
+                MoveKind::All =>
+                    score_and_push_all_moves(&mut self.moves_buffer, td, state),
+                MoveKind::DefendOpenThree =>
+                    generate_defend_open_three_moves(&mut self.moves_buffer, &mut self.fours_buffer, &state.board),
+                MoveKind::ExtendFour =>
+                    score_and_push_extend_four_moves(&mut self.moves_buffer, td, state, &self.fours_buffer),
+            }
+
+            self.stage = MoveStage::Moves(kind);
         }
 
         None
     }
 
-    fn score_and_push_all_moves(
-        &mut self,
-        td: &mut ThreadData<impl ThreadType, impl Evaluator>,
-        state: &GameState
-    ) {
-        let policy_buffer = td.evaluator.eval_policy(state);
-
-        self.neural_scored = false;
-
-        let field = state.board.legal_field() & state.movegen_window.movegen_field;
-
-        let player_pattern = state.board.patterns.field[state.board.player_color];
-
-        for idx in field.iter_hot_idx() {
-            let player_pattern = player_pattern[idx];
-
-            let history_score = if player_pattern.has_threes() {
-                td.ht.three[state.board.player_color][idx]
-            } else if player_pattern.has_any_four() {
-                td.ht.four[state.board.player_color][idx]
-            } else {
-                td.ht.quiet[state.board.player_color][idx]
-            }.clamp(-MAX_HISTORY_MOVE_SCORE, MAX_HISTORY_MOVE_SCORE);
-
-            self.moves_buffer.push(Pos::from_index(idx as u8), policy_buffer[idx] + history_score);
+    fn is_forced_legal(&self, state: &GameState, pos: Pos) -> bool {
+        if !self.forced_defend_three {
+            return true;
         }
+
+        state.board.patterns.field[!state.board.player_color][pos.idx_usize()].has_close_three()
+            || state.board.patterns.field[state.board.player_color][pos.idx_usize()].has_any_four()
     }
 
+}
+
+fn score_and_push_all_moves(
+    buffer: &mut MoveList,
+    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
+    state: &GameState
+) {
+    let policy_buffer = td.evaluator.eval_policy(state);
+
+    let field = state.board.legal_field(state.board.player_color) & state.movegen_window.movegen_field;
+
+    let player_pattern = state.board.patterns.field[state.board.player_color];
+
+    for idx in field.iter_hot_idx() {
+        let player_pattern = player_pattern[idx];
+
+        let history_score = if player_pattern.has_three() {
+            td.ht.three[state.board.player_color][idx] / 64
+        } else if player_pattern.has_any_four() {
+            td.ht.four[state.board.player_color][idx] / 64
+        } else {
+            td.ht.quiet[state.board.player_color][idx] / 128
+        };
+
+        buffer.push(Pos::from_index(idx as u8), policy_buffer[idx] + history_score);
+    }
+}
+
+fn score_and_push_extend_four_moves(
+    buffer: &mut MoveList,
+    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
+    state: &GameState,
+    fours_buffer: &Bitfield,
+) {
+    let policy_buffer = td.evaluator.eval_policy(state);
+
+    for idx in fours_buffer.iter_hot_idx() {
+
+        let history_score = td.ht.four[state.board.player_color][idx] / 64;
+
+        buffer.push(Pos::from_index(idx as u8), policy_buffer[idx] + history_score);
+    }
 }

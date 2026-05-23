@@ -18,7 +18,7 @@ use typeshare::typeshare;
 #[cfg_attr(feature = "typeshare", typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone)]
-pub struct CompactGameState {
+pub struct GameStateData {
     pub board: Board,
     pub history: History,
 }
@@ -30,8 +30,8 @@ pub struct CompactGameState {
 #[derive(Debug, Clone)]
 pub enum Command {
     Clear,
-    Load(Box<CompactGameState>),
-    Sync(Box<CompactGameState>),
+    Init(Box<GameStateData>),
+    Sync(Box<GameStateData>),
     Play {
         hash: HashKey,
         pos: MaybePos,
@@ -75,8 +75,8 @@ mod typeshare_workaround {
     #[serde(tag = "type", content = "content")]
     pub enum CommandSchema {
         Clear,
-        Load(Box<CompactGameState>),
-        Sync(Box<CompactGameState>),
+        Init(Box<GameStateData>),
+        Sync(Box<GameStateData>),
         Play {
             hash: HashKey,
             pos: MaybePos,

@@ -1,6 +1,6 @@
 use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
-use mintaka::protocol::command::{Command, CompactGameState};
+use mintaka::protocol::command::{Command, GameStateData};
 use mintaka::protocol::response::{CallBackResponseSender, Response};
 use mintaka::state::GameState;
 use mintaka_interface::message::{Message, MessageCommand, MessageSender, StatusCommand};
@@ -121,7 +121,7 @@ fn print_status(game_agent: &GameAgent, command: StatusCommand) {
             game_agent
                 .state
                 .board
-                .to_string_with_last_moves(game_agent.state.history.recent_action_pair())
+                .to_string_with_last_moves(game_agent.state.history.last_action_pair())
         ),
         StatusCommand::History => println!("= {}", game_agent.state.history),
         StatusCommand::Time => println!("= {:?}", game_agent.time_manager.timer),
@@ -252,8 +252,8 @@ fn handle_command(
 
                 let history = (&board).try_into().unwrap_or_default();
 
-                message_sender.command(MessageCommand::Raw(Command::Load(Box::new(
-                    CompactGameState { board, history },
+                message_sender.command(MessageCommand::Raw(Command::Init(Box::new(
+                    GameStateData { board, history },
                 ))));
             }
             "history" => {
@@ -261,8 +261,8 @@ fn handle_command(
 
                 let board: Board = (&history).into();
 
-                message_sender.command(MessageCommand::Raw(Command::Load(Box::new(
-                    CompactGameState { board, history },
+                message_sender.command(MessageCommand::Raw(Command::Init(Box::new(
+                    GameStateData { board, history },
                 ))));
             }
             &_ => return Err("unknown data type.".to_string()),

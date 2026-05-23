@@ -35,7 +35,7 @@ impl Evaluator for HeuristicEvaluator {
     fn eval_policy(&mut self, state: &GameState) -> PolicyDistribution {
         let mut policy = [0; pattern::PATTERN_SIZE];
 
-        let movegen_field = state.movegen_window.movegen_field & state.board.legal_field();
+        let movegen_field = state.movegen_window.movegen_field & state.board.legal_field(state.board.player_color);
 
         let player_pattern_field = &state.board.patterns.field[state.board.player_color];
         let player_policy_score_lut = &POLICY_SCORE_LUT[state.board.player_color];
@@ -47,7 +47,7 @@ impl Evaluator for HeuristicEvaluator {
             let neighbor_score = self.move_scores.scores[idx] as i16;
 
             let distance_score = {
-                let distance = state.history.avg_distance_to_recent_actions(Pos::from_index(idx as u8)) as i16;
+                let distance = state.history.avg_distance_to_last_actions(Pos::from_index(idx as u8)) as i16;
                 (10 - distance) / 2
             };
 
@@ -70,7 +70,7 @@ impl Evaluator for HeuristicEvaluator {
 
         let parent_score =
             if state.len() > 1 {
-                let recent_action = state.history.recent_action().unwrap();
+                let recent_action = state.history.last_action().unwrap();
                 if let Some(&(hash_key, score)) = self.eval_history.get(state.len() - 2)
                     && hash_key == state.board.hash_key.set(!state.board.player_color, recent_action)
                 {

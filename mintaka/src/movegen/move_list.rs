@@ -13,15 +13,9 @@ pub struct MoveList {
     top: usize,
 }
 
-impl Default for MoveList {
-    fn default() -> Self {
-        Self::EMPTY
-    }
-}
-
 impl MoveList {
 
-    const EMPTY: Self = unsafe { std::mem::zeroed() };
+    pub const EMPTY: Self = unsafe { std::mem::zeroed() };
 
     pub fn push(&mut self, pos: Pos, move_score: i16) {
         self.moves[self.top] = MoveEntry { pos, move_score };

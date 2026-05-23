@@ -1,7 +1,7 @@
 use crate::bitfield::Bitfield;
 use crate::notation::color::{AlignedColorContainer, Color, ColorContainer};
 use crate::notation::direction::Direction;
-use crate::notation::pos::Pos;
+use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::{ForbiddenKind, RuleKind};
 use crate::slice::Slice;
 use crate::slice_pattern::SlicePattern;
@@ -163,10 +163,6 @@ impl Pattern {
         DirectionIterator { packed_unit: self.apply_mask(UNIT_OPEN_THREE_MASK) }
     }
 
-    pub fn iter_four_directions(&self) -> impl Iterator<Item=Direction> + '_ {
-        DirectionIterator { packed_unit: self.apply_mask(UNIT_ANY_FOUR_MASK) }
-    }
-
     pub fn has_invalid_double_three(&self) -> bool {
         self.descending & POTENTIAL == POTENTIAL
     }
@@ -207,7 +203,7 @@ impl Pattern {
 pub struct Patterns {
     pub field: AlignedColorContainer<[Pattern; PATTERN_SIZE]>,
     pub counts: SlicePatternCounts,
-    pub unchecked_five_pos: ColorContainer<Option<Pos>>,
+    pub unchecked_five_pos: ColorContainer<MaybePos>,
     pub candidate_forbidden_field: Bitfield,
     pub forbidden_field: Bitfield,
 }
@@ -223,12 +219,10 @@ impl Patterns {
     pub const EMPTY: Self = Self {
         field: unsafe { std::mem::zeroed() },
         counts: SlicePatternCounts::EMPTY,
-        unchecked_five_pos: ColorContainer::new(None, None),
+        unchecked_five_pos: ColorContainer::new(MaybePos::NONE, MaybePos::NONE),
         candidate_forbidden_field: Bitfield::ZERO_FILLED,
         forbidden_field: Bitfield::ZERO_FILLED,
     };
-
-    pub const EMPTY_UNCHECKED_FIVE_POS: ColorContainer<Option<Pos>> = ColorContainer::new(None, None);
 
     pub fn is_forbidden(&self, pos: Pos) -> bool {
         self.forbidden_field.is_hot(pos)
@@ -279,12 +273,12 @@ impl Patterns {
     fn update_with_slice_pattern_mut<const C: Color, const D: Direction>(
         &mut self, slice: &mut Slice, slice_pattern: SlicePattern
     ) {
-        self.unchecked_five_pos[C] = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK != 0)
-            .then(|| {
-                let slice_idx = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8;
-                Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8))
-            })
-            .or(self.unchecked_five_pos[C]);
+        if (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK) != 0 {
+            let slice_idx = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8;
+            let pos = Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8));
+
+            self.unchecked_five_pos[C] = pos.into();
+        }
 
         self.counts.update_slice_mut::<C, D>(
             slice.idx as usize,
@@ -312,6 +306,23 @@ impl Patterns {
             if C == Color::Black && self.field[Color::Black][idx].is_forbidden_unchecked() {
                 self.candidate_forbidden_field.set_idx(idx);
             }
+        }
+    }
+
+    pub fn effective_open_fours(&self, color: Color) -> u32 {
+        match color {
+            Color::Black => {
+                let mut total_fours = self.counts.global[Color::Black].open_fours as u32;
+
+                if !self.forbidden_field.is_empty() {
+                    total_fours -= self.forbidden_field.iter_hot_idx()
+                        .map(|idx| self.field[Color::Black][idx].count_open_fours())
+                        .sum::<u32>();
+                }
+
+                total_fours
+            },
+            Color::White => self.counts.global[Color::White].open_fours as u32
         }
     }
 

@@ -125,19 +125,7 @@ impl History {
         self.entries[..self.top].iter()
     }
 
-    pub fn inverted_sequence(&self) -> [u8; pos::BOARD_SIZE + 1] {
-        let mut result = [0; pos::BOARD_SIZE + 1];
-
-        for (index, &action) in self.iter().enumerate() {
-            if action.is_some() {
-                result[action.unwrap().idx_usize()] = (index + 1) as u8;
-            }
-        }
-
-        result
-    }
-
-    pub fn recent_action_pair(&self) -> [MaybePos; 2] {
+    pub fn last_action_pair(&self) -> [MaybePos; 2] {
         match self.len() {
             0 => [MaybePos::NONE, MaybePos::NONE],
             1 => [MaybePos::NONE, self.entries[0]],
@@ -145,17 +133,15 @@ impl History {
         }
     }
 
-    pub fn recent_action(&self) -> MaybePos {
-        debug_assert_ne!(self.top, 0);
+    pub fn last_action(&self) -> MaybePos {
         self.entries[self.top - 1]
     }
 
-    pub fn recent_player_action(&self) -> MaybePos {
-        debug_assert!(self.top > 1);
+    pub fn previous_action(&self) -> MaybePos {
         self.entries[self.top - 2]
     }
 
-    pub fn avg_distance_to_recent_action_pair(&self, pos: Pos) -> u8 {
+    pub fn avg_distance_to_last_action_pair(&self, pos: Pos) -> u8 {
         if self.top > 1 {
             let distance1 = self.entries[self.top - 2].distance_or(pos, 0);
             let distance2 = self.entries[self.top - 1].distance_or(pos, 0);
@@ -168,7 +154,7 @@ impl History {
         }
     }
 
-    pub fn avg_distance_to_recent_actions(&self, pos: Pos) -> u8 {
+    pub fn avg_distance_to_last_actions(&self, pos: Pos) -> u8 {
         if self.top > 3 {
             let distance1 = self.entries[self.top - 4].distance_or(pos, 0);
             let distance2 = self.entries[self.top - 3].distance_or(pos, 0);

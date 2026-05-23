@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize, Serializer};
 pub type QuietPlied = PosList<{ 256 - 8 }>;
 pub type TacticalPlied = PosList<{ 64 - 8 }>;
 
-pub const MAX_HISTORY_SCORE: i16 = i16::MAX / 2;
+pub const MAX_HISTORY_SCORE: i32 = (i16::MAX / 2) as i32;
 
 #[derive(Copy, Clone)]
 pub struct HistoryTable {
@@ -37,33 +37,32 @@ impl HistoryTable {
     };
 
     pub fn update_quiet(&mut self, history: &History, quiet_plied: QuietPlied, color: Color, best_move: Pos, depth: Depth) {
+        let bonus = depth * depth * params::HT_QUIET_BONUS_MUL;
+
         for &pos in quiet_plied.iter() {
-            let bonus = (depth * depth) as i16 * ((pos == best_move) as i16 * 2 - 1);
+            let bonus = bonus * Self::is_equal_sign(pos, best_move);
 
-            let updated_score = self.quiet[color][pos.idx_usize()] + bonus;
-            self.quiet[color][pos.idx_usize()] = updated_score.clamp(-MAX_HISTORY_SCORE, MAX_HISTORY_SCORE);
+            Self::update_gravity_score(&mut self.quiet[color][pos.idx_usize()], bonus);
+        }
 
-            if !history.is_empty()
-                && let Some(prev_move) = history.recent_action().ok()
-            {
-                self.counter[color][prev_move.idx_usize()] = best_move.into();
-            }
+        if let Some(prev_move) = history.last_action().ok() {
+            self.counter[color][prev_move.idx_usize()] = best_move.into();
         }
     }
 
     pub fn update_tactical(&mut self, three_plied: TacticalPlied, four_plied: TacticalPlied, color: Color, best_move: Pos, depth: Depth) {
-        for &pos in three_plied.iter() {
-            let bonus = (depth * depth) as i16 * ((pos == best_move) as i16 * 2 - 1);
+        let bonus = depth * depth * params::HT_TACTICAL_BONUS_MUL;
 
-            let updated_score = self.three[color][pos.idx_usize()] + bonus;
-            self.three[color][pos.idx_usize()] = updated_score.clamp(-MAX_HISTORY_SCORE, MAX_HISTORY_SCORE);
+        for &pos in three_plied.iter() {
+            let bonus = bonus * Self::is_equal_sign(pos, best_move);
+
+            Self::update_gravity_score(&mut self.three[color][pos.idx_usize()], bonus);
         }
 
         for &pos in four_plied.iter() {
-            let bonus = (depth * depth) as i16 * ((pos == best_move) as i16 * 2 - 1);
+            let bonus = bonus * Self::is_equal_sign(pos, best_move);
 
-            let updated_score = self.four[color][pos.idx_usize()] + bonus;
-            self.four[color][pos.idx_usize()] = updated_score.clamp(-MAX_HISTORY_SCORE, MAX_HISTORY_SCORE);
+            Self::update_gravity_score(&mut self.four[color][pos.idx_usize()], bonus);
         }
     }
 
@@ -72,7 +71,23 @@ impl HistoryTable {
             .chain(self.three.iter_mut().flatten())
             .chain(self.four.iter_mut().flatten())
         {
-            *score = (*score as f64 * params::HISTORY_TABLE_AGEING_MUL) as i16;
+            *score = (*score as f64 * params::HT_AGEING_MUL) as i16;
+        }
+    }
+
+    fn update_gravity_score(score: &mut i16, bonus: i32) {
+        let current = *score as i32;
+
+        *score = (current + bonus - current * bonus.abs() / MAX_HISTORY_SCORE)
+            .clamp(-MAX_HISTORY_SCORE, MAX_HISTORY_SCORE)
+            as i16;
+    }
+
+    fn is_equal_sign(pos: Pos, best_move: Pos) -> i32 {
+        if pos == best_move {
+            1
+        } else {
+            -1
         }
     }
 
@@ -135,7 +150,7 @@ impl<'de> Deserialize<'de> for HistoryTable {
 
         unsafe { Ok(Self {
             quiet: std::mem::transmute(data.quiet),
-            three: std::mem::transmute(data.quiet),
+            three: std::mem::transmute(data.three),
             four: std::mem::transmute(data.four),
             counter: std::mem::transmute(data.counter),
         }) }

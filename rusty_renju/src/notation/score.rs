@@ -6,6 +6,7 @@ pub trait Scores {
     const INF: Score = i16::MAX as Score - 1;
     const WIN: Score = 32000;
     const DETERMINISTIC: Score = Score::WIN - 300;
+    const ABORT: Score = 0;
     const DRAW: Score = 0;
 
     fn win_in(ply: usize) -> Score {

@@ -3,7 +3,7 @@ use crate::eval::evaluator::{ActiveEvaluator, Evaluator};
 use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
-use crate::protocol::command::{Command, CompactGameState};
+use crate::protocol::command::{Command, GameStateData};
 pub use crate::protocol::response::{ComputingResource, Response, ResponseSender};
 use crate::protocol::results::{BestMove, CommandResult, GameResult};
 use crate::search::iterative_deepening;
@@ -252,12 +252,12 @@ impl GameAgent {
                 self.evaluator = HeuristicEvaluator::from_state(&self.state);
             },
             Command::Clear => {
-                self.reinit_from_state(CompactGameState {
+                self.reinit_from_state(GameStateData {
                     board: Board::default(),
                     history: History::default(),
                 });
             },
-            Command::Load(state) => {
+            Command::Init(state) => {
                 self.reinit_from_state(*state);
             },
             Command::Sync(state) => {
@@ -419,13 +419,13 @@ impl GameAgent {
         }
     }
 
-    fn sync_state(&mut self, compact_state: CompactGameState) {
+    fn sync_state(&mut self, compact_state: GameStateData) {
         self.state = GameState::from_board_and_history(compact_state.board, compact_state.history);
         self.evaluator = ActiveEvaluator::from_state(&self.state);
         self.executed_moves = Bitfield::default();
     }
 
-    fn reinit_from_state(&mut self, compact_state: CompactGameState) {
+    fn reinit_from_state(&mut self, compact_state: GameStateData) {
         self.state = GameState::from_board_and_history(compact_state.board, compact_state.history);
 
         self.evaluator = ActiveEvaluator::from_state(&self.state);

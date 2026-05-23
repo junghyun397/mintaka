@@ -1,6 +1,6 @@
 use crate::bitfield::Bitfield;
 use crate::memo::hash_key::HashKey;
-use crate::notation::color::Color;
+use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::RuleKind;
@@ -48,8 +48,8 @@ impl Board {
             && (self.player_color != Color::Black || !self.patterns.is_forbidden(pos))
     }
 
-    pub fn legal_field(&self) -> Bitfield {
-        match self.player_color {
+    pub fn legal_field(&self, color: Color) -> Bitfield {
+        match color {
             Color::Black => !(self.hot_field | self.patterns.forbidden_field),
             Color::White => !self.hot_field
         }
@@ -186,7 +186,7 @@ impl Board {
             }};
         }
 
-        self.patterns.unchecked_five_pos = Patterns::EMPTY_UNCHECKED_FIVE_POS;
+        self.patterns.unchecked_five_pos = ColorContainer::new(MaybePos::NONE, MaybePos::NONE);
 
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
         update_by_slice!(Direction::Horizontal, horizontal_slice, pos.col());
@@ -218,7 +218,7 @@ impl Board {
             }};
         }
 
-        self.patterns.unchecked_five_pos = Patterns::EMPTY_UNCHECKED_FIVE_POS;
+        self.patterns.unchecked_five_pos = ColorContainer::new(MaybePos::NONE, MaybePos::NONE);
 
         for horizontal_slice in self.slices.horizontal_slices.iter_mut() {
             update_by_slice!(horizontal_slice, Direction::Horizontal);
@@ -315,7 +315,7 @@ impl Board {
         };
 
         for direction in pattern_unit.iter_three_directions() {
-            if !C::IS_ROOT && direction == context.parent_direction() {
+            if context.is_parent_direction(direction) {
                 continue;
             }
 
@@ -374,9 +374,8 @@ impl Board {
             (0 .. direction_from as usize * 3)
                 .chain((direction_from as usize + 1) * 3 .. 12)
         {
-            let four_pos = overrides.next_four[next_four_idx];
-            if four_pos.is_some() {
-                overrides.bitfield.set(four_pos.unwrap());
+            if let Some(four_pos) = overrides.next_four[next_four_idx].ok() {
+                overrides.bitfield.set(four_pos);
             }
         }
 
@@ -455,27 +454,6 @@ impl Board {
         (((stones << 2) >> slice_idx) & 0b11111) as u8 // 0[00V00]0
     }
 
-    pub fn is_forced_defense(&self) -> bool {
-        self.effective_open_fours(self.player_color) != 0
-    }
-
-    fn effective_open_fours(&self, color: Color) -> u32 {
-        match color {
-            Color::White => {
-                let mut total_fours = self.patterns.counts.global[Color::Black].open_fours as u32;
-
-                if !self.patterns.forbidden_field.is_empty() {
-                    total_fours -= self.patterns.forbidden_field.iter_hot_idx()
-                        .map(|idx| self.patterns.field[Color::Black][idx].count_open_fours())
-                        .sum::<u32>();
-                }
-
-                total_fours
-            },
-            Color::Black => self.patterns.counts.global[Color::White].open_fours as u32
-        }
-    }
-
 }
 
 impl PartialEq for Board {
@@ -503,7 +481,7 @@ trait ValidateThreeContext : Copy {
 
     fn parent_pos(&self) -> Pos;
 
-    fn parent_direction(&self) -> Direction;
+    fn is_parent_direction(&self, direction: Direction) -> bool;
 
     fn branch_overrides(&self) -> SetOverrides;
 
@@ -523,15 +501,15 @@ impl ValidateThreeContext for ValidateThreeRoot {
         self.root_pos
     }
 
-    fn parent_direction(&self) -> Direction {
-        unreachable!()
+    fn is_parent_direction(&self, _: Direction) -> bool {
+        false
     }
 
     fn branch_overrides(&self) -> SetOverrides {
         SetOverrides::new(self.root_pos)
     }
 
-    fn override_contains(&self, _pos: Pos) -> bool {
+    fn override_contains(&self, _: Pos) -> bool {
         false
     }
 }
@@ -551,8 +529,8 @@ impl ValidateThreeContext for ValidateThreeNode {
         self.parent_pos
     }
 
-    fn parent_direction(&self) -> Direction {
-        self.parent_direction
+    fn is_parent_direction(&self, direction: Direction) -> bool {
+        self.parent_direction == direction
     }
 
     fn branch_overrides(&self) -> SetOverrides {

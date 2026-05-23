@@ -38,4 +38,6 @@ pub const LMP_DIV_NON_IMPROVING: f64 = parse_float!("lmp_div_non_improving", f64
 pub const FP_BASE: Depth = parse_int!("fp_base", Depth, 100);
 pub const FP_MUL: Depth = parse_int!("fp_mul", Depth, 32);
 
-pub const HISTORY_TABLE_AGEING_MUL: f64 = parse_float!("history_table_ageing_mul", f64, 0.75);
+pub const HT_QUIET_BONUS_MUL: i32 = parse_int!("ht_quiet_bonus_mul", i32, 16);
+pub const HT_TACTICAL_BONUS_MUL: i32 = parse_int!("ht_tactical_bonus_mul", i32, 16);
+pub const HT_AGEING_MUL: f64 = parse_float!("ht_ageing_mul", f64, 0.75);

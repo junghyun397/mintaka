@@ -1,4 +1,3 @@
-use crate::state::GameState;
 use crate::movegen::move_list::MoveList;
 use crate::search_endgame::{EndgameMovesUnchecked, ENDGAME_MAX_MOVES};
 use rusty_renju::board::Board;
@@ -8,12 +7,7 @@ use rusty_renju::utils::platform;
 use rusty_renju::{cartesian_to_index, pattern};
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
-
-fn score_distance(state: &GameState, pos: Pos) -> i16 {
-    let distance = (state.history.avg_distance_to_recent_actions(pos).max(8) + 4) as f32;
-
-    (16 - distance as i16) / 2
-}
+use rusty_renju::bitfield::Bitfield;
 
 pub fn generate_endgame_moves<const VCT: bool>(board: &Board, distance_window: u8, recent_move: Pos) -> EndgameMovesUnchecked {
     let mut vcf_moves = [MaybePos::NONE; ENDGAME_MAX_MOVES];
@@ -73,9 +67,9 @@ pub fn generate_endgame_moves<const VCT: bool>(board: &Board, distance_window: u
     EndgameMovesUnchecked { moves: vcf_moves, top: vcf_moves_top as u8 }
 }
 
-pub fn generate_defend_open_four_moves(state: &GameState, moves: &mut MoveList) {
-    let player_ptr = state.board.patterns.field[state.board.player_color].as_ptr() as *const u32;
-    let opponent_ptr = state.board.patterns.field[!state.board.player_color].as_ptr() as *const u32;
+pub fn generate_defend_open_three_moves(moves: &mut MoveList, fours: &mut Bitfield, board: &Board) {
+    let player_ptr = board.patterns.field[board.player_color].as_ptr() as *const u32;
+    let opponent_ptr = board.patterns.field[!board.player_color].as_ptr() as *const u32;
 
     let zero_mask = Simd::splat(0);
     let four_mask = Simd::splat(pattern::UNIT_ANY_FOUR_MASK);
@@ -93,23 +87,21 @@ pub fn generate_defend_open_four_moves(state: &GameState, moves: &mut MoveList) 
         player_vector &= four_mask;
         opponent_vector &= close_three_mask;
 
-        let mut three_bitmask = player_vector.simd_ne(zero_mask).to_bitmask();
-        let mut four_bitmask = opponent_vector.simd_ne(zero_mask).to_bitmask();
+        let mut close_three_bitmask = opponent_vector.simd_ne(zero_mask).to_bitmask();
+        let mut extend_four_bitmask = player_vector.simd_ne(zero_mask).to_bitmask();
 
-        while three_bitmask != 0 {
-            let lane_position = three_bitmask.trailing_zeros() as usize;
-            three_bitmask &= three_bitmask - 1;
+        while close_three_bitmask != 0 {
+            let lane_position = close_three_bitmask.trailing_zeros() as usize;
+            close_three_bitmask &= close_three_bitmask - 1;
 
-            let pos = Pos::from_index((start_idx + lane_position) as u8);
-            moves.push(pos, 256);
+            moves.push(Pos::from_index((start_idx + lane_position) as u8), 256);
         }
 
-        while four_bitmask != 0 {
-            let lane_position = four_bitmask.trailing_zeros() as usize;
-            four_bitmask &= four_bitmask - 1;
+        while extend_four_bitmask != 0 {
+            let lane_position = extend_four_bitmask.trailing_zeros() as usize;
+            extend_four_bitmask &= extend_four_bitmask - 1;
 
-            let pos = Pos::from_index((start_idx + lane_position) as u8);
-            moves.push(pos, score_distance(state, pos));
+            fours.set(Pos::from_index((start_idx + lane_position) as u8));
         }
     }
 }

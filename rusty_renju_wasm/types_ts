@@ -29,8 +29,8 @@ export type ByteSize = LongInt;
 
 export type CommandSchema = 
 	| { type: "Clear", content?: undefined }
-	| { type: "Load", content: CompactGameState }
-	| { type: "Sync", content: CompactGameState }
+	| { type: "Init", content: GameStateData }
+	| { type: "Sync", content: GameStateData }
 	| { type: "Play", content: {
 	hash: HashKey;
 	pos: MaybePos;
@@ -145,11 +145,6 @@ export interface CommandResult {
 	result?: GameResult;
 }
 
-export interface CompactGameState {
-	board: Board;
-	history: History;
-}
-
 export interface ComputingResource {
 	workers: number;
 	tt_size: ByteSize;
@@ -188,6 +183,11 @@ export interface CreateSessionResponse {
 	token: string;
 	hash: string;
 	version: string;
+}
+
+export interface GameStateData {
+	board: Board;
+	history: History;
 }
 
 export interface Health {

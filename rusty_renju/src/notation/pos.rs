@@ -244,6 +244,7 @@ impl MaybePos {
         }
     }
 
+    // same codegen as a manual branch
     pub fn ok(self) -> Option<Pos> {
         self.is_some().then_some(self.0)
     }

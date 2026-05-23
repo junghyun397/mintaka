@@ -1,6 +1,6 @@
 use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
-use mintaka::protocol::command::{Command, CompactGameState};
+use mintaka::protocol::command::{Command, GameStateData};
 use mintaka::protocol::response::{CallBackResponseSender, Response};
 use mintaka_interface::message::{Message, MessageCommand, MessageSender};
 use rusty_renju::board::Board;
@@ -285,7 +285,7 @@ fn match_command(
             let board: Board = (&history).into();
 
             message_sender.command(MessageCommand::Raw(Command::Sync(Box::new(
-                CompactGameState { board, history },
+                GameStateData { board, history },
             ))));
 
             if args[0] == "BOARD" {

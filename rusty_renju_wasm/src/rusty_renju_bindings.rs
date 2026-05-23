@@ -122,8 +122,8 @@ impl BoardWorker {
     pub fn set(self, pos: MaybePos) -> Self {
         let maybe_pos: rusty_renju::notation::pos::MaybePos = try_from_js_value(pos).unwrap();
 
-        if maybe_pos.is_some() {
-            self.inner.set(maybe_pos.unwrap()).into()
+        if let Some(pos) = maybe_pos.ok() {
+            self.inner.set(pos).into()
         } else {
             self.inner.pass().into()
         }
@@ -132,8 +132,8 @@ impl BoardWorker {
     pub fn unset(self, pos: MaybePos) -> Self {
         let maybe_pos: rusty_renju::notation::pos::MaybePos = try_from_js_value(pos).unwrap();
 
-        if maybe_pos.is_some() {
-            self.inner.unset(maybe_pos.unwrap()).into()
+        if let Some(pos) = maybe_pos.ok() {
+            self.inner.unset(pos).into()
         } else {
             self.inner.pass().into()
         }

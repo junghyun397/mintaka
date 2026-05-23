@@ -12,26 +12,7 @@ use crate::value::Depth;
 use crate::{params, value};
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::{Score, Scores};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub struct RootMove {
-    pub score: RootScore,
-    pub nodes_in_1k: usize,
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum RootScore {
-    Exact(Score),
-    FailHigh,
-    FailLow,
-    #[default] Unknown,
-}
-
 
 #[derive(Debug, Copy, Clone)]
 pub struct SearchFrame {
@@ -170,7 +151,6 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
 
     pub fn push_ply(&mut self, pos: Pos) {
         self.ply += 1;
-        self.batch_counter.increment_single();
         self.ss[self.ply].pos = pos.into();
         self.ss[self.ply].cutoffs = 0;
     }
@@ -185,7 +165,9 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
     }
 
     pub fn clear_killer(&mut self) {
-        self.killers[self.ply + 1] = [MaybePos::NONE; 2];
+        if self.ply + 2 < value::MAX_PLY {
+            self.killers[self.ply + 2] = [MaybePos::NONE; 2];
+        }
     }
 
     pub fn clear_endgame_stack(&mut self) {

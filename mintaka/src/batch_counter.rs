@@ -17,16 +17,8 @@ impl<'a> BatchCounter<'a> {
         }
     }
 
-    pub fn increment_single(&mut self) {
-        self.increment_amount(1);
-    }
-
-    pub fn increment_pair(&mut self) {
-        self.increment_amount(2);
-    }
-
-    fn increment_amount(&mut self, amount: u64) {
-        self.buffer += amount;
+    pub fn increment(&mut self) {
+        self.buffer += 1;
         if self.buffer >= 1000 {
             self.global_counter_in_1k.fetch_add(1, Ordering::Relaxed);
             self.local_counter_in_1k += 1;

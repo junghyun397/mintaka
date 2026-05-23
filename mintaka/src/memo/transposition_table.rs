@@ -3,7 +3,7 @@ use crate::value::Depth;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
-use rusty_renju::notation::score::Score;
+use rusty_renju::notation::score::{Score, Scores};
 use rusty_renju::utils::byte_size::ByteSize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize, Serializer};
@@ -95,7 +95,7 @@ impl TranspositionTable {
 
     // compression level: 0-9
     pub fn export(&self, compression_level: u32) -> Vec<u8> {
-        let age = self.fetch_age().to_le_bytes();
+        let age = self.fetch_age().to_be_bytes();
         let byte_len = self.table.len() * size_of::<TTEntryBucket>();
         let byte_cap = self.table.capacity() * size_of::<TTEntryBucket>();
 
@@ -237,6 +237,22 @@ impl TTView<'_> {
                 (entry as *const TTEntryBucket).cast(),
             );
         }
+    }
+}
+
+pub fn encode_mate_distance(score: Score, ply: usize) -> Score {
+    if Score::is_deterministic(score) {
+        score + (ply as Score) * score.signum()
+    } else {
+        score
+    }
+}
+
+pub fn decode_mate_distance(score: Score, ply: usize) -> Score {
+    if Score::is_deterministic(score) {
+        score - (ply as Score) * score.signum()
+    } else {
+        score
     }
 }
 

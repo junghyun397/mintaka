@@ -22,5 +22,6 @@ pub mod value;
 pub mod utils;
 pub mod search_endgame;
 pub mod params;
+mod search_snap;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -388,7 +388,7 @@ fn draw_recent(
     res: &Resources,
     include_prev: bool,
 ) {
-    let [prev, last] = history.recent_action_pair();
+    let [prev, last] = history.last_action_pair();
 
     let mut draw = |pos: Option<Pos>, sprite: &ColorContainer<Pixmap>| {
         if let Some(pos) = pos
