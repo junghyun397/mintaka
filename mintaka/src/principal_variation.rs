@@ -15,7 +15,6 @@ pub struct PrincipalVariation {
 }
 
 impl PrincipalVariation {
-
     pub const EMPTY: Self = Self { line: [MaybePos::NONE; MAX_PLY], top: 0 };
 
     pub fn moves(&self) -> &[MaybePos] {
@@ -36,7 +35,6 @@ impl PrincipalVariation {
         self.top = rest.top + 1;
         self.line[1 .. self.top].copy_from_slice(rest.moves());
     }
-
 }
 
 impl Display for PrincipalVariation {

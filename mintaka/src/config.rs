@@ -91,7 +91,6 @@ impl Ord for Config {
 }
 
 impl Config {
-
     pub const UNLIMITED_CONFIG: Self = Self {
         rule_kind: RuleKind::Renju,
         draw_condition: pos::BOARD_SIZE as u32,
@@ -113,7 +112,6 @@ impl Config {
     pub fn max_depth(&self) -> Depth {
         self.max_depth.unwrap_or(Depth::PLY_LIMIT)
     }
-
 }
 
 #[derive(Debug)]
@@ -132,7 +130,6 @@ impl Display for ConfigValidationError {
 impl std::error::Error for ConfigValidationError {}
 
 impl Config {
-
     pub fn validate(self) -> Result<Self, ConfigValidationError> {
         if self.draw_condition > history::MAX_HISTORY_SIZE as u32 {
             Err(ConfigValidationError::DrawConditionDeeperThenMaxHistory)
@@ -144,5 +141,4 @@ impl Config {
             Ok(self)
         }
     }
-
 }

@@ -11,10 +11,11 @@ mod template {
     use std::sync::atomic::{AtomicBool, AtomicU32};
     use std::sync::Arc;
     use std::time::Instant;
+    use rusty_renju::utils::empty::Empty;
 
     fn td() {
         let config = Config::default();
-        let source = Board::default();
+        let source = Board::empty();
 
         let state = source.into();
 
@@ -43,7 +44,7 @@ mod template {
             let mut config = Config::default();
             config.max_nodes_in_1k = Some(1000);
 
-            let source = Board::default();
+            let source = Board::empty();
 
             let state = source.into();
 

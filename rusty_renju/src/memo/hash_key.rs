@@ -11,6 +11,7 @@ use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
+use crate::utils::empty::Empty;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -36,8 +37,8 @@ impl HashKey {
 
 }
 
-impl Default for HashKey {
-    fn default() -> Self {
+impl Empty for HashKey {
+    fn empty() -> Self {
         Self(hash_table::EMPTY_HASH)
     }
 }
@@ -53,7 +54,7 @@ impl From<&[Slice; pos::U_BOARD_WIDTH]> for HashKey {
     fn from(value: &[Slice; pos::U_BOARD_WIDTH]) -> Self {
         value.iter()
             .enumerate()
-            .fold(HashKey::default(), |mut key, (row, slice)| {
+            .fold(HashKey::empty(), |mut key, (row, slice)| {
                 for col in 0 .. pos::BOARD_WIDTH {
                     if let Some(color) = slice.stone_kind(col) {
                         key = key.set_idx(color, cartesian_to_index!(row, col as usize))

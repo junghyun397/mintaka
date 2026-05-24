@@ -7,13 +7,14 @@ use crate::movegen::move_picker::MovePicker;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
 use crate::search_endgame::endgame_search;
-use crate::state::GameState;
+use crate::game_state::GameState;
 use crate::thread_data::{SearchFrame, ThreadData};
 use crate::thread_type::ThreadType;
 use crate::utils::time::MonotonicClock;
 use crate::value::Depth;
 use crate::{params, value};
 use rusty_renju::const_for;
+use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{Score, Scores};
@@ -197,11 +198,10 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
             on_pv: NT::IS_PV,
             recovery_state: state.recovery_state(),
             searching: MaybePos::NONE,
-            cutoffs: 0,
         };
 
         td.push_ply(pos);
-        state.set_mut(pos);
+        state.play_mut(pos);
 
         // no depth reduction for forced defense
         let score = -pvs::<CLK, R, TH, NT::NextType>(td, state, depth_left, -beta, -alpha, cut_node);
@@ -309,7 +309,9 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
     };
 
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
-        return endgame_search::<R, false>(td, td.config.max_vcf_depth.unwrap_or(100), state, static_eval, alpha, beta);
+        return endgame_search::<R, false>(
+            td, td.config.max_vcf_depth.unwrap_or(pos::BOARD_SIZE as Depth), state, alpha, beta, static_eval
+        );
     }
 
     td.ss[td.ply].recovery_state = state.recovery_state();
@@ -332,6 +334,8 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
             continue;
         }
 
+        moves_made += 1;
+
         let player_pattern = state.board.patterns.field[state.board.player_color][pos.idx_usize()];
         let on_three = player_pattern.has_three();
         let on_four = player_pattern.has_any_four();
@@ -339,12 +343,13 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         if !NT::IS_PV
             && !is_tactical
+            && !forced_defense
             && move_score < move_picker::KILLER_MOVE_SCORE
         {
             // move count pruning
             let lmp_margin = lookup_lmp_mc_table(depth_left, static_eval_improvement > 0);
             if moves_made >= lmp_margin {
-                continue;
+                break 'position_search;
             }
 
             // futility pruning
@@ -352,16 +357,14 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
             if !Score::is_winning(alpha)
                  && static_eval + fp_margin <= alpha
             {
-                continue;
+                break 'position_search;
             }
         }
 
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
         td.push_ply(pos);
-        state.set_mut(pos);
-
-        moves_made += 1;
+        state.play_mut(pos);
 
         if on_three {
             three_plied.push(pos);
@@ -379,9 +382,9 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
             let mut reduction = 1;
 
             // late move reduction
-            if !NT::IS_ROOT
+            if depth_left > 2
                 && move_score < move_picker::KILLER_MOVE_SCORE
-                && depth_left > 1
+                && (!NT::IS_ROOT || moves_made > 2)
             {
                 // base reduction
                 reduction += td.lookup_lmr_table(depth_left, moves_made);
@@ -392,6 +395,10 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 // reduction pv less
                 reduction -= Depth::from(NT::IS_PV);
 
+                if NT::IS_ROOT {
+                    reduction -= 1;
+                }
+
                 // reduction tactical less
                 if is_tactical
                     && td.ply < 4
@@ -399,10 +406,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
                     reduction -= 1;
                 }
 
-                // reduction sparse fail-highs
-                reduction -= (td.ss[td.ply].cutoffs < 4) as Depth;
-
-                reduction = reduction.max(1);
+                reduction = reduction.clamp(1, depth_left - 1);
             }
 
             depth_left - reduction
@@ -411,10 +415,24 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
         let score = if moves_made == 1 { // full-window search
             -pvs::<CLK, R, TH, NT::NextType>(td, state, reduced_depth_left, -beta, -alpha, false)
         } else { // zero-window search
-            let mut score = -pvs::<CLK, R, TH, OffPVNode>(td, state, reduced_depth_left, -alpha - 1, -alpha, true);
+            let mut score = -pvs::<CLK, R, TH, OffPVNode>(
+                td, state, reduced_depth_left, -alpha - 1, -alpha, true
+            );
 
-            if score > alpha { // zero-window failed, full-window search
-                score = -pvs::<CLK, R, TH, NT::NextType>(td, state, depth_left - 1, -beta, -alpha, false);
+            if score > alpha
+                && reduced_depth_left < depth_left - 1
+            { // zero-window failed, full-depth null-window search
+                score = -pvs::<CLK, R, TH, OffPVNode>(
+                    td, state, depth_left - 1, -alpha - 1, -alpha, !cut_node
+                );
+            }
+
+            if NT::IS_PV
+                && alpha < score && score < beta
+            { // exact value required, full-window search
+                score = -pvs::<CLK, R, TH, NT::NextType>(
+                    td, state, depth_left - 1, -beta, -alpha, false,
+                );
             }
 
             score
@@ -443,8 +461,6 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
             }
 
             if alpha >= beta { // beta cutoff
-                td.ss[td.ply].cutoffs += 1;
-
                 break 'position_search;
             }
         }

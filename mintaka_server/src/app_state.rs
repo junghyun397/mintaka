@@ -4,7 +4,7 @@ use crate::session::{Session, SessionData, SessionKey, SessionResponse, SessionR
 use crate::stream_response_sender::StreamSessionResponseSender;
 use mintaka::config::Config;
 use mintaka::protocol::command::Command;
-use mintaka::state::GameState;
+use mintaka::game_state::GameState;
 use rusty_renju::utils::byte_size::ByteSize;
 use std::cmp::Reverse;
 use std::io::ErrorKind;

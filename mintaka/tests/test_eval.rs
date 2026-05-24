@@ -2,7 +2,7 @@
 mod test_eval {
     use indoc::indoc;
     use mintaka::eval::evaluator::{ActiveEvaluator, Evaluator};
-    use mintaka::state::GameState;
+    use mintaka::game_state::GameState;
     use rusty_renju::board;
     use rusty_renju::notation::pos;
 
@@ -25,7 +25,7 @@ mod test_eval {
 
         for pos in movegen_field.iter_hot_pos() {
             let mut state = *state;
-            state.set_mut(pos);
+            state.play_mut(pos);
 
             let score = -evaluator.eval_value(&state);
 

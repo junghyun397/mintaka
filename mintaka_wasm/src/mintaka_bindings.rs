@@ -1,3 +1,4 @@
+use rusty_renju::utils::empty::Empty;
 use crate::{to_js_err, to_js_value, try_from_js_value, WebClock};
 use mintaka::protocol::response::ResponseSender;
 use std::cell::RefCell;
@@ -41,7 +42,7 @@ impl GameAgent {
     #[wasm_bindgen(constructor)]
     pub fn new(config: Config, state: GameState) -> Self {
         let config: mintaka::config::Config = try_from_js_value(config).unwrap_or_default();
-        let state: mintaka::state::GameState = try_from_js_value(state).unwrap_or_default();
+        let state: mintaka::game_state::GameState = try_from_js_value(state).unwrap_or_else(|_| mintaka::game_state::GameState::empty());
 
         Self {
             inner: Arc::new(RefCell::new(mintaka::game_agent::GameAgent::from_state(config, state))),

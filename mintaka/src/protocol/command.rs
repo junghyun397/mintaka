@@ -1,6 +1,5 @@
 use crate::config::Config;
-use rusty_renju::board::Board;
-use rusty_renju::history::History;
+use crate::game_state::GameStateData;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
@@ -14,14 +13,6 @@ use std::fmt::Debug;
 use std::time::Duration;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
-
-#[cfg_attr(feature = "typeshare", typeshare)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Clone)]
-pub struct GameStateData {
-    pub board: Board,
-    pub history: History,
-}
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "CommandSchema"))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

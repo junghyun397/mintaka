@@ -6,16 +6,53 @@ use rusty_renju::notation::pos::{MaybePos, Pos};
 use serde::{Deserialize, Serialize, Deserializer, Serializer};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
+use rusty_renju::utils::empty::Empty;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "GameStateData"))]
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct GameState {
     pub board: Board,
     pub history: History,
     pub movegen_window: MovegenWindow,
 }
 
-#[derive(Default, Debug, Copy, Clone)]
+impl Empty for GameState {
+    fn empty() -> Self {
+        Self {
+            board: Board::empty(),
+            history: History::empty(),
+            movegen_window: MovegenWindow::EMPTY,
+        }
+    }
+}
+
+#[cfg_attr(feature = "typeshare", typeshare)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Copy, Clone)]
+pub struct GameStateData {
+    pub board: Board,
+    pub history: History,
+}
+
+impl From<GameState> for GameStateData {
+    fn from(state: GameState) -> Self {
+        Self { board: state.board, history: state.history }
+    }
+}
+
+impl From<GameStateData> for GameState {
+    fn from(data: GameStateData) -> Self {
+        let movegen_window = MovegenWindow::from(&data.board.hot_field);
+
+        Self {
+            board: data.board,
+            history: data.history,
+            movegen_window,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 pub struct RecoveryState {
     pub movegen_window: MovegenWindow
 }
@@ -28,14 +65,6 @@ impl RecoveryState {
 
 impl GameState {
 
-    pub fn from_board_and_history(board: Board, history: History) -> Self {
-        GameState {
-            board,
-            history,
-            movegen_window: MovegenWindow::from(&board.hot_field),
-        }
-    }
-
     pub fn recovery_state(&self) -> RecoveryState {
         RecoveryState {
             movegen_window: self.movegen_window
@@ -43,7 +72,7 @@ impl GameState {
     }
 
     pub fn play(mut self, pos: Pos) -> Self {
-        self.set_mut(pos);
+        self.play_mut(pos);
         self
     }
 
@@ -62,7 +91,7 @@ impl GameState {
         self
     }
 
-    pub fn set_mut(&mut self, pos: Pos) {
+    pub fn play_mut(&mut self, pos: Pos) {
         self.board.set_mut(pos);
         self.history.set_mut(pos);
 
@@ -104,7 +133,7 @@ impl GameState {
 
 impl From<Board> for GameState {
     fn from(board: Board) -> Self {
-        let history = (&board).try_into().unwrap_or_default();
+        let history: History = (&board).try_into().unwrap_or_else(|_| History::empty());
 
         GameState {
             board,
@@ -124,13 +153,6 @@ impl From<History> for GameState {
             movegen_window: MovegenWindow::from(&board.hot_field),
         }
     }
-}
-
-#[cfg_attr(feature = "typeshare", typeshare)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-struct GameStateData {
-    board: Board,
-    history: History,
 }
 
 #[cfg(feature = "serde")]

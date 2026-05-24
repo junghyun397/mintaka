@@ -17,6 +17,7 @@ use std::str::FromStr;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 use crate::board_utils::BoardWinner;
+use crate::utils::empty::Empty;
 
 pub const SYMBOL_BLACK: char = 'X';
 pub const SYMBOL_WHITE: char = 'O';
@@ -278,7 +279,7 @@ impl Board {
 
 impl From<&History> for Board {
     fn from(value: &History) -> Self {
-        let mut board = Board::default();
+        let mut board = Board::empty();
 
         board.batch_set_mut(value.actions());
 
@@ -306,7 +307,7 @@ impl FromStr for Board {
         let blacks = extract_stones_by_color(Color::Black, &elements);
         let whites = extract_stones_by_color(Color::White, &elements);
 
-        let mut board = Board::default();
+        let mut board = Board::empty();
         let player_color = Color::player_color_from_each_moves(blacks.len(), whites.len());
 
         board.batch_set_each_color_mut(blacks, whites, player_color);
@@ -398,7 +399,7 @@ impl<'de> Deserialize<'de> for Board {
         let black_moves = data.bitfield[Color::Black].iter_hot_pos().collect::<Box<_>>();
         let white_moves = data.bitfield[Color::White].iter_hot_pos().collect::<Box<_>>();
 
-        let mut board = Board::default();
+        let mut board = Board::empty();
 
         board.batch_set_each_color_mut(black_moves, white_moves, data.player_color);
 

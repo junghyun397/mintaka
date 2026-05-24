@@ -3,11 +3,12 @@ mod test_image {
     use rusty_renju::board::Board;
     use rusty_renju::history::History;
     use rusty_renju::notation::pos::pos_unchecked;
+    use rusty_renju::utils::empty::Empty;
     use rusty_renju_image::{rusty_renju_image_format_png, rusty_renju_image_render, rusty_renju_image_renderer_sequence, HistoryRender, RenderPayloads};
 
     #[test]
     fn default_image() {
-        let history = History::default()
+        let history = History::empty()
             .set(pos_unchecked("h8"))
             .set(pos_unchecked("g7"))
             ;

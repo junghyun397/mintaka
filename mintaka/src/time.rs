@@ -19,7 +19,6 @@ pub struct Timer {
 }
 
 impl Default for Timer {
-
     fn default() -> Self {
         Self {
             total_remaining: Some(Duration::from_secs(60 * 5)),
@@ -27,11 +26,9 @@ impl Default for Timer {
             turn: Some(Duration::from_secs(30)),
         }
     }
-
 }
 
 impl Timer {
-
     pub const INFINITE: Self = Self::new(None, Duration::ZERO, None);
 
     pub const fn new(
@@ -67,7 +64,6 @@ impl Timer {
             *total_remaining += additional_time;
         }
     }
-
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -95,7 +91,6 @@ impl From<Timer> for TimeManager {
 }
 
 impl TimeManager {
-
     pub fn new(timer: Timer) -> Self {
         Self {
             timer,
@@ -118,5 +113,4 @@ impl TimeManager {
             self.timer.turn
         }
     }
-
 }

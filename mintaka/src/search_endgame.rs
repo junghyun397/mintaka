@@ -1,5 +1,5 @@
 use crate::eval::evaluator::Evaluator;
-use crate::state::GameState;
+use crate::game_state::GameState;
 use crate::memo::transposition_table::{encode_mate_distance, TTView};
 use crate::memo::tt_entry::{ScoreKind, TTFlag};
 use crate::movegen::move_generator::generate_endgame_moves;
@@ -171,9 +171,9 @@ pub fn endgame_search<const R: RuleKind, const VCT: bool>(
     td: &mut ThreadData<impl ThreadType, impl Evaluator>,
     max_ply: Depth,
     state: &GameState,
-    static_eval: Score,
     alpha: Score,
     beta: Score,
+    static_eval: Score,
 ) -> Score {
     let counts = state.board.patterns.counts.global[state.board.player_color];
 

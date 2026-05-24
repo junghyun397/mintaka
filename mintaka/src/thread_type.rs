@@ -4,7 +4,6 @@ use rusty_renju::memo::hash_key::HashKey;
 use std::time::Duration;
 
 pub trait ThreadType {
-
     const IS_MAIN: bool;
 
     fn make_response(&self, response: Response);
@@ -14,7 +13,6 @@ pub trait ThreadType {
     fn time_exceeded(&self) -> bool;
 
     fn position_hash(&self) -> HashKey;
-
 }
 
 pub struct MainThread<CLK: MonotonicClock, T: ResponseSender> {
@@ -25,7 +23,6 @@ pub struct MainThread<CLK: MonotonicClock, T: ResponseSender> {
 }
 
 impl<CLK: MonotonicClock, T: ResponseSender> MainThread<CLK, T> {
-
     pub fn new(
         position_hash: HashKey,
         response_sender: T,
@@ -39,7 +36,6 @@ impl<CLK: MonotonicClock, T: ResponseSender> MainThread<CLK, T> {
             running_time,
         }
     }
-
 }
 
 impl<CLK: MonotonicClock, T: ResponseSender> ThreadType for MainThread<CLK, T> {

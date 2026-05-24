@@ -16,11 +16,9 @@ pub struct MovegenWindow {
 }
 
 impl Default for MovegenWindow {
-
     fn default() -> Self {
         Self::DEFAULT
     }
-
 }
 
 const MOVEGEN_WINDOW_MARGIN: u8 = 3;
@@ -109,7 +107,6 @@ impl MovegenWindow {
 }
 
 impl From<&Bitfield> for MovegenWindow {
-
     fn from(value: &Bitfield) -> Self {
         let mut acc = Self::default();
 
@@ -119,7 +116,6 @@ impl From<&Bitfield> for MovegenWindow {
 
         acc
     }
-
 }
 
 const fn build_movegen_imprint_mask_lut() -> [Bitfield; pos::BOARD_SIZE] {

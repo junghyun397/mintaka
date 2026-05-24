@@ -1,6 +1,6 @@
 use crate::eval::evaluator::Evaluator;
-use crate::state::GameState;
-use crate::movegen::move_generator::generate_defend_open_three_moves;
+use crate::game_state::GameState;
+use crate::movegen::move_generator::generate_defend_open_four_moves;
 use crate::movegen::move_list::{MoveEntry, MoveList};
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
@@ -27,13 +27,13 @@ enum MoveStage {
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum MoveKind {
     All,
-    DefendOpenThree,
+    DefendOpenFour,
     ExtendFour,
 }
 
 pub struct MovePicker {
     stage: MoveStage,
-    forced_defend_three: bool,
+    forced_defense_three: bool,
     moves_buffer: MoveList,
     fours_buffer: Bitfield,
     tt_move: MaybePos,
@@ -46,11 +46,11 @@ impl MovePicker {
     pub fn init_new(
         tt_move: MaybePos,
         killer_moves: [MaybePos; KILLER_MOVE_SLOTS],
-        forced_defend_three: bool
+        forced_defense_three: bool
     ) -> Self {
         Self {
             stage: MoveStage::TT,
-            forced_defend_three,
+            forced_defense_three,
             moves_buffer: MoveList::EMPTY,
             fours_buffer: Bitfield::ZERO_FILLED,
             tt_move,
@@ -64,101 +64,99 @@ impl MovePicker {
         td: &mut ThreadData<impl ThreadType, impl Evaluator>,
         state: &GameState,
     ) -> Option<MoveEntry> {
-        if self.stage == MoveStage::TT {
-            self.stage = MoveStage::Killer;
+        loop {
+            match self.stage {
+                MoveStage::TT => {
+                    self.stage = MoveStage::Killer;
 
-            if let Some(tt_move) = self.tt_move.ok()
-                && self.is_forced_legal(state, tt_move)
-            {
-                self.occupied_moves.set(tt_move);
+                    if let Some(tt_move) = self.tt_move.ok()
+                        && self.is_forced_legal(state, tt_move)
+                    {
+                        self.occupied_moves.set(tt_move);
 
-                return Some(MoveEntry {
-                    pos: tt_move,
-                    move_score: TT_MOVE_SCORE
-                });
-            }
-        }
+                        return Some(MoveEntry {
+                            pos: tt_move,
+                            move_score: TT_MOVE_SCORE
+                        });
+                    }
+                }
+                MoveStage::Killer => {
+                    loop {
+                        let Some(killer_move) = self.killer_moves[0].ok() else {
+                            self.stage = MoveStage::Counter;
+                            break;
+                        };
 
-        if self.stage == MoveStage::Killer {
-            loop {
-                let Some(killer_move) = self.killer_moves[0].ok() else {
-                    self.stage = MoveStage::Counter;
-                    break;
-                };
+                        self.killer_moves[0] = self.killer_moves[1];
+                        self.killer_moves[1] = MaybePos::NONE;
 
-                self.killer_moves[0] = self.killer_moves[1];
-                self.killer_moves[1] = MaybePos::NONE;
+                        if self.occupied_moves.is_cold(killer_move)
+                            && self.is_forced_legal(state, killer_move)
+                        {
+                            self.occupied_moves.set(killer_move);
 
-                if self.occupied_moves.is_cold(killer_move)
-                    && self.is_forced_legal(state, killer_move)
-                {
-                    self.occupied_moves.set(killer_move);
+                            return Some(MoveEntry {
+                                pos: killer_move,
+                                move_score: KILLER_MOVE_SCORE
+                            });
+                        }
+                    }
+                }
+                MoveStage::Counter => {
+                    if self.forced_defense_three {
+                        self.stage = MoveStage::Generate(MoveKind::DefendOpenFour);
+                    } else {
+                        self.stage = MoveStage::Generate(MoveKind::All);
+                    }
 
-                    return Some(MoveEntry {
-                        pos: killer_move,
-                        move_score: KILLER_MOVE_SCORE
-                    });
+                    if state.history.len() > 1
+                        && let Some(prev_move) = state.history.last_action().ok()
+                        && let Some(counter_move) = td.ht.counter[state.board.player_color][prev_move.idx_usize()].ok()
+                        && self.occupied_moves.is_cold(counter_move)
+                        && self.is_forced_legal(state, counter_move)
+                    {
+                        self.occupied_moves.set(counter_move);
+
+                        return Some(MoveEntry {
+                            pos: counter_move,
+                            move_score: COUNTER_MOVE_SCORE
+                        });
+                    }
+                }
+                MoveStage::Generate(kind) => {
+                    match kind {
+                        MoveKind::All =>
+                            score_and_push_all_moves(&mut self.moves_buffer, td, state),
+                        MoveKind::DefendOpenFour =>
+                            generate_defend_open_four_moves(&mut self.moves_buffer, &mut self.fours_buffer, &state.board),
+                        MoveKind::ExtendFour =>
+                            score_and_push_extend_four_moves(&mut self.moves_buffer, td, state, &self.fours_buffer),
+                    }
+
+                    self.stage = MoveStage::Moves(kind);
+                }
+                MoveStage::Moves(kind) => {
+                    while let Some(next_move) = self.moves_buffer.consume_best() {
+                        if self.occupied_moves.is_hot(next_move.pos) {
+                            continue;
+                        }
+
+                        self.occupied_moves.set(next_move.pos);
+
+                        return Some(next_move);
+                    }
+
+                    match kind {
+                        MoveKind::DefendOpenFour => self.stage = MoveStage::Generate(MoveKind::ExtendFour),
+                        _ => return None,
+                    }
                 }
             }
         }
-
-        if self.stage == MoveStage::Counter {
-            if self.forced_defend_three {
-                self.stage = MoveStage::Generate(MoveKind::DefendOpenThree);
-            } else {
-                self.stage = MoveStage::Generate(MoveKind::All);
-            }
-
-            if state.history.len() > 1
-                && let Some(prev_move) = state.history.last_action().ok()
-                && let Some(counter_move) = td.ht.counter[state.board.player_color][prev_move.idx_usize()].ok()
-                && self.occupied_moves.is_cold(counter_move)
-                && self.is_forced_legal(state, counter_move)
-            {
-                self.occupied_moves.set(counter_move);
-
-                return Some(MoveEntry {
-                    pos: counter_move,
-                    move_score: COUNTER_MOVE_SCORE
-                });
-            }
-        }
-
-        if let MoveStage::Moves(kind) = self.stage {
-            while let Some(next_move) = self.moves_buffer.consume_best() {
-                if self.occupied_moves.is_hot(next_move.pos) {
-                    continue;
-                }
-
-                self.occupied_moves.set(next_move.pos);
-
-                return Some(next_move);
-            }
-
-            match kind {
-                MoveKind::DefendOpenThree => self.stage = MoveStage::Generate(MoveKind::ExtendFour),
-                _ => {}
-            }
-        }
-
-        if let MoveStage::Generate(kind) = self.stage {
-            match kind {
-                MoveKind::All =>
-                    score_and_push_all_moves(&mut self.moves_buffer, td, state),
-                MoveKind::DefendOpenThree =>
-                    generate_defend_open_three_moves(&mut self.moves_buffer, &mut self.fours_buffer, &state.board),
-                MoveKind::ExtendFour =>
-                    score_and_push_extend_four_moves(&mut self.moves_buffer, td, state, &self.fours_buffer),
-            }
-
-            self.stage = MoveStage::Moves(kind);
-        }
-
-        None
     }
 
     fn is_forced_legal(&self, state: &GameState, pos: Pos) -> bool {
-        if !self.forced_defend_three {
+        if !self.forced_defense_three {
             return true;
         }
 

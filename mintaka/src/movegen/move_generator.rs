@@ -67,7 +67,7 @@ pub fn generate_endgame_moves<const VCT: bool>(board: &Board, distance_window: u
     EndgameMovesUnchecked { moves: vcf_moves, top: vcf_moves_top as u8 }
 }
 
-pub fn generate_defend_open_three_moves(moves: &mut MoveList, fours: &mut Bitfield, board: &Board) {
+pub fn generate_defend_open_four_moves(moves: &mut MoveList, fours: &mut Bitfield, board: &Board) {
     let player_ptr = board.patterns.field[board.player_color].as_ptr() as *const u32;
     let opponent_ptr = board.patterns.field[!board.player_color].as_ptr() as *const u32;
 

@@ -21,6 +21,7 @@ panic_hook = ["dep:console_error_panic_hook"]
 default = []
 
 [dependencies]
+rusty_renju = { path = "../rusty_renju", features = ["serde"] }
 mintaka = { path = "../mintaka", features = ["serde", "rayon"] }
 
 serde = "1.0"

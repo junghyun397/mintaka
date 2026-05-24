@@ -1,4 +1,4 @@
-use crate::state::GameState;
+use crate::game_state::GameState;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos};
 use rusty_renju::notation::score::{Score, Scores};

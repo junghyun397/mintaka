@@ -4,6 +4,7 @@ use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::{assert_struct_sizes, const_for, const_max, slice_pattern};
+use crate::utils::empty::Empty;
 
 pub const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
@@ -118,12 +119,10 @@ pub struct Slices {
     pub descending_slices: [Slice; DIAGONAL_SLICE_AMOUNT],
 }
 
-impl Default for Slices {
-
-    fn default() -> Self {
+impl Empty for Slices {
+    fn empty() -> Self {
         Slices::EMPTY
     }
-
 }
 
 impl Slices {
@@ -244,7 +243,7 @@ impl Slices {
             .enumerate()
             .fold(
                 ColorContainer::new(
-                    Bitfield::default(), Bitfield::default()),
+                    Bitfield::empty(), Bitfield::empty()),
                 |mut bitfield_container, (row_idx, slice)| {
                       for col_idx in 0..pos::BOARD_WIDTH {
                           if let Some(color) = slice.stone_kind(col_idx) {

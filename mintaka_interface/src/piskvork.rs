@@ -1,10 +1,8 @@
 use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
-use mintaka::protocol::command::{Command, GameStateData};
+use mintaka::protocol::command::Command;
 use mintaka::protocol::response::{CallBackResponseSender, Response};
 use mintaka_interface::message::{Message, MessageCommand, MessageSender};
-use rusty_renju::board::Board;
-use rusty_renju::history::History;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::rule::RuleKind;
@@ -14,6 +12,9 @@ use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
+use mintaka::game_state::GameState;
+use rusty_renju::notation::color::Color;
+use rusty_renju::utils::empty::Empty;
 
 enum PiskvorkResponse {
     Message(String),
@@ -72,7 +73,7 @@ fn main() -> Result<(), impl Error> {
     for message in message_receiver {
         match message {
             Message::Command(command) => {
-                let command = command.into_command(game_agent.state.board.hash_key);
+                let command = command.into_command(&game_agent.state);
 
                 command_failed = match game_agent.command(command) {
                     Ok(_) => false,
@@ -180,8 +181,10 @@ fn match_command(
     message_sender: &MessageSender,
     args: Vec<&str>,
 ) -> Result<PiskvorkResponse, &'static str> {
-    let response = match args[0] {
-        "YXSTOP" => {
+    let command_kind = args[0].to_uppercase();
+
+    let response = match command_kind.as_str() {
+        "STOP" | "YXSTOP" => {
             aborted.store(true, Ordering::Relaxed);
 
             PiskvorkResponse::None
@@ -232,8 +235,7 @@ fn match_command(
         "BOARD" | "YXBOARD" => {
             const DONE_TOKEN: &str = "DONE";
 
-            let mut player_moves = vec![];
-            let mut opponent_moves = vec![];
+            let mut sequence = vec![];
 
             let mut buf = String::new();
             loop {
@@ -251,51 +253,47 @@ fn match_command(
                     .split(',')
                     .collect::<Vec<&str>>()
                     .try_into()
-                    .map_err(|_| "token parsing failed.")?;
+                    .map_err(|_| "token parsing failed")?;
 
                 let pos = parse_pos(x, y)?;
 
                 match color {
-                    "1" => player_moves.push(pos),
-                    "2" => { opponent_moves.push(pos); }
-                    &_ => return Err("unknown color token."),
+                    "1" => sequence.push((pos, true)),
+                    "2" => sequence.push((pos, false)),
+                    "3" => {},
+                    &_ => return Err("unknown color token")
                 }
+
             }
 
-            let (black_moves, white_moves) = if player_moves.len() >= opponent_moves.len() {
-                (player_moves, opponent_moves)
-            } else {
-                (opponent_moves, player_moves)
-            };
+            let own_color = sequence.first()
+                .map(|&(_, own)| if own { Color::Black } else { Color::White })
+                .unwrap_or(Color::Black);
 
-            if black_moves.len() > white_moves.len() + 1 {
-                return Err("invalid board stones.");
-            }
+            let mut game_state = GameState::empty();
 
-            let mut moves = vec![];
-            for index in 0..black_moves.len() {
-                moves.push(black_moves[index].into());
-
-                if let Some(&pos) = white_moves.get(index) {
-                    moves.push(pos.into());
+            for (pos, own) in sequence {
+                if own != (game_state.board.player_color == own_color) {
+                    game_state.pass_mut();
                 }
+
+                if !game_state.board.is_legal_move(pos) {
+                    return Err("illegal move");
+                }
+
+                game_state.play_mut(pos);
             }
 
-            let history = History::from(moves.as_slice());
-            let board: Board = (&history).into();
+            message_sender.command(MessageCommand::Raw(Command::Init(Box::new(game_state.into()))));
 
-            message_sender.command(MessageCommand::Raw(Command::Sync(Box::new(
-                GameStateData { board, history },
-            ))));
-
-            if args[0] == "BOARD" {
+            if command_kind.as_str() == "BOARD" {
                 message_sender.launch(SearchObjective::Best, true, false);
             }
 
             PiskvorkResponse::None
         }
         "INFO" => {
-            match args.get(1).copied() {
+            match args.get(1).copied().map(str::to_lowercase).as_deref() {
                 Some("timeout_match") | Some("time_left") => {
                     if let Ok(time) = parse_time(&args) {
                         message_sender.command(MessageCommand::Raw(Command::TotalTime(time)));
@@ -317,15 +315,21 @@ fn match_command(
                         }
                     }
                 }
+                Some("thread_num") => {
+                    if let Some(workers) =
+                         args.get(2).and_then(|value| value.parse::<u32>().ok())
+                    {
+                        message_sender.command(MessageCommand::Raw(Command::Workers(workers)));
+                    }
+                }
                 Some("game_type") => {
                     let _ = args.get(2);
                 }
                 Some("rule") => {
                     if let Some(rule) = args.get(2).and_then(|value| value.parse::<usize>().ok()) {
-                        let rule_kind = if rule & 4 == 4 {
-                            RuleKind::Renju
-                        } else {
-                            RuleKind::Gomoku
+                        let rule_kind = match rule {
+                            2 | 4 => RuleKind::Renju,
+                            _ => return Err("unsupported rule"),
                         };
 
                         message_sender.command(MessageCommand::Raw(Command::Rule(rule_kind)));
@@ -336,13 +340,6 @@ fn match_command(
 
             PiskvorkResponse::None
         }
-        "YXHASHCLEAR" => {
-            message_sender.command(MessageCommand::Raw(Command::Clear));
-
-            PiskvorkResponse::None
-        }
-        "YXSHOWFORBID" => PiskvorkResponse::None,
-        "YXSHOWINFO" => PiskvorkResponse::None,
         "ABOUT" => PiskvorkResponse::About(format!(
             "name=\"mintaka\", author=\"JeongHyeon Choi\", version=\"{}\", country=\"KOR\"",
             mintaka::VERSION

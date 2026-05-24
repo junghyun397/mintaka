@@ -1,6 +1,7 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
+use rusty_renju::utils::empty::Empty;
 
 pub const COLOR_NONE: u8 = u8::MAX;
 
@@ -138,7 +139,7 @@ pub struct BoardPattens {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_default_board() -> *mut rusty_renju::notation::ffi::CBoard {
-    Box::into_raw(Box::new(rusty_renju::board::Board::default().into()))
+    Box::into_raw(Box::new(rusty_renju::board::Board::empty().into()))
 }
 
 #[unsafe(no_mangle)]

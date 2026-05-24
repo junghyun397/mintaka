@@ -2,6 +2,7 @@ use crate::{impl_wrapper, to_js_value, try_from_js_value};
 use std::str::FromStr;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsError;
+use rusty_renju::utils::empty::Empty;
 
 #[wasm_bindgen]
 extern "C" {
@@ -32,7 +33,7 @@ extern "C" {
 
 #[wasm_bindgen(js_name = defaultBoard)]
 pub fn default_board() -> Board {
-    to_js_value(&rusty_renju::board::Board::default())
+    to_js_value(&rusty_renju::board::Board::empty())
 }
 
 #[wasm_bindgen(js_name = emptyHash)]
@@ -69,7 +70,7 @@ impl BoardWorker {
 
     #[wasm_bindgen]
     pub fn empty() -> Self {
-        Self { inner: rusty_renju::board::Board::EMPTY_BOARD }
+        Self { inner: rusty_renju::board::Board::empty() }
     }
 
     #[wasm_bindgen(js_name = toString)]

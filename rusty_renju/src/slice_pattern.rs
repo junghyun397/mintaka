@@ -3,6 +3,7 @@ use crate::notation::rule::RuleKind;
 use crate::slice::Slice;
 use crate::slice_pattern::ExtendedMatch::{Left, Right};
 use crate::{assert_struct_sizes, const_for, pattern};
+use crate::utils::empty::Empty;
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 #[repr(transparent)]
@@ -10,9 +11,9 @@ pub struct SlicePattern {
     pub patterns: u128
 }
 
-impl Default for SlicePattern {
+impl Empty for SlicePattern {
 
-    fn default() -> Self {
+    fn empty() -> Self {
         Self::EMPTY
     }
 

@@ -1,6 +1,6 @@
 use clap::Parser;
 use mintaka::config::Config;
-use mintaka::state::GameState;
+use mintaka::game_state::{GameState, GameStateData};
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::utils::byte_size::ByteSize;
@@ -50,7 +50,7 @@ impl Preference {
             self.game_state = Some(history.into());
         } else if let Some(board) = self.board {
             let history = (&board).try_into().unwrap();
-            self.game_state = Some(GameState::from_board_and_history(board, history));
+            self.game_state = Some(GameStateData { board, history }.into());
         }
 
         if let Some(&[total_time_in_ms, increment_time_in_ms, turn_time_in_ms]) = self.time.as_deref() {

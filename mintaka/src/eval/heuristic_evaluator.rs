@@ -1,6 +1,6 @@
 use crate::eval::evaluator::{Evaluator, PolicyDistribution};
 use crate::movegen::move_scores::MoveScores;
-use crate::state::GameState;
+use crate::game_state::GameState;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::board::Board;
 use rusty_renju::memo::hash_key::HashKey;

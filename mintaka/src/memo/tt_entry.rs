@@ -26,14 +26,6 @@ impl From<ScoreKind> for u8 {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct TTFlag(u8);
 
-impl Default for TTFlag {
-
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-
-}
-
 impl TTFlag {
 
     const DEFAULT: Self = Self(0);

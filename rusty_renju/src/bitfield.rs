@@ -10,6 +10,7 @@ use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, N
 use std::simd::u8x32;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
+use crate::utils::empty::Empty;
 
 // serialization format: base64url-safe no padding
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
@@ -19,16 +20,13 @@ pub struct Bitfield(pub [u8; 32]);
 
 assert_struct_sizes!(Bitfield, size=32, align=32);
 
-impl Default for Bitfield {
-
-    fn default() -> Self {
+impl Empty for Bitfield {
+    fn empty() -> Self {
         Self::ZERO_FILLED
     }
-
 }
 
 impl Bitfield {
-
     pub const ZERO_FILLED: Bitfield = Bitfield([0; 32]);
 
     pub const ONE_FILLED: Bitfield = Bitfield([0xFF; 32]);
@@ -116,7 +114,6 @@ impl Bitfield {
             u64::from_le_bytes(self.0[24..32].try_into().unwrap()),
         ]
     }
-
 }
 
 impl Not for Bitfield {
@@ -268,7 +265,6 @@ impl Iterator for BitfieldSetBitsIterator {
 
         Some(idx)
     }
-
 }
 
 impl Display for Bitfield {

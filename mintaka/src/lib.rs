@@ -8,7 +8,7 @@ pub mod batch_counter;
 pub mod config;
 pub mod eval;
 pub mod game_agent;
-pub mod state;
+pub mod game_state;
 pub mod memo;
 pub mod movegen;
 pub mod principal_variation;

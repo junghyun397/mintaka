@@ -185,11 +185,6 @@ export interface CreateSessionResponse {
 	version: string;
 }
 
-export interface GameStateData {
-	board: Board;
-	history: History;
-}
-
 export interface Health {
 	available_workers: number;
 	available_memory_in_mib: number;

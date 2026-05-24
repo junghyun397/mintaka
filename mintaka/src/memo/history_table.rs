@@ -7,6 +7,7 @@ use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos, PosList};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize, Serializer};
+use rusty_renju::utils::empty::Empty;
 
 pub type QuietPlied = PosList<{ 256 - 8 }>;
 pub type TacticalPlied = PosList<{ 64 - 8 }>;
@@ -21,8 +22,8 @@ pub struct HistoryTable {
     pub counter: ColorContainer<[MaybePos; pos::BOARD_SIZE]>,
 }
 
-impl Default for HistoryTable {
-    fn default() -> Self {
+impl Empty for HistoryTable {
+    fn empty() -> Self {
         Self::EMPTY
     }
 }

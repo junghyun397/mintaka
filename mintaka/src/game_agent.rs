@@ -3,11 +3,11 @@ use crate::eval::evaluator::{ActiveEvaluator, Evaluator};
 use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
-use crate::protocol::command::{Command, GameStateData};
+use crate::protocol::command::Command;
 pub use crate::protocol::response::{ComputingResource, Response, ResponseSender};
 use crate::protocol::results::{BestMove, CommandResult, GameResult};
 use crate::search::iterative_deepening;
-use crate::state::GameState;
+use crate::game_state::{GameState, GameStateData};
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::time::{TimeManager, Timer};
@@ -28,6 +28,7 @@ use serde::{Deserialize, Serialize, Deserializer, Serializer};
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
+use rusty_renju::utils::empty::Empty;
 
 #[cfg(not(feature = "rayon"))]
 macro_rules! search_scope {
@@ -97,7 +98,7 @@ pub struct GameAgent {
 impl GameAgent {
 
     pub fn new(config: Config) -> Self {
-        Self::from_state(config, GameState::default())
+        Self::from_state(config, GameState::empty())
     }
 
     pub fn from_state(config: Config, state: GameState) -> Self {
@@ -108,8 +109,8 @@ impl GameAgent {
             state,
             evaluator: ActiveEvaluator::from_state(&state),
             tt,
-            ht: HistoryTable::EMPTY,
-            executed_moves: Bitfield::default(),
+            ht: HistoryTable::empty(),
+            executed_moves: Bitfield::empty(),
             time_manager: config.initial_timer.into(),
         }
     }
@@ -134,7 +135,7 @@ impl GameAgent {
                             return Err(GameError::ForbiddenMove);
                         }
 
-                        self.state.set_mut(pos);
+                        self.state.play_mut(pos);
                         self.evaluator.update(&self.state);
 
                         if let Some(winner) = self.state.board.find_winner(pos) {
@@ -253,8 +254,8 @@ impl GameAgent {
             },
             Command::Clear => {
                 self.reinit_from_state(GameStateData {
-                    board: Board::default(),
-                    history: History::default(),
+                    board: Board::empty(),
+                    history: History::empty(),
                 });
             },
             Command::Init(state) => {
@@ -419,19 +420,19 @@ impl GameAgent {
         }
     }
 
-    fn sync_state(&mut self, compact_state: GameStateData) {
-        self.state = GameState::from_board_and_history(compact_state.board, compact_state.history);
+    fn sync_state(&mut self, data: GameStateData) {
+        self.state = data.into();
         self.evaluator = ActiveEvaluator::from_state(&self.state);
-        self.executed_moves = Bitfield::default();
+        self.executed_moves = Bitfield::empty();
     }
 
-    fn reinit_from_state(&mut self, compact_state: GameStateData) {
-        self.state = GameState::from_board_and_history(compact_state.board, compact_state.history);
+    fn reinit_from_state(&mut self, data: GameStateData) {
+        self.state = data.into();
 
         self.evaluator = ActiveEvaluator::from_state(&self.state);
 
         self.tt.clear(self.config.workers);
-        self.executed_moves = Bitfield::default();
+        self.executed_moves = Bitfield::empty();
 
         self.time_manager = TimeManager::from(self.config.initial_timer);
     }

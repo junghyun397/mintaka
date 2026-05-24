@@ -1,8 +1,8 @@
 use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
-use mintaka::protocol::command::{Command, GameStateData};
+use mintaka::protocol::command::Command;
 use mintaka::protocol::response::{CallBackResponseSender, Response};
-use mintaka::state::GameState;
+use mintaka::game_state::{GameState, GameStateData};
 use mintaka_interface::message::{Message, MessageCommand, MessageSender, StatusCommand};
 use mintaka_interface::preference::Preference;
 use rusty_renju::board::Board;
@@ -14,6 +14,7 @@ use std::io::BufRead;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
+use rusty_renju::utils::empty::Empty;
 
 fn main() -> Result<(), GameError> {
     let pref = Preference::parse();
@@ -31,7 +32,7 @@ fn main() -> Result<(), GameError> {
 
     text_protocol(
         pref.default_config,
-        pref.game_state.unwrap_or_default(),
+        pref.game_state.unwrap_or_else(|| GameState::empty()),
         command_sequence,
     )
 }
@@ -55,7 +56,7 @@ fn text_protocol(
     for message in message_receiver {
         match message {
             Message::Command(command) => {
-                let command = command.into_command(game_agent.state.board.hash_key);
+                let command = command.into_command(&game_agent.state);
 
                 execute_command(&mut game_agent, command);
             }
@@ -250,20 +251,16 @@ fn handle_command(
             "board" => {
                 let board: Board = buf.parse()?;
 
-                let history = (&board).try_into().unwrap_or_default();
+                let history = (&board).try_into().unwrap_or_else(|_| History::empty());
 
-                message_sender.command(MessageCommand::Raw(Command::Init(Box::new(
-                    GameStateData { board, history },
-                ))));
+                message_sender.command(MessageCommand::Raw(Command::Init(Box::new(GameStateData { board, history }))));
             }
             "history" => {
                 let history: History = args.get(2).ok_or("history not provided.")?.parse()?;
 
                 let board: Board = (&history).into();
 
-                message_sender.command(MessageCommand::Raw(Command::Init(Box::new(
-                    GameStateData { board, history },
-                ))));
+                message_sender.command(MessageCommand::Raw(Command::Init(Box::new(GameStateData { board, history }))));
             }
             &_ => return Err("unknown data type.".to_string()),
         },

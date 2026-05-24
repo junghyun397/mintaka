@@ -1,4 +1,4 @@
-use crate::state::GameState;
+use crate::game_state::GameState;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::score::Score;
@@ -25,4 +25,8 @@ pub trait Evaluator {
 
     fn eval_value(&mut self, state: &GameState) -> Score;
 
+}
+
+pub fn stabilize_eval(current: Score, parent: Score) -> Score {
+    (current + parent) / 2
 }

@@ -8,7 +8,7 @@ use axum::Json;
 use futures_util::Stream;
 use mintaka::config::Config;
 use mintaka::protocol::command::Command;
-use mintaka::state::GameState;
+use mintaka::game_state::GameState;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::str::FromStr;

@@ -10,7 +10,7 @@ use mintaka::game_agent::GameAgent;
 use mintaka::protocol::command::Command;
 use mintaka::protocol::results::{BestMove, CommandResult};
 use mintaka::protocol::response::Response;
-use mintaka::state::GameState;
+use mintaka::game_state::GameState;
 use rusty_renju::memo::hash_key::HashKey;
 use serde::ser::SerializeStruct;
 use serde::{ser, Deserialize, Serialize, Serializer};

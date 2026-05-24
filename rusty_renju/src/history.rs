@@ -12,6 +12,7 @@ use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
+use crate::utils::empty::Empty;
 
 pub const MAX_HISTORY_SIZE: usize = 248;
 
@@ -22,15 +23,15 @@ pub struct History {
     top: usize,
 }
 
-impl Default for History {
-    fn default() -> Self {
+impl Empty for History {
+    fn empty() -> Self {
         Self::EMPTY
     }
 }
 
 impl From<&[MaybePos]> for History {
     fn from(value: &[MaybePos]) -> Self {
-        let mut history = History::default();
+        let mut history = History::empty();
         history.entries[.. value.len()].copy_from_slice(value);
         history.top = value.len();
         history
@@ -53,7 +54,7 @@ impl IndexMut<usize> for History {
 
 impl History {
 
-    const EMPTY: Self = Self {
+    pub const EMPTY: Self = Self {
         entries: [MaybePos::NONE; MAX_HISTORY_SIZE],
         top: 0,
     };
@@ -134,6 +135,10 @@ impl History {
     }
 
     pub fn last_action(&self) -> MaybePos {
+        if self.top == 0 {
+            return MaybePos::NONE;
+        }
+
         self.entries[self.top - 1]
     }
 
@@ -204,7 +209,7 @@ impl FromStr for History {
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        let mut history = History::default();
+        let mut history = History::empty();
         let source = source.to_lowercase();
         let bytes = source.as_bytes();
         let mut idx = 0;
@@ -300,7 +305,7 @@ impl TryFrom<&Board> for History {
             return Err(HistoryError::WhiteIsLongerThanBlack);
         }
 
-        let mut history = History::default();
+        let mut history = History::empty();
 
         while let Some(white_pos) = white_history.pop()
             && let Some(black_pos) = black_history.pop()

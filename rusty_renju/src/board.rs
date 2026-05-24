@@ -10,6 +10,7 @@ use crate::slice::Slices;
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
+use crate::utils::empty::Empty;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "BoardData"))]
 #[derive(Copy, Clone)]
@@ -22,22 +23,20 @@ pub struct Board {
     pub hash_key: HashKey,
 }
 
-impl Default for Board {
-    fn default() -> Self {
-        Self::EMPTY_BOARD
+impl Empty for Board {
+    fn empty() -> Self {
+        Self {
+            player_color: Color::Black,
+            stones: 0,
+            slices: Slices::EMPTY,
+            patterns: Patterns::empty(),
+            hot_field: Bitfield::empty(),
+            hash_key: HashKey::EMPTY,
+        }
     }
 }
 
 impl Board {
-
-    pub const EMPTY_BOARD: Self = Self {
-        player_color: Color::Black,
-        stones: 0,
-        slices: Slices::EMPTY,
-        patterns: Patterns::EMPTY,
-        hot_field: Bitfield::ZERO_FILLED,
-        hash_key: HashKey::EMPTY,
-    };
 
     pub fn is_pos_empty(&self, pos: Pos) -> bool {
         self.hot_field.is_cold(pos)
@@ -552,7 +551,7 @@ pub struct SetOverrides {
 impl SetOverrides {
 
     fn new(root: Pos) -> Self {
-        let mut bitfield = Bitfield::default();
+        let mut bitfield = Bitfield::empty();
 
         bitfield.set(root);
 

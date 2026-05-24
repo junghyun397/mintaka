@@ -7,10 +7,10 @@ mod bench_vcf {
     use mintaka::config::{Config, SearchObjective};
     use mintaka::eval::evaluator::ActiveEvaluator;
     use mintaka::eval::evaluator::Evaluator;
-    use mintaka::state::GameState;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
     use mintaka::search_endgame;
+    use mintaka::game_state::{GameState, GameStateData};
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
     use mintaka::value::Depth;
@@ -21,6 +21,7 @@ mod bench_vcf {
     use rusty_renju::notation::rule::RuleKind;
     use rusty_renju::notation::score::{Score, Scores};
     use rusty_renju::utils::byte_size::ByteSize;
+    use rusty_renju::utils::empty::Empty;
     use std::sync::atomic::{AtomicBool, AtomicU32};
     use test::Bencher;
 
@@ -28,18 +29,16 @@ mod bench_vcf {
         ($bencher:expr,$board:expr,$player_move:expr,$opponent_move:expr,$expect_vcf:expr) => {{
             let config = Config::default();
 
-            let state = GameState {
-                board: $board,
-                history: {
-                    let mut history = History::default();
+            let history = {
+                let mut history = History::empty();
 
-                    history.set_mut($player_move.into());
-                    history.set_mut($opponent_move.into());
+                history.set_mut($player_move.into());
+                history.set_mut($opponent_move.into());
 
-                    history
-                },
-                ..Default::default()
+                history
             };
+
+            let state = GameStateData { board: $board, history }.into();
 
             let evaluator = ActiveEvaluator::from_state(&state);
 
@@ -52,7 +51,7 @@ mod bench_vcf {
             let td = ThreadData::new(WorkerThread, 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
-                let result = search_endgame::endgame_search::<{ RuleKind::Renju }, false>(&mut td.clone(), Depth::MAX, &state, Score::DRAW, -Score::INF, Score::INF);
+                let result = search_endgame::endgame_search::<{ RuleKind::Renju }, false>(&mut td.clone(), Depth::MAX, &state, -Score::INF, Score::INF, Score::DRAW);
 
                 tt.clear(1);
 

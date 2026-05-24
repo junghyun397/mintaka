@@ -10,6 +10,7 @@ use crate::step_idx;
 use crate::utils::lang::{repeat_16x, repeat_4x};
 use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
+use crate::utils::empty::Empty;
 
 pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
@@ -208,21 +209,19 @@ pub struct Patterns {
     pub forbidden_field: Bitfield,
 }
 
-impl Default for Patterns {
-    fn default() -> Self {
-        Self::EMPTY
+impl Empty for Patterns {
+    fn empty() -> Self {
+        Self {
+            field: unsafe { std::mem::zeroed() },
+            counts: SlicePatternCounts::EMPTY,
+            unchecked_five_pos: ColorContainer::new(MaybePos::NONE, MaybePos::NONE),
+            candidate_forbidden_field: Bitfield::ZERO_FILLED,
+            forbidden_field: Bitfield::ZERO_FILLED,
+        }
     }
 }
 
 impl Patterns {
-
-    pub const EMPTY: Self = Self {
-        field: unsafe { std::mem::zeroed() },
-        counts: SlicePatternCounts::EMPTY,
-        unchecked_five_pos: ColorContainer::new(MaybePos::NONE, MaybePos::NONE),
-        candidate_forbidden_field: Bitfield::ZERO_FILLED,
-        forbidden_field: Bitfield::ZERO_FILLED,
-    };
 
     pub fn is_forbidden(&self, pos: Pos) -> bool {
         self.forbidden_field.is_hot(pos)

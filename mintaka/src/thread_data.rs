@@ -6,7 +6,7 @@ use crate::memo::transposition_table::TTView;
 use crate::movegen::move_picker;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_endgame::EndgameFrame;
-use crate::state::RecoveryState;
+use crate::game_state::RecoveryState;
 use crate::thread_type::ThreadType;
 use crate::value::Depth;
 use crate::{params, value};
@@ -21,7 +21,6 @@ pub struct SearchFrame {
     pub on_pv: bool,
     pub recovery_state: RecoveryState,
     pub searching: MaybePos,
-    pub cutoffs: usize,
 }
 
 impl SearchFrame {
@@ -31,7 +30,6 @@ impl SearchFrame {
         on_pv: false,
         recovery_state: RecoveryState::EMPTY,
         searching: MaybePos::NONE,
-        cutoffs: 0,
     };
 }
 
@@ -152,7 +150,6 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
     pub fn push_ply(&mut self, pos: Pos) {
         self.ply += 1;
         self.ss[self.ply].pos = pos.into();
-        self.ss[self.ply].cutoffs = 0;
     }
 
     pub fn pop_ply(&mut self) {
