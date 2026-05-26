@@ -47,6 +47,18 @@ impl Bitfield {
         !self.is_hot_idx(pos.idx_usize())
     }
 
+    pub const fn or_bit_idx(&mut self, idx: usize, bit: bool) {
+        self.0[idx / 8] |= (bit as u8) << (idx % 8);
+    }
+
+    pub const fn set_bit_idx(&mut self, idx: usize, bit: bool) {
+        if bit {
+            self.set_idx(idx);
+        } else {
+            self.unset_idx(idx);
+        }
+    }
+
     pub const fn set_idx(&mut self, idx: usize) {
         self.0[idx / 8] |= 0b1 << (idx % 8);
     }
@@ -63,14 +75,14 @@ impl Bitfield {
         self.unset_idx(pos.idx_usize());
     }
 
-    pub fn count_ones(&self) -> u32 {
+    pub fn count_hots(&self) -> u32 {
         self.to_chunks()
             .iter()
             .map(|x| x.count_ones())
             .sum()
     }
 
-    pub fn count_zeros(&self) -> u32 {
+    pub fn count_colds(&self) -> u32 {
         self.to_chunks()
             .iter()
             .map(|x| x.count_zeros())
@@ -97,6 +109,10 @@ impl Bitfield {
         BitfieldSetBitsIterator::from((!*self).to_chunks())
             .map(|x| Pos::from_index(x as u8))
     }
+    
+    pub fn unique_pos(&self) -> Option<Pos> {
+        self.iter_hot_pos().next()
+    }
 
     pub fn is_empty(&self) -> bool {
         self.0 == [0; 32]
@@ -113,6 +129,12 @@ impl Bitfield {
             u64::from_le_bytes(self.0[16..24].try_into().unwrap()),
             u64::from_le_bytes(self.0[24..32].try_into().unwrap()),
         ]
+    }
+
+    pub fn from_chunks(chunks: [u64; 4]) -> Self {
+        let bytes: [[u8; 8]; 4] = chunks.map(u64::to_le_bytes);
+
+        Self(unsafe { std::mem::transmute(bytes) })
     }
 }
 

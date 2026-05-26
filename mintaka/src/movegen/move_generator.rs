@@ -13,6 +13,28 @@ pub fn generate_endgame_moves<const VCT: bool>(board: &Board, distance_window: u
     let mut vcf_moves = [MaybePos::NONE; ENDGAME_MAX_MOVES];
     let mut vcf_moves_top = 0;
 
+    let mut field = board.patterns.indexes[board.player_color].closed_fours;
+
+    if VCT {
+        field |= board.patterns.indexes[board.player_color].open_threes;
+    }
+
+    for pos in field.iter_hot_pos() {
+        if pos.distance(recent_move) > distance_window {
+            continue;
+        }
+
+        vcf_moves[vcf_moves_top] = pos.into();
+        vcf_moves_top += 1;
+    }
+
+    EndgameMovesUnchecked { moves: vcf_moves, top: vcf_moves_top as u8 }
+}
+
+pub fn generate_endgame_move<const VCT: bool>(board: &Board, distance_window: u8, recent_move: Pos) -> EndgameMovesUnchecked {
+    let mut vcf_moves = [MaybePos::NONE; ENDGAME_MAX_MOVES];
+    let mut vcf_moves_top = 0;
+
     let field_ptr = board.patterns.field[board.player_color].as_ptr() as *const u32;
 
     let zero_mask = Simd::splat(0);

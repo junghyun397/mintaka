@@ -1,5 +1,7 @@
 use crate::eval::evaluator::Evaluator;
+use crate::game_state::GameState;
 use crate::memo::history_table::{QuietPlied, TacticalPlied};
+use crate::memo::transposition_table::{decode_mate_distance, encode_mate_distance};
 use crate::memo::tt_entry::ScoreKind;
 use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker;
@@ -7,27 +9,23 @@ use crate::movegen::move_picker::MovePicker;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
 use crate::search_endgame::endgame_search;
-use crate::game_state::GameState;
 use crate::thread_data::{SearchFrame, ThreadData};
 use crate::thread_type::ThreadType;
 use crate::utils::time::MonotonicClock;
 use crate::value::Depth;
 use crate::{params, value};
 use rusty_renju::const_for;
+use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{Score, Scores};
-use crate::memo::transposition_table::{decode_mate_distance, encode_mate_distance};
-use crate::search_snap::find_immediate_win;
 
 trait NodeType {
-
     const IS_ROOT: bool;
     const IS_PV: bool;
 
     type NextType: NodeType;
-
 }
 
 struct RootNode; impl NodeType for RootNode {
@@ -169,7 +167,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
     {
         let (score, pos) = find_immediate_win(state, td.ply);
 
-        if score != Score::NAN {
+        if score != Score::NAN { // immediate win or lose
             if NT::IS_ROOT {
                 td.singular_root = true;
                 td.best_move = pos;
@@ -177,52 +175,52 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
             return score;
         }
-    }
 
-    if let Some(pos) = state.board.patterns.unchecked_five_pos[!state.board.player_color].ok()
-        && td.ply < value::MAX_PLY
-    { // defend immediate win
-        if NT::IS_ROOT {
-            td.singular_root = true;
+        if let Some(pos) = pos.ok() { // defend immediate win
+            if NT::IS_ROOT {
+                td.singular_root = true;
+            }
+
+            let parent_eval = if td.ply > 0 {
+                -td.ss[td.ply - 1].static_eval
+            } else {
+                0
+            };
+
+            td.ss[td.ply] = SearchFrame {
+                pos: pos.into(),
+                static_eval: parent_eval,
+                on_pv: NT::IS_PV,
+                recovery_state: state.recovery_state(),
+                searching: MaybePos::NONE,
+            };
+
+            td.push_ply(pos);
+            state.play_mut(pos);
+            td.evaluator.play(&state.board, pos);
+
+            // no depth reduction for forced defense
+            let score = -pvs::<CLK, R, TH, NT::NextType>(td, state, depth_left, -beta, -alpha, cut_node);
+
+            td.pop_ply();
+            state.undo_mut(td.ss[td.ply].recovery_state);
+            td.evaluator.undo(&state.board, pos);
+
+            if td.is_aborted() {
+                return Score::DRAW;
+            }
+
+            if NT::IS_PV {
+                let sub_pv = td.pvs[td.ply + 1];
+                td.pvs[td.ply].load(pos.into(), sub_pv);
+            }
+
+            if NT::IS_ROOT {
+                td.best_move = pos.into();
+            }
+
+            return score;
         }
-
-        let parent_eval = if td.ply > 0 {
-            -td.ss[td.ply - 1].static_eval
-        } else {
-            0
-        };
-
-        td.ss[td.ply] = SearchFrame {
-            pos: pos.into(),
-            static_eval: parent_eval,
-            on_pv: NT::IS_PV,
-            recovery_state: state.recovery_state(),
-            searching: MaybePos::NONE,
-        };
-
-        td.push_ply(pos);
-        state.play_mut(pos);
-
-        // no depth reduction for forced defense
-        let score = -pvs::<CLK, R, TH, NT::NextType>(td, state, depth_left, -beta, -alpha, cut_node);
-
-        td.pop_ply();
-        state.undo_mut(td.ss[td.ply].recovery_state);
-
-        if td.is_aborted() {
-            return Score::DRAW;
-        }
-
-        if NT::IS_PV {
-            let sub_pv = td.pvs[td.ply + 1];
-            td.pvs[td.ply].load(pos.into(), sub_pv);
-        }
-
-        if NT::IS_ROOT {
-            td.best_move = pos.into();
-        }
-
-        return score;
     }
 
     if !NT::IS_ROOT {
@@ -233,7 +231,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
         }
     }
 
-    let forced_defense = state.board.patterns.effective_open_fours(!state.board.player_color) != 0;
+    let forced_defense = state.board.patterns.effective_fork_fours(!state.board.player_color) != 0;
 
     let static_eval: Score;
     let tt_move: MaybePos;
@@ -337,9 +335,12 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
         moves_made += 1;
 
         let player_pattern = state.board.patterns.field[state.board.player_color][pos.idx_usize()];
+        let opponent_pattern = state.board.patterns.field[!state.board.player_color][pos.idx_usize()];
         let on_three = player_pattern.has_three();
         let on_four = player_pattern.has_any_four();
-        let is_tactical = on_three | on_four;
+        let on_opponent_close_three = opponent_pattern.has_close_three();
+
+        let is_tactical = on_three | on_four | on_opponent_close_three;
 
         if !NT::IS_PV
             && !is_tactical
@@ -365,6 +366,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         td.push_ply(pos);
         state.play_mut(pos);
+        td.evaluator.play(&state.board, pos);
 
         if on_three {
             three_plied.push(pos);
@@ -440,6 +442,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         td.pop_ply();
         state.undo_mut(td.ss[td.ply].recovery_state);
+        td.evaluator.undo(&state.board, pos);
 
         if td.is_aborted() {
             return Score::DRAW;
@@ -509,6 +512,43 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
     );
 
     best_score
+}
+
+fn find_immediate_win(state: &GameState, ply: usize) -> (Score, MaybePos) {
+    if let Some(pos) = state.board.patterns.unchecked_five_pos[state.board.player_color].ok()
+    { // five
+        return (Score::win_in(ply + 1), pos.into())
+    }
+
+    if let Some(pos) = state.board.patterns.unchecked_five_pos[!state.board.player_color].ok() {
+        if state.board.player_color == Color::Black
+            && state.board.patterns.is_forbidden(pos)
+        { // trap
+            return (Score::lose_in(ply + 2), MaybePos::NONE)
+        }
+
+        if 1 < state.board.patterns.field[!state.board.player_color].iter()
+            .filter(|pattern| pattern.has_five())
+            .count()
+        { // opponent-five
+            return (Score::lose_in(ply + 2), pos.into())
+        }
+
+        return (Score::NAN, pos.into())
+    }
+
+    let fork_four_field = if state.board.player_color == Color::Black {
+        !state.board.patterns.forbidden_field
+            & state.board.patterns.indexes[Color::Black].fork_fours
+    } else {
+        state.board.patterns.indexes[Color::White].fork_fours
+    };
+
+    if let Some(pos) = fork_four_field.unique_pos() { // open-four
+        return (Score::win_in(ply + 3), pos.into());
+    }
+
+    (Score::NAN, MaybePos::NONE)
 }
 
 fn lookup_lmp_mc_table(depth: Depth, is_improving: bool) -> usize {

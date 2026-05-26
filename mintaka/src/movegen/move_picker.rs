@@ -1,12 +1,12 @@
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
-use crate::movegen::move_generator::generate_defend_open_four_moves;
 use crate::movegen::move_list::{MoveEntry, MoveList};
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::{Score, Scores};
+use crate::movegen::move_generator::generate_defend_open_four_moves;
 
 pub const KILLER_MOVE_SLOTS: usize = 2;
 
@@ -110,7 +110,7 @@ impl MovePicker {
                     }
 
                     if state.history.len() > 1
-                        && let Some(prev_move) = state.history.last_action().ok()
+                        && let Some(prev_move) = state.history.last_action_unchecked().ok()
                         && let Some(counter_move) = td.ht.counter[state.board.player_color][prev_move.idx_usize()].ok()
                         && self.occupied_moves.is_cold(counter_move)
                         && self.is_forced_legal(state, counter_move)

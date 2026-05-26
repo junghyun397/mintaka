@@ -121,27 +121,24 @@ impl GameAgent {
                 if hash != self.state.board.hash_key {
                     return Err(GameError::HashMismatch);
                 }
-
-                match pos {
-                    MaybePos::NONE => self.state.pass_mut(),
-                    pos => {
-                        let pos = pos.unwrap();
-
-                        if !self.state.board.is_pos_empty(pos) {
-                            return Err(GameError::StoneAlreadyExist);
-                        }
-
-                        if !self.state.board.is_legal_move(pos) {
-                            return Err(GameError::ForbiddenMove);
-                        }
-
-                        self.state.play_mut(pos);
-                        self.evaluator.update(&self.state);
-
-                        if let Some(winner) = self.state.board.find_winner(pos) {
-                            return Ok(CommandResult::finished(self.state.board.hash_key, GameResult::Win(winner)));
-                        }
+                
+                if let Some(pos) = pos.ok() {
+                    if !self.state.board.is_pos_empty(pos) {
+                        return Err(GameError::StoneAlreadyExist);
                     }
+
+                    if !self.state.board.is_legal_move(pos) {
+                        return Err(GameError::ForbiddenMove);
+                    }
+
+                    self.state.play_mut(pos);
+                    self.evaluator.play(&self.state.board, pos.into());
+
+                    if let Some(winner) = self.state.board.find_winner(pos) {
+                        return Ok(CommandResult::finished(self.state.board.hash_key, GameResult::Win(winner)));
+                    }
+                } else {
+                    self.state.pass_mut();
                 }
 
                 if self.state.board.stones == pos::U8_BOARD_SIZE {
@@ -155,16 +152,13 @@ impl GameAgent {
                     return Err(GameError::HashMismatch);
                 }
 
-                match self.state.history.pop_mut() {
+                match self.state.history.last_action() {
                     None => return Err(GameError::NoHistoryToUndo),
                     Some(action) => {
-                        match action {
-                            MaybePos::NONE => {
-                                self.state.board.switch_player_mut();
-                            },
-                            pos => {
-                                self.state.board.unset_mut(pos.unwrap());
-                            }
+                        self.state.undo_rebuild_mut();
+
+                        if let Some(pos) = action.ok() {
+                            self.evaluator.undo(&self.state.board, pos);
                         }
 
                         if self.executed_moves.is_hot_idx(self.state.len()) {
@@ -342,14 +336,18 @@ impl GameAgent {
         global_counter_in_1k: Arc<AtomicU32>,
         aborted: Arc<AtomicBool>,
     ) -> BestMove {
-        let computing_resource = self.next_computing_resource();
-
         let started_time = CLK::now();
+
+        let computing_resource = self.next_computing_resource();
 
         global_counter_in_1k.store(0, Ordering::Relaxed);
         aborted.store(false, Ordering::Relaxed);
 
         response_sender.response(Response::Begins(computing_resource));
+
+        if self.evaluator.hash_key() != self.state.board.hash_key {
+            self.evaluator.init(&self.state.board)
+        }
 
         let tt_view = self.tt.view();
 

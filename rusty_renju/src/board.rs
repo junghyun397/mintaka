@@ -7,10 +7,10 @@ use crate::notation::rule::RuleKind;
 use crate::pattern;
 use crate::pattern::Patterns;
 use crate::slice::Slices;
+use crate::utils::empty::Empty;
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
-use crate::utils::empty::Empty;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "BoardData"))]
 #[derive(Copy, Clone)]
@@ -163,10 +163,10 @@ impl Board {
                     $slice.has_potential_pattern::<{ $color }>()
                 ) {
                     (_, true) => {
-                        self.patterns.update_with_slice_mut::<{ RuleKind::Renju }, { $color }, { $direction }>($slice);
+                        self.patterns.update_with_slice::<{ RuleKind::Renju }, { $color }, { $direction }>($slice);
                     },
                     (true, false) => {
-                        self.patterns.clear_with_slice_mut::<{ $color }, { $direction }>($slice);
+                        self.patterns.clear_with_slice::<{ $color }, { $direction }>($slice);
                     },
                     _ => {}
                 }
@@ -208,11 +208,11 @@ impl Board {
         macro_rules! update_by_slice {
             ($slice:expr,$direction:expr) => {{
                 if $slice.has_potential_pattern::<{ Color::Black }>() {
-                    self.patterns.update_with_slice_mut::<{ RuleKind::Renju }, { Color::Black }, { $direction }>($slice);
+                    self.patterns.update_with_slice::<{ RuleKind::Renju }, { Color::Black }, { $direction }>($slice);
                 }
 
                 if $slice.has_potential_pattern::<{ Color::White }>() {
-                    self.patterns.update_with_slice_mut::<{ RuleKind::Renju }, { Color::White }, { $direction }>($slice);
+                    self.patterns.update_with_slice::<{ RuleKind::Renju }, { Color::White }, { $direction }>($slice);
                 }
             }};
         }

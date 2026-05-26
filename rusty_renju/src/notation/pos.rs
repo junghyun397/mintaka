@@ -82,10 +82,14 @@ impl TryFrom<u8> for Pos {
 impl Pos {
 
     pub const fn from_index(index: u8) -> Self {
+        debug_assert!(index < U8_BOARD_SIZE);
+
         Self(index)
     }
 
     pub const fn from_cartesian(row: u8, col: u8) -> Self {
+        debug_assert!(row < BOARD_WIDTH && col < BOARD_WIDTH);
+
         Self(cartesian_to_index!(row, col))
     }
 
@@ -228,11 +232,12 @@ impl MaybePos {
     }
 
     pub const fn is_some(&self) -> bool {
-        !self.is_none()
+        self.0.0 != Self::INVALID_POS.0
     }
 
     pub const fn unwrap(self) -> Pos {
         debug_assert!(self.is_some());
+
         self.0
     }
 

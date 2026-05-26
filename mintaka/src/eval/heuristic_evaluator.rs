@@ -1,6 +1,6 @@
 use crate::eval::evaluator::{Evaluator, PolicyDistribution};
-use crate::movegen::move_scores::MoveScores;
 use crate::game_state::GameState;
+use crate::movegen::move_scores::MoveScores;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::board::Board;
 use rusty_renju::memo::hash_key::HashKey;
@@ -14,23 +14,38 @@ use rusty_renju::{const_for, pattern};
 #[derive(Clone)]
 pub struct HeuristicEvaluator {
     move_scores: MoveScores,
-    eval_history: [(HashKey, Score); pos::BOARD_SIZE]
+    eval_history: [(HashKey, Score); pos::BOARD_SIZE],
+    hash_key: HashKey,
 }
 
 impl Evaluator for HeuristicEvaluator {
-
     type EvaluatorParameter = ();
 
     fn from_state(state: &GameState) -> Self {
         Self {
             move_scores: (&state.board.hot_field).into(),
-            eval_history: [(HashKey::INVALID, Score::DRAW); pos::BOARD_SIZE]
+            eval_history: [(HashKey::INVALID, Score::DRAW); pos::BOARD_SIZE],
+            hash_key: state.board.hash_key,
         }
     }
 
-    fn update(&mut self, _state: &GameState) {}
+    fn init(&mut self, board: &Board) {
+        self.move_scores = (&board.hot_field).into();
+        self.eval_history = [(HashKey::INVALID, Score::DRAW); pos::BOARD_SIZE];
+        self.hash_key = board.hash_key;
+    }
 
-    fn undo(&mut self, _state: &GameState, _color: Color, _pos: Pos) {}
+    fn play(&mut self, board: &Board, plied: Pos) {
+        self.move_scores.add_neighbor_score(plied);
+
+        self.hash_key = board.hash_key;
+    }
+
+    fn undo(&mut self, board: &Board, removed: Pos) {
+        self.move_scores.remove_neighbor_score(removed);
+
+        self.hash_key = board.hash_key;
+    }
 
     fn eval_policy(&mut self, state: &GameState) -> PolicyDistribution {
         let mut policy = [0; pattern::PATTERN_SIZE];
@@ -70,7 +85,7 @@ impl Evaluator for HeuristicEvaluator {
 
         let parent_score =
             if state.len() > 1 {
-                let recent_action = state.history.last_action().unwrap();
+                let recent_action = state.history.last_action_unchecked().unwrap();
                 if let Some(&(hash_key, score)) = self.eval_history.get(state.len() - 2)
                     && hash_key == state.board.hash_key.set(!state.board.player_color, recent_action)
                 {
@@ -97,10 +112,12 @@ impl Evaluator for HeuristicEvaluator {
         (current_score + parent_score) / 2
     }
 
+    fn hash_key(&self) -> HashKey {
+        self.hash_key
+    }
 }
 
 impl HeuristicEvaluator {
-
     fn eval_board_value(&self, board: &Board, eval_window: Bitfield) -> Score {
         let mut value_black = 0;
         let mut tactical_black = 0;
@@ -134,8 +151,8 @@ impl HeuristicEvaluator {
     }
 
     fn eval_tactical_value(board: &Board, mut tactical_points: u16, mut opponent_tactical_points: u16) -> Score {
-        tactical_points += board.patterns.counts.slice[board.player_color].total_open_four_structs_unchecked() as u16;
-        opponent_tactical_points += board.patterns.counts.slice[!board.player_color].total_open_four_structs_unchecked() as u16;
+        tactical_points += board.patterns.indexes[board.player_color].fork_fours.count_hots() as u16;
+        opponent_tactical_points += board.patterns.indexes[!board.player_color].fork_fours.count_hots() as u16;
 
         if tactical_points > 0 {
             return 10000;
@@ -145,7 +162,6 @@ impl HeuristicEvaluator {
 
         0
     }
-
 }
 
 const VALUE_SCORE_LUT_SIZE: usize = (0b1 << 8) + 1;

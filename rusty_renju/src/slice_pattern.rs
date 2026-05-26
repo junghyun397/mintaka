@@ -31,6 +31,7 @@ impl SlicePattern {
 
 impl Slice {
 
+    #[inline(always)]
     pub fn calculate_slice_pattern<const R: RuleKind, const C: Color>(&self) -> SlicePattern {
         // padding = 3
         let extended_stones: usize = (self.stones[C] as usize) << 3;

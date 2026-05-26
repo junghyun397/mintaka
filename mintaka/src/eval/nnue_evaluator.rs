@@ -2,7 +2,7 @@ use crate::eval::evaluator::{Evaluator, PolicyDistribution};
 use crate::eval::nn::network_params::NnueNetworkParams;
 use crate::game_state::GameState;
 use rusty_renju::board::Board;
-use rusty_renju::notation::color::Color;
+use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::score::Score;
@@ -19,22 +19,26 @@ struct NNUEInput {
 #[derive(Clone)]
 pub struct NnueEvaluator {
     black_network: (),
-    white_network: ()
+    white_network: (),
+    hash_key: HashKey,
 }
 
 impl Evaluator for NnueEvaluator {
-
     type EvaluatorParameter = NnueNetworkParams;
 
     fn from_state(state: &GameState) -> Self {
         todo!()
     }
 
-    fn update(&mut self, state: &GameState) {
+    fn init(&mut self, board: &Board) {
         todo!()
     }
 
-    fn undo(&mut self, state: &GameState, color: Color, pos: Pos) {
+    fn play(&mut self, board: &Board, pos: Pos) {
+        todo!()
+    }
+
+    fn undo(&mut self, board: &Board, pos: Pos) {
         todo!()
     }
 
@@ -46,6 +50,9 @@ impl Evaluator for NnueEvaluator {
         todo!()
     }
 
+    fn hash_key(&self) -> HashKey {
+        self.hash_key
+    }
 }
 
 impl NnueEvaluator {

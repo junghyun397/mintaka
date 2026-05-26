@@ -3,14 +3,12 @@ use crate::notation::color::{AlignedColorContainer, Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::{ForbiddenKind, RuleKind};
+use crate::pattern_index::{pattern_bitmaps_from_patterns, PatternIndex, SliceBitmap};
 use crate::slice::Slice;
 use crate::slice_pattern::SlicePattern;
-use crate::slice_pattern_count::SlicePatternCounts;
 use crate::step_idx;
-use crate::utils::lang::{repeat_16x, repeat_4x};
-use std::simd::cmp::SimdPartialEq;
-use std::simd::Simd;
 use crate::utils::empty::Empty;
+use crate::utils::lang::{repeat_16x, repeat_4x};
 
 pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
@@ -62,7 +60,7 @@ impl PatternCount {
 }
 
 #[derive(Debug, Copy, Clone, Default)]
-#[repr(C)]
+#[repr(C, packed)]
 pub struct Pattern {
     horizontal: u8,
     vertical: u8,
@@ -110,6 +108,10 @@ impl Pattern {
 
     pub fn has_fours(&self) -> bool {
         self.apply_mask(UNIT_ANY_FOUR_MASK).count_ones() > 1
+    }
+
+    pub fn has_closed_four(&self) -> bool {
+        self.apply_mask(UNIT_CLOSED_FOUR_MASK) != 0
     }
 
     pub fn has_close_three(&self) -> bool {
@@ -203,7 +205,7 @@ impl Pattern {
 #[derive(Debug, Copy, Clone)]
 pub struct Patterns {
     pub field: AlignedColorContainer<[Pattern; PATTERN_SIZE]>,
-    pub counts: SlicePatternCounts,
+    pub indexes: ColorContainer<PatternIndex>,
     pub unchecked_five_pos: ColorContainer<MaybePos>,
     pub candidate_forbidden_field: Bitfield,
     pub forbidden_field: Bitfield,
@@ -213,7 +215,7 @@ impl Empty for Patterns {
     fn empty() -> Self {
         Self {
             field: unsafe { std::mem::zeroed() },
-            counts: SlicePatternCounts::EMPTY,
+            indexes: ColorContainer::new(PatternIndex::empty(), PatternIndex::empty()),
             unchecked_five_pos: ColorContainer::new(MaybePos::NONE, MaybePos::NONE),
             candidate_forbidden_field: Bitfield::ZERO_FILLED,
             forbidden_field: Bitfield::ZERO_FILLED,
@@ -222,11 +224,12 @@ impl Empty for Patterns {
 }
 
 impl Patterns {
-
+    #[inline(always)]
     pub fn is_forbidden(&self, pos: Pos) -> bool {
         self.forbidden_field.is_hot(pos)
     }
 
+    #[inline(always)]
     pub fn forbidden_kind(&self, pos: Pos) -> Option<ForbiddenKind> {
         self.is_forbidden(pos).then(|| {
             let pattern = self.field[Color::Black][pos.idx_usize()];
@@ -241,35 +244,40 @@ impl Patterns {
         })
     }
 
-    pub fn update_with_slice_mut<const R: RuleKind, const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
+    #[inline(always)]
+    pub fn update_with_slice<const R: RuleKind, const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
         let slice_pattern = slice.calculate_slice_pattern::<R, C>();
 
         match (slice.pattern_bitmap[C] == 0, slice_pattern.is_empty()) {
             (false, true) =>
-                self.clear_with_slice_mut::<C, D>(slice),
+                self.clear_with_slice::<C, D>(slice),
             (_, false) =>
-                self.update_with_slice_pattern_mut::<C, D>(slice, slice_pattern),
+                self.update_with_slice_pattern::<C, D>(slice, slice_pattern),
             _ => {}
         };
     }
 
-    pub fn clear_with_slice_mut<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
-        self.counts.clear_slice_mut::<C, D>(slice.idx as usize);
-
+    #[inline(always)]
+    pub fn clear_with_slice<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
         let start_idx = slice.start_pos.idx_usize();
 
-        let mut clear_mask = std::mem::take(&mut slice.pattern_bitmap[C]);
-
+        let mut clear_mask = slice.pattern_bitmap[C];
         while clear_mask != 0 {
             let slice_idx = clear_mask.trailing_zeros() as usize;
             clear_mask &= clear_mask - 1;
 
-            let idx = step_idx!(D, start_idx, slice_idx);
-            self.field[C][idx].apply_mask_mut::<D>(0);
+            self.field[C][step_idx!(D, start_idx, slice_idx)]
+                .apply_mask_mut::<D>(0);
         }
+
+        let old_bitmap = self.indexes[C]
+            .replace_slice_bitmap::<D>(slice.idx, SliceBitmap::empty());
+        self.indexes[C]
+            .update_slice_bitfields::<C, D>(&self.field[C], start_idx, old_bitmap, SliceBitmap::empty());
     }
 
-    fn update_with_slice_pattern_mut<const C: Color, const D: Direction>(
+    #[inline(always)]
+    fn update_with_slice_pattern<const C: Color, const D: Direction>(
         &mut self, slice: &mut Slice, slice_pattern: SlicePattern
     ) {
         if (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK) != 0 {
@@ -279,52 +287,41 @@ impl Patterns {
             self.unchecked_five_pos[C] = pos.into();
         }
 
-        self.counts.update_slice_mut::<C, D>(
-            slice.idx as usize,
-            (slice_pattern.patterns & SLICE_PATTERN_THREE_MASK).count_ones() as u8,
-            (slice_pattern.patterns & SLICE_PATTERN_CLOSED_FOUR_MASK).count_ones() as u8,
-            (slice_pattern.patterns & SLICE_PATTERN_OPEN_FOUR_MASK).count_ones() as u8,
-        );
-
-        let pattern_bitmap = std::mem::replace(
-            &mut slice.pattern_bitmap[C],
-            encode_u128_into_u16(slice_pattern.patterns)
-        );
-
         let slice_patterns = slice_pattern.patterns.to_le_bytes();
+        let (new_pattern_bitmap, new_slice_bitmap) = pattern_bitmaps_from_patterns(slice_patterns);
+
+        let old_pattern_bitmap = std::mem::replace(&mut slice.pattern_bitmap[C], new_pattern_bitmap);
+
+        let old_slice_bitmap = self.indexes[C]
+            .replace_slice_bitmap::<D>(slice.idx, new_slice_bitmap);
 
         let start_idx = slice.start_pos.idx_usize();
-        let mut update_mask = slice.pattern_bitmap[C] | pattern_bitmap;
-        while update_mask != 0 {
-            let slice_idx = update_mask.trailing_zeros() as usize;
-            update_mask &= update_mask - 1;
 
-            let idx = step_idx!(D, start_idx, slice_idx);
-            self.field[C][idx].apply_mask_mut::<D>(slice_patterns[slice_idx]);
+        let mut update_bitmask = new_pattern_bitmap | old_pattern_bitmap;
+        while update_bitmask != 0 {
+            let slice_idx = update_bitmask.trailing_zeros() as usize;
+            update_bitmask &= update_bitmask - 1;
 
-            if C == Color::Black && self.field[Color::Black][idx].is_forbidden_unchecked() {
-                self.candidate_forbidden_field.set_idx(idx);
+            let board_idx = step_idx!(D, start_idx, slice_idx);
+
+            self.field[C][board_idx]
+                .apply_mask_mut::<D>(slice_patterns[slice_idx]);
+
+            if C == Color::Black && self.field[Color::Black][board_idx].is_forbidden_unchecked() {
+                self.candidate_forbidden_field.set_idx(board_idx);
             }
         }
+
+        self.indexes[C]
+            .update_slice_bitfields::<C, D>(&self.field[C], start_idx, old_slice_bitmap, new_slice_bitmap);
     }
 
-    pub fn effective_open_fours(&self, color: Color) -> u32 {
+    pub fn effective_fork_fours(&self, color: Color) -> u32 {
         match color {
-            Color::Black => {
-                let mut total_fours = self.counts.global[Color::Black].open_fours as u32;
-
-                if !self.forbidden_field.is_empty() {
-                    total_fours -= self.forbidden_field.iter_hot_idx()
-                        .map(|idx| self.field[Color::Black][idx].count_open_fours())
-                        .sum::<u32>();
-                }
-
-                total_fours
-            },
-            Color::White => self.counts.global[Color::White].open_fours as u32
+            Color::Black => (self.indexes[Color::Black].fork_fours & !self.forbidden_field).count_hots(),
+            Color::White => self.indexes[Color::White].fork_fours.count_hots()
         }
     }
-
 }
 
 struct DirectionIterator {
@@ -342,10 +339,4 @@ impl Iterator for DirectionIterator {
             Direction::from(tails as u8 / 8)
         })
     }
-}
-
-fn encode_u128_into_u16(source: u128) -> u16 {
-    Simd::<u8, 16>::from(source.to_le_bytes())
-        .simd_ne(Simd::splat(0))
-        .to_bitmask() as u16
 }

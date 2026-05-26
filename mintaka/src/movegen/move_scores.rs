@@ -45,7 +45,7 @@ impl MoveScores {
         self.adjust_neighbor_score::<false>(pos);
     }
 
-    fn adjust_neighbor_score<const INC: bool>(&mut self, pos: Pos) {
+    fn adjust_neighbor_score<const POSITIVE: bool>(&mut self, pos: Pos) {
         let scores_ptr = self.scores.as_mut_slice().as_mut_ptr();
         let mask_ptr = NEIGHBORHOOD_SCORE_LUT.0[pos.idx_usize()].as_ptr();
 
@@ -61,20 +61,17 @@ impl MoveScores {
                 );
 
             for idx in 0 .. platform::U8_REGISTER_N {
-                if INC {
-                    registers[idx] += Simd::from_slice(
-                        unsafe { slice::from_raw_parts(
-                            mask_ptr.add(start_idx + idx * platform::U8_LANE_N),
-                            platform::U8_LANE_N
-                        ) }
-                    );
+                let vector = Simd::from_slice(
+                    unsafe { slice::from_raw_parts(
+                        mask_ptr.add(start_idx + idx * platform::U8_LANE_N),
+                        platform::U8_LANE_N
+                    ) }
+                );
+
+                if POSITIVE {
+                    registers[idx] += vector;
                 } else {
-                    registers[idx] -= Simd::from_slice(
-                        unsafe { slice::from_raw_parts(
-                            mask_ptr.add(start_idx + idx * platform::U8_LANE_N),
-                            platform::U8_LANE_N
-                        ) }
-                    )
+                    registers[idx] -= vector;
                 }
             }
 

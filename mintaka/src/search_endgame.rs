@@ -73,7 +73,6 @@ pub struct EndgameMovesUnchecked {
 }
 
 impl EndgameMovesUnchecked {
-
     pub const EMPTY: Self = Self {
         moves: [MaybePos::NONE; ENDGAME_MAX_MOVES],
         top: 0,
@@ -115,7 +114,6 @@ impl EndgameMovesUnchecked {
     pub fn is_empty(&self) -> bool {
         self.top == 0
     }
-
 }
 
 #[derive(Copy, Clone)]
@@ -136,11 +134,9 @@ impl EndgameFrame {
 }
 
 pub trait VcfDestination {
-
     fn conditional_abort(&self, defend_pattern: Pattern) -> bool;
 
     fn additional_reached(&self, four_pos: Pos) -> bool;
-
 }
 
 pub struct VcfWin; impl VcfDestination for VcfWin {
@@ -175,15 +171,15 @@ pub fn endgame_search<const R: RuleKind, const VCT: bool>(
     beta: Score,
     static_eval: Score,
 ) -> Score {
-    let counts = state.board.patterns.counts.global[state.board.player_color];
+    let indexes = state.board.patterns.indexes[state.board.player_color];
+    
+    let has_threats = if VCT {
+        !(indexes.closed_fours | indexes.open_threes).is_empty()
+    } else {
+        !indexes.closed_fours.is_empty()
+    };
 
-    let mut total_threats = counts.total_fours();
-
-    if VCT {
-        total_threats += counts.threes;
-    }
-
-    if total_threats == 0 {
+    if !has_threats {
         return static_eval;
     }
 
@@ -361,8 +357,9 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                 return Sq::resolve(trace_result, win_score);
             }
 
-            state.board.set_mut(four_pos);
             td.batch_counter.increment();
+            state.board.set_mut(four_pos);
+            td.evaluator.play(&state.board, four_pos);
             vcf_ply += 1;
             vcf_depth_left -= 1;
 
@@ -382,6 +379,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                 _ => defend_pattern.has_open_four() && !defend_is_forbidden
             } || dest.conditional_abort(defend_pattern) {
                 state.board.unset_mut(four_pos);
+                td.evaluator.undo(&state.board, four_pos);
                 vcf_ply -= 1;
                 vcf_depth_left += 1;
                 continue 'position_search;
@@ -409,6 +407,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                 || vcf_depth_left <= 0
             {
                 state.board.unset_mut(four_pos);
+                td.evaluator.undo(&state.board, four_pos);
                 vcf_ply -= 1;
                 vcf_depth_left += 1;
                 continue 'position_search;
@@ -436,19 +435,23 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
 
                 if abort {
                     state.board.unset_mut(four_pos);
+                    td.evaluator.undo(&state.board, four_pos);
                     vcf_ply -= 1;
                     vcf_depth_left += 1;
                     continue 'position_search;
                 }
             }
 
-            state.board.set_mut(defend_pos);
             td.batch_counter.increment();
+            state.board.set_mut(defend_pos);
+            td.evaluator.play(&state.board, defend_pos);
             vcf_ply += 1;
 
-            if state.board.patterns.counts.global[C].total_fours() == 0 { // cold branch pruning
+            if !state.board.patterns.indexes[C].has_any_four() { // cold branch pruning
                 state.board.unset_mut(defend_pos);
+                td.evaluator.undo(&state.board, defend_pos);
                 state.board.unset_mut(four_pos);
+                td.evaluator.undo(&state.board, four_pos);
                 vcf_ply -= 2;
                 vcf_depth_left += 1;
                 continue 'position_search;
@@ -469,7 +472,9 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                 {
                     td.endgame_stack_top -= 1;
                     state.board.unset_mut(defend_pos);
+                    td.evaluator.undo(&state.board, defend_pos);
                     state.board.unset_mut(four_pos);
+                    td.evaluator.undo(&state.board, four_pos);
                     vcf_ply -= 2;
                     vcf_depth_left += 1;
                     continue 'position_search;
@@ -506,8 +511,9 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
 
         if let Some(frame) = td.pop_endgame_frame() {
             state.board.unset_mut(frame.defend_pos);
+            td.evaluator.undo(&state.board, frame.defend_pos);
             state.board.unset_mut(frame.four_pos);
-
+            td.evaluator.undo(&state.board, frame.four_pos);
             vcf_ply -= 2;
             vcf_depth_left += 1;
 

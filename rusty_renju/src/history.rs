@@ -134,11 +134,15 @@ impl History {
         }
     }
 
-    pub fn last_action(&self) -> MaybePos {
+    pub fn last_action(&self) -> Option<MaybePos> {
         if self.top == 0 {
-            return MaybePos::NONE;
+            return None;
         }
 
+        Some(self.entries[self.top - 1])
+    }
+
+    pub fn last_action_unchecked(&self) -> MaybePos {
         self.entries[self.top - 1]
     }
 

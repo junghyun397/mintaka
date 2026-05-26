@@ -115,9 +115,12 @@ impl GameState {
     }
 
     fn undo_move(&mut self) {
-        match self.history.pop_mut() {
-            Some(MaybePos::NONE) | None => self.board.unpass_mut(),
-            Some(pos) => self.board.unset_mut(pos.unwrap()),
+        if let Some(action) = self.history.pop_mut() {
+            if let Some(pos) = action.ok() {
+                self.board.unset_mut(pos);
+            } else {
+                self.board.unpass_mut();
+            }
         }
     }
 

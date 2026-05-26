@@ -3,8 +3,8 @@ use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::Direction;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::{assert_struct_sizes, const_for, const_max, slice_pattern};
 use crate::utils::empty::Empty;
+use crate::{const_for, const_max, slice_pattern};
 
 pub const DIAGONAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 - 4 - 4 - 1;
 const I_DIAGONAL_SLICE_AMOUNT: isize = DIAGONAL_SLICE_AMOUNT as isize;
@@ -12,7 +12,6 @@ pub const TOTAL_SLICE_AMOUNT: usize = pos::U_BOARD_WIDTH * 2 + DIAGONAL_SLICE_AM
 const DIAGONAL_BOARD_PADDING: isize = 5 - pos::I_BOARD_WIDTH;
 
 #[derive(Debug, Copy, Clone)]
-#[repr(align(16))]
 pub struct Slice {
     pub idx: u8,
     pub length: u8,
@@ -22,11 +21,9 @@ pub struct Slice {
     pub pattern_bitmap: ColorContainer<u16>,
 }
 
-assert_struct_sizes!(Slice, size=16, align=16);
-
 impl Slice {
 
-    pub const PLACEHOLDER: Self = unsafe { std::mem::zeroed() };
+    const PLACEHOLDER: Self = unsafe { std::mem::zeroed() };
 
     pub const fn empty(idx: u8, length: u8, start_row: u8, start_col: u8) -> Self {
         Slice {
@@ -39,29 +36,35 @@ impl Slice {
         }
     }
 
+    #[inline(always)]
     pub fn set(mut self, color: Color, idx: u8) -> Self {
         self.set_mut(color, idx);
         self
     }
 
+    #[inline(always)]
     pub fn unset(mut self, color: Color, idx: u8) -> Self {
         self.unset_mut(color, idx);
         self
     }
 
+    #[inline(always)]
     pub fn set_mut(&mut self, color: Color, idx: u8) {
         self.stones[color] |= 0b1 << idx;
     }
 
+    #[inline(always)]
     pub fn unset_mut(&mut self, color: Color, idx: u8) {
         self.stones[color] &= !(0b1 << idx);
     }
 
+    #[inline(always)]
     pub fn is_empty(&self, idx: u8) -> bool {
         let mask = 0b1 << idx;
         (self.stones[Color::Black] | self.stones[Color::White]) & mask == 0
     }
 
+    #[inline(always)]
     pub fn stone_kind(&self, idx: u8) -> Option<Color> {
         let mask = 0b1 << idx;
 
@@ -74,6 +77,7 @@ impl Slice {
         }
     }
 
+    #[inline(always)]
     pub fn calculate_slice_idx(&self, direction: Direction, pos: Pos) -> usize {
         match direction {
             Direction::Vertical => pos.row_usize(),
@@ -82,6 +86,7 @@ impl Slice {
         }
     }
 
+    #[inline(always)]
     pub fn has_potential_pattern<const C: Color>(&self) -> bool {
         let stones = self.stones[C];
         let blocks = self.blocks::<C>();
@@ -105,6 +110,7 @@ impl Slice {
         slice_pattern::five_in_a_row_idx(self.stones[C])
     }
 
+    #[inline(always)]
     pub fn blocks<const C: Color>(&self) -> u16 {
         u16::MAX << self.length | self.stones[!C]
     }

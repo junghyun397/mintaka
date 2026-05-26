@@ -32,7 +32,6 @@ pub trait Scores {
     fn clamp(score: Score) -> Score {
         score.clamp(-Score::INF, Score::INF)
     }
-
 }
 
 impl Scores for Score {}
