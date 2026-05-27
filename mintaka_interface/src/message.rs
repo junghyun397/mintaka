@@ -68,11 +68,7 @@ impl MessageSender {
 
     pub fn launch(&self, objective: SearchObjective, apply: bool, interactive: bool) {
         self.sender
-            .send(Message::Launch {
-                objective,
-                apply,
-                interactive,
-            })
+            .send(Message::Launch { objective, apply, interactive })
             .expect(CHANNEL_CLOSED_MESSAGE);
     }
 }

@@ -53,7 +53,6 @@ impl IndexMut<usize> for History {
 }
 
 impl History {
-
     pub const EMPTY: Self = Self {
         entries: [MaybePos::NONE; MAX_HISTORY_SIZE],
         top: 0,
@@ -142,6 +141,14 @@ impl History {
         Some(self.entries[self.top - 1])
     }
 
+    pub fn last_action_or_none(&self) -> MaybePos {
+        if self.top == 0 {
+            return MaybePos::NONE;
+        }
+
+        self.entries[self.top - 1]
+    }
+
     pub fn last_action_unchecked(&self) -> MaybePos {
         self.entries[self.top - 1]
     }
@@ -150,45 +157,17 @@ impl History {
         self.entries[self.top - 2]
     }
 
-    pub fn avg_distance_to_last_action_pair(&self, pos: Pos) -> u8 {
-        if self.top > 1 {
-            let distance1 = self.entries[self.top - 2].distance_or(pos, 0);
-            let distance2 = self.entries[self.top - 1].distance_or(pos, 0);
-            return (distance1 + distance2) / 2
+    pub fn avg_distance(&self, pos: Pos, sample_size: usize) -> u8 {
+        if self.top == 0 {
+            return 0;
         }
 
-        match self.top {
-            1 => self.entries[0].distance_or(pos, 0),
-            _ => 0
-        }
+        let sample_size = self.top.min(sample_size);
+
+        self.entries[self.top - sample_size .. self.top].iter()
+            .map(|&action| action.distance_or(pos, 0) as u16)
+            .sum::<u16>() as u8 / sample_size as u8
     }
-
-    pub fn avg_distance_to_last_actions(&self, pos: Pos) -> u8 {
-        if self.top > 3 {
-            let distance1 = self.entries[self.top - 4].distance_or(pos, 0);
-            let distance2 = self.entries[self.top - 3].distance_or(pos, 0);
-            let distance3 = self.entries[self.top - 2].distance_or(pos, 0);
-            let distance4 = self.entries[self.top - 1].distance_or(pos, 0);
-            return (distance1 + distance2 + distance3 + distance4) / 4
-        }
-
-        match self.top {
-            1 => self.entries[0].distance_or(pos, 0),
-            2 => {
-                let distance1 = self.entries[self.top - 2].distance_or(pos, 0);
-                let distance2 = self.entries[self.top - 1].distance_or(pos, 0);
-                (distance1 + distance2) / 2
-            },
-            3 => {
-                let distance1 = self.entries[self.top - 3].distance_or(pos, 0);
-                let distance2 = self.entries[self.top - 2].distance_or(pos, 0);
-                let distance3 = self.entries[self.top - 1].distance_or(pos, 0);
-                (distance1 + distance2 + distance3) / 3
-            },
-            _ => 0
-        }
-    }
-
 }
 
 impl Display for History {

@@ -56,7 +56,7 @@ def play_arena(config, arena_no, baseline_value, target_value, baseline_elo, tar
          "--log-prefix-filter",
          "--a-time", str(config.args.time[0]), str(config.args.time[1]), str(config.args.time[2]),
          "--b-time", str(config.args.time[0]), str(config.args.time[1]), str(config.args.time[2]),
-         *(["--openings", config.args.openings] if config.args.openings is not None else []),
+         *(["--openings-file", config.args.openings_file] if config.args.openings_file is not None else []),
          "--elo-k-factor", str(16.0),
          "--num-games", str(config.args.num_games),
          "--a-path", f"target/release/{config.engine_name(baseline_value)}",
@@ -102,7 +102,7 @@ def main():
     parser.add_argument("--time", type=int, nargs=3, default=[180_000, 0, 10_000],
                         help="total(ms) increment(ms) turn(ms)")
 
-    parser.add_argument("--openings", type=str, default=None)
+    parser.add_argument("--openings-file", type=str, default=None)
 
     parser.add_argument("--num-games", type=int, default=17)
     parser.add_argument("--num-concurrency", type=int, default=1)

@@ -1,8 +1,8 @@
 use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucket, TTFlag};
-use crate::value::Depth;
+use crate::value::{Depth, Depths};
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::memo::hash_key::HashKey;
-use rusty_renju::notation::pos::MaybePos;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::{Score, Scores};
 use rusty_renju::utils::byte_size::ByteSize;
 #[cfg(feature = "serde")]
@@ -169,25 +169,28 @@ impl TTView<'_> {
         key: HashKey,
         best_move: MaybePos,
         maybe_score_kind: Option<ScoreKind>,
-        endgame_depth: Depth,
+        endgame_depth: u8,
         depth: Depth,
         eval: Score,
         score: Score,
         is_pv: bool,
     ) {
         let idx = self.calculate_index(key);
-        let depth = depth as u8;
         let eval = eval as i16;
         let score = score as i16;
 
         let bucket = &self.table[idx];
 
         if let Some(mut entry) = bucket.probe(key) {
+            if entry.tt_flag.is_endgame_proven() {
+                return;
+            }
+
             let entry_score_kind = entry.tt_flag.maybe_score_kind();
 
             let score_kind_value = maybe_score_kind.map_or(0, ScoreKind::into);
             let replace_score = depth + score_kind_value + 5;
-            let keep_score = entry.depth + entry_score_kind.map_or(0, ScoreKind::into);
+            let keep_score = entry.depth as i32 + entry_score_kind.map_or(0, ScoreKind::into);
 
             if self.age > entry.age as u32
                 || (maybe_score_kind == Some(ScoreKind::Exact)
@@ -200,7 +203,7 @@ impl TTView<'_> {
 
                 entry.tt_flag = TTFlag::new(maybe_score_kind, is_pv, endgame_depth);
                 entry.age = self.age as u8;
-                entry.depth = depth;
+                entry.depth = clamp_depth(depth);
                 entry.eval = eval;
                 entry.score = score;
 
@@ -211,9 +214,46 @@ impl TTView<'_> {
                 best_move,
                 tt_flag: TTFlag::new(maybe_score_kind, is_pv, endgame_depth),
                 age: self.age as u8,
-                depth,
+                depth: clamp_depth(depth),
                 eval,
                 score,
+            };
+
+            bucket.store(key, entry);
+        }
+    }
+
+    pub fn store_endgame_proven(
+        &self,
+        key: HashKey,
+        response_pos: Pos,
+        score_kind: ScoreKind,
+        score: Score,
+        is_pv: bool,
+    ) {
+        let idx = self.calculate_index(key);
+
+        let bucket = &self.table[idx];
+
+        if let Some(mut entry) = bucket.probe(key) {
+            if !entry.tt_flag.is_endgame_proven() {
+                entry.best_move = response_pos.into();
+                entry.tt_flag.set_endgame_proven();
+                entry.tt_flag.set_score_kind(score_kind);
+                entry.age = self.age as u8;
+                entry.depth = Depth::PLY_LIMIT as u8;
+                entry.score = score as i16;
+
+                bucket.store(key, entry);
+            }
+        } else {
+            let entry = TTEntry {
+                best_move: response_pos.into(),
+                tt_flag: TTFlag::new_endgame_proven(score_kind, is_pv),
+                age: self.age as u8,
+                depth: Depth::PLY_LIMIT as u8,
+                eval: 0,
+                score: score as i16,
             };
 
             bucket.store(key, entry);
@@ -240,8 +280,12 @@ impl TTView<'_> {
     }
 }
 
+fn clamp_depth(depth: Depth) -> u8 {
+    depth.clamp(0, u8::MAX as Depth) as u8
+}
+
 pub fn encode_mate_distance(score: Score, ply: usize) -> Score {
-    if Score::is_deterministic(score) {
+    if Score::is_mate(score) {
         score + (ply as Score) * score.signum()
     } else {
         score
@@ -249,7 +293,7 @@ pub fn encode_mate_distance(score: Score, ply: usize) -> Score {
 }
 
 pub fn decode_mate_distance(score: Score, ply: usize) -> Score {
-    if Score::is_deterministic(score) {
+    if Score::is_mate(score) {
         score - (ply as Score) * score.signum()
     } else {
         score

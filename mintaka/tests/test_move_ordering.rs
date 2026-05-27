@@ -20,7 +20,7 @@ mod test_movegen {
 
             let state = history.into();
 
-            let mut evaluator = ActiveEvaluator::from_state(&state);
+            let evaluator = ActiveEvaluator::from_state(&state);
 
             let tt = TranspositionTable::new_with_size(config.tt_size);
             let ht = HistoryTable::EMPTY;
@@ -39,13 +39,13 @@ mod test_movegen {
                 &global_counter_in_1k
             );
 
-            let mut move_picker = MovePicker::init_new(MaybePos::NONE, [MaybePos::NONE; 2], false);
+            let mut move_picker = MovePicker::init_new(MaybePos::NONE, [MaybePos::NONE; 2], None);
 
             let mut heatmap = [f32::NAN; pos::BOARD_SIZE];
-            while let Some(MoveEntry { pos, move_score: score }) = move_picker.next(&mut td, &state) {
-                heatmap[pos.idx_usize()] = score as f32;
+            while let Some(MoveEntry { pos, move_score, .. }) = move_picker.next(&mut td, &state) {
+                heatmap[pos.idx_usize()] = move_score as f32;
 
-                print!("{:?}, ", (pos, score));
+                print!("{:?}, ", (pos, move_score));
             }
 
             println!("\n{}", state.board.to_string_with_heatmap(heatmap, true));

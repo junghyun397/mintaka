@@ -27,7 +27,7 @@ pub struct Preference {
     pub workers: Option<u32>,
     #[arg(short, long)]
     pub pondering: bool,
-    #[arg(short, long)]
+    #[arg(long)]
     pub command_sequence: Option<String>,
     #[clap(skip)]
     pub game_state: Option<GameState>,

@@ -1,11 +1,11 @@
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::memo::history_table::{QuietPlied, TacticalPlied};
-use crate::memo::transposition_table::{decode_mate_distance, encode_mate_distance};
-use crate::memo::tt_entry::ScoreKind;
+use crate::memo::transposition_table;
+use crate::memo::tt_entry::{ScoreKind, TTFlag};
+use crate::movegen::move_generator;
 use crate::movegen::move_list::MoveEntry;
-use crate::movegen::move_picker;
-use crate::movegen::move_picker::MovePicker;
+use crate::movegen::move_picker::{MovePicker, ThreatKind};
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
 use crate::search_endgame::endgame_search;
@@ -16,7 +16,6 @@ use crate::value::Depth;
 use crate::{params, value};
 use rusty_renju::const_for;
 use rusty_renju::notation::color::Color;
-use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{Score, Scores};
@@ -55,6 +54,8 @@ pub fn iterative_deepening<CLK: MonotonicClock, const R: RuleKind, TH: ThreadTyp
     let mut root_pv = PrincipalVariation::EMPTY;
     let mut selective_depth = 0;
 
+    let mut mate_count = 0;
+
     let starting_depth = (td.tid % 10 + 1) as Depth;
 
     'iterative_deepening: for depth in starting_depth ..= td.config.max_depth() {
@@ -85,9 +86,17 @@ pub fn iterative_deepening<CLK: MonotonicClock, const R: RuleKind, TH: ThreadTyp
             })
         }
 
-        if td.singular_root && Score::is_winning(iter_score) {
-            break 'iterative_deepening;
+        if Score::is_mate(iter_score) {
+            mate_count += 1;
+
+            if depth - starting_depth > 10
+                && mate_count > 2
+            {
+                break 'iterative_deepening;
+            }
         }
+
+        td.singular_root = false;
     }
 
     if TH::IS_MAIN {
@@ -199,7 +208,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
             state.play_mut(pos);
             td.evaluator.play(&state.board, pos);
 
-            // no depth reduction for forced defense
+            // no depth reduction for forced response
             let score = -pvs::<CLK, R, TH, NT::NextType>(td, state, depth_left, -beta, -alpha, cut_node);
 
             td.pop_ply();
@@ -231,16 +240,49 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
         }
     }
 
-    let forced_defense = state.board.patterns.effective_fork_fours(!state.board.player_color) != 0;
+    let threat_kind;
+    'threat_kind: {
+        let fork_four_field = state.board.patterns.effective_fork_four_field(!state.board.player_color);
+
+        if !fork_four_field.is_empty() {
+            threat_kind = Some(ThreatKind::ForkFour(fork_four_field));
+            break 'threat_kind;
+        }
+
+        let fork_three_four_field = state.board.patterns.effective_fork_three_four_field(!state.board.player_color);
+
+        if !fork_three_four_field.is_empty() {
+            threat_kind = Some(ThreatKind::ForkThreeFour(fork_three_four_field | state.board.patterns.indexes[!state.board.player_color].open_threes));
+            break 'threat_kind;
+        }
+
+        threat_kind = None;
+    };
 
     let static_eval: Score;
     let tt_move: MaybePos;
     let tt_pv: bool;
-    let tt_endgame_depth: Depth;
+    let tt_endgame_depth: u8;
 
-    match td.tt.probe(state.board.hash_key) {
+    let tt_entry = td.tt.probe(state.board.hash_key);
+
+    // endgame-hit
+    if let Some(entry) = tt_entry && entry.tt_flag.is_endgame_proven() {
+        if NT::IS_ROOT {
+            td.best_move = entry.best_move;
+            td.singular_root = true;
+        }
+
+        if NT::IS_PV {
+            td.pvs[td.ply].load(entry.best_move, PrincipalVariation::EMPTY);
+        }
+
+        return transposition_table::decode_mate_distance(entry.score as Score, td.ply);
+    }
+
+    match tt_entry {
         Some(entry) if entry.tt_flag.maybe_score_kind().is_some() => { // full-tt
-            let tt_score = decode_mate_distance(entry.score as Score, td.ply);
+            let tt_score = transposition_table::decode_mate_distance(entry.score as Score, td.ply);
 
             tt_move = entry.best_move;
             tt_pv = entry.tt_flag.is_pv();
@@ -255,17 +297,30 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
                     ScoreKind::Exact => true,
                 }
             {
+                if tt_score >= beta
+                    && let Some(pos) = tt_move.ok()
+                    && threat_kind.is_none()
+                    && state.board.is_legal_move(pos)
+                    && !state.board.patterns.field[state.board.player_color][pos.idx_usize()].is_tactical()
+                {
+                    td.push_killer(pos);
+
+                    let mut quiet_plied = QuietPlied::EMPTY;
+                    quiet_plied.push(pos);
+                    td.ht.update_quiet(&state.history, quiet_plied, state.board.player_color, pos, depth_left);
+                }
+
                 return tt_score;
             }
 
             static_eval = entry.eval as Score;
         }
-        Some(entry) => {
+        Some(entry) => { // endgame-tt
             tt_move = MaybePos::NONE;
             tt_pv = false;
             tt_endgame_depth = entry.tt_flag.endgame_depth();
 
-            static_eval = td.evaluator.eval_value(state);
+            static_eval = entry.eval as Score;
 
             td.tt.store(
                 state.board.hash_key,
@@ -307,8 +362,17 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
     };
 
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
+        let vcf_depth = td.config.max_vcf_depth.unwrap_or(30);
+
+        if static_eval >= beta
+            || Score::is_winning(alpha)
+            || tt_endgame_depth >= vcf_depth.min(TTFlag::MAX_TT_ENDGAME_DEPTH as Depth) as u8
+        {
+            return static_eval;
+        }
+
         return endgame_search::<R, false>(
-            td, td.config.max_vcf_depth.unwrap_or(pos::BOARD_SIZE as Depth), state, alpha, beta, static_eval
+            td, vcf_depth, state, alpha, beta, static_eval
         );
     }
 
@@ -320,14 +384,14 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
     let mut best_score = -Score::INF;
     let mut best_move = MaybePos::NONE;
 
-    let mut move_picker = MovePicker::init_new(tt_move, td.killers[td.ply], forced_defense);
+    let mut move_picker = MovePicker::init_new(tt_move, td.killers[td.ply], threat_kind);
     let mut moves_made = 0;
 
     let mut quiet_plied = QuietPlied::EMPTY;
     let mut three_plied = TacticalPlied::EMPTY;
     let mut four_plied = TacticalPlied::EMPTY;
 
-    'position_search: while let Some(MoveEntry { pos, move_score }) = move_picker.next(td, state) {
+    'position_search: while let Some(MoveEntry { pos, move_score, history_score, .. }) = move_picker.next(td, state) {
         if !state.board.is_legal_move(pos) {
             continue;
         }
@@ -336,21 +400,23 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         let player_pattern = state.board.patterns.field[state.board.player_color][pos.idx_usize()];
         let opponent_pattern = state.board.patterns.field[!state.board.player_color][pos.idx_usize()];
-        let on_three = player_pattern.has_three();
+
+        let on_three = player_pattern.has_open_three();
         let on_four = player_pattern.has_any_four();
-        let on_opponent_close_three = opponent_pattern.has_close_three();
+        let on_opponent_three = opponent_pattern.has_open_three();
 
-        let is_tactical = on_three | on_four | on_opponent_close_three;
+        let is_tactical = on_three | on_four | on_opponent_three;
 
+        // late move pruning
         if !NT::IS_PV
             && !is_tactical
-            && !forced_defense
-            && move_score < move_picker::KILLER_MOVE_SCORE
+            && threat_kind.is_none()
         {
             // move count pruning
             let lmp_margin = lookup_lmp_mc_table(depth_left, static_eval_improvement > 0);
             if moves_made >= lmp_margin {
-                break 'position_search;
+                move_picker.skip_lp_quiets();
+                continue 'position_search;
             }
 
             // futility pruning
@@ -358,74 +424,77 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
             if !Score::is_winning(alpha)
                  && static_eval + fp_margin <= alpha
             {
-                break 'position_search;
+                move_picker.skip_lp_quiets();
+                continue 'position_search;
             }
         }
 
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
-        td.push_ply(pos);
         state.play_mut(pos);
+        td.push_ply(pos);
         td.evaluator.play(&state.board, pos);
 
-        if on_three {
-            three_plied.push(pos);
+        if threat_kind.is_none() {
+            if on_three {
+                three_plied.push(pos);
+            } else if on_four {
+                four_plied.push(pos);
+            } else {
+                quiet_plied.push(pos);
+            }
         }
 
-        if on_four {
-            four_plied.push(pos);
-        }
+        let new_full_depth = depth_left - 1;
+        let mut reduction = 0;
 
-        if !on_three && !on_four {
-            quiet_plied.push(pos);
-        }
+        // late move reduction
+        if depth_left > 2
+            && moves_made > 1 + NT::IS_ROOT as usize
+            && move_score < move_generator::KILLER_MOVE_SCORE
+            && threat_kind.is_none()
+        {
+            reduction = td.lookup_lmr_table(depth_left, moves_made);
 
-        let reduced_depth_left = {
-            let mut reduction = 1;
+            // cut-node reduction
+            reduction += Depth::from(cut_node);
 
-            // late move reduction
-            if depth_left > 2
-                && move_score < move_picker::KILLER_MOVE_SCORE
-                && (!NT::IS_ROOT || moves_made > 2)
+            // reduction pv less
+            reduction -= Depth::from(NT::IS_PV);
+
+            // reduction tactical less
+            if is_tactical
+                && td.ply < 4
             {
-                // base reduction
-                reduction += td.lookup_lmr_table(depth_left, moves_made);
-
-                // cut-node reduction
-                reduction += Depth::from(cut_node);
-
-                // reduction pv less
-                reduction -= Depth::from(NT::IS_PV);
-
-                if NT::IS_ROOT {
-                    reduction -= 1;
-                }
-
-                // reduction tactical less
-                if is_tactical
-                    && td.ply < 4
-                {
-                    reduction -= 1;
-                }
-
-                reduction = reduction.clamp(1, depth_left - 1);
+                reduction -= 1;
             }
 
-            depth_left - reduction
-        };
+            // reduction history score
+            if let Some(history_score) = history_score {
+                if history_score > 0 {
+                    reduction -= 1;
+                } else if history_score < -4096 {
+                    reduction += 1;
+                }
+            }
+
+            reduction = reduction.clamp(0, new_full_depth);
+        }
+
+        let new_depth = (new_full_depth - reduction).clamp(0, new_full_depth);
 
         let score = if moves_made == 1 { // full-window search
-            -pvs::<CLK, R, TH, NT::NextType>(td, state, reduced_depth_left, -beta, -alpha, false)
+            -pvs::<CLK, R, TH, NT::NextType>(td, state, new_depth, -beta, -alpha, !NT::IS_PV && !cut_node)
         } else { // zero-window search
             let mut score = -pvs::<CLK, R, TH, OffPVNode>(
-                td, state, reduced_depth_left, -alpha - 1, -alpha, true
+                td, state, new_depth, -alpha - 1, -alpha, true
             );
 
             if score > alpha
-                && reduced_depth_left < depth_left - 1
+                && new_depth < new_full_depth
             { // zero-window failed, full-depth null-window search
                 score = -pvs::<CLK, R, TH, OffPVNode>(
-                    td, state, depth_left - 1, -alpha - 1, -alpha, !cut_node
+                    td, state, new_full_depth, -alpha - 1, -alpha, !cut_node
                 );
             }
 
@@ -433,7 +502,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 && alpha < score && score < beta
             { // exact value required, full-window search
                 score = -pvs::<CLK, R, TH, NT::NextType>(
-                    td, state, depth_left - 1, -beta, -alpha, false,
+                    td, state, new_full_depth, -beta, -alpha, false,
                 );
             }
 
@@ -492,9 +561,11 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
     if alpha > original_alpha {
         let best_move = best_move.unwrap();
 
-        td.push_killer(best_move);
+        if threat_kind.is_none() {
+            if !state.board.patterns.field[state.board.player_color][best_move.idx_usize()].is_tactical() {
+                td.push_killer(best_move);
+            }
 
-        if !forced_defense {
             td.ht.update_tactical(three_plied, four_plied, state.board.player_color, best_move, depth_left);
             td.ht.update_quiet(&state.history, quiet_plied, state.board.player_color, best_move, depth_left)
         }
@@ -507,7 +578,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
         tt_endgame_depth,
         depth_left,
         static_eval,
-        encode_mate_distance(best_score, td.ply),
+        transposition_table::encode_mate_distance(best_score, td.ply),
         tt_pv | NT::IS_PV,
     );
 
@@ -537,14 +608,9 @@ fn find_immediate_win(state: &GameState, ply: usize) -> (Score, MaybePos) {
         return (Score::NAN, pos.into())
     }
 
-    let fork_four_field = if state.board.player_color == Color::Black {
-        !state.board.patterns.forbidden_field
-            & state.board.patterns.indexes[Color::Black].fork_fours
-    } else {
-        state.board.patterns.indexes[Color::White].fork_fours
-    };
-
-    if let Some(pos) = fork_four_field.unique_pos() { // open-four
+    if let Some(pos) = state.board.patterns.effective_fork_four_field(state.board.player_color)
+        .unique_pos()
+    { // open-four
         return (Score::win_in(ply + 3), pos.into());
     }
 

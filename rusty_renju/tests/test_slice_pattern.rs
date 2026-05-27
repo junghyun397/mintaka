@@ -480,6 +480,24 @@ mod test_slice_pattern {
 
         test_pattern!(
             color               = both,
+            case                = "O O . . .",
+            potential           = "O O V V V",
+        );
+
+        test_pattern!(
+            color               = both,
+            case                = "O . O . .",
+            potential           = "O V O V V",
+        );
+
+        test_pattern!(
+            color               = both,
+            case                = "O . . O .",
+            potential           = "O V V O V",
+        );
+
+        test_pattern!(
+            color               = both,
             case                = "O . . O . . . .",
             potential           = "O V V O V V . .",
         );

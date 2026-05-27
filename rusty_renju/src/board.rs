@@ -243,25 +243,25 @@ impl Board {
             let pattern = self.patterns.field[Color::Black][root_pos.idx_usize()];
 
             let mark_forbidden: bool;
-            let delete_forbidden: bool;
+            let delete_candidate: bool;
 
             if pattern.has_five() {
                 mark_forbidden = false;
-                delete_forbidden = false;
-            } else if pattern.has_fours() || pattern.has_overline() {
+                delete_candidate = false;
+            } else if pattern.has_any_fours() || pattern.has_overline() {
                 mark_forbidden = true;
-                delete_forbidden = false;
-            } else if pattern.has_threes() {
+                delete_candidate = false;
+            } else if pattern.has_open_threes() {
                 if self.is_valid_double_three(ValidateThreeRoot { root_pos }) {
                     mark_forbidden = true;
-                    delete_forbidden = false;
+                    delete_candidate = false;
                 } else {
                     mark_forbidden = false;
-                    delete_forbidden = false;
+                    delete_candidate = false;
                 }
             } else {
                 mark_forbidden = false;
-                delete_forbidden = true;
+                delete_candidate = true;
             }
 
             if mark_forbidden {
@@ -270,7 +270,7 @@ impl Board {
                 self.patterns.forbidden_field.unset(root_pos);
             }
 
-            if delete_forbidden {
+            if delete_candidate {
                 self.patterns.candidate_forbidden_field.unset(root_pos);
             }
         }
@@ -283,7 +283,7 @@ impl Board {
 
         let pattern = self.patterns.field[Color::Black][pos.idx_usize()];
 
-        !pattern.has_three() // non-three
+        !pattern.has_open_three() // non-three
             || pattern.apply_mask(ANY_FOUR_OR_OVERLINE_MASK) != 0 // double-four or overline
             || context.override_contains(pos) // double-four or recursive
             || (pattern.count_open_threes() > 2 && { // nested double-three

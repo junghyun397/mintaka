@@ -59,7 +59,9 @@ fn stdio_out(piskvork_response: PiskvorkResponse) {
 fn main() -> Result<(), impl Error> {
     let aborted = Arc::new(AtomicBool::new(false));
 
-    let mut game_agent = GameAgent::new(Config::default());
+    let config = Config::default();
+
+    let mut game_agent = GameAgent::new(config);
 
     let (message_sender, message_receiver) = {
         let (tx, rx) = mpsc::channel();
@@ -108,7 +110,7 @@ fn main() -> Result<(), impl Error> {
                     }
                 }
 
-                stdio_out(PiskvorkResponse::Pos(best_move.best_move.unwrap()));
+                stdio_out(PiskvorkResponse::Pos(best_move.best_move.unwrap_or(Pos::from_cartesian(7, 7))));
             }
             Message::Status(_) => unreachable!(),
         }
@@ -184,14 +186,7 @@ fn match_command(
     let command_kind = args[0].to_uppercase();
 
     let response = match command_kind.as_str() {
-        "STOP" | "YXSTOP" => {
-            aborted.store(true, Ordering::Relaxed);
-
-            PiskvorkResponse::None
-        }
-        "END" => {
-            std::process::exit(0);
-        }
+        // basic commands
         "START" => {
             let size: usize = args
                 .get(1)
@@ -207,30 +202,58 @@ fn match_command(
                 return Err("unsupported size");
             }
         }
-        "RECTSTART" => return Err("rectangular board is not supported"),
-        "TURN" => {
-            let pos = parse_command_pos(&args)?;
-
-            message_sender.command(MessageCommand::Play { pos: pos.into() });
-            message_sender.launch(SearchObjective::Best, true, false);
-
-            PiskvorkResponse::None
-        }
         "BEGIN" => {
             message_sender.launch(SearchObjective::Best, true, false);
 
             PiskvorkResponse::None
         }
-        "RESTART" => {
-            message_sender.command(MessageCommand::Raw(Command::Clear));
-            PiskvorkResponse::Ok
-        }
-        "TAKEBACK" => {
-            parse_command_pos(&args)?;
+        "INFO" => {
+            match args.get(1).copied().map(str::to_lowercase).as_deref() {
+                Some("timeout_match") | Some("time_left") => {
+                    if let Ok(time) = parse_time(&args) {
+                        message_sender.command(MessageCommand::Raw(Command::TotalTime(time)));
+                    }
+                }
+                Some("timeout_turn") => {
+                    if let Ok(time) = parse_time(&args) {
+                        message_sender.command(MessageCommand::Raw(Command::TurnTime(time)));
+                    }
+                }
+                Some("max_memory") => {
+                    if let Some(max_memory_in_bytes) =
+                        args.get(2).and_then(|value| value.parse::<u64>().ok())
+                    {
+                        if max_memory_in_bytes > 10 * 1024 * 1024 {
+                            message_sender.command(MessageCommand::Raw(Command::MaxMemory(
+                                ByteSize::from_bytes(max_memory_in_bytes),
+                            )));
+                        }
+                    }
+                }
+                Some("thread_num") => {
+                    if let Some(workers) =
+                        args.get(2).and_then(|value| value.parse::<u32>().ok())
+                    {
+                        message_sender.command(MessageCommand::Raw(Command::Workers(workers)));
+                    }
+                }
+                Some("game_type") => {
+                    let _ = args.get(2);
+                }
+                Some("rule") => {
+                    if let Some(rule) = args.get(2).and_then(|value| value.parse::<usize>().ok()) {
+                        let rule_kind = match rule {
+                            2 | 4 => RuleKind::Renju,
+                            _ => return Err("unsupported rule"),
+                        };
 
-            message_sender.command(MessageCommand::Undo);
+                        message_sender.command(MessageCommand::Raw(Command::Rule(rule_kind)));
+                    }
+                }
+                _ => {}
+            }
 
-            PiskvorkResponse::Ok
+            PiskvorkResponse::None
         }
         "BOARD" | "YXBOARD" => {
             const DONE_TOKEN: &str = "DONE";
@@ -292,53 +315,34 @@ fn match_command(
 
             PiskvorkResponse::None
         }
-        "INFO" => {
-            match args.get(1).copied().map(str::to_lowercase).as_deref() {
-                Some("timeout_match") | Some("time_left") => {
-                    if let Ok(time) = parse_time(&args) {
-                        message_sender.command(MessageCommand::Raw(Command::TotalTime(time)));
-                    }
-                }
-                Some("timeout_turn") => {
-                    if let Ok(time) = parse_time(&args) {
-                        message_sender.command(MessageCommand::Raw(Command::TurnTime(time)));
-                    }
-                }
-                Some("max_memory") => {
-                    if let Some(max_memory_in_bytes) =
-                        args.get(2).and_then(|value| value.parse::<u64>().ok())
-                    {
-                        if max_memory_in_bytes > 10 * 1024 * 1024 {
-                            message_sender.command(MessageCommand::Raw(Command::MaxMemory(
-                                ByteSize::from_bytes(max_memory_in_bytes),
-                            )));
-                        }
-                    }
-                }
-                Some("thread_num") => {
-                    if let Some(workers) =
-                         args.get(2).and_then(|value| value.parse::<u32>().ok())
-                    {
-                        message_sender.command(MessageCommand::Raw(Command::Workers(workers)));
-                    }
-                }
-                Some("game_type") => {
-                    let _ = args.get(2);
-                }
-                Some("rule") => {
-                    if let Some(rule) = args.get(2).and_then(|value| value.parse::<usize>().ok()) {
-                        let rule_kind = match rule {
-                            2 | 4 => RuleKind::Renju,
-                            _ => return Err("unsupported rule"),
-                        };
+        "TURN" => {
+            let pos = parse_command_pos(&args)?;
 
-                        message_sender.command(MessageCommand::Raw(Command::Rule(rule_kind)));
-                    }
-                }
-                _ => {}
-            }
+            message_sender.command(MessageCommand::Play { pos: pos.into() });
+            message_sender.launch(SearchObjective::Best, true, false);
 
             PiskvorkResponse::None
+        }
+        "END" => {
+            std::process::exit(0);
+        }
+        "STOP" | "YXSTOP" => {
+            aborted.store(true, Ordering::Relaxed);
+
+            PiskvorkResponse::None
+        }
+        // extended commands
+        "RECTSTART" => return Err("rectangular board is not supported"),
+        "RESTART" => {
+            message_sender.command(MessageCommand::Raw(Command::Clear));
+            PiskvorkResponse::Ok
+        }
+        "TAKEBACK" => {
+            parse_command_pos(&args)?;
+
+            message_sender.command(MessageCommand::Undo);
+
+            PiskvorkResponse::Ok
         }
         "ABOUT" => PiskvorkResponse::About(format!(
             "name=\"mintaka\", author=\"JeongHyeon Choi\", version=\"{}\", country=\"KOR\"",

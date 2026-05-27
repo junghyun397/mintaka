@@ -22,7 +22,7 @@ panic = "abort"
 [profile.bench]
 inherits = "release"
 codegen-units = 16
-lto = "off"
+lto = "thin"
 
 [profile.perf]
 inherits = "release"

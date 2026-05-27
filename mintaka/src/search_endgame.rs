@@ -1,26 +1,28 @@
+use std::cmp::Reverse;
+use rusty_renju::board::Board;
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
-use crate::memo::transposition_table::{encode_mate_distance, TTView};
+use crate::memo::transposition_table;
+use crate::memo::transposition_table::TTView;
 use crate::memo::tt_entry::{ScoreKind, TTFlag};
 use crate::movegen::move_generator::generate_endgame_moves;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use crate::value::Depth;
-use rusty_renju::board::Board;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{Score, Scores};
-use rusty_renju::pattern::{Pattern, PatternCount};
+use rusty_renju::pattern::Pattern;
 
 pub trait SequenceTracker {
     type Output;
 
     fn unit(four: Pos) -> Self;
 
-    fn push(&mut self, defend: Pos, attack: Pos);
+    fn push(&mut self, response: Pos, attack: Pos);
 
     fn resolve(self, score: Score) -> Self::Output;
 
@@ -32,7 +34,7 @@ pub struct NullSequenceTracker; impl SequenceTracker for NullSequenceTracker {
 
     fn unit(_four: Pos) -> Self { Self }
 
-    fn push(&mut self, _defend: Pos, _attack: Pos) { }
+    fn push(&mut self, _response: Pos, _attack: Pos) { }
 
     fn resolve(self, score: Score) -> Self::Output {
         score
@@ -50,8 +52,8 @@ type VecSequenceTracker = Vec<Pos>; impl SequenceTracker for VecSequenceTracker 
         vec![four]
     }
 
-    fn push(&mut self, defend: Pos, attack: Pos) {
-        self.push(defend);
+    fn push(&mut self, response: Pos, attack: Pos) {
+        self.push(response);
         self.push(attack);
     }
 
@@ -105,10 +107,16 @@ impl EndgameMovesUnchecked {
         next_move
     }
 
-    pub fn sort_moves(&mut self, ref_pos: Pos) {
-        self.moves[..self.top as usize].sort_by_key(|maybe_pos|
-            maybe_pos.unwrap().distance(ref_pos)
-        );
+    pub fn sort_moves(&mut self, board: &Board, ref_pos: Pos) {
+        self.moves[..self.top as usize].sort_by_key(|pos| {
+            let pos = pos.unwrap();
+
+            let potential_score = board.patterns.field[board.player_color][pos.idx_usize()]
+                .count_potentials()
+                .min(2);
+
+            Reverse(potential_score * 10 + (pos::BOARD_WIDTH as u32 - pos.distance(ref_pos) as u32) * 3)
+        });
     }
 
     pub fn is_empty(&self) -> bool {
@@ -121,7 +129,7 @@ pub struct EndgameFrame {
     pub moves: EndgameMovesUnchecked,
     pub alpha: Score,
     pub four_pos: Pos,
-    pub defend_pos: Pos,
+    pub response_pos: Pos,
 }
 
 impl EndgameFrame {
@@ -129,33 +137,33 @@ impl EndgameFrame {
         moves: EndgameMovesUnchecked::EMPTY,
         alpha: Score::NAN,
         four_pos: MaybePos::INVALID_POS,
-        defend_pos: MaybePos::INVALID_POS,
+        response_pos: MaybePos::INVALID_POS,
     };
 }
 
 pub trait VcfDestination {
-    fn conditional_abort(&self, defend_pattern: Pattern) -> bool;
+    fn conditional_abort(&self, response_pattern: Pattern) -> bool;
 
     fn additional_reached(&self, four_pos: Pos) -> bool;
 }
 
 pub struct VcfWin; impl VcfDestination for VcfWin {
-    fn conditional_abort(&self, _defend_pattern: Pattern) -> bool {
+    fn conditional_abort(&self, _: Pattern) -> bool {
         false
     }
 
-    fn additional_reached(&self, _four_pos: Pos) -> bool {
+    fn additional_reached(&self, _: Pos) -> bool {
         false
     }
 }
 
-pub struct VcfDefend {
+pub struct VcfCounter {
     target_pos: Pos
 }
 
-impl VcfDestination for VcfDefend {
-    fn conditional_abort(&self, defend_pattern: Pattern) -> bool {
-        defend_pattern.has_three()
+impl VcfDestination for VcfCounter {
+    fn conditional_abort(&self, response_pattern: Pattern) -> bool {
+        response_pattern.has_open_three()
     }
 
     fn additional_reached(&self, four_pos: Pos) -> bool {
@@ -172,14 +180,12 @@ pub fn endgame_search<const R: RuleKind, const VCT: bool>(
     static_eval: Score,
 ) -> Score {
     let indexes = state.board.patterns.indexes[state.board.player_color];
-    
-    let has_threats = if VCT {
-        !(indexes.closed_fours | indexes.open_threes).is_empty()
-    } else {
-        !indexes.closed_fours.is_empty()
-    };
 
-    if !has_threats {
+    let empty_closed_fours = indexes.closed_fours.is_empty();
+
+    if (!VCT && empty_closed_fours)
+        || (VCT && empty_closed_fours && indexes.open_threes.is_empty())
+    {
         return static_eval;
     }
 
@@ -191,15 +197,11 @@ pub fn endgame_search<const R: RuleKind, const VCT: bool>(
         return static_eval;
     }
 
-    endgame_moves.sort_moves(state.history.previous_action().unwrap_or(pos::CENTER));
+    endgame_moves.sort_moves(&state.board, recent_player_action);
     endgame_moves.init();
 
     if VCT {
-        pns::<R, 5, NullSequenceTracker>(
-            td, max_ply,
-            *state, endgame_moves,
-            static_eval, alpha, beta
-        )
+        todo!()
     } else {
         vcf::<R, 5, NullSequenceTracker>(
             td, VcfWin, max_ply,
@@ -222,11 +224,7 @@ pub fn endgame_sequence<const R: RuleKind, const VCT: bool>(
     endgame_moves.init();
 
     let maybe_sequence = if VCT {
-        pns::<R, 5, VecSequenceTracker>(
-            td, Depth::MAX,
-            *state, endgame_moves,
-            0, Score::MIN, Score::MAX
-        )
+        todo!()
     } else {
         vcf::<R, 5, VecSequenceTracker>(
             td, VcfWin, Depth::MAX,
@@ -239,32 +237,6 @@ pub fn endgame_sequence<const R: RuleKind, const VCT: bool>(
         sq.reverse();
         sq
     })
-}
-
-fn pns<const R: RuleKind, const DW: isize, Sq: SequenceTracker>(
-    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
-    max_depth: Depth,
-    state: GameState,
-    endgame_moves: EndgameMovesUnchecked,
-    static_eval: Score,
-    alpha: Score, beta: Score,
-) -> Sq::Output {
-    match state.board.player_color {
-        Color::Black => try_pns::<R, { Color::Black }, DW, _, Sq>(td, max_depth, max_depth, state, endgame_moves, static_eval, alpha, beta),
-        Color::White => try_pns::<R, { Color::White }, DW, _, Sq>(td, max_depth, max_depth, state, endgame_moves, static_eval, alpha, beta),
-    }
-}
-
-fn try_pns<const R: RuleKind, const C: Color, const DW: isize, TH: ThreadType, Sq: SequenceTracker>(
-    td: &mut ThreadData<TH, impl Evaluator>,
-    mut vcf_switch_depth: Depth,
-    mut depth_left: Depth,
-    mut state: GameState,
-    mut endgame_moves: EndgameMovesUnchecked,
-    static_eval: Score,
-    mut alpha: Score, beta: Score,
-) -> Sq::Output {
-    todo!()
 }
 
 fn vcf<const R: RuleKind, const DW: u8, Sq: SequenceTracker>(
@@ -297,7 +269,8 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
 
     fn backtrace_frames<Sq: SequenceTracker>(
         td: &mut ThreadData<impl ThreadType, impl Evaluator>,
-        board: Board,
+        mut hash_key: HashKey,
+        player_color: Color,
         vcf_ply: usize,
         four_pos: Pos
     ) -> Sq {
@@ -307,18 +280,15 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
         let lose_score = Score::lose_in(total_ply);
 
         let mut result = Sq::unit(four_pos);
-        let mut hash_key = board.hash_key;
-
-        let opponent_color = !board.player_color;
 
         while let Some(frame) = td.pop_endgame_frame() {
-            hash_key = hash_key.set(opponent_color, frame.defend_pos);
-            tt_store_vcf_lose(&td.tt, hash_key, frame.defend_pos, lose_score, total_ply);
+            hash_key = hash_key.set(player_color, frame.response_pos);
+            tt_store_vcf_lose(&td.tt, hash_key, frame.response_pos, lose_score, total_ply);
 
-            hash_key = hash_key.set(board.player_color, frame.four_pos);
+            hash_key = hash_key.set(!player_color, frame.four_pos);
             tt_store_vcf_win(&td.tt, hash_key, frame.four_pos, win_score, total_ply);
 
-            result.push(frame.defend_pos, frame.four_pos);
+            result.push(frame.response_pos, frame.four_pos);
         }
 
         result
@@ -352,10 +322,13 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
 
                 tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, win_score, total_ply);
 
-                let trace_result = backtrace_frames(td, state.board, vcf_ply, four_pos);
+                let trace_result = backtrace_frames(td, state.board.hash_key, !state.board.player_color, vcf_ply, four_pos);
 
                 return Sq::resolve(trace_result, win_score);
             }
+
+            let parent_hash_key = state.board.hash_key;
+            let parent_player_color = state.board.player_color;
 
             td.batch_counter.increment();
             state.board.set_mut(four_pos);
@@ -363,21 +336,21 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
             vcf_ply += 1;
             vcf_depth_left -= 1;
 
-            let defend_pos = state.board.patterns.unchecked_five_pos[C].unwrap();
-            let tt_key = state.board.hash_key.set(C.reversed(), defend_pos);
+            let response_pos = state.board.patterns.unchecked_five_pos[C].unwrap();
+            let tt_key = state.board.hash_key.set(C.reversed(), response_pos);
             td.tt.prefetch(tt_key);
 
-            let defend_pattern = state.board.patterns.field[!C][defend_pos.idx_usize()];
-            let defend_four_count = defend_pattern.count_fours();
-            let defend_is_forbidden = R == RuleKind::Renju
+            let response_pattern = state.board.patterns.field[!C][response_pos.idx_usize()];
+            let response_four_count = response_pattern.count_any_fours();
+            let response_is_forbidden = R == RuleKind::Renju
                 && C == Color::White
-                && state.board.patterns.is_forbidden(defend_pos);
+                && state.board.patterns.is_forbidden(response_pos);
 
             if match (R, C) {
-                (RuleKind::Renju, Color::Black) => defend_four_count == PatternCount::Multiple
-                    || defend_pattern.has_open_four(),
-                _ => defend_pattern.has_open_four() && !defend_is_forbidden
-            } || dest.conditional_abort(defend_pattern) {
+                (RuleKind::Renju, Color::Black) => response_four_count > 1
+                    || response_pattern.has_open_four(),
+                _ => response_pattern.has_open_four() && !response_is_forbidden
+            } || dest.conditional_abort(response_pattern) {
                 state.board.unset_mut(four_pos);
                 td.evaluator.undo(&state.board, four_pos);
                 vcf_ply -= 1;
@@ -385,16 +358,16 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                 continue 'position_search;
             }
 
-            if (C == Color::White && defend_is_forbidden) || (
-                defend_four_count == PatternCount::Cold
-                    && (player_pattern.has_three() || dest.additional_reached(four_pos))
+            if (C == Color::White && response_is_forbidden) || (
+                response_four_count == 0
+                    && (player_pattern.has_open_three() || dest.additional_reached(four_pos))
             ) {
                 let total_ply = td.ply + vcf_ply;
                 let win_score = Score::win_in(total_ply);
 
-                tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, win_score, total_ply);
+                tt_store_vcf_win(&td.tt, parent_hash_key, four_pos, win_score, total_ply);
 
-                let trace_result = backtrace_frames(td, state.board, vcf_ply, four_pos);
+                let trace_result = backtrace_frames(td, parent_hash_key, parent_player_color, vcf_ply, four_pos);
 
                 return Sq::resolve(trace_result, win_score);
             }
@@ -414,26 +387,22 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
             }
 
             if let Some(entry) = td.tt.probe(tt_key) {
-                let mut abort = false;
+                // tt cutoff
+                if Score::is_winning(entry.score as Score) {
+                    let total_ply = td.ply + vcf_ply;
+                    let win_score = Score::win_in(total_ply);
 
-                let tt_vcf_depth = entry.tt_flag.endgame_depth();
+                    tt_store_vcf_win(&td.tt, parent_hash_key, four_pos, win_score, total_ply);
 
-                if tt_vcf_depth != 0 { // tt pruning
-                    if Score::is_winning(entry.score as Score) {
-                        let total_ply = td.ply + vcf_ply;
-                        let win_score = Score::win_in(total_ply);
+                    let trace_result = backtrace_frames(td, parent_hash_key, parent_player_color, vcf_ply, four_pos);
 
-                        tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, win_score, total_ply);
-
-                        let trace_result = backtrace_frames(td, state.board, vcf_ply, four_pos);
-
-                        return Sq::resolve(trace_result, win_score);
-                    } else if vcf_depth_left.min(TTFlag::MAX_TT_ENDGAME_DEPTH) <= tt_vcf_depth {
-                        abort = true;
-                    }
+                    return Sq::resolve(trace_result, win_score);
                 }
 
-                if abort {
+                let tt_endgame_depth = entry.tt_flag.endgame_depth();
+
+                // tt vcf cache
+                if vcf_depth_left.min(TTFlag::MAX_TT_ENDGAME_DEPTH as Depth) as u8 <= tt_endgame_depth {
                     state.board.unset_mut(four_pos);
                     td.evaluator.undo(&state.board, four_pos);
                     vcf_ply -= 1;
@@ -443,13 +412,13 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
             }
 
             td.batch_counter.increment();
-            state.board.set_mut(defend_pos);
-            td.evaluator.play(&state.board, defend_pos);
+            state.board.set_mut(response_pos);
+            td.evaluator.play(&state.board, response_pos);
             vcf_ply += 1;
 
             if !state.board.patterns.indexes[C].has_any_four() { // cold branch pruning
-                state.board.unset_mut(defend_pos);
-                td.evaluator.undo(&state.board, defend_pos);
+                state.board.unset_mut(response_pos);
+                td.evaluator.undo(&state.board, response_pos);
                 state.board.unset_mut(four_pos);
                 td.evaluator.undo(&state.board, four_pos);
                 vcf_ply -= 2;
@@ -461,18 +430,18 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                 moves: vcf_moves,
                 alpha,
                 four_pos,
-                defend_pos,
+                response_pos,
             });
 
-            if defend_four_count != PatternCount::Cold {
-                let defend_move = state.board.patterns.unchecked_five_pos[!C].unwrap();
+            if response_four_count != 0 {
+                let response_move = state.board.patterns.unchecked_five_pos[!C].unwrap();
 
-                if !state.board.patterns.field[C][defend_move.idx_usize()].has_any_four()
-                    || (C == Color::Black && state.board.patterns.is_forbidden(defend_move))
+                if !state.board.patterns.field[C][response_move.idx_usize()].has_any_four()
+                    || (C == Color::Black && state.board.patterns.is_forbidden(response_move))
                 {
                     td.endgame_stack_top -= 1;
-                    state.board.unset_mut(defend_pos);
-                    td.evaluator.undo(&state.board, defend_pos);
+                    state.board.unset_mut(response_pos);
+                    td.evaluator.undo(&state.board, response_pos);
                     state.board.unset_mut(four_pos);
                     td.evaluator.undo(&state.board, four_pos);
                     vcf_ply -= 2;
@@ -480,7 +449,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                     continue 'position_search;
                 }
 
-                vcf_moves = EndgameMovesUnchecked::unit(defend_move);
+                vcf_moves = EndgameMovesUnchecked::unit(response_move);
             } else {
                 vcf_moves = generate_endgame_moves::<false>(&state.board, DW, four_pos);
             }
@@ -490,18 +459,22 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
             continue 'vcf_search;
         }
 
-        if let Some(mut entry) = td.tt.probe(state.board.hash_key)
-            && entry.tt_flag.endgame_depth() <= vcf_depth_left
-        {
-            entry.tt_flag.set_endgame_depth(vcf_depth_left);
+        let clamped_vcf_depth_left = vcf_depth_left.min(TTFlag::MAX_TT_ENDGAME_DEPTH as Depth) as u8;
 
-            td.tt.store_entry(state.board.hash_key, entry);
+        if let Some(mut entry) = td.tt.probe(state.board.hash_key) {
+            if !entry.tt_flag.is_endgame_proven()
+                && entry.tt_flag.endgame_depth() <= clamped_vcf_depth_left
+            {
+                entry.tt_flag.set_endgame_depth(clamped_vcf_depth_left);
+
+                td.tt.store_entry(state.board.hash_key, entry);
+            }
         } else {
             td.tt.store(
                 state.board.hash_key,
                 MaybePos::NONE,
                 None,
-                vcf_depth_left,
+                clamped_vcf_depth_left,
                 0,
                 Score::NAN,
                 0,
@@ -510,8 +483,8 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
         }
 
         if let Some(frame) = td.pop_endgame_frame() {
-            state.board.unset_mut(frame.defend_pos);
-            td.evaluator.undo(&state.board, frame.defend_pos);
+            state.board.unset_mut(frame.response_pos);
+            td.evaluator.undo(&state.board, frame.response_pos);
             state.board.unset_mut(frame.four_pos);
             td.evaluator.undo(&state.board, frame.four_pos);
             vcf_ply -= 2;
@@ -534,34 +507,28 @@ fn tt_store_vcf_win(
     score: Score,
     ply: usize,
 ) {
-    tt.store(
+    tt.store_endgame_proven(
         hash_key,
-        four_pos.into(),
-        Some(ScoreKind::Exact),
-        TTFlag::MAX_TT_ENDGAME_DEPTH,
-        0,
-        score,
-        encode_mate_distance(score, ply),
+        four_pos,
+        ScoreKind::LowerBound,
+        transposition_table::encode_mate_distance(score, ply),
         false,
-    )
+    );
 }
 
 #[inline]
 fn tt_store_vcf_lose(
     tt: &TTView,
     hash_key: HashKey,
-    defend_pos: Pos,
+    response_pos: Pos,
     score: Score,
     ply: usize,
 ) {
-    tt.store(
+    tt.store_endgame_proven(
         hash_key,
-        defend_pos.into(),
-        Some(ScoreKind::Exact),
-        TTFlag::MAX_TT_ENDGAME_DEPTH,
-        0,
-        score,
-        encode_mate_distance(score, ply),
+        response_pos,
+        ScoreKind::UpperBound,
+        transposition_table::encode_mate_distance(score, ply),
         false,
     )
 }

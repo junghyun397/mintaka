@@ -3,7 +3,6 @@ use crate::config::{Config, SearchObjective};
 use crate::eval::evaluator::Evaluator;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
-use crate::movegen::move_picker;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_endgame::EndgameFrame;
 use crate::game_state::RecoveryState;
@@ -13,6 +12,8 @@ use crate::{params, value};
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::{Score, Scores};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+
+pub const KILLER_MOVE_SLOTS: usize = 2;
 
 #[derive(Debug, Copy, Clone)]
 pub struct SearchFrame {
@@ -63,7 +64,7 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub ht: Box<HistoryTable>,
     pub ss: Box<[SearchFrame; value::MAX_PLY_SLOTS]>,
     pub pvs: Box<[PrincipalVariation; value::MAX_PLY_SLOTS]>,
-    pub killers: Box<[[MaybePos; move_picker::KILLER_MOVE_SLOTS]; value::MAX_PLY_SLOTS]>,
+    pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; value::MAX_PLY_SLOTS]>,
     pub debug_statics: Box<[DebugStatics; value::MAX_PLY_SLOTS]>,
 
     pub lmr_table: Box<[[Depth; value::MAX_PLY_SLOTS]; 64]>,
@@ -157,6 +158,10 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
     }
 
     pub fn push_killer(&mut self, pos: Pos) {
+        if self.killers[self.ply].contains(&pos.into()) {
+            return;
+        }
+
         self.killers[self.ply][1] = self.killers[self.ply][0];
         self.killers[self.ply][0] = pos.into();
     }

@@ -1,9 +1,8 @@
-.idea
+/.idea
+/.venv
 /target
 /sessions
 /temp
+__pycache__
 max_config.toml
-/.venv
 **/playground.rs
-patch
-diff

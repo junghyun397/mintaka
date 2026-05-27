@@ -4,28 +4,15 @@ mod test_image {
     use rusty_renju::history::History;
     use rusty_renju::notation::pos::pos_unchecked;
     use rusty_renju::utils::empty::Empty;
-    use rusty_renju_image::{rusty_renju_image_format_png, rusty_renju_image_render, rusty_renju_image_renderer_sequence, HistoryRender, RenderPayloads};
+    use rusty_renju_image::{rusty_renju_image_format_png, rusty_renju_image_render, rusty_renju_image_renderer_sequence};
 
     #[test]
     fn default_image() {
         let history = History::empty()
             .set(pos_unchecked("h8"))
-            .set(pos_unchecked("g7"))
-            ;
+            .set(pos_unchecked("g7"));
 
         let board = Board::from(&history);
-        let opts = RenderPayloads {
-            history,
-            history_render: HistoryRender::Sequence,
-            offers: &[
-                pos_unchecked("a1"),
-                pos_unchecked("a2"),
-            ],
-            blinds: &[
-                pos_unchecked("a9"),
-            ],
-            enable_forbidden: true,
-        };
 
         let png = rusty_renju_image_render(
             rusty_renju_image_format_png(), 1.0,

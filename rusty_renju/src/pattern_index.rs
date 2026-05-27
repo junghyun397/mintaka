@@ -58,16 +58,6 @@ impl PatternIndex {
     }
 
     #[inline(always)]
-    pub fn three_four_forks(&self) -> Bitfield {
-        self.open_threes & self.closed_fours
-    }
-
-    #[inline(always)]
-    pub fn any_fours(&self) -> Bitfield {
-        self.fork_fours | self.closed_fours
-    }
-
-    #[inline(always)]
     pub fn slice_bitmap<const D: Direction>(&self, slice_idx: u8) -> SliceBitmap {
         self.slice_bitmap[Self::local_slice_idx::<D>(slice_idx as usize)]
     }
@@ -99,7 +89,7 @@ impl PatternIndex {
         Self::update_slice_bitfield::<D>(
             pattern_field, &mut self.open_threes, start_idx,
             old_bitmap.open_threes, new_bitmap.open_threes,
-            Pattern::has_three,
+            Pattern::has_open_three,
         );
 
         Self::update_slice_bitfield::<D>(
@@ -216,16 +206,11 @@ pub fn pattern_bitmaps_from_patterns(slice_pattern: [u8; 16]) -> (u16, SliceBitm
         closed_fours: pattern_bitmask(slice_pattern, pattern::CLOSED_FOUR_SINGLE),
     };
 
-    let slice_pattern_bitmap = pattern_nonzero_bitmask(slice_pattern);
+    let slice_pattern_bitmap = slice_pattern
+        .simd_ne(Simd::splat(0))
+        .to_bitmask() as u16;
 
     (slice_pattern_bitmap, slice_bitmap)
-}
-
-#[inline(always)]
-fn pattern_nonzero_bitmask(patterns: u8x16) -> u16 {
-    patterns
-        .simd_ne(Simd::splat(0))
-        .to_bitmask() as u16
 }
 
 #[inline(always)]

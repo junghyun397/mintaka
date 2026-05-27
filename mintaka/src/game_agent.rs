@@ -18,7 +18,6 @@ use rusty_renju::history::History;
 use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
-use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
 #[cfg(feature = "serde")]
@@ -109,9 +108,9 @@ impl GameAgent {
             state,
             evaluator: ActiveEvaluator::from_state(&state),
             tt,
-            ht: HistoryTable::empty(),
+            ht: HistoryTable::EMPTY,
             executed_moves: Bitfield::empty(),
-            time_manager: config.initial_timer.into(),
+            time_manager: TimeManager::new(config.initial_timer),
         }
     }
 
@@ -395,9 +394,10 @@ impl GameAgent {
             (main_td, score, best_move)
         });
 
+        self.ht = *main_td.ht;
+
         self.tt.increase_age();
         self.ht.increase_age();
-        self.ht = *main_td.ht;
 
         self.executed_moves.set_idx(self.state.len());
 
@@ -431,8 +431,6 @@ impl GameAgent {
 
         self.tt.clear(self.config.workers);
         self.executed_moves = Bitfield::empty();
-
-        self.time_manager = TimeManager::from(self.config.initial_timer);
     }
 
     fn resize_tt(&mut self, size: ByteSize) {

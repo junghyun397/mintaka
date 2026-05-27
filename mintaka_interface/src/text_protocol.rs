@@ -1,20 +1,20 @@
 use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
+use mintaka::game_state::{GameState, GameStateData};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::response::{CallBackResponseSender, Response};
-use mintaka::game_state::{GameState, GameStateData};
 use mintaka_interface::message::{Message, MessageCommand, MessageSender, StatusCommand};
 use mintaka_interface::preference::Preference;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::notation::color::UnknownColorError;
-use rusty_renju::notation::pos::{Pos, PosError};
+use rusty_renju::notation::pos::{MaybePos, PosError};
 use rusty_renju::utils::byte_size::ByteSize;
+use rusty_renju::utils::empty::Empty;
 use std::io::BufRead;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
-use rusty_renju::utils::empty::Empty;
 
 fn main() -> Result<(), GameError> {
     let pref = Preference::parse();
@@ -171,7 +171,7 @@ fn handle_command(
     buf: &str,
     args: Vec<&str>,
 ) -> Result<(), String> {
-    match args[0] {
+    match args[0].to_ascii_lowercase().as_str() {
         "abort" => {
             abort.store(true, Ordering::Relaxed);
         }
@@ -304,11 +304,11 @@ fn handle_command(
             message_sender.command(MessageCommand::Unset { pos, color });
         }
         "play" => {
-            let pos: Pos = args.get(1).ok_or("position not provided.")?
+            let action: MaybePos = args.get(1).ok_or("position not provided.")?
                 .parse()
                 .map_err(|e: PosError| e.to_string())?;
 
-            message_sender.command(MessageCommand::Play { pos: pos.into() });
+            message_sender.command(MessageCommand::Play { pos: action });
         }
         "undo" => {
             message_sender.command(MessageCommand::Undo);

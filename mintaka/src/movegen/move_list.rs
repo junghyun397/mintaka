@@ -1,10 +1,13 @@
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
+use rusty_renju::utils::empty::Empty;
 
 #[derive(Debug, Copy, Clone)]
 pub struct MoveEntry {
     pub pos: Pos,
     pub move_score: i16,
+    pub history_score: Option<i16>,
+    pub lp_quiet: bool,
 }
 
 #[derive(Debug)]
@@ -13,12 +16,15 @@ pub struct MoveList {
     top: usize,
 }
 
+impl Empty for MoveList {
+    fn empty() -> Self {
+        unsafe { std::mem::zeroed() }
+    }
+}
+
 impl MoveList {
-
-    pub const EMPTY: Self = unsafe { std::mem::zeroed() };
-
-    pub fn push(&mut self, pos: Pos, move_score: i16) {
-        self.moves[self.top] = MoveEntry { pos, move_score };
+    pub fn push(&mut self, pos: Pos, move_score: i16, lp_quiet: bool, history_score: Option<i16>) {
+        self.moves[self.top] = MoveEntry { pos, move_score, lp_quiet, history_score };
         self.top += 1;
     }
 
@@ -42,5 +48,4 @@ impl MoveList {
 
         Some(self.moves[self.top])
     }
-
 }

@@ -14,12 +14,16 @@ pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
 pub const OPEN_FOUR: u8                 = 0b0010_0000;
 pub const ANY_FOUR: u8                  = 0b1110_0000;
-pub const FIVE: u8                      = 0b0001_0000;
-
 pub const OPEN_THREE: u8                = 0b0000_1000;
+
+pub const FIVE: u8                      = 0b0001_0000; // remove
+pub const OVERLINE: u8                  = 0b0000_0010; // remove
+pub const POTENTIAL: u8                 = 0b0000_0001; // remove
+
 pub const CLOSE_THREE: u8               = 0b0000_0100;
-pub const OVERLINE: u8                  = 0b0000_0010;
-pub const POTENTIAL: u8                 = 0b0000_0001;
+// pub const POTENTIAL_EXTENSIVE
+// pub const POTENTIAL_THREE
+// pub const POTENTIAL_FOUR
 
 pub const UNIT_CLOSED_FOUR_SINGLE_MASK: u32 = repeat_4x(CLOSED_FOUR_SINGLE);
 pub const UNIT_CLOSED_FOUR_MASK: u32        = repeat_4x(CLOSED_FOUR_DOUBLE);
@@ -42,22 +46,6 @@ pub const SLICE_PATTERN_OVERLINE_MASK: u128     = repeat_16x(OVERLINE);
 pub const SLICE_PATTERN_MASK: u128              = repeat_16x(OVERLINE | ANY_FOUR | OPEN_THREE);
 
 pub const PATTERN_SIZE: usize = 256;
-
-#[derive(Eq, PartialEq, Copy, Clone)]
-#[repr(u8)]
-pub enum PatternCount {
-    Cold = 0,
-    Single = 1,
-    Multiple = 2
-}
-
-impl PatternCount {
-
-    fn from_masked_unit(masked: u32) -> Self {
-        unsafe { std::mem::transmute::<u8, PatternCount>(masked.count_ones().min(2) as u8) }
-    }
-
-}
 
 #[derive(Debug, Copy, Clone, Default)]
 #[repr(C, packed)]
@@ -90,11 +78,11 @@ impl Pattern {
         self.apply_mask(UNIT_TACTICAL_MASK) != 0
     }
 
-    pub fn has_three(&self) -> bool {
+    pub fn has_open_three(&self) -> bool {
         self.apply_mask(UNIT_OPEN_THREE_MASK) != 0
     }
 
-    pub fn has_threes(&self) -> bool {
+    pub fn has_open_threes(&self) -> bool {
         self.apply_mask(UNIT_OPEN_THREE_MASK).count_ones() > 1
     }
 
@@ -106,7 +94,7 @@ impl Pattern {
         self.apply_mask(UNIT_OPEN_FOUR_MASK) != 0
     }
 
-    pub fn has_fours(&self) -> bool {
+    pub fn has_any_fours(&self) -> bool {
         self.apply_mask(UNIT_ANY_FOUR_MASK).count_ones() > 1
     }
 
@@ -122,16 +110,12 @@ impl Pattern {
         self.apply_mask(UNIT_FIVE_MASK) != 0
     }
 
+    pub fn has_any_threat(&self) -> bool {
+        self.apply_mask(UNIT_OPEN_THREE_MASK | UNIT_ANY_FOUR_MASK) != 0
+    }
+
     pub fn has_overline(&self) -> bool {
         self.apply_mask(UNIT_OVERLINE_MASK) != 0
-    }
-
-    pub fn count_threes(&self) -> PatternCount {
-        PatternCount::from_masked_unit(self.apply_mask(UNIT_OPEN_THREE_MASK))
-    }
-
-    pub fn count_fours(&self) -> PatternCount {
-        PatternCount::from_masked_unit(self.apply_mask(UNIT_ANY_FOUR_MASK))
     }
 
     pub fn count_open_threes(&self) -> u32 {
@@ -150,7 +134,7 @@ impl Pattern {
         self.apply_mask(UNIT_OPEN_FOUR_MASK).count_ones()
     }
 
-    pub fn count_total_fours(&self) -> u32 {
+    pub fn count_any_fours(&self) -> u32 {
         self.apply_mask(UNIT_ANY_FOUR_MASK).count_ones()
     }
 
@@ -183,7 +167,7 @@ impl Pattern {
     }
 
     pub fn is_forbidden_unchecked(&self) -> bool {
-        (self.count_total_fours() > 1 || self.count_open_threes() > 1 || self.has_overline())
+        (self.has_any_fours() || self.has_open_threes() || self.has_overline())
             && !self.has_five()
     }
 
@@ -229,19 +213,38 @@ impl Patterns {
         self.forbidden_field.is_hot(pos)
     }
 
-    #[inline(always)]
     pub fn forbidden_kind(&self, pos: Pos) -> Option<ForbiddenKind> {
         self.is_forbidden(pos).then(|| {
             let pattern = self.field[Color::Black][pos.idx_usize()];
 
             if pattern.has_overline() {
                 ForbiddenKind::Overline
-            } else if pattern.has_fours() {
+            } else if pattern.has_any_fours() {
                 ForbiddenKind::DoubleFour
             } else {
                 ForbiddenKind::DoubleThree
             }
         })
+    }
+
+    pub fn effective_fork_four_field(&self, color: Color) -> Bitfield {
+        let mut field = self.indexes[color].fork_fours;
+
+        if color == Color::Black {
+            field &= !self.forbidden_field;
+        }
+
+        field
+    }
+
+    pub fn effective_fork_three_four_field(&self, color: Color) -> Bitfield {
+        let mut field = self.indexes[color].closed_fours | self.indexes[color].open_threes;
+
+        if color == Color::Black {
+            field &= !self.forbidden_field;
+        }
+
+        field
     }
 
     #[inline(always)]
@@ -292,9 +295,6 @@ impl Patterns {
 
         let old_pattern_bitmap = std::mem::replace(&mut slice.pattern_bitmap[C], new_pattern_bitmap);
 
-        let old_slice_bitmap = self.indexes[C]
-            .replace_slice_bitmap::<D>(slice.idx, new_slice_bitmap);
-
         let start_idx = slice.start_pos.idx_usize();
 
         let mut update_bitmask = new_pattern_bitmap | old_pattern_bitmap;
@@ -312,15 +312,10 @@ impl Patterns {
             }
         }
 
+        let old_slice_bitmap = self.indexes[C]
+            .replace_slice_bitmap::<D>(slice.idx, new_slice_bitmap);
         self.indexes[C]
             .update_slice_bitfields::<C, D>(&self.field[C], start_idx, old_slice_bitmap, new_slice_bitmap);
-    }
-
-    pub fn effective_fork_fours(&self, color: Color) -> u32 {
-        match color {
-            Color::Black => (self.indexes[Color::Black].fork_fours & !self.forbidden_field).count_hots(),
-            Color::White => self.indexes[Color::White].fork_fours.count_hots()
-        }
     }
 }
 

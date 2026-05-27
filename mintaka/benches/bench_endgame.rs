@@ -7,10 +7,10 @@ mod bench_vcf {
     use mintaka::config::{Config, SearchObjective};
     use mintaka::eval::evaluator::ActiveEvaluator;
     use mintaka::eval::evaluator::Evaluator;
+    use mintaka::game_state::GameStateData;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
     use mintaka::search_endgame;
-    use mintaka::game_state::{GameState, GameStateData};
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
     use mintaka::value::Depth;
@@ -43,7 +43,7 @@ mod bench_vcf {
             let evaluator = ActiveEvaluator::from_state(&state);
 
             let tt = TranspositionTable::new_with_size(ByteSize::from_kib(8));
-            let ht = HistoryTable::EMPTY;
+            let ht = HistoryTable::empty();
 
             let global_counter_in_1k = AtomicU32::new(0);
             let aborted = AtomicBool::new(false);
@@ -55,7 +55,7 @@ mod bench_vcf {
 
                 tt.clear(1);
 
-                assert_eq!(Score::is_deterministic(result), $expect_vcf)
+                assert_eq!(Score::is_mate(result), $expect_vcf)
             })
         }};
     }

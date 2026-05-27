@@ -1,12 +1,12 @@
 use crate::movegen::movegen_window::MovegenWindow;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
-use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::notation::pos::Pos;
+use rusty_renju::utils::empty::Empty;
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize, Deserializer, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
-use rusty_renju::utils::empty::Empty;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "GameStateData"))]
 #[derive(Debug, Copy, Clone)]
@@ -21,7 +21,7 @@ impl Empty for GameState {
         Self {
             board: Board::empty(),
             history: History::empty(),
-            movegen_window: MovegenWindow::EMPTY,
+            movegen_window: MovegenWindow::default(),
         }
     }
 }

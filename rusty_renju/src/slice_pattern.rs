@@ -129,6 +129,42 @@ fn calculate_five_in_a_rows(stones: u16) -> u16 {
         & (stones >> 4)
 }
 
+#[inline(always)]
+pub fn match_five_position(stones: u16, blocks: u16) -> Option<u16> {
+    let pair = stones & (stones >> 1);
+    let trio = pair & (stones >> 2);
+    let quad = pair & (pair >> 2);
+
+    let matches = (quad >> 1)         // .OOOO
+        | (quad << 4)                      // OOOO.
+        | ((stones & (trio >> 2)) << 1)    // O.OOO
+        | ((pair & (pair >> 3)) << 2)      // OO.OO
+        | ((trio & (stones >> 4)) << 3);   // OOO.O
+
+    let matches = matches & !(stones | blocks);
+
+    (matches != 0).then_some(matches)
+}
+
+#[inline(always)]
+pub fn match_overline_position(stones: u16, blocks: u16) -> Option<u16> {
+    let pair = stones & (stones >> 1);
+    let trio = pair & (stones >> 2);
+    let quad = pair & (pair >> 2);
+    let penta = quad & (stones >> 4);
+
+    let matches = (penta >> 1)        // .OOOOO
+        | (penta << 5)                     // OOOOO.
+        | ((stones & (quad >> 2)) << 1)    // O.OOOO
+        | ((pair & (trio >> 3)) << 2)      // OO.OOO
+        | ((trio & (pair >> 4)) << 3)      // OOO.OO
+        | ((quad & (stones >> 5)) << 4);   // OOOO.O
+
+    let matches = matches & !(stones | blocks);
+
+    (matches != 0).then_some(matches)
+}
+
 pub fn contains_five_in_a_row(stones: u16) -> bool {
     calculate_five_in_a_rows(stones) != 0
 }
@@ -540,6 +576,9 @@ const fn parse_vector_variant_literal(source: &str, reversed: bool) -> VectorVar
     acc
 }
 
+// potential three T
+// potential four F
+// potential extensive E
 const fn parse_patch_literal(source: &str, reversed: bool) -> (usize, u8) {
     const_for!(idx in 0, source.len(); {
         let pos = if reversed { 7 - idx } else { idx };

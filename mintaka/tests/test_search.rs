@@ -14,6 +14,7 @@ mod test_search {
         ($source:expr) => {{
             let mut agent = {
                 let mut config = Config::default();
+                config.workers = 8;
                 config.max_nodes_in_1k = Some(100);
 
                 let state: GameState = $source.into();
@@ -33,7 +34,7 @@ mod test_search {
     }
 
     #[test]
-    fn empty_position() {
+    fn basic_position() {
         let source = board!(indoc! {"
            A B C D E F G H I J K L M N O
         15 . . . . . . . . . . . . . . . 15

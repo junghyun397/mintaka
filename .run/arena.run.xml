@@ -14,8 +14,8 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <option name="DEBUG_JUST_MY_CODE" value="true" />
     <option name="RUN_TOOL" value="" />
-    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mintaka_trainer/arena.py" />
-    <option name="PARAMETERS" value="--a-path &quot;target/release/mintaka_text_protocol_baseline&quot; --b-path &quot;target/release/mintaka_text_protocol_target&quot; --a-time 30000 0 100 --b-time 30000 0 100" />
+    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mintaka_trainer/arena/arena.py" />
+    <option name="PARAMETERS" value="--a-path &quot;target/release/mintaka_text_protocol_baseline&quot; --b-path &quot;target/release/mintaka_text_protocol_target&quot; --a-time 120000 0 2000 --b-time 120000 0 2000 --openings-file &quot;mintaka_trainer/arena/openings.csv&quot;" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

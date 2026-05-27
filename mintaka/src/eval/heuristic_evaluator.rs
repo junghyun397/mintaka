@@ -18,6 +18,25 @@ pub struct HeuristicEvaluator {
     hash_key: HashKey,
 }
 
+impl HeuristicEvaluator {
+    fn eval_policy_(&mut self, state: &GameState) -> PolicyDistribution {
+        let mut policy = [0; pattern::PATTERN_SIZE];
+
+        let player_indexes = &state.board.patterns.indexes[state.board.player_color];
+        let opponent_indexes = &state.board.patterns.indexes[!state.board.player_color];
+
+        let threes = player_indexes.open_threes;
+        let fours = player_indexes.closed_fours;
+        let close_threes = opponent_indexes.close_threes;
+
+        policy
+    }
+
+    fn eval_value_(&mut self, state: &GameState) -> Score {
+        todo!()
+    }
+}
+
 impl Evaluator for HeuristicEvaluator {
     type EvaluatorParameter = ();
 
@@ -62,7 +81,7 @@ impl Evaluator for HeuristicEvaluator {
             let neighbor_score = self.move_scores.scores[idx] as i16;
 
             let distance_score = {
-                let distance = state.history.avg_distance_to_last_actions(Pos::from_index(idx as u8)) as i16;
+                let distance = state.history.avg_distance(Pos::from_index(idx as u8), 4) as i16;
                 (10 - distance) / 2
             };
 
@@ -172,7 +191,7 @@ const VALUE_SCORE_LUT_SPAN_MASK: u32 = !(u32::MAX << 8);
 // total 8 bits
 fn encode_value_key(pattern: Pattern) -> usize {
     let has_open_four = pattern.has_open_four() as u32;
-    let total_fours = (pattern.count_total_fours() & 0b11) << 1;
+    let total_fours = (pattern.count_any_fours() & 0b11) << 1;
     let open_threes = (pattern.count_open_threes() & 0b11) << 3;
     let potentials = (pattern.count_potentials() & 0b111) << 5;
     let has_overline = pattern.has_overline() as u32 * VALUE_SCORE_LUT_SPAN_MASK;
@@ -289,7 +308,7 @@ const POLICY_SCORE_LUT_SPAN_MASK: u32 = !(u32::MAX << 8);
 fn encode_policy_key(pattern: Pattern) -> usize {
     let has_overline_pattern = (pattern.has_overline() as u32) * POLICY_SCORE_LUT_SPAN_MASK;
     let has_open_four = pattern.has_open_four() as u32;
-    let total_fours = (pattern.count_total_fours() & 0b11) << 1;
+    let total_fours = (pattern.count_any_fours() & 0b11) << 1;
     let open_threes = (pattern.count_open_threes() & 0b11) << 3;
     let potentials = (pattern.count_potentials() & 0b111) << 5;
 

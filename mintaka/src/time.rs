@@ -72,22 +72,6 @@ pub struct TimeManager {
     pub timer: Timer,
     pub time_history: Vec<(MaybePos, Duration)>,
     pub dynamic_time: bool,
-    stability: usize,
-    pv_stability: usize,
-    fail_low_count: usize,
-}
-
-impl From<Timer> for TimeManager {
-    fn from(timer: Timer) -> Self {
-        Self {
-            timer,
-            time_history: Vec::new(),
-            dynamic_time: false,
-            stability: 0,
-            pv_stability: 0,
-            fail_low_count: 0,
-        }
-    }
 }
 
 impl TimeManager {
@@ -96,21 +80,29 @@ impl TimeManager {
             timer,
             time_history: Vec::new(),
             dynamic_time: false,
-            stability: 0,
-            pv_stability: 0,
-            fail_low_count: 0,
         }
     }
 
     pub fn next_running_time(&self) -> Option<Duration> {
         if self.timer.is_infinite() {
-            None
-        } else if self.dynamic_time {
-            self.timer.total_remaining
-                .map(|total_remaining| total_remaining / 20 + self.timer.increment)
-                .or(self.timer.turn)
-        } else {
-            self.timer.turn
+            return None
         }
+
+        if self.dynamic_time {
+            return self.timer.total_remaining
+                .map(|total_remaining| {
+                    let mut base = total_remaining / 20
+                        + self.timer.increment / 2;
+
+                    if let &Some(turn) = &self.timer.turn {
+                        base = base.min(turn);
+                    }
+
+                    base
+                })
+                .or(self.timer.turn)
+        }
+
+        self.timer.turn
     }
 }

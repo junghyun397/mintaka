@@ -36,7 +36,7 @@ mod bench_forbidden_moves {
 
         b.iter(|| {
             let board = board.set(pos);
-            assert_eq!(board.patterns.field[Color::White][validate_pos.idx_usize()].has_three(), false);
+            assert_eq!(board.patterns.field[Color::White][validate_pos.idx_usize()].has_open_three(), false);
         })
     }
 

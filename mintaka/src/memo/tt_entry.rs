@@ -1,4 +1,3 @@
-use crate::value::Depth;
 use rusty_renju::assert_struct_sizes;
 use rusty_renju::memo::abstract_transposition_table::AbstractTTEntry;
 use rusty_renju::memo::hash_key::HashKey;
@@ -23,21 +22,33 @@ impl From<ScoreKind> for u8 {
     }
 }
 
+impl From<ScoreKind> for i32 {
+    fn from(score_kind: ScoreKind) -> Self {
+        score_kind as i32
+    }
+}
+
+// endgame_depth(5) | endgame_win_sentinel(5) , is_pv(1) , score_kind(2)
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct TTFlag(u8);
 
 impl TTFlag {
-
     const DEFAULT: Self = Self(0);
 
-    pub const TT_ENDGAME_WIN_MASK: u8 = 0b11111 << 3;
-    pub const MAX_TT_ENDGAME_DEPTH: Depth = 0b11110;
+    pub const TT_ENDGAME_WIN_DEPTH: u8 = 0b11111;
+    pub const MAX_TT_ENDGAME_DEPTH: u8 = 0b11110;
+    const TT_ENDGAME_WIN_MASK: u8 = Self::TT_ENDGAME_WIN_DEPTH << 3;
 
-    pub fn new(maybe_score_kind: Option<ScoreKind>, is_pv: bool, endgame_depth: Depth) -> Self {
+    pub fn new(maybe_score_kind: Option<ScoreKind>, is_pv: bool, clamped_endgame_depth: u8) -> Self {
+        debug_assert!(clamped_endgame_depth <= Self::MAX_TT_ENDGAME_DEPTH);
+
         let score_kind = maybe_score_kind.map_or(0, ScoreKind::into);
-        let tt_endgame_depth = Self::clamp_endgame_depth(endgame_depth);
 
-        Self(score_kind | ((is_pv as u8) << 2) | tt_endgame_depth << 3)
+        Self(score_kind | ((is_pv as u8) << 2) | clamped_endgame_depth << 3)
+    }
+
+    pub fn new_endgame_proven(score_kind: ScoreKind, is_pv: bool) -> Self {
+        Self(score_kind as u8 | ((is_pv as u8) << 2) | Self::TT_ENDGAME_WIN_MASK)
     }
 
     pub fn maybe_score_kind(&self) -> Option<ScoreKind> {
@@ -58,8 +69,8 @@ impl TTFlag {
         (self.0 >> 2) & 0b1 == 0b1
     }
 
-    pub fn endgame_depth(&self) -> Depth {
-        (self.0 >> 3) as Depth
+    pub fn endgame_depth(&self) -> u8 {
+        self.0 >> 3
     }
 
     pub fn set_score_kind(&mut self, score_kind: ScoreKind) {
@@ -70,20 +81,17 @@ impl TTFlag {
         self.0 = (self.0 & !(0b1 << 2)) | ((is_pv as u8) << 2);
     }
 
-    pub fn set_endgame_win(&mut self) {
-        self.0 = self.0 & Self::TT_ENDGAME_WIN_MASK
+    pub fn is_endgame_proven(&self) -> bool {
+        self.0 & Self::TT_ENDGAME_WIN_MASK == Self::TT_ENDGAME_WIN_MASK
     }
 
-    pub fn set_endgame_depth(&mut self, endgame_depth: Depth) {
-        let tt_endgame_depth = Self::clamp_endgame_depth(endgame_depth);
-
-        self.0 = (self.0 & !(0b11111 << 3)) | (tt_endgame_depth << 3);
+    pub fn set_endgame_proven(&mut self) {
+        self.0 |= Self::TT_ENDGAME_WIN_MASK;
     }
 
-    fn clamp_endgame_depth(endgame_depth: Depth) -> u8 {
-        endgame_depth.clamp(0, Self::MAX_TT_ENDGAME_DEPTH) as u8
+    pub fn set_endgame_depth(&mut self, clamped_endgame_depth: u8) {
+        self.0 = (self.0 & !(0b11111 << 3)) | (clamped_endgame_depth << 3);
     }
-
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -100,23 +108,18 @@ pub struct TTEntry {
 assert_struct_sizes!(TTEntry, size=8, align=8);
 
 impl From<TTEntry> for u64 {
-
     fn from(value: TTEntry) -> Self {
         unsafe { std::mem::transmute(value) }
     }
-
 }
 
 impl From<u64> for TTEntry {
-
     fn from(value: u64) -> Self {
         unsafe { std::mem::transmute(value) }
     }
-
 }
 
 impl TTEntry {
-
     pub const EMPTY: Self = Self {
         best_move: MaybePos::NONE,
         tt_flag: TTFlag::DEFAULT,
@@ -125,7 +128,6 @@ impl TTEntry {
         eval: 0,
         score: 0,
     };
-
 }
 
 #[derive(Debug)]
@@ -138,7 +140,6 @@ pub struct TTEntryBucket {
 assert_struct_sizes!(TTEntryBucket, size=64, align=64);
 
 impl AbstractTTEntry for TTEntryBucket {
-
     const BUCKET_SIZE: u64 = 6;
 
     fn clear_mut(&self) {
@@ -160,11 +161,9 @@ impl AbstractTTEntry for TTEntryBucket {
 
         count as usize
     }
-
 }
 
 impl TTEntryBucket {
-
     fn pack_hash_key(key: HashKey) -> u64 {
         u64::from(key) & KEY_MASK
     }
@@ -215,5 +214,4 @@ impl TTEntryBucket {
         self.store_key(slot_idx, packed_key ^ Self::shuffle_pack_entry(entry));
         self.entries[slot_idx].store(entry, Ordering::Relaxed);
     }
-
 }

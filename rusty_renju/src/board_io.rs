@@ -113,21 +113,21 @@ fn extract_stones_by_color(color: Color, source: &[BoardElement]) -> Box<[Pos]> 
 impl Board {
 
     pub fn to_string_with_highlighted_move(&self, pos: Pos) -> String {
-        let marker = ["[".to_string(), "]".to_string()];
+        const MARKER: [char; 2] = ['[', ']'];
 
         self.render_with_attributes(
             |pos, &item| board_iter_item_to_symbol(self, pos, item),
-            |iter_pos, _| (iter_pos == pos).then(|| (false, marker.clone()))
+            |iter_pos, _| (iter_pos == pos).then(|| (false, MARKER))
         )
     }
 
-    fn make_last_moves_marker(pair: [MaybePos; 2]) -> impl Fn(Pos, &BoardIterItem) -> Option<(bool, [String; 2])> {
-        const POST_MARKER: [&str; 2] = ["[", "]"];
-        const PRE_MARKER: [&str; 2] = ["|", "|"];
+    fn make_last_moves_marker(pair: [MaybePos; 2]) -> impl Fn(Pos, &BoardIterItem) -> Option<(bool, [char; 2])> {
+        const POST_MARKER: [char; 2] = ['[', ']'];
+        const PRE_MARKER: [char; 2] = ['|', '|'];
 
         move |iter_pos, _| match MaybePos::from(iter_pos) {
-            pos if pos == pair[1] => Some((true, POST_MARKER.map(String::from))),
-            pos if pos == pair[0] => Some((false, PRE_MARKER.map(String::from))),
+            pos if pos == pair[1] => Some((true, POST_MARKER)),
+            pos if pos == pair[0] => Some((false, PRE_MARKER)),
             _ => None,
         }
     }
@@ -188,7 +188,7 @@ impl Board {
 
     pub fn render_with_attributes<T1, T2>(&self, cell: T1, marker: T2) -> String where
         T1: Fn(Pos, &BoardIterItem) -> String,
-        T2: Fn(Pos, &BoardIterItem) -> Option<(bool, [String; 2])>
+        T2: Fn(Pos, &BoardIterItem) -> Option<(bool, [char; 2])>
     {
         let content = self.iter_items()
             .collect::<Vec<_>>()
