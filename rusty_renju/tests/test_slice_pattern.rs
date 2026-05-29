@@ -63,7 +63,6 @@ mod test_slice_pattern {
             $(open_four = $open_four:expr,)?
             $(close_three = $close_three:expr,)?
             $(five = $five:expr,)?
-            $(overline = $overline:expr,)?
         ) => {{
             test_pattern!(
                 color = Color::White,
@@ -75,7 +74,6 @@ mod test_slice_pattern {
                 $(open_four = $open_four,)?
                 $(close_three = $close_three,)?
                 $(five = $five,)?
-                $(overline = $overline,)?
             );
 
             test_pattern!(
@@ -88,7 +86,6 @@ mod test_slice_pattern {
                 $(open_four = &invert_color($open_four),)?
                 $(close_three = &invert_color($close_three),)?
                 $(five = &invert_color($five),)?
-                $(overline = &invert_color($overline),)?
             );
         }};
         (
@@ -101,7 +98,6 @@ mod test_slice_pattern {
             $(open_four = $open_four:expr,)?
             $(close_three = $close_three:expr,)?
             $(five = $five:expr,)?
-            $(overline = $overline:expr,)?
         ) => {{
             $(test_both_flow!($case, $potential, $color, POTENTIAL, POTENTIAL);)?
 
@@ -116,8 +112,6 @@ mod test_slice_pattern {
             $(test_both_flow!($case, $close_three, $color, CLOSE_THREE, CLOSE_THREE);)?
 
             $(test_both_flow!($case, $five, $color, FIVE, FIVE);)?
-
-            $(test_both_flow!($case, $overline, $color, OVERLINE, OVERLINE);)?
         }};
     }
 
@@ -420,87 +414,23 @@ mod test_slice_pattern {
             case                = "O O . O O",
             five                = "O O V O O",
         );
-    }
 
-    #[test]
-    fn overline() {
         test_pattern!(
             color               = Color::Black,
             case                = "X . X X X X .",
             five                = "X . X X X X V",
-            overline            = "X V X X X X .",
         );
 
         test_pattern!(
             color               = Color::Black,
             case                = "X X X . X X",
             five                = "X X X . X X",
-            overline            = "X X X V X X",
         );
 
         test_pattern!(
             color               = Color::Black,
             case                = "X X X X . X",
             five                = "X X X X . X",
-            overline            = "X X X X V X",
         );
     }
-
-    #[test]
-    fn potential() {
-        test_pattern!(
-            color               = both,
-            case                = ". . . O . . .",
-            potential           = ". V V O V V .",
-        );
-
-        test_pattern!(
-            color               = both,
-            case                = ". . O . . . .",
-            potential           = ". V O V V . .",
-        );
-
-        test_pattern!(
-            color               = both,
-            case                = ". O . . O . . .",
-            potential           = ". O . . O . . .",
-        );
-
-        test_pattern!(
-            color               = both,
-            case                = ". O . . . . .",
-            potential           = ". O V V V . .",
-        );
-
-        test_pattern!(
-            color               = both,
-            case                = ". . O . .",
-            potential           = ". . O . .",
-        );
-
-        test_pattern!(
-            color               = both,
-            case                = "O O . . .",
-            potential           = "O O V V V",
-        );
-
-        test_pattern!(
-            color               = both,
-            case                = "O . O . .",
-            potential           = "O V O V V",
-        );
-
-        test_pattern!(
-            color               = both,
-            case                = "O . . O .",
-            potential           = "O V V O V",
-        );
-
-        test_pattern!(
-            color               = both,
-            case                = "O . . O . . . .",
-            potential           = "O V V O V V . .",
-        );
-    }
-
 }

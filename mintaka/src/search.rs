@@ -205,15 +205,15 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
             };
 
             td.push_ply(pos);
-            state.play_mut(pos);
-            td.evaluator.play(&state.board, pos);
+            let artifact = state.play_mut(pos);
+            td.evaluator.play(&state.board, artifact, pos);
 
             // no depth reduction for forced response
             let score = -pvs::<CLK, R, TH, NT::NextType>(td, state, depth_left, -beta, -alpha, cut_node);
 
             td.pop_ply();
-            state.undo_mut(td.ss[td.ply].recovery_state);
-            td.evaluator.undo(&state.board, pos);
+            let artifact = state.undo_mut(td.ss[td.ply].recovery_state);
+            td.evaluator.undo(&state.board, artifact, pos);
 
             if td.is_aborted() {
                 return Score::DRAW;
@@ -431,9 +431,9 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
-        state.play_mut(pos);
+        let artifact = state.play_mut(pos);
         td.push_ply(pos);
-        td.evaluator.play(&state.board, pos);
+        td.evaluator.play(&state.board, artifact, pos);
 
         if threat_kind.is_none() {
             if on_three {
@@ -510,8 +510,8 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
         };
 
         td.pop_ply();
-        state.undo_mut(td.ss[td.ply].recovery_state);
-        td.evaluator.undo(&state.board, pos);
+        let artifact = state.undo_mut(td.ss[td.ply].recovery_state);
+        td.evaluator.undo(&state.board, artifact, pos);
 
         if td.is_aborted() {
             return Score::DRAW;

@@ -151,6 +151,12 @@ macro_rules! impl_color_container {
                 &mut self.0[index as usize]
             }
         }
+        
+        impl<T: crate::utils::empty::Empty> crate::utils::empty::Empty for $name<T> {
+            fn empty() -> Self {
+                Self::new(T::empty(), T::empty())
+            }
+        }
     };
 }
 

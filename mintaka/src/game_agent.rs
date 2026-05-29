@@ -110,7 +110,7 @@ impl GameAgent {
             tt,
             ht: HistoryTable::EMPTY,
             executed_moves: Bitfield::empty(),
-            time_manager: TimeManager::new(config.initial_timer),
+            time_manager: TimeManager::new(config.initial_timer, config.dynamic_time),
         }
     }
 
@@ -130,8 +130,8 @@ impl GameAgent {
                         return Err(GameError::ForbiddenMove);
                     }
 
-                    self.state.play_mut(pos);
-                    self.evaluator.play(&self.state.board, pos.into());
+                    let artifact = self.state.play_mut(pos);
+                    self.evaluator.play(&self.state.board, artifact, pos.into());
 
                     if let Some(winner) = self.state.board.find_winner(pos) {
                         return Ok(CommandResult::finished(self.state.board.hash_key, GameResult::Win(winner)));
@@ -154,10 +154,10 @@ impl GameAgent {
                 match self.state.history.last_action() {
                     None => return Err(GameError::NoHistoryToUndo),
                     Some(action) => {
-                        self.state.undo_rebuild_mut();
+                        let artifact = self.state.undo_rebuild_mut();
 
                         if let Some(pos) = action.ok() {
-                            self.evaluator.undo(&self.state.board, pos);
+                            self.evaluator.undo(&self.state.board, artifact, pos);
                         }
 
                         if self.executed_moves.is_hot_idx(self.state.len()) {

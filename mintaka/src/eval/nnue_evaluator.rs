@@ -1,7 +1,7 @@
 use crate::eval::evaluator::{Evaluator, PolicyDistribution};
 use crate::eval::nn::network_params::NnueNetworkParams;
 use crate::game_state::GameState;
-use rusty_renju::board::Board;
+use rusty_renju::board::{Board, MoveArtifact};
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
@@ -34,11 +34,11 @@ impl Evaluator for NnueEvaluator {
         todo!()
     }
 
-    fn play(&mut self, board: &Board, pos: Pos) {
+    fn play(&mut self, board: &Board, artifact: MoveArtifact, pos: Pos) {
         todo!()
     }
 
-    fn undo(&mut self, board: &Board, pos: Pos) {
+    fn undo(&mut self, board: &Board, artifact: MoveArtifact, pos: Pos) {
         todo!()
     }
 

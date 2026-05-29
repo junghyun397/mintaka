@@ -22,7 +22,6 @@ pub struct Slice {
 }
 
 impl Slice {
-
     const PLACEHOLDER: Self = unsafe { std::mem::zeroed() };
 
     pub const fn empty(idx: u8, length: u8, start_row: u8, start_col: u8) -> Self {
@@ -91,9 +90,13 @@ impl Slice {
         let stones = self.stones[C];
         let blocks = self.blocks::<C>();
 
-        // filter O X . . O X .
         stones != 0
-            && stones & !(blocks << 1) & !(blocks >> 1) != 0
+            && (
+                // filter O X . . O X .
+                stones & !(blocks << 1) & !(blocks >> 1) != 0
+                    // accept X O . . . O X
+                    || stones & (stones >> 4) & (blocks << 1) & (blocks >> 5) != 0
+            )
     }
 
     pub fn winner(&self) -> Option<Color> {
@@ -114,7 +117,6 @@ impl Slice {
     pub fn blocks<const C: Color>(&self) -> u16 {
         u16::MAX << self.length | self.stones[!C]
     }
-
 }
 
 #[derive(Copy, Clone)]
@@ -132,7 +134,6 @@ impl Empty for Slices {
 }
 
 impl Slices {
-
     pub const EMPTY: Self = {
         let mut horizontal_slices = [Slice::PLACEHOLDER; pos::U_BOARD_WIDTH];
         let mut vertical_slices = [Slice::PLACEHOLDER; pos::U_BOARD_WIDTH];
@@ -198,6 +199,19 @@ impl Slices {
         }
     }
 
+    pub fn simulate_set_slices(&self, color: Color, pos: Pos) -> [Option<u16>; 4] {
+        [
+            Some(self.horizontal_slices[pos.row_usize()].stones[color] | 0b1 << pos.col_usize()),
+            Some(self.vertical_slices[pos.col_usize()].stones[color] | 0b1 << pos.row_usize()),
+            Self::ascending_slice_idx(pos).map(|idx|
+                self.ascending_slices[idx].stones[color] | 0b1 << (pos.col() - self.ascending_slices[idx].start_col)
+            ),
+            Self::descending_slice_idx(pos).map(|idx|
+                self.descending_slices[idx].stones[color] | 0b1 << (pos.col() - self.descending_slices[idx].start_col)
+            ),
+        ]
+    }
+
     #[inline]
     fn calculate_ascending_slice_idx(pos: Pos) -> isize {
         // y = x + b, b = y - x (reversed row sequence)
@@ -261,5 +275,4 @@ impl Slices {
                 }
             )
     }
-
 }

@@ -112,7 +112,7 @@ impl EndgameMovesUnchecked {
             let pos = pos.unwrap();
 
             let potential_score = board.patterns.field[board.player_color][pos.idx_usize()]
-                .count_potentials()
+                .count_potential_four()
                 .min(2);
 
             Reverse(potential_score * 10 + (pos::BOARD_WIDTH as u32 - pos.distance(ref_pos) as u32) * 3)
@@ -331,8 +331,8 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
             let parent_player_color = state.board.player_color;
 
             td.batch_counter.increment();
-            state.board.set_mut(four_pos);
-            td.evaluator.play(&state.board, four_pos);
+            let artifact = state.board.set_mut(four_pos);
+            td.evaluator.play(&state.board, artifact, four_pos);
             vcf_ply += 1;
             vcf_depth_left -= 1;
 
@@ -342,8 +342,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
 
             let response_pattern = state.board.patterns.field[!C][response_pos.idx_usize()];
             let response_four_count = response_pattern.count_any_fours();
-            let response_is_forbidden = R == RuleKind::Renju
-                && C == Color::White
+            let response_is_forbidden = R == RuleKind::Renju && C == Color::White
                 && state.board.patterns.is_forbidden(response_pos);
 
             if match (R, C) {
@@ -351,8 +350,8 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                     || response_pattern.has_open_four(),
                 _ => response_pattern.has_open_four() && !response_is_forbidden
             } || dest.conditional_abort(response_pattern) {
-                state.board.unset_mut(four_pos);
-                td.evaluator.undo(&state.board, four_pos);
+                let artifact = state.board.unset_mut(four_pos);
+                td.evaluator.undo(&state.board, artifact, four_pos);
                 vcf_ply -= 1;
                 vcf_depth_left += 1;
                 continue 'position_search;
@@ -379,8 +378,8 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                 || state.board.stones + 2 >= pos::U8_BOARD_SIZE
                 || vcf_depth_left <= 0
             {
-                state.board.unset_mut(four_pos);
-                td.evaluator.undo(&state.board, four_pos);
+                let artifact = state.board.unset_mut(four_pos);
+                td.evaluator.undo(&state.board, artifact, four_pos);
                 vcf_ply -= 1;
                 vcf_depth_left += 1;
                 continue 'position_search;
@@ -403,8 +402,8 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
 
                 // tt vcf cache
                 if vcf_depth_left.min(TTFlag::MAX_TT_ENDGAME_DEPTH as Depth) as u8 <= tt_endgame_depth {
-                    state.board.unset_mut(four_pos);
-                    td.evaluator.undo(&state.board, four_pos);
+                    let artifact = state.board.unset_mut(four_pos);
+                    td.evaluator.undo(&state.board, artifact, four_pos);
                     vcf_ply -= 1;
                     vcf_depth_left += 1;
                     continue 'position_search;
@@ -412,15 +411,15 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
             }
 
             td.batch_counter.increment();
-            state.board.set_mut(response_pos);
-            td.evaluator.play(&state.board, response_pos);
+            let artifact = state.board.set_mut(response_pos);
+            td.evaluator.play(&state.board, artifact, response_pos);
             vcf_ply += 1;
 
             if !state.board.patterns.indexes[C].has_any_four() { // cold branch pruning
-                state.board.unset_mut(response_pos);
-                td.evaluator.undo(&state.board, response_pos);
-                state.board.unset_mut(four_pos);
-                td.evaluator.undo(&state.board, four_pos);
+                let artifact = state.board.unset_mut(response_pos);
+                td.evaluator.undo(&state.board, artifact, response_pos);
+                let artifact = state.board.unset_mut(four_pos);
+                td.evaluator.undo(&state.board, artifact, four_pos);
                 vcf_ply -= 2;
                 vcf_depth_left += 1;
                 continue 'position_search;
@@ -440,10 +439,10 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                     || (C == Color::Black && state.board.patterns.is_forbidden(response_move))
                 {
                     td.endgame_stack_top -= 1;
-                    state.board.unset_mut(response_pos);
-                    td.evaluator.undo(&state.board, response_pos);
-                    state.board.unset_mut(four_pos);
-                    td.evaluator.undo(&state.board, four_pos);
+                    let artifact = state.board.unset_mut(response_pos);
+                    td.evaluator.undo(&state.board, artifact, response_pos);
+                    let artifact = state.board.unset_mut(four_pos);
+                    td.evaluator.undo(&state.board, artifact, four_pos);
                     vcf_ply -= 2;
                     vcf_depth_left += 1;
                     continue 'position_search;
@@ -483,10 +482,10 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
         }
 
         if let Some(frame) = td.pop_endgame_frame() {
-            state.board.unset_mut(frame.response_pos);
-            td.evaluator.undo(&state.board, frame.response_pos);
-            state.board.unset_mut(frame.four_pos);
-            td.evaluator.undo(&state.board, frame.four_pos);
+            let artifact = state.board.unset_mut(frame.response_pos);
+            td.evaluator.undo(&state.board, artifact, frame.response_pos);
+            let artifact = state.board.unset_mut(frame.four_pos);
+            td.evaluator.undo(&state.board, artifact, frame.four_pos);
             vcf_ply -= 2;
             vcf_depth_left += 1;
 

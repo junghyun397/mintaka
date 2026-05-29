@@ -1,16 +1,16 @@
 use crate::bitfield::Bitfield;
 use crate::memo::hash_key::HashKey;
 use crate::notation::color::{Color, ColorContainer};
-use crate::notation::direction::Direction;
+use crate::notation::direction::{Direction, DirectionContainer};
 use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::RuleKind;
-use crate::pattern;
 use crate::pattern::Patterns;
 use crate::slice::Slices;
 use crate::utils::empty::Empty;
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
+use crate::slice_pattern;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "BoardData"))]
 #[derive(Copy, Clone)]
@@ -21,6 +21,20 @@ pub struct Board {
     pub patterns: Patterns,
     pub hot_field: Bitfield,
     pub hash_key: HashKey,
+}
+
+impl PartialEq for Board {
+    fn eq(&self, other: &Self) -> bool {
+        self.slices.bitfield() == other.slices.bitfield()
+    }
+}
+
+impl Eq for Board {}
+
+impl Hash for Board {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash_key.hash(state);
+    }
 }
 
 impl Empty for Board {
@@ -36,8 +50,14 @@ impl Empty for Board {
     }
 }
 
-impl Board {
+#[derive(std::marker::ConstParamTy, Eq, PartialEq,)]
+pub enum MoveType {
+    Set, Unset
+}
 
+pub type MoveArtifact = ColorContainer<DirectionContainer<u16>>;
+
+impl Board {
     pub fn is_pos_empty(&self, pos: Pos) -> bool {
         self.hot_field.is_cold(pos)
     }
@@ -73,24 +93,26 @@ impl Board {
         self
     }
 
-    pub fn set_mut(&mut self, pos: Pos) {
+    pub fn set_mut(&mut self, pos: Pos) -> MoveArtifact {
         self.stones += 1;
         self.hot_field.set(pos);
         self.hash_key = self.hash_key.set(self.player_color, pos);
 
-        self.incremental_update_mut::<{ MoveType::Set }>(pos);
+        let artifact = self.incremental_update::<{ MoveType::Set }>(pos);
 
         self.player_color = !self.player_color;
+
+        artifact
     }
 
-    pub fn unset_mut(&mut self, pos: Pos) {
+    pub fn unset_mut(&mut self, pos: Pos) -> MoveArtifact {
         self.player_color = !self.player_color;
 
         self.stones -= 1;
         self.hot_field.unset(pos);
         self.hash_key = self.hash_key.set(self.player_color, pos);
 
-        self.incremental_update_mut::<{ MoveType::Unset }>(pos);
+        self.incremental_update::<{ MoveType::Unset }>(pos)
     }
 
     pub fn pass_mut(&mut self) {
@@ -145,7 +167,7 @@ impl Board {
 
         self.player_color = player;
 
-        self.full_update_mut();
+        self.full_update();
         self.hash_key = HashKey::from(&self.slices.horizontal_slices);
     }
 
@@ -155,22 +177,24 @@ impl Board {
         self.player_color = !self.player_color;
     }
 
-    fn incremental_update_mut<const M: MoveType>(&mut self, pos: Pos) {
+    fn incremental_update<const M: MoveType>(&mut self, pos: Pos) -> MoveArtifact {
+        let mut artifact = MoveArtifact::empty();
+
         macro_rules! update_by_slice_each_color {
             ($color:expr,$direction:expr,$slice:expr,$slice_idx:expr) => {
-                match (
+                let unit_artifact = match (
                     $slice.pattern_bitmap[$color] != 0,
-                    $slice.has_potential_pattern::<{ $color }>()
+                    $slice.has_potential_pattern::<{ $color }>(),
                 ) {
-                    (_, true) => {
-                        self.patterns.update_with_slice::<{ RuleKind::Renju }, { $color }, { $direction }>($slice);
-                    },
-                    (true, false) => {
-                        self.patterns.clear_with_slice::<{ $color }, { $direction }>($slice);
-                    },
-                    _ => {}
-                }
-            };
+                    (_, true) =>
+                        self.patterns.update_pattern_with_slice::<{ RuleKind::Renju }, { $color }, { $direction }>($slice),
+                    (true, false) =>
+                        self.patterns.clear_pattern_with_slice::<{ RuleKind::Renju }, { $color }, { $direction }>($slice),
+                    _ => 0
+                };
+
+                artifact[$color][$direction] = unit_artifact;
+            }
         }
 
         macro_rules! update_by_slice {
@@ -201,18 +225,21 @@ impl Board {
             update_by_slice!(Direction::Descending, descending_slice, pos.col() - descending_slice.start_col);
         }
 
-        self.validate_forbidden_moves_mut();
+        self.validate_overlines::<M>();
+        self.validate_forbidden_moves();
+
+        artifact
     }
 
-    fn full_update_mut(&mut self) {
+    fn full_update(&mut self) {
         macro_rules! update_by_slice {
             ($slice:expr,$direction:expr) => {{
                 if $slice.has_potential_pattern::<{ Color::Black }>() {
-                    self.patterns.update_with_slice::<{ RuleKind::Renju }, { Color::Black }, { $direction }>($slice);
+                    self.patterns.update_pattern_with_slice::<{ RuleKind::Renju }, { Color::Black }, { $direction }>($slice);
                 }
 
                 if $slice.has_potential_pattern::<{ Color::White }>() {
-                    self.patterns.update_with_slice::<{ RuleKind::Renju }, { Color::White }, { $direction }>($slice);
+                    self.patterns.update_pattern_with_slice::<{ RuleKind::Renju }, { Color::White }, { $direction }>($slice);
                 }
             }};
         }
@@ -235,10 +262,29 @@ impl Board {
             update_by_slice!(descending_slice, Direction::Descending);
         }
 
-        self.validate_forbidden_moves_mut();
+        self.validate_overlines::<{ MoveType::Unset }>();
+        self.validate_forbidden_moves();
     }
 
-    fn validate_forbidden_moves_mut(&mut self) {
+    fn validate_overlines<const M: MoveType>(&mut self) {
+        if M == MoveType::Unset
+            && self.player_color == Color::Black
+            && !self.patterns.candidate_overline_field.is_empty()
+        {
+            for overline_pos in self.patterns.candidate_overline_field.clone().iter_hot_pos() {
+                if !self.slices.simulate_set_slices(Color::Black, overline_pos)
+                    .iter()
+                    .any(|&stones|
+                        stones.is_some_and(slice_pattern::contains_overline)
+                    )
+                {
+                    self.patterns.candidate_overline_field.unset(overline_pos);
+                }
+            }
+        }
+    }
+
+    fn validate_forbidden_moves(&mut self) {
         for root_pos in self.patterns.candidate_forbidden_field.clone().iter_hot_pos() {
             let pattern = self.patterns.field[Color::Black][root_pos.idx_usize()];
 
@@ -248,7 +294,7 @@ impl Board {
             if pattern.has_five() {
                 mark_forbidden = false;
                 delete_candidate = false;
-            } else if pattern.has_any_fours() || pattern.has_overline() {
+            } else if pattern.has_any_fours() || self.patterns.candidate_overline_field.is_hot(root_pos) {
                 mark_forbidden = true;
                 delete_candidate = false;
             } else if pattern.has_open_threes() {
@@ -277,15 +323,14 @@ impl Board {
     }
 
     fn is_invalid_three_component<C: ValidateThreeContext>(&self, context: C, direction: Direction, offset: isize) -> bool {
-        const ANY_FOUR_OR_OVERLINE_MASK: u32 = pattern::UNIT_ANY_FOUR_MASK | pattern::UNIT_OVERLINE_MASK;
-
         let pos = context.parent_pos().directional_offset_unchecked(direction, offset);
 
         let pattern = self.patterns.field[Color::Black][pos.idx_usize()];
 
         !pattern.has_open_three() // non-three
-            || pattern.apply_mask(ANY_FOUR_OR_OVERLINE_MASK) != 0 // double-four or overline
+            || pattern.has_any_four() // double-four
             || context.override_contains(pos) // double-four or recursive
+            || self.patterns.candidate_overline_field.is_hot(pos) // overline
             || (pattern.count_open_threes() > 2 && { // nested double-three
                 let mut new_overrides = context.branch_overrides();
 
@@ -445,37 +490,11 @@ impl Board {
         let slice = self.slices.access_slice_unchecked(direction, pos);
         let slice_idx = slice.calculate_slice_idx(direction, pos);
 
-        let stones = match C {
-            Color::Black => slice.stones[Color::Black],
-            Color::White => slice.stones[Color::White]
-        } as u32;
-
-        (((stones << 2) >> slice_idx) & 0b11111) as u8 // 0[00V00]0
+        ((((slice.stones[C] as u32) << 2) >> slice_idx) & 0b11111) as u8 // 0[00V00]0
     }
-
-}
-
-impl PartialEq for Board {
-    fn eq(&self, other: &Self) -> bool {
-        self.slices.bitfield() == other.slices.bitfield()
-    }
-}
-
-impl Eq for Board {}
-
-impl Hash for Board {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.hash_key.hash(state);
-    }
-}
-
-#[derive(std::marker::ConstParamTy, Eq, PartialEq,)]
-pub enum MoveType {
-    Set, Unset
 }
 
 trait ValidateThreeContext : Copy {
-
     const IS_ROOT: bool;
 
     fn parent_pos(&self) -> Pos;
@@ -485,7 +504,6 @@ trait ValidateThreeContext : Copy {
     fn branch_overrides(&self) -> SetOverrides;
 
     fn override_contains(&self, pos: Pos) -> bool;
-
 }
 
 #[derive(Copy, Clone)]
@@ -549,7 +567,6 @@ pub struct SetOverrides {
 }
 
 impl SetOverrides {
-
     fn new(root: Pos) -> Self {
         let mut bitfield = Bitfield::empty();
 
@@ -561,5 +578,4 @@ impl SetOverrides {
             root,
         }
     }
-
 }

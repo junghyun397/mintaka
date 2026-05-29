@@ -1,5 +1,5 @@
 use crate::game_state::GameState;
-use rusty_renju::board::Board;
+use rusty_renju::board::{Board, MoveArtifact};
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::score::Score;
@@ -19,9 +19,9 @@ pub trait Evaluator {
 
     fn init(&mut self, board: &Board);
 
-    fn play(&mut self, board: &Board, plied: Pos);
+    fn play(&mut self, board: &Board, artifact: MoveArtifact, plied: Pos);
 
-    fn undo(&mut self, board: &Board, removed: Pos);
+    fn undo(&mut self, board: &Board, artifact: MoveArtifact, removed: Pos);
 
     fn eval_policy(&mut self, state: &GameState) -> PolicyDistribution;
 

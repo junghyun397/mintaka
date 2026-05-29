@@ -2,7 +2,7 @@ use crate::eval::evaluator::{Evaluator, PolicyDistribution};
 use crate::game_state::GameState;
 use crate::movegen::move_scores::MoveScores;
 use rusty_renju::bitfield::Bitfield;
-use rusty_renju::board::Board;
+use rusty_renju::board::{Board, MoveArtifact};
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::{Color, ColorContainer};
 use rusty_renju::notation::pos;
@@ -54,13 +54,13 @@ impl Evaluator for HeuristicEvaluator {
         self.hash_key = board.hash_key;
     }
 
-    fn play(&mut self, board: &Board, plied: Pos) {
+    fn play(&mut self, board: &Board, artifact: MoveArtifact, plied: Pos) {
         self.move_scores.add_neighbor_score(plied);
 
         self.hash_key = board.hash_key;
     }
 
-    fn undo(&mut self, board: &Board, removed: Pos) {
+    fn undo(&mut self, board: &Board, artifact: MoveArtifact, removed: Pos) {
         self.move_scores.remove_neighbor_score(removed);
 
         self.hash_key = board.hash_key;
@@ -193,10 +193,8 @@ fn encode_value_key(pattern: Pattern) -> usize {
     let has_open_four = pattern.has_open_four() as u32;
     let total_fours = (pattern.count_any_fours() & 0b11) << 1;
     let open_threes = (pattern.count_open_threes() & 0b11) << 3;
-    let potentials = (pattern.count_potentials() & 0b111) << 5;
-    let has_overline = pattern.has_overline() as u32 * VALUE_SCORE_LUT_SPAN_MASK;
 
-    (has_overline | has_open_four | total_fours | open_threes | potentials) as usize
+    (has_open_four | total_fours | open_threes) as usize
 }
 
 type ValueScoreLut = [(i16, u16); VALUE_SCORE_LUT_SIZE];
@@ -306,13 +304,11 @@ const POLICY_SCORE_LUT_SPAN_MASK: u32 = !(u32::MAX << 8);
 // overline override for full-bits
 // total 8 bits
 fn encode_policy_key(pattern: Pattern) -> usize {
-    let has_overline_pattern = (pattern.has_overline() as u32) * POLICY_SCORE_LUT_SPAN_MASK;
     let has_open_four = pattern.has_open_four() as u32;
     let total_fours = (pattern.count_any_fours() & 0b11) << 1;
     let open_threes = (pattern.count_open_threes() & 0b11) << 3;
-    let potentials = (pattern.count_potentials() & 0b111) << 5;
 
-    (has_overline_pattern | has_open_four | total_fours | open_threes | potentials) as usize
+    (has_open_four | total_fours | open_threes) as usize
 }
 
 type PolicyScoreLut = [i8; POLICY_SCORE_LUT_SIZE];

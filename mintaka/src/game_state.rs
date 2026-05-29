@@ -1,5 +1,5 @@
 use crate::movegen::movegen_window::MovegenWindow;
-use rusty_renju::board::Board;
+use rusty_renju::board::{Board, MoveArtifact};
 use rusty_renju::history::History;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::utils::empty::Empty;
@@ -91,11 +91,11 @@ impl GameState {
         self
     }
 
-    pub fn play_mut(&mut self, pos: Pos) {
-        self.board.set_mut(pos);
+    pub fn play_mut(&mut self, pos: Pos) -> MoveArtifact {
         self.history.set_mut(pos);
-
         self.movegen_window.imprint_window(pos);
+
+        self.board.set_mut(pos)
     }
 
     pub fn pass_mut(&mut self) {
@@ -103,25 +103,29 @@ impl GameState {
         self.history.pass_mut();
     }
 
-    pub fn undo_mut(&mut self, recovery_state: RecoveryState) {
+    pub fn undo_mut(&mut self, recovery_state: RecoveryState) -> MoveArtifact {
         self.movegen_window = recovery_state.movegen_window;
 
-        self.undo_move();
+        self.undo_move()
     }
 
-    pub fn undo_rebuild_mut(&mut self) {
-        self.undo_move();
+    pub fn undo_rebuild_mut(&mut self) -> MoveArtifact {
+        let artifact = self.undo_move();
         self.movegen_window = MovegenWindow::from(&self.board.hot_field);
+        
+        artifact
     }
 
-    fn undo_move(&mut self) {
+    fn undo_move(&mut self) -> MoveArtifact {
         if let Some(action) = self.history.pop_mut() {
             if let Some(pos) = action.ok() {
-                self.board.unset_mut(pos);
+                return self.board.unset_mut(pos)
             } else {
                 self.board.unpass_mut();
             }
         }
+
+        MoveArtifact::empty()
     }
 
     pub fn len(&self) -> usize {

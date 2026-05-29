@@ -26,7 +26,7 @@ pub extern "C" fn rusty_renju_forbidden_kind_double_three() -> u8 { rusty_renju:
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_forbidden_kind_double_four() -> u8 { rusty_renju::notation::rule::ForbiddenKind::DoubleFour as u8 }
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_forbidden_kind_double_overline() -> u8 { rusty_renju::notation::rule::ForbiddenKind::Overline as u8 }
+pub extern "C" fn rusty_renju_forbidden_kind_overline() -> u8 { rusty_renju::notation::rule::ForbiddenKind::Overline as u8 }
 
 pub const MAYBE_POS_NONE: u8 = rusty_renju::notation::pos::MaybePos::INVALID_POS.idx();
 
@@ -49,13 +49,9 @@ pub extern "C" fn rusty_renju_closed_four_mask() -> u32 { rusty_renju::pattern::
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_open_four_mask() -> u32 { rusty_renju::pattern::UNIT_OPEN_FOUR_MASK }
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_five_mask() -> u32 { rusty_renju::pattern::UNIT_FIVE_MASK }
-#[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_open_three_mask() -> u32 { rusty_renju::pattern::UNIT_OPEN_THREE_MASK }
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_close_three_mask() -> u32 { rusty_renju::pattern::UNIT_CLOSE_THREE_MASK }
-#[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_potential_mask() -> u32 { rusty_renju::pattern::UNIT_POTENTIAL_MASK }
 
 #[repr(C)]
 pub struct BoardExportItem {

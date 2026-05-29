@@ -75,11 +75,11 @@ pub struct TimeManager {
 }
 
 impl TimeManager {
-    pub fn new(timer: Timer) -> Self {
+    pub fn new(timer: Timer, dynamic_time: bool) -> Self {
         Self {
             timer,
             time_history: Vec::new(),
-            dynamic_time: false,
+            dynamic_time,
         }
     }
 

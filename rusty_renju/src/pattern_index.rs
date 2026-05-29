@@ -8,6 +8,7 @@ use crate::utils::empty::Empty;
 use std::simd::cmp::SimdPartialEq;
 use std::simd::{u8x16, Simd};
 use crate::notation::pos;
+use crate::notation::rule::RuleKind;
 
 #[derive(Debug, Copy, Clone)]
 #[repr(align(32))]
@@ -58,11 +59,6 @@ impl PatternIndex {
     }
 
     #[inline(always)]
-    pub fn slice_bitmap<const D: Direction>(&self, slice_idx: u8) -> SliceBitmap {
-        self.slice_bitmap[Self::local_slice_idx::<D>(slice_idx as usize)]
-    }
-
-    #[inline(always)]
     pub fn replace_slice_bitmap<const D: Direction>(
         &mut self,
         slice_idx: u8,
@@ -75,7 +71,7 @@ impl PatternIndex {
     }
 
     #[inline(always)]
-    pub fn update_slice_bitfields<const C: Color, const D: Direction>(
+    pub fn update_slice_bitfields<const R: RuleKind, const C: Color, const D: Direction>(
         &mut self,
         pattern_field: &[Pattern; pattern::PATTERN_SIZE],
         start_idx: usize,
@@ -86,38 +82,81 @@ impl PatternIndex {
             return;
         }
 
-        Self::update_slice_bitfield::<D>(
-            pattern_field, &mut self.open_threes, start_idx,
-            old_bitmap.open_threes, new_bitmap.open_threes,
-            Pattern::has_open_three,
+        macro_rules! update_slice_bitfield {
+            ($bitfield:expr,$old_bitmask:expr,$new_bitmask:expr,$is_present:ident) => {{
+                if $old_bitmask != $new_bitmask {
+                    let mut added = $new_bitmask & !$old_bitmask;
+                    while added != 0 {
+                        let slice_idx = added.trailing_zeros() as usize;
+                        added &= added - 1;
+
+                        $bitfield.set_idx(step_idx!(D, start_idx, slice_idx));
+                    }
+
+                    let mut removed = $old_bitmask & !$new_bitmask;
+                    while removed != 0 {
+                        let slice_idx = removed.trailing_zeros() as usize;
+                        removed &= removed - 1;
+
+                        let idx = step_idx!(D, start_idx, slice_idx);
+
+                        if !pattern_field[idx].$is_present() {
+                            $bitfield.unset_idx(idx);
+                        }
+                    }
+                }
+            }};
+        }
+
+        update_slice_bitfield!(
+            self.open_threes,
+            old_bitmap.open_threes,
+            new_bitmap.open_threes,
+            has_open_three
         );
 
-        Self::update_slice_bitfield::<D>(
-            pattern_field, &mut self.close_threes, start_idx,
-            old_bitmap.close_threes, new_bitmap.close_threes,
-            Pattern::has_close_three,
+        update_slice_bitfield!(
+            self.close_threes,
+            old_bitmap.close_threes,
+            new_bitmap.close_threes,
+            has_close_three
         );
 
-        Self::update_slice_bitfield::<D>(
-            pattern_field, &mut self.closed_fours, start_idx,
-            old_bitmap.closed_fours, new_bitmap.closed_fours,
-            Pattern::has_closed_four,
+        update_slice_bitfield!(
+            self.closed_fours,
+            old_bitmap.closed_fours,
+            new_bitmap.closed_fours,
+            has_closed_four
         );
 
-        if C == Color::Black {
-            Self::update_slice_bitfield::<D>(
-                pattern_field, &mut self.fork_fours, start_idx,
-                old_bitmap.open_fours, new_bitmap.open_fours,
-                Pattern::has_open_four,
+        if C == Color::White {
+            update_slice_bitfield!(
+                self.fork_fours,
+                old_bitmap.open_fours,
+                new_bitmap.open_fours,
+                has_open_four
             );
         } else {
-            self.update_fork_four_slice_bitfield::<C, D>(
-                pattern_field,
-                start_idx,
-                (old_bitmap.open_fours ^ new_bitmap.open_fours)
-                    | old_bitmap.closed_fours
-                    | new_bitmap.closed_fours,
-            );
+            let mut changed_bitmask = (old_bitmap.open_fours ^ new_bitmap.open_fours)
+                | old_bitmap.closed_fours
+                | new_bitmap.closed_fours;
+
+            while changed_bitmask != 0 {
+                let slice_idx = changed_bitmask.trailing_zeros() as usize;
+                changed_bitmask &= changed_bitmask - 1;
+
+                let idx = step_idx!(D, start_idx, slice_idx);
+                
+                let is_fork_four = match (R, C) {
+                    (RuleKind::Renju, Color::Black) => pattern_field[idx].has_open_four(),
+                    _ => pattern_field[idx].has_any_fours(),
+                };
+
+                self.fork_fours.set_bit_idx(
+                    idx,
+                    is_fork_four,
+                );
+            }
         }
     }
 
@@ -130,74 +169,18 @@ impl PatternIndex {
             Direction::Descending => pos::U_BOARD_WIDTH * 2 + slice::DIAGONAL_SLICE_AMOUNT,
         }) + slice_idx
     }
-
-    #[inline(always)]
-    fn update_slice_bitfield<const D: Direction>(
-        pattern_field: &[Pattern; pattern::PATTERN_SIZE],
-        bitfield: &mut Bitfield,
-        start_idx: usize,
-        old_bitmask: u16,
-        new_bitmask: u16,
-        is_present: impl Fn(&Pattern) -> bool,
-    ) {
-        if old_bitmask == new_bitmask {
-            return;
-        }
-
-        let mut added = new_bitmask & !old_bitmask;
-        while added != 0 {
-            let slice_idx = added.trailing_zeros() as usize;
-            added &= added - 1;
-
-            bitfield.set_idx(step_idx!(D, start_idx, slice_idx));
-        }
-
-        let mut removed = old_bitmask & !new_bitmask;
-        while removed != 0 {
-            let slice_idx = removed.trailing_zeros() as usize;
-            removed &= removed - 1;
-
-            let idx = step_idx!(D, start_idx, slice_idx);
-
-            if !is_present(&pattern_field[idx]) {
-                bitfield.unset_idx(idx);
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn update_fork_four_slice_bitfield<const C: Color, const D: Direction>(
-        &mut self,
-        field: &[Pattern; pattern::PATTERN_SIZE],
-        start_idx: usize,
-        mut changed_bitmask: u16,
-    ) {
-        while changed_bitmask != 0 {
-            let slice_idx = changed_bitmask.trailing_zeros() as usize;
-            changed_bitmask &= changed_bitmask - 1;
-
-            let idx = step_idx!(D, start_idx, slice_idx);
-
-            let is_fork_four = if C == Color::Black {
-                field[idx].has_open_four()
-            } else {
-                let closed_fours = field[idx].apply_mask(pattern::UNIT_CLOSED_FOUR_MASK);
-
-                field[idx].has_open_four()
-                    || (closed_fours != 0 && (closed_fours & (closed_fours - 1)) != 0)
-            };
-
-            self.fork_fours.set_bit_idx(
-                idx,
-                is_fork_four,
-            );
-        }
-    }
 }
 
 #[inline(always)]
 pub fn pattern_bitmaps_from_patterns(slice_pattern: [u8; 16]) -> (u16, SliceBitmap) {
     let slice_pattern = Simd::<u8, 16>::from(slice_pattern);
+
+    #[inline(always)]
+    fn pattern_bitmask(patterns: u8x16, mask: u8) -> u16 {
+        (patterns & Simd::splat(mask))
+            .simd_ne(Simd::splat(0))
+            .to_bitmask() as u16
+    }
 
     let slice_bitmap = SliceBitmap {
         open_threes: pattern_bitmask(slice_pattern, pattern::OPEN_THREE),
@@ -211,11 +194,4 @@ pub fn pattern_bitmaps_from_patterns(slice_pattern: [u8; 16]) -> (u16, SliceBitm
         .to_bitmask() as u16;
 
     (slice_pattern_bitmap, slice_bitmap)
-}
-
-#[inline(always)]
-fn pattern_bitmask(patterns: u8x16, mask: u8) -> u16 {
-    (patterns & Simd::splat(mask))
-        .simd_ne(Simd::splat(0))
-        .to_bitmask() as u16
 }

@@ -3,7 +3,6 @@ use crate::notation::rule::RuleKind;
 use crate::slice::Slice;
 use crate::slice_pattern::ExtendedMatch::{Left, Right};
 use crate::{assert_struct_sizes, const_for, pattern};
-use crate::utils::empty::Empty;
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 #[repr(transparent)]
@@ -11,26 +10,15 @@ pub struct SlicePattern {
     pub patterns: u128
 }
 
-impl Empty for SlicePattern {
-
-    fn empty() -> Self {
-        Self::EMPTY
-    }
-
-}
-
 impl SlicePattern {
-
     pub const EMPTY: Self = Self { patterns: 0 };
 
     pub fn is_empty(&self) -> bool {
         self.patterns == 0
     }
-
 }
 
 impl Slice {
-
     #[inline(always)]
     pub fn calculate_slice_pattern<const R: RuleKind, const C: Color>(&self) -> SlicePattern {
         // padding = 3
@@ -52,7 +40,6 @@ impl Slice {
 
         acc
     }
-
 }
 
 #[inline(always)]
@@ -121,6 +108,12 @@ fn increase_closed_four(mut copied: u128, clear_mask: u128, mask: u128) -> u128 
     copied                               // 0 0 0 | 1 0 0 | 1 1 0
 }
 
+pub fn five_in_a_row_idx(stones: u16) -> Option<u32> {
+    let five = calculate_five_in_a_rows(stones);
+
+    (five != 0).then_some(five.trailing_zeros())
+}
+
 fn calculate_five_in_a_rows(stones: u16) -> u16 {
     stones
         & (stones >> 1)
@@ -129,50 +122,31 @@ fn calculate_five_in_a_rows(stones: u16) -> u16 {
         & (stones >> 4)
 }
 
-#[inline(always)]
-pub fn match_five_position(stones: u16, blocks: u16) -> Option<u16> {
-    let pair = stones & (stones >> 1);
-    let trio = pair & (stones >> 2);
-    let quad = pair & (pair >> 2);
-
-    let matches = (quad >> 1)         // .OOOO
-        | (quad << 4)                      // OOOO.
-        | ((stones & (trio >> 2)) << 1)    // O.OOO
-        | ((pair & (pair >> 3)) << 2)      // OO.OO
-        | ((trio & (stones >> 4)) << 3);   // OOO.O
-
-    let matches = matches & !(stones | blocks);
-
-    (matches != 0).then_some(matches)
-}
-
-#[inline(always)]
-pub fn match_overline_position(stones: u16, blocks: u16) -> Option<u16> {
-    let pair = stones & (stones >> 1);
-    let trio = pair & (stones >> 2);
-    let quad = pair & (pair >> 2);
-    let penta = quad & (stones >> 4);
-
-    let matches = (penta >> 1)        // .OOOOO
-        | (penta << 5)                     // OOOOO.
-        | ((stones & (quad >> 2)) << 1)    // O.OOOO
-        | ((pair & (trio >> 3)) << 2)      // OO.OOO
-        | ((trio & (pair >> 4)) << 3)      // OOO.OO
-        | ((quad & (stones >> 5)) << 4);   // OOOO.O
-
-    let matches = matches & !(stones | blocks);
-
-    (matches != 0).then_some(matches)
-}
-
 pub fn contains_five_in_a_row(stones: u16) -> bool {
     calculate_five_in_a_rows(stones) != 0
 }
 
-pub fn five_in_a_row_idx(stones: u16) -> Option<u32> {
-    let five = calculate_five_in_a_rows(stones);
+#[inline(always)]
+pub fn match_overline_positions(stones: u16, blocks: u16) -> u16 {
+    let two = stones & (stones >> 1);
+    let three = two & (stones >> 2);
+    let four = two & (two >> 2);
 
-    (five != 0).then_some(five.trailing_zeros())
+    let matches = ((stones & (four >> 2)) << 1)    // O.OOOO
+        | ((two & (three >> 3)) << 2)                   // OO.OOO
+        | ((three & (two >> 4)) << 3)                   // OOO.OO
+        | ((four & (stones >> 5)) << 4);                // OOOO.O
+
+    matches & !(stones | blocks)
+}
+
+pub fn contains_overline(stones: u16) -> bool {
+    (stones
+        & (stones >> 1)
+        & (stones >> 2)
+        & (stones >> 3)
+        & (stones >> 4)
+        & (stones >> 5)) != 0
 }
 
 const VECTOR_MATCH_LUT_SIZE: usize = u16::MAX as usize + 1;
@@ -251,8 +225,8 @@ impl SlicePatchData {
 
 }
 
-const BLACK_LUT_SIZE: usize = 97;
-const WHITE_LUT_SIZE: usize = 92;
+const BLACK_LUT_SIZE: usize = 94;
+const WHITE_LUT_SIZE: usize = 94;
 
 #[repr(align(32))]
 struct PatchLut {
@@ -263,8 +237,8 @@ struct PatchLut {
 struct SlicePatternLut {
     vector: VectorMatchLut,
     patch: PatchLut,
-    _dbg_black_length: usize,
-    _dbg_white_length: usize,
+    _dbg_black_lut_length: usize,
+    _dbg_white_lut_length: usize,
 }
 
 static SLICE_PATTERN_LUT: SlicePatternLut = build_slice_pattern_lut();
@@ -288,8 +262,8 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
                 black: [initial_patch_data; BLACK_LUT_SIZE],
                 white: [initial_patch_data; WHITE_LUT_SIZE],
             },
-            _dbg_black_length: 0,
-            _dbg_white_length: 0,
+            _dbg_black_lut_length: 0,
+            _dbg_white_lut_length: 0,
         }
     };
 
@@ -340,18 +314,19 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
         }};
     }
 
-    // potential
+    // potential-three
 
-    embed_pattern!(both, symmetry, "!O...O!", "!OP..O!", "!O.P.O!", "!O..PO!");
+    embed_pattern!(both, symmetry, "!O...O!", "!OE..O!", "!O.E.O!", "!O..EO!");
+    embed_pattern!(both, asymmetry, "!..O....", "!.TO....", "!..OT...", "!..O.T..", "!..O..T.");
+    embed_pattern!(both, asymmetry, "XO..O...", "XO..O.T.");
+    embed_pattern!(both, asymmetry, "X.O....!", "X.OT...!", "X.O.T..!", "X.O..T.!");
 
-    embed_pattern!(both, asymmetry, "!..O...", "!.PO...", "!..OP..", "!..O.P.");
-    embed_pattern!(both, asymmetry, "XO..O...", "XO..O.P.");
-    embed_pattern!(both, asymmetry, "X.O....!", "X.OP...!", "X.O.P..!");
-    embed_pattern!(both, asymmetry, "X.O....!", "X.O..P..");
+    // potential-closed-four
 
-    embed_pattern!(both, asymmetry, "XOO...!", "XOOP..!", "XOO.P.!", "XOO..P!");
-    embed_pattern!(both, asymmetry, "XO.O..!", "XOPO..!", "XO.OP.!", "XO.O.P!");
-    embed_pattern!(both, asymmetry, "XO..O.!", "XOP.O.!", "XO.PO.!", "XO..OP!");
+    embed_pattern!(both, asymmetry, "XOO...!", "XOOE..!", "XOO.E.!", "XOO..E!");
+    embed_pattern!(both, asymmetry, "XO.O..!", "XOEO..!", "XO.OE.!", "XO.O.E!");
+    embed_pattern!(both, asymmetry, "XO..O.!", "XOE.O.!", "XO.EO.!", "XO..OE!");
+    embed_pattern!(both, asymmetry, "XO...O!", "XOE..O!", "XO.E.O!", "XO..EO!");
 
     // black-open-three
 
@@ -429,19 +404,14 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
     embed_pattern!(white, asymmetry, "OOO.O", "OOO5O");
     embed_pattern!(white, asymmetry, "OOOO.", "OOOO5");
 
-    // black-overline
-
-    embed_pattern!(black, asymmetry, "O.OOOO", "O6OOOO");
-    embed_pattern!(black, asymmetry, "OO.OOO", "OO6OOO");
-
-    slice_pattern_lut._dbg_black_length = compress_pattern_lut(
+    slice_pattern_lut._dbg_black_lut_length = compress_pattern_lut(
         temp_vector_match_lut_black,
         &mut slice_pattern_lut.vector.black,
         &mut slice_pattern_lut.patch.black,
         patch_top_black
     );
 
-    slice_pattern_lut._dbg_white_length = compress_pattern_lut(
+    slice_pattern_lut._dbg_white_lut_length = compress_pattern_lut(
         temp_vector_match_lut_white,
         &mut slice_pattern_lut.vector.white,
         &mut slice_pattern_lut.patch.white,
@@ -520,7 +490,7 @@ const fn compress_pattern_lut<const N: usize>(
         };
     });
 
-    patch_top
+    patch_top + 1
 }
 
 
@@ -576,23 +546,33 @@ const fn parse_vector_variant_literal(source: &str, reversed: bool) -> VectorVar
     acc
 }
 
-// potential three T
-// potential four F
-// potential extensive E
 const fn parse_patch_literal(source: &str, reversed: bool) -> (usize, u8) {
     const_for!(idx in 0, source.len(); {
         let pos = if reversed { 7 - idx } else { idx };
         match source.as_bytes()[idx] as char {
-            'P' => return (pos, pattern::POTENTIAL),
+            'T' => return (pos, pattern::POTENTIAL_THREE),
+            'E' => return (pos, pattern::POTENTIAL_FOUR),
             '3' => return (pos, pattern::OPEN_THREE),
             'C' => return (pos, pattern::CLOSE_THREE),
             '4' => return (pos, pattern::OPEN_FOUR),
             'F' => return (pos, pattern::CLOSED_FOUR_SINGLE),
             '5' => return (pos, pattern::FIVE),
-            '6' => return (pos, pattern::OVERLINE),
             _ => {}
         }
     });
 
     unreachable!()
+}
+
+#[cfg(test)]
+mod dbg_lut_length {
+    use super::*;
+
+    #[test]
+    fn test_dbg_lut_length() {
+        let slice_pattern_lut = build_slice_pattern_lut();
+
+        assert_eq!(slice_pattern_lut._dbg_black_lut_length, BLACK_LUT_SIZE);
+        assert_eq!(slice_pattern_lut._dbg_white_lut_length, WHITE_LUT_SIZE);
+    }
 }
