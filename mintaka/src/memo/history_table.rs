@@ -24,19 +24,16 @@ pub struct HistoryTable {
 
 impl Empty for HistoryTable {
     fn empty() -> Self {
-        Self::EMPTY
+        Self {
+            quiet: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
+            three: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
+            four: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
+            counter: ColorContainer::new([MaybePos::NONE; pos::BOARD_SIZE], [MaybePos::NONE; pos::BOARD_SIZE]),
+        }
     }
 }
 
 impl HistoryTable {
-
-    pub const EMPTY: Self = Self {
-        quiet: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
-        three: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
-        four: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
-        counter: ColorContainer::new([MaybePos::NONE; pos::BOARD_SIZE], [MaybePos::NONE; pos::BOARD_SIZE]),
-    };
-
     pub fn update_quiet(&mut self, history: &History, quiet_plied: QuietPlied, color: Color, best_move: Pos, depth: Depth) {
         let bonus = depth * depth * params::HT_QUIET_BONUS_MUL;
 
@@ -70,9 +67,9 @@ impl HistoryTable {
     }
 
     pub fn increase_age(&mut self) {
-        for score in self.quiet.iter_mut().flatten()
-            .chain(self.three.iter_mut().flatten())
-            .chain(self.four.iter_mut().flatten())
+        for score in self.quiet.0.iter_mut().flatten()
+            .chain(self.three.0.iter_mut().flatten())
+            .chain(self.four.0.iter_mut().flatten())
         {
             *score = (*score as f64 * params::HT_AGEING_MUL) as i16;
         }
@@ -93,7 +90,6 @@ impl HistoryTable {
             -1
         }
     }
-
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

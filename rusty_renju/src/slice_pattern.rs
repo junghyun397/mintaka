@@ -3,6 +3,8 @@ use crate::notation::rule::RuleKind;
 use crate::slice::Slice;
 use crate::slice_pattern::ExtendedMatch::{Left, Right};
 use crate::{assert_struct_sizes, const_for, pattern};
+use std::simd::cmp::SimdPartialEq;
+use std::simd::Simd;
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 #[repr(transparent)]
@@ -15,6 +17,23 @@ impl SlicePattern {
 
     pub fn is_empty(&self) -> bool {
         self.patterns == 0
+    }
+    
+    #[inline(always)]
+    pub fn pattern_bitmap(&self) -> u16 {
+        Simd::<u8, 16>::from(self.patterns.to_le_bytes())
+            .simd_ne(Simd::splat(0))
+            .to_bitmask() as u16
+    }
+
+    #[inline(always)]
+    pub fn changed_pattern_bitmap(&self, other: Self) -> u16 {
+        let old_patterns = Simd::<u8, 16>::from(self.patterns.to_le_bytes());
+        let new_patterns = Simd::<u8, 16>::from(other.patterns.to_le_bytes());
+
+        old_patterns
+            .simd_ne(new_patterns)
+            .to_bitmask() as u16
     }
 }
 

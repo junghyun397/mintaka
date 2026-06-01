@@ -1,6 +1,6 @@
 use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucket, TTFlag};
 use crate::value::{Depth, Depths};
-use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
+use rusty_renju::memo::abstract_transposition_table::{AbstractTTEntry, AbstractTranspositionTable};
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::{Score, Scores};
@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize, Serializer};
 #[cfg(feature = "compress-tt")]
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Duration;
 
 #[cfg(feature = "compress-tt")]
 fn tt_compress(bytes: &[u8], compression_level: u32) -> Vec<u8> {
@@ -91,6 +92,25 @@ impl TranspositionTable {
             table: &self.table,
             age: self.fetch_age(),
         }
+    }
+
+    pub fn optimal_size(nps: usize, expected_runtime: Duration) -> ByteSize {
+        const FILL_FACTOR: f64 = 0.75;
+        const ENTRY_SIZE: f64 = size_of::<TTEntryBucket>() as f64 * TTEntryBucket::BUCKET_SIZE as f64;
+
+        let total_nodes = nps as f64 * expected_runtime.as_secs() as f64;
+        ByteSize::from_bytes((total_nodes / ENTRY_SIZE * FILL_FACTOR) as u64)
+    }
+
+    pub fn hash_full_permille(&self) -> usize {
+        const SAMPLE: usize = 1000;
+
+        let used: usize = self.table.iter()
+            .take(SAMPLE)
+            .map(|entry| entry.usage(self.age.load(Ordering::Relaxed) as u8))
+            .sum();
+
+        used * 1000 / SAMPLE * TTEntryBucket::BUCKET_SIZE as usize
     }
 
     // compression level: 0-9

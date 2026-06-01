@@ -3,7 +3,7 @@ use crate::notation::color::{AlignedColorContainer, Color, ColorContainer};
 use crate::notation::direction::{Direction, DirectionContainer};
 use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::{ForbiddenKind, RuleKind};
-use crate::pattern_index::{pattern_bitmaps_from_patterns, PatternIndex, SliceBitmap};
+use crate::pattern_index::PatternIndex;
 use crate::slice::Slice;
 use crate::slice_pattern::SlicePattern;
 use crate::utils::empty::Empty;
@@ -236,22 +236,24 @@ impl Patterns {
     pub fn clear_pattern_with_slice<const R: RuleKind, const C: Color, const D: Direction>(&mut self, slice: &mut Slice) -> u16 {
         let start_idx = slice.start_pos.idx_usize();
 
-        let cleand_bitmask = slice.pattern_bitmap[C];
+        let old_bitmap = self.indexes[C]
+            .replace_slice_bitmap::<D>(slice.idx, SlicePattern::EMPTY);
+        let changed_bitmask = old_bitmap.changed_pattern_bitmap(SlicePattern::EMPTY);
 
-        let mut clear_mask = cleand_bitmask;
+        let mut clear_mask = changed_bitmask;
         while clear_mask != 0 {
             let slice_idx = clear_mask.trailing_zeros() as usize;
             clear_mask &= clear_mask - 1;
 
-            self.field[C][step_idx!(D, start_idx, slice_idx)].0[D] = 0;
+            let board_idx = step_idx!(D, start_idx, slice_idx);
+
+            self.field[C][board_idx].0[D] = 0;
         }
 
-        let old_bitmap = self.indexes[C]
-            .replace_slice_bitmap::<D>(slice.idx, SliceBitmap::empty());
         self.indexes[C]
-            .update_slice_bitfields::<R, C, D>(&self.field[C], start_idx, old_bitmap, SliceBitmap::empty());
+            .update_slice_bitfields::<R, C, D>(&self.field[C], start_idx, old_bitmap, SlicePattern::EMPTY);
 
-        cleand_bitmask
+        changed_bitmask
     }
 
     #[inline(always)]
@@ -265,14 +267,15 @@ impl Patterns {
             self.unchecked_five_pos[C] = pos.into();
         }
 
-        let start_idx = slice.start_pos.idx_usize();
+        slice.pattern_bitmap[C] = slice_pattern.pattern_bitmap();
+        let old_slice_bitmap = self.indexes[C]
+            .replace_slice_bitmap::<D>(slice.idx, slice_pattern);
 
         let slice_patterns = slice_pattern.patterns.to_le_bytes();
-        let (new_pattern_bitmap, new_slice_bitmap) = pattern_bitmaps_from_patterns(slice_patterns);
-        let old_pattern_bitmap = std::mem::replace(&mut slice.pattern_bitmap[C], new_pattern_bitmap);
 
-        let changed_bitmask = new_pattern_bitmap | old_pattern_bitmap;
+        let changed_bitmask = old_slice_bitmap.changed_pattern_bitmap(slice_pattern);
 
+        let start_idx = slice.start_pos.idx_usize();
         let mut update_bitmask = changed_bitmask;
         while update_bitmask != 0 {
             let slice_idx = update_bitmask.trailing_zeros() as usize;
@@ -289,10 +292,8 @@ impl Patterns {
             }
         }
 
-        let old_slice_bitmap = self.indexes[C]
-            .replace_slice_bitmap::<D>(slice.idx, new_slice_bitmap);
         self.indexes[C]
-            .update_slice_bitfields::<R, C, D>(&self.field[C], start_idx, old_slice_bitmap, new_slice_bitmap);
+            .update_slice_bitfields::<R, C, D>(&self.field[C], start_idx, old_slice_bitmap, slice_pattern);
 
         changed_bitmask
     }

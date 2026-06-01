@@ -2,6 +2,7 @@ import argparse
 import random
 import shlex
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -99,6 +100,10 @@ def game_prefix(config, game_no) -> str:
 
 def turn_prefix(turn_no, player, color) -> str:
     return f"[#{turn_no}:{player}:{color}] "
+
+
+def opening_for(openings: list[Opening], game_no: int) -> Opening | None:
+    return openings[game_no % len(openings)] if len(openings) != 0 else None
 
 
 def spawn_process(path, params, time_manager: TimeManager, opening: Opening | None) -> subprocess.Popen:
@@ -232,11 +237,11 @@ def play_game(config, game_no: int, opening: Opening | None) -> GameResult:
 
 
 def main():
-    random.seed(42)
-
-    default_total_increment_turn = [300_000, 0, 30_000]
+    default_total_increment_turn = [180_000, 0, 30_000]
 
     parser = argparse.ArgumentParser()
+
+    parser.add_argument("--seed", type=int, default=42)
 
     parser.add_argument("--a-path", type=str, required=True)
     parser.add_argument("--a-params", type=str, default="")
@@ -245,6 +250,7 @@ def main():
     parser.add_argument("--b-params", type=str, default="")
 
     parser.add_argument("--num-games", type=int, default=100)
+    parser.add_argument("--concurrency", type=int, default=1)
 
     parser.add_argument("--a-time", type=int, nargs=3, default=default_total_increment_turn,
                         help="total(ms) increment(ms) turn(ms)")
@@ -264,6 +270,8 @@ def main():
     parser.add_argument("--log-prefix-filter", type=str, nargs="*", default=["solution"])
 
     config = Config(parser.parse_args())
+
+    random.seed(config.args.seed)
 
     openings = []
     if config.args.openings_file is not None:
@@ -290,34 +298,45 @@ def main():
 
     draws = 0
 
-    for game_no in range(config.args.num_games):
-        result = play_game(config, game_no, openings[game_no % len(openings)] if len(openings) != 0 else None)
+    completed_games = 0
 
-        elo_delta = calculate_elo_delta(
-            elo[Player.A], elo[Player.B],
-            result.win_zero_to_one(Player.A), config.args.elo_k_factor
-        )
+    with ThreadPoolExecutor(max_workers=max(1, config.args.concurrency)) as executor:
+        futures = {
+            executor.submit(play_game, config, game_no, opening_for(openings, game_no)): game_no
+            for game_no in range(config.args.num_games)
+        }
 
-        elo[Player.A] += elo_delta
-        elo[Player.B] -= elo_delta
+        for future in as_completed(futures):
+            game_no = futures[future]
+            result = future.result()
+            completed_games += 1
 
-        wins[Player.A] += int(round(result.win_zero_to_one(Player.A)))
-        wins[Player.B] += int(round(result.win_zero_to_one(Player.B)))
+            elo_delta = calculate_elo_delta(
+                elo[Player.A], elo[Player.B],
+                result.win_zero_to_one(Player.A), config.args.elo_k_factor
+            )
 
-        draws = game_no + 1 - wins[Player.A] - wins[Player.B]
+            elo[Player.A] += elo_delta
+            elo[Player.B] -= elo_delta
 
-        wins[Color.BLACK] += 1 if result.winner == Color.BLACK else 0
-        wins[Color.WHITE] = game_no + 1 - wins[Color.BLACK] - draws
+            wins[Player.A] += int(round(result.win_zero_to_one(Player.A)))
+            wins[Player.B] += int(round(result.win_zero_to_one(Player.B)))
 
-        prefix = f"{datetime_prefix(config)}{game_prefix(config, game_no)}"
+            draws = completed_games - wins[Player.A] - wins[Player.B]
 
-        if not config.args.concise:
-            print(f"{prefix}Game State:\n{result.board_str}")
-            print(f"{prefix}Game History: {result.history}")
+            wins[Color.BLACK] += 1 if result.winner == Color.BLACK else 0
+            wins[Color.WHITE] = completed_games - wins[Color.BLACK] - draws
 
-        print(f"{prefix}Game Finished: a={result.color[Player.A]}, b={result.color[Player.B]}, win={result.winner}, "
-              f"abd={wins[Player.A]}-{wins[Player.B]}-{draws}, bwd={wins[Color.BLACK]}-{wins[Color.WHITE]}-{draws}")
-        print(f"{prefix}ELO Updated: a{elo_delta:+}, b{-elo_delta:+}, a={elo[Player.A]}, b={elo[Player.B]}")
+            prefix = f"{datetime_prefix(config)}{game_prefix(config, game_no)}"
+
+            if not config.args.concise:
+                print(f"{prefix}Game State:\n{result.board_str}")
+                print(f"{prefix}Game History: {result.history}")
+
+            print(f"{prefix}Game Finished: a={result.color[Player.A]}, b={result.color[Player.B]}, "
+                  f"win={result.winner}, abd={wins[Player.A]}-{wins[Player.B]}-{draws}, "
+                  f"bwd={wins[Color.BLACK]}-{wins[Color.WHITE]}-{draws}")
+            print(f"{prefix}ELO Updated: a{elo_delta:+}, b{-elo_delta:+}, a={elo[Player.A]}, b={elo[Player.B]}")
 
     print(
         f"{datetime_prefix(config)}Arena Finished: a-elo={elo[Player.A]}, b-elo={elo[Player.B]}, "

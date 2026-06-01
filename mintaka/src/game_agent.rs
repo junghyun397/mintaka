@@ -108,7 +108,7 @@ impl GameAgent {
             state,
             evaluator: ActiveEvaluator::from_state(&state),
             tt,
-            ht: HistoryTable::EMPTY,
+            ht: HistoryTable::empty(),
             executed_moves: Bitfield::empty(),
             time_manager: TimeManager::new(config.initial_timer, config.dynamic_time),
         }

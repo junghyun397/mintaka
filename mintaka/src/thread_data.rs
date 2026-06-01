@@ -18,6 +18,7 @@ pub const KILLER_MOVE_SLOTS: usize = 2;
 #[derive(Debug, Copy, Clone)]
 pub struct SearchFrame {
     pub pos: MaybePos,
+    pub evaluator_eval: Score,
     pub static_eval: Score,
     pub on_pv: bool,
     pub recovery_state: RecoveryState,
@@ -27,6 +28,7 @@ pub struct SearchFrame {
 impl SearchFrame {
     pub const EMPTY: Self = Self {
         pos: MaybePos::NONE,
+        evaluator_eval: Score::DRAW,
         static_eval: Score::DRAW,
         on_pv: false,
         recovery_state: RecoveryState::EMPTY,

@@ -3,23 +3,23 @@ use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::score::Score;
 use rusty_renju::utils::platform;
-use rusty_renju::{cartesian_to_index, const_for, const_max, const_min};
+use rusty_renju::{cartesian_to_index, const_for, const_max, const_min, pattern};
 use std::simd::Simd;
 use std::slice;
 
 #[derive(Debug, Copy, Clone)]
 #[repr(align(32))]
-pub struct MoveScores {
-    pub scores: [u8; 256],
+pub struct NeighborScores {
+    pub scores: [u8; pattern::PATTERN_SIZE],
 }
 
-impl Default for MoveScores {
+impl Default for NeighborScores {
     fn default() -> Self {
         Self::EMPTY
     }
 }
 
-impl From<&Bitfield> for MoveScores {
+impl From<&Bitfield> for NeighborScores {
     fn from(value: &Bitfield) -> Self {
         let mut acc = Self::default();
 
@@ -31,9 +31,9 @@ impl From<&Bitfield> for MoveScores {
     }
 }
 
-impl MoveScores {
+impl NeighborScores {
 
-    pub const EMPTY: MoveScores = MoveScores {
+    pub const EMPTY: NeighborScores = NeighborScores {
         scores: [0; 256],
     };
 

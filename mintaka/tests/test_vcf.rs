@@ -12,6 +12,7 @@ mod test_vcf {
     use rusty_renju::board;
     use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use rusty_renju::notation::pos::{pos_unchecked, MaybePos, Pos};
+    use rusty_renju::utils::empty::Empty;
     use rusty_renju::notation::rule::RuleKind;
     use rusty_renju::utils::byte_size::ByteSize;
     use std::sync::atomic::{AtomicBool, AtomicU32};
@@ -25,7 +26,7 @@ mod test_vcf {
             let evaluator = ActiveEvaluator::from_state(&state);
 
             let tt = TranspositionTable::new_with_size(ByteSize::from_kib(32));
-            let ht = HistoryTable::EMPTY;
+            let ht = HistoryTable::empty();
 
             let global_counter_in_1k = AtomicU32::new(0);
             let aborted = AtomicBool::new(false);

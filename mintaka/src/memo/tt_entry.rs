@@ -33,8 +33,6 @@ impl From<ScoreKind> for i32 {
 pub struct TTFlag(u8);
 
 impl TTFlag {
-    const DEFAULT: Self = Self(0);
-
     pub const TT_ENDGAME_WIN_DEPTH: u8 = 0b11111;
     pub const MAX_TT_ENDGAME_DEPTH: u8 = 0b11110;
     const TT_ENDGAME_WIN_MASK: u8 = Self::TT_ENDGAME_WIN_DEPTH << 3;
@@ -119,17 +117,6 @@ impl From<u64> for TTEntry {
     }
 }
 
-impl TTEntry {
-    pub const EMPTY: Self = Self {
-        best_move: MaybePos::NONE,
-        tt_flag: TTFlag::DEFAULT,
-        age: 0,
-        depth: 0,
-        eval: 0,
-        score: 0,
-    };
-}
-
 #[derive(Debug)]
 #[repr(align(64))]
 pub struct TTEntryBucket {
@@ -180,7 +167,7 @@ impl TTEntryBucket {
         KEY_SIZE * (slot_idx % 3)
     }
 
-    pub(crate) fn probe(&self, key: HashKey) -> Option<TTEntry> {
+    pub fn probe(&self, key: HashKey) -> Option<TTEntry> {
         let packed_key = Self::pack_hash_key(key);
 
         let slot_idx = Self::calculate_slot_index(packed_key);
@@ -205,7 +192,7 @@ impl TTEntryBucket {
             .ok();
     }
 
-    pub(crate) fn store(&self, key: HashKey, entry: TTEntry) {
+    pub fn store(&self, key: HashKey, entry: TTEntry) {
         let entry: u64 = entry.into();
         let packed_key = Self::pack_hash_key(key);
 
@@ -213,5 +200,16 @@ impl TTEntryBucket {
 
         self.store_key(slot_idx, packed_key ^ Self::shuffle_pack_entry(entry));
         self.entries[slot_idx].store(entry, Ordering::Relaxed);
+    }
+
+    pub fn usage(&self, age: u8) -> usize {
+        self.entries
+            .iter()
+            .map(|entry| {
+                let entry = entry.load(Ordering::Relaxed);
+
+                (entry != 0 && TTEntry::from(entry).age == age) as usize
+            })
+            .sum()
     }
 }

@@ -26,6 +26,10 @@ pub struct NnueEvaluator {
 impl Evaluator for NnueEvaluator {
     type EvaluatorParameter = NnueNetworkParams;
 
+    fn require_stabilize(&self) -> bool {
+        false
+    }
+
     fn from_state(state: &GameState) -> Self {
         todo!()
     }

@@ -15,6 +15,8 @@ pub type PolicyDistribution = [i16; pattern::PATTERN_SIZE];
 pub trait Evaluator {
     type EvaluatorParameter;
 
+    fn require_stabilize(&self) -> bool;
+
     fn from_state(state: &GameState) -> Self;
 
     fn init(&mut self, board: &Board);

@@ -3,6 +3,7 @@ use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::pattern::Pattern;
 use crate::{pattern, slice};
+use crate::slice_pattern::SlicePattern;
 use crate::step_idx;
 use crate::utils::empty::Empty;
 use std::simd::cmp::SimdPartialEq;
@@ -17,27 +18,7 @@ pub struct PatternIndex {
     pub close_threes: Bitfield,
     pub fork_fours: Bitfield,
     pub closed_fours: Bitfield,
-    pub slice_bitmap: [SliceBitmap; slice::TOTAL_SLICE_AMOUNT],
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-#[repr(C, packed)]
-pub struct SliceBitmap {
-    open_threes: u16,
-    close_threes: u16,
-    open_fours: u16,
-    closed_fours: u16,
-}
-
-impl Empty for SliceBitmap {
-    fn empty() -> Self {
-        Self {
-            open_threes: 0,
-            close_threes: 0,
-            open_fours: 0,
-            closed_fours: 0,
-        }
-    }
+    pub slice_bitmap: [SlicePattern; slice::TOTAL_SLICE_AMOUNT],
 }
 
 impl Empty for PatternIndex {
@@ -47,7 +28,7 @@ impl Empty for PatternIndex {
             close_threes: Bitfield::empty(),
             fork_fours: Bitfield::empty(),
             closed_fours: Bitfield::empty(),
-            slice_bitmap: [SliceBitmap::empty(); slice::TOTAL_SLICE_AMOUNT],
+            slice_bitmap: [SlicePattern::EMPTY; slice::TOTAL_SLICE_AMOUNT],
         }
     }
 }
@@ -62,8 +43,8 @@ impl PatternIndex {
     pub fn replace_slice_bitmap<const D: Direction>(
         &mut self,
         slice_idx: u8,
-        bitmap: SliceBitmap,
-    ) -> SliceBitmap {
+        bitmap: SlicePattern,
+    ) -> SlicePattern {
         std::mem::replace(
             &mut self.slice_bitmap[Self::local_slice_idx::<D>(slice_idx as usize)],
             bitmap,
@@ -75,17 +56,23 @@ impl PatternIndex {
         &mut self,
         pattern_field: &[Pattern; pattern::PATTERN_SIZE],
         start_idx: usize,
-        old_bitmap: SliceBitmap,
-        new_bitmap: SliceBitmap,
+        old_bitmap: SlicePattern,
+        new_bitmap: SlicePattern,
     ) {
         if old_bitmap == new_bitmap {
             return;
         }
 
+        let old_patterns = Simd::<u8, 16>::from(old_bitmap.patterns.to_le_bytes());
+        let new_patterns = Simd::<u8, 16>::from(new_bitmap.patterns.to_le_bytes());
+
         macro_rules! update_slice_bitfield {
-            ($bitfield:expr,$old_bitmask:expr,$new_bitmask:expr,$is_present:ident) => {{
-                if $old_bitmask != $new_bitmask {
-                    let mut added = $new_bitmask & !$old_bitmask;
+            ($bitfield:expr,$mask:expr,$is_present:ident) => {{
+                let old_bitmask = pattern_bitmask(old_patterns, $mask);
+                let new_bitmask = pattern_bitmask(new_patterns, $mask);
+
+                if old_bitmask != new_bitmask {
+                    let mut added = new_bitmask & !old_bitmask;
                     while added != 0 {
                         let slice_idx = added.trailing_zeros() as usize;
                         added &= added - 1;
@@ -93,7 +80,7 @@ impl PatternIndex {
                         $bitfield.set_idx(step_idx!(D, start_idx, slice_idx));
                     }
 
-                    let mut removed = $old_bitmask & !$new_bitmask;
+                    let mut removed = old_bitmask & !new_bitmask;
                     while removed != 0 {
                         let slice_idx = removed.trailing_zeros() as usize;
                         removed &= removed - 1;
@@ -110,43 +97,37 @@ impl PatternIndex {
 
         update_slice_bitfield!(
             self.open_threes,
-            old_bitmap.open_threes,
-            new_bitmap.open_threes,
+            pattern::OPEN_THREE,
             has_open_three
         );
 
         update_slice_bitfield!(
             self.close_threes,
-            old_bitmap.close_threes,
-            new_bitmap.close_threes,
+            pattern::CLOSE_THREE,
             has_close_three
         );
 
         update_slice_bitfield!(
             self.closed_fours,
-            old_bitmap.closed_fours,
-            new_bitmap.closed_fours,
+            pattern::CLOSED_FOUR_SINGLE,
             has_closed_four
         );
 
-        if C == Color::White {
-            update_slice_bitfield!(
-                self.fork_fours,
-                old_bitmap.open_fours,
-                new_bitmap.open_fours,
-                has_open_four
-            );
-        } else {
-            let mut changed_bitmask = (old_bitmap.open_fours ^ new_bitmap.open_fours)
-                | old_bitmap.closed_fours
-                | new_bitmap.closed_fours;
+        if R == RuleKind::Renju && C == Color::Black {
+            let old_open_fours = pattern_bitmask(old_patterns, pattern::OPEN_FOUR);
+            let new_open_fours = pattern_bitmask(new_patterns, pattern::OPEN_FOUR);
+            let old_closed_fours = pattern_bitmask(old_patterns, pattern::CLOSED_FOUR_SINGLE);
+            let new_closed_fours = pattern_bitmask(new_patterns, pattern::CLOSED_FOUR_SINGLE);
+            let mut changed_bitmask = (old_open_fours ^ new_open_fours)
+                | old_closed_fours
+                | new_closed_fours;
 
             while changed_bitmask != 0 {
                 let slice_idx = changed_bitmask.trailing_zeros() as usize;
                 changed_bitmask &= changed_bitmask - 1;
 
                 let idx = step_idx!(D, start_idx, slice_idx);
-                
+
                 let is_fork_four = match (R, C) {
                     (RuleKind::Renju, Color::Black) => pattern_field[idx].has_open_four(),
                     _ => pattern_field[idx].has_any_fours(),
@@ -157,6 +138,12 @@ impl PatternIndex {
                     is_fork_four,
                 );
             }
+        } else {
+            update_slice_bitfield!(
+                self.fork_fours,
+                pattern::OPEN_FOUR,
+                has_open_four
+            );
         }
     }
 
@@ -172,26 +159,8 @@ impl PatternIndex {
 }
 
 #[inline(always)]
-pub fn pattern_bitmaps_from_patterns(slice_pattern: [u8; 16]) -> (u16, SliceBitmap) {
-    let slice_pattern = Simd::<u8, 16>::from(slice_pattern);
-
-    #[inline(always)]
-    fn pattern_bitmask(patterns: u8x16, mask: u8) -> u16 {
-        (patterns & Simd::splat(mask))
-            .simd_ne(Simd::splat(0))
-            .to_bitmask() as u16
-    }
-
-    let slice_bitmap = SliceBitmap {
-        open_threes: pattern_bitmask(slice_pattern, pattern::OPEN_THREE),
-        close_threes: pattern_bitmask(slice_pattern, pattern::CLOSE_THREE),
-        open_fours: pattern_bitmask(slice_pattern, pattern::OPEN_FOUR),
-        closed_fours: pattern_bitmask(slice_pattern, pattern::CLOSED_FOUR_SINGLE),
-    };
-
-    let slice_pattern_bitmap = slice_pattern
+fn pattern_bitmask(patterns: u8x16, mask: u8) -> u16 {
+    (patterns & Simd::splat(mask))
         .simd_ne(Simd::splat(0))
-        .to_bitmask() as u16;
-
-    (slice_pattern_bitmap, slice_bitmap)
+        .to_bitmask() as u16
 }

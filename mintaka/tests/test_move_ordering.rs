@@ -11,6 +11,7 @@ mod test_movegen {
     use rusty_renju::history::History;
     use rusty_renju::notation::pos;
     use rusty_renju::notation::pos::MaybePos;
+    use rusty_renju::utils::empty::Empty;
     use std::sync::atomic::{AtomicBool, AtomicU32};
 
     macro_rules! test_move_ordering {
@@ -23,7 +24,7 @@ mod test_movegen {
             let evaluator = ActiveEvaluator::from_state(&state);
 
             let tt = TranspositionTable::new_with_size(config.tt_size);
-            let ht = HistoryTable::EMPTY;
+            let ht = HistoryTable::empty();
 
             let global_counter_in_1k = AtomicU32::new(0);
             let aborted = AtomicBool::new(false);

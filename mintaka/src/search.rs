@@ -199,6 +199,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
             td.ss[td.ply] = SearchFrame {
                 pos: pos.into(),
                 static_eval: parent_eval,
+                evaluator_eval: Score::NAN,
                 on_pv: NT::IS_PV,
                 recovery_state: state.recovery_state(),
                 searching: MaybePos::NONE,
@@ -338,7 +339,14 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
             tt_pv = false;
             tt_endgame_depth = 0;
 
-            static_eval = td.evaluator.eval_value(state);
+            let evaluator_eval = td.evaluator.eval_value(state);
+            td.ss[td.ply].evaluator_eval = evaluator_eval;
+
+            if td.evaluator.require_stabilize() && td.ply > 0 {
+                static_eval = (-td.ss[td.ply - 1].evaluator_eval + evaluator_eval) / 2;
+            } else {
+                static_eval = evaluator_eval;
+            }
 
             td.tt.store(
                 state.board.hash_key,
@@ -609,7 +617,7 @@ fn find_immediate_win(state: &GameState, ply: usize) -> (Score, MaybePos) {
     }
 
     if let Some(pos) = state.board.patterns.effective_fork_four_field(state.board.player_color)
-        .unique_pos()
+        .first_pos()
     { // open-four
         return (Score::win_in(ply + 3), pos.into());
     }
