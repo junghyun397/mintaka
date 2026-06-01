@@ -36,7 +36,6 @@ pub fn new_agent(opening_kind: OpeningKind) -> OpeningStage {
 }
 
 pub trait OpeningAgent {
-
     fn moves(&self) -> usize;
 
     fn opening_kind(&self) -> OpeningKind;
@@ -50,13 +49,10 @@ pub trait OpeningAgent {
     fn openers_turn(&self) -> bool {
         self.opener_color() == Color::player_color_from_moves(self.moves())
     }
-
 }
 
 pub trait MoveStageOpeningAgent : OpeningAgent {
-
     fn validate_move(&self, pos: Pos) -> bool;
-
 }
 
 macro_rules! impl_opening_agent {
@@ -91,7 +87,6 @@ pub struct OpeningMove {
 impl_opening_agent!(OpeningMove);
 
 impl MoveStageOpeningAgent for OpeningMove {
-
     fn validate_move(&self, pos: Pos) -> bool {
         let pole: u8 = pos::CENTER_ROW_COL - self.move_window_half_width;
         let (row, col) = pos.to_cartesian();
@@ -99,11 +94,9 @@ impl MoveStageOpeningAgent for OpeningMove {
         (pole <= row && row <= pole + self.move_window_half_width * 2)
             && (pole <= col && col <= pole + self.move_window_half_width * 2)
     }
-
 }
 
 impl OpeningMove {
-
     pub fn set(&self, pos: Pos) -> Option<OpeningStage> {
         self.validate_move(pos).then(|| {
             match self.opening_kind {
@@ -142,7 +135,6 @@ impl OpeningMove {
             }
         })
     }
-
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -158,7 +150,6 @@ pub struct OpeningSwap {
 impl_opening_agent!(OpeningSwap);
 
 impl OpeningSwap {
-
     pub fn swap(&self, do_swap: bool) -> OpeningStage {
         let opener_color = if do_swap {
             !self.opener_color
@@ -196,7 +187,6 @@ impl OpeningSwap {
             OpeningKind::Random4 => unreachable!()
         }
     }
-
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -212,7 +202,6 @@ pub struct OpeningDeclare {
 impl_opening_agent!(OpeningDeclare);
 
 impl OpeningDeclare {
-    
     pub fn declare(&self, count: usize) -> Option<OpeningStage> {
         match self.opening_kind() {
             OpeningKind::Soosyrv8 => {
@@ -230,7 +219,6 @@ impl OpeningDeclare {
             OpeningKind::Random4 => unreachable!(),
         }
     }
-
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -248,15 +236,12 @@ pub struct OpeningOffer {
 impl_opening_agent!(OpeningOffer);
 
 impl MoveStageOpeningAgent for OpeningOffer {
-
     fn validate_move(&self, pos: Pos) -> bool {
         self.symmetry_moves.contains(&pos)
     }
-
 }
 
 impl OpeningOffer {
-
     pub fn add(&self, partial_history: &[Pos; 4], pos: Pos) -> Option<OpeningStage> {
         self.validate_move(pos).then(|| {
             let mut offers = self.offers.clone();
@@ -285,7 +270,6 @@ impl OpeningOffer {
             }
         })
     }
-
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -300,15 +284,12 @@ pub struct OpeningSelect {
 impl_opening_agent!(OpeningSelect);
 
 impl MoveStageOpeningAgent for OpeningSelect {
-
     fn validate_move(&self, pos: Pos) -> bool {
         self.offered_moves.contains(&pos)
     }
-
 }
 
 impl OpeningSelect {
-
     pub fn select(&self, pos: Pos) -> Option<OpeningStage> {
         self.validate_move(pos).then(||
             match self.opening_kind {
@@ -318,7 +299,6 @@ impl OpeningSelect {
             }
         )
     }
-
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -332,7 +312,6 @@ pub struct OpeningBranch {
 impl_opening_agent!(OpeningBranch);
 
 impl OpeningBranch {
-
     pub fn branch(&self, make_offer: bool) -> OpeningStage {
         match self.opening_kind {
             OpeningKind::Taraguchi10 =>
@@ -359,5 +338,4 @@ impl OpeningBranch {
             OpeningKind::Random4 => unreachable!(),
         }
     }
-
 }

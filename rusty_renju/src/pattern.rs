@@ -1,6 +1,6 @@
 use crate::bitfield::Bitfield;
 use crate::notation::color::{AlignedColorContainer, Color, ColorContainer};
-use crate::notation::direction::Direction;
+use crate::notation::direction::{Direction, DirectionContainer};
 use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::{ForbiddenKind, RuleKind};
 use crate::pattern_index::{pattern_bitmaps_from_patterns, PatternIndex, SliceBitmap};
@@ -8,7 +8,7 @@ use crate::slice::Slice;
 use crate::slice_pattern::SlicePattern;
 use crate::utils::empty::Empty;
 use crate::utils::lang::{repeat_16x, repeat_4x};
-use crate::{slice_pattern, step_idx};
+use crate::{assert_struct_sizes, slice_pattern, step_idx};
 
 pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
@@ -43,13 +43,9 @@ pub const SLICE_PATTERN_FIVE_MASK: u128     = repeat_16x(FIVE);
 pub const PATTERN_SIZE: usize = 256;
 
 #[derive(Debug, Copy, Clone, Default)]
-#[repr(C, packed)]
-pub struct Pattern {
-    horizontal: u8,
-    vertical: u8,
-    ascending: u8,
-    descending: u8
-}
+pub struct Pattern(DirectionContainer<u8>);
+
+assert_struct_sizes!(Pattern, size=4, align=1);
 
 impl From<Pattern> for u32 {
     fn from(value: Pattern) -> Self {
@@ -64,7 +60,6 @@ impl From<u32> for Pattern {
 }
 
 impl Pattern {
-
     pub fn is_empty(&self) -> bool {
         u32::from(*self) == 0
     }
@@ -156,19 +151,9 @@ impl Pattern {
         !self.has_five() && (self.has_any_fours() || self.has_open_threes())
     }
 
-    fn apply_mask_mut<const D: Direction>(&mut self, pattern: u8) {
-        match D {
-            Direction::Horizontal => self.horizontal = pattern,
-            Direction::Vertical => self.vertical = pattern,
-            Direction::Ascending => self.ascending = pattern,
-            Direction::Descending => self.descending = pattern
-        }
-    }
-
     fn apply_mask(&self, mask: u32) -> u32 {
         u32::from(*self) & mask
     }
-
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -258,8 +243,7 @@ impl Patterns {
             let slice_idx = clear_mask.trailing_zeros() as usize;
             clear_mask &= clear_mask - 1;
 
-            self.field[C][step_idx!(D, start_idx, slice_idx)]
-                .apply_mask_mut::<D>(0);
+            self.field[C][step_idx!(D, start_idx, slice_idx)].0[D] = 0;
         }
 
         let old_bitmap = self.indexes[C]
@@ -296,8 +280,7 @@ impl Patterns {
 
             let board_idx = step_idx!(D, start_idx, slice_idx);
 
-            self.field[C][board_idx]
-                .apply_mask_mut::<D>(slice_patterns[slice_idx]);
+            self.field[C][board_idx].0[D] = slice_patterns[slice_idx];
 
             if C == Color::Black && R == RuleKind::Renju
                 && self.field[Color::Black][board_idx].is_forbidden_unchecked() 

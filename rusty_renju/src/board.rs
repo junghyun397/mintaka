@@ -45,7 +45,7 @@ impl Empty for Board {
             slices: Slices::EMPTY,
             patterns: Patterns::empty(),
             hot_field: Bitfield::empty(),
-            hash_key: HashKey::EMPTY,
+            hash_key: HashKey::empty(),
         }
     }
 }

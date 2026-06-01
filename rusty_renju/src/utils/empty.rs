@@ -3,7 +3,7 @@ pub trait Empty {
 }
 
 impl Empty for u16 {
-    fn empty() -> Self { 
+    fn empty() -> Self {
         0
     }
 }

@@ -16,7 +16,6 @@ pub struct BoardWinner {
 }
 
 impl Board {
-
     pub fn find_winner(&self, pos: Pos) -> Option<Color> {
         [
             Some(&self.slices.horizontal_slices[pos.row_usize()]),
@@ -54,5 +53,4 @@ impl Board {
                     })
             })
     }
-
 }

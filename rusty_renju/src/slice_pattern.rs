@@ -316,13 +316,13 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
 
     // potential-three
 
-    embed_pattern!(both, symmetry, "!O...O!", "!OE..O!", "!O.E.O!", "!O..EO!");
     embed_pattern!(both, asymmetry, "!..O....", "!.TO....", "!..OT...", "!..O.T..", "!..O..T.");
     embed_pattern!(both, asymmetry, "XO..O...", "XO..O.T.");
     embed_pattern!(both, asymmetry, "X.O....!", "X.OT...!", "X.O.T..!", "X.O..T.!");
 
     // potential-closed-four
 
+    embed_pattern!(both, symmetry, "!O...O!", "!OE..O!", "!O.E.O!", "!O..EO!");
     embed_pattern!(both, asymmetry, "XOO...!", "XOOE..!", "XOO.E.!", "XOO..E!");
     embed_pattern!(both, asymmetry, "XO.O..!", "XOEO..!", "XO.OE.!", "XO.O.E!");
     embed_pattern!(both, asymmetry, "XO..O.!", "XOE.O.!", "XO.EO.!", "XO..OE!");

@@ -212,6 +212,24 @@ impl Slices {
         ]
     }
 
+    pub fn slice_start_pos(direction: Direction, pos: Pos) -> Pos {
+        const ASCENDING_POS_STEP: u8 = pos::BOARD_WIDTH + 1;
+        const DESCENDING_POS_STEP: u8 = pos::BOARD_WIDTH - 1;
+
+        match direction {
+            Direction::Horizontal => Pos::from_index(pos.idx() - pos.col()),
+            Direction::Vertical => Pos::from_index(pos.col()),
+            Direction::Ascending => Pos::from_index(
+                pos.idx()
+                    - ASCENDING_POS_STEP * pos.row().min(pos.col())
+            ),
+            Direction::Descending => Pos::from_index(
+                pos.idx()
+                    + DESCENDING_POS_STEP * pos.col().min(pos::BOARD_WIDTH - 1 - pos.row())
+            )
+        }
+    }
+
     #[inline]
     fn calculate_ascending_slice_idx(pos: Pos) -> isize {
         // y = x + b, b = y - x (reversed row sequence)

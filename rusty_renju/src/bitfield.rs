@@ -60,7 +60,7 @@ impl Bitfield {
     }
 
     pub const fn set_idx(&mut self, idx: usize) {
-        self.0[idx / 8] |= 0b1 << (idx % 8);
+        self.or_bit_idx(idx, true)
     }
 
     pub const fn set(&mut self, pos: Pos) {
@@ -105,36 +105,37 @@ impl Bitfield {
             .map(|x| Pos::from_index(x as u8))
     }
 
-    pub fn iter_cold_pos(&self) -> impl Iterator<Item=Pos> + '_ {
-        BitfieldSetBitsIterator::from((!*self).to_chunks())
-            .map(|x| Pos::from_index(x as u8))
-    }
-    
-    pub fn unique_pos(&self) -> Option<Pos> {
-        self.iter_hot_pos().next()
+    pub fn first_pos(&self) -> Option<Pos> {
+        let chunks = self.to_chunks();
+
+        if chunks[0] != 0 {
+            Some(Pos::from_index(chunks[0].trailing_zeros() as u8))
+        } else if chunks[1] != 0 {
+            Some(Pos::from_index(chunks[1].trailing_zeros() as u8 + 64))
+        } else if chunks[2] != 0 {
+            Some(Pos::from_index(chunks[2].trailing_zeros() as u8 + 128))
+        } else if chunks[3] != 0 {
+            Some(Pos::from_index(chunks[3].trailing_zeros() as u8 + 192))
+        } else {
+            None
+        }
     }
 
     pub fn is_empty(&self) -> bool {
         self.0 == [0; 32]
     }
 
-    pub fn to_simd(self) -> u8x32 {
+    fn to_simd(self) -> u8x32 {
         u8x32::from_array(self.0)
     }
 
-    pub fn to_chunks(self) -> [u64; 4] {
+    fn to_chunks(self) -> [u64; 4] {
         [
             u64::from_le_bytes(self.0[0..8].try_into().unwrap()),
             u64::from_le_bytes(self.0[8..16].try_into().unwrap()),
             u64::from_le_bytes(self.0[16..24].try_into().unwrap()),
             u64::from_le_bytes(self.0[24..32].try_into().unwrap()),
         ]
-    }
-
-    pub fn from_chunks(chunks: [u64; 4]) -> Self {
-        let bytes: [[u8; 8]; 4] = chunks.map(u64::to_le_bytes);
-
-        Self(unsafe { std::mem::transmute(bytes) })
     }
 }
 

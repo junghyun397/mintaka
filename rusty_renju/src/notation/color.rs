@@ -1,9 +1,8 @@
 use crate::board_io::{SYMBOL_BLACK, SYMBOL_WHITE};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
+use std::fmt::Formatter;
 use std::ops::Not;
-use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
@@ -18,7 +17,6 @@ pub enum Color {
 }
 
 impl Color {
-
     pub const fn reversed(&self) -> Color {
         match self {
             Color::Black => Color::White,
@@ -41,7 +39,6 @@ impl Color {
             Color::Black
         }
     }
-
 }
 
 impl Not for Color {
@@ -85,7 +82,7 @@ impl TryFrom<u8> for Color {
     }
 }
 
-impl Display for Color {
+impl std::fmt::Display for Color {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self:?}")
     }
@@ -94,7 +91,7 @@ impl Display for Color {
 #[derive(Debug)]
 pub struct UnknownColorError;
 
-impl Display for UnknownColorError {
+impl std::fmt::Display for UnknownColorError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "unknown color")
     }
@@ -122,21 +119,14 @@ macro_rules! impl_color_container {
                 Self([black, white])
             }
 
-            #[inline]
-            pub fn access_pair(&self, color: Color) -> (&T, &T) {
-                (&self.0[color as usize], &self.0[color.reversed() as usize])
-            }
-
-            pub fn iter(&self) -> std::slice::Iter<'_, T> {
-                self.0.iter()
-            }
-
-            pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, T> {
-                self.0.iter_mut()
+            pub fn iter(&self) -> impl Iterator<Item = (Color, &T)> {
+                [Color::Black, Color::White]
+                    .map(|color| (color, &self[color]))
+                    .into_iter()
             }
         }
 
-        impl<T> Index<Color> for $name<T> {
+        impl<T> std::ops::Index<Color> for $name<T> {
             type Output = T;
 
             #[inline]
@@ -145,16 +135,47 @@ macro_rules! impl_color_container {
             }
         }
 
-        impl<T> IndexMut<Color> for $name<T> {
+        impl<T> std::ops::IndexMut<Color> for $name<T> {
             #[inline]
             fn index_mut(&mut self, index: Color) -> &mut Self::Output {
                 &mut self.0[index as usize]
             }
         }
-        
+
         impl<T: crate::utils::empty::Empty> crate::utils::empty::Empty for $name<T> {
             fn empty() -> Self {
                 Self::new(T::empty(), T::empty())
+            }
+        }
+
+        impl <T: PartialEq> PartialEq for $name<T> {
+            fn eq(&self, other: &Self) -> bool {
+                self.0 == other.0
+            }
+        }
+
+        impl <T: Eq> Eq for $name<T> { }
+
+        impl <T: Copy> Copy for $name<T> {}
+
+        impl <T: Clone> Clone for $name<T> {
+            fn clone(&self) -> Self {
+                Self::new(self[Color::Black].clone(), self[Color::White].clone())
+            }
+        }
+
+        impl <T: std::fmt::Debug> std::fmt::Debug for $name<T> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.debug_struct("ColorContainer")
+                    .field("black", &self.0[0])
+                    .field("white", &self.0[1])
+                    .finish()
+            }
+        }
+
+        impl<T: Default> Default for $name<T> {
+            fn default() -> Self {
+                Self::new(T::default(), T::default())
             }
         }
     };
@@ -162,27 +183,9 @@ macro_rules! impl_color_container {
 
 #[cfg_attr(feature = "typeshare", typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, PartialEq, Eq)]
 pub struct ColorContainer<T>(pub [T; 2]);
-
 impl_color_container!(ColorContainer);
 
-impl<T: Copy> Clone for ColorContainer<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<T: Copy> Copy for ColorContainer<T> {}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(align(64))]
 pub struct AlignedColorContainer<T>(pub [T; 2]);
-
 impl_color_container!(AlignedColorContainer);
-
-impl<T> From<AlignedColorContainer<T>> for ColorContainer<T> {
-    fn from(value: AlignedColorContainer<T>) -> Self {
-        Self(value.0)
-    }
-}
