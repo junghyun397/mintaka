@@ -37,7 +37,6 @@ export class MintakaWorkerControl {
 }
 
 export const DefaultWorkerConfig: Config = {
-    rule_kind: "Renju",
     draw_condition: 225,
     max_nodes_in_1k: undefined,
     max_depth: undefined,

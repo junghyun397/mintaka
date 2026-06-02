@@ -46,8 +46,8 @@ struct OffPVNode; impl NodeType for OffPVNode {
 }
 
 pub fn iterative_deepening<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType>(
-    td: &mut ThreadData<TH, impl Evaluator>,
-    mut state: GameState,
+    td: &mut ThreadData<R, TH, impl Evaluator<R>>,
+    mut state: GameState<R>,
 ) -> (Score, MaybePos) {
     let mut score: Score = 0;
     let mut best_move = MaybePos::NONE;
@@ -110,8 +110,8 @@ pub fn iterative_deepening<CLK: MonotonicClock, const R: RuleKind, TH: ThreadTyp
 }
 
 fn aspiration<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType>(
-    td: &mut ThreadData<TH, impl Evaluator>,
-    state: &mut GameState,
+    td: &mut ThreadData<R, TH, impl Evaluator<R>>,
+    state: &mut GameState<R>,
     max_depth: Depth,
     prev_score: Score,
 ) -> Score {
@@ -144,8 +144,8 @@ fn aspiration<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType>(
 }
 
 fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
-    td: &mut ThreadData<TH, impl Evaluator>,
-    state: &mut GameState,
+    td: &mut ThreadData<R, TH, impl Evaluator<R>>,
+    state: &mut GameState<R>,
     depth_left: Depth,
     mut alpha: Score,
     mut beta: Score,
@@ -207,14 +207,14 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
             td.push_ply(pos);
             let artifact = state.play_mut(pos);
-            td.evaluator.play(&state.board, artifact, pos);
+            td.evaluator.play(&state.board, artifact, pos.into());
 
             // no depth reduction for forced response
             let score = -pvs::<CLK, R, TH, NT::NextType>(td, state, depth_left, -beta, -alpha, cut_node);
 
             td.pop_ply();
             let artifact = state.undo_mut(td.ss[td.ply].recovery_state);
-            td.evaluator.undo(&state.board, artifact, pos);
+            td.evaluator.undo(&state.board, artifact, pos.into());
 
             if td.is_aborted() {
                 return Score::DRAW;
@@ -441,7 +441,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         let artifact = state.play_mut(pos);
         td.push_ply(pos);
-        td.evaluator.play(&state.board, artifact, pos);
+        td.evaluator.play(&state.board, artifact, pos.into());
 
         if threat_kind.is_none() {
             if on_three {
@@ -519,7 +519,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         td.pop_ply();
         let artifact = state.undo_mut(td.ss[td.ply].recovery_state);
-        td.evaluator.undo(&state.board, artifact, pos);
+        td.evaluator.undo(&state.board, artifact, pos.into());
 
         if td.is_aborted() {
             return Score::DRAW;
@@ -593,7 +593,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
     best_score
 }
 
-fn find_immediate_win(state: &GameState, ply: usize) -> (Score, MaybePos) {
+fn find_immediate_win<const R: RuleKind>(state: &GameState<R>, ply: usize) -> (Score, MaybePos) {
     if let Some(pos) = state.board.patterns.unchecked_five_pos[state.board.player_color].ok()
     { // five
         return (Score::win_in(ply + 1), pos.into())

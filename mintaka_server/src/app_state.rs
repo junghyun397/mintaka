@@ -17,6 +17,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use mintaka::game_agent::GameError;
 use mintaka::protocol::results::{BestMove, CommandResult};
 use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::notation::rule::RuleKind;
 use crate::app_error::AppError::SessionInComputing;
 
 const SESSION_RESPONSE_CHANNEL_CAPACITY: usize = 4;
@@ -175,7 +176,7 @@ impl AppState {
         }
     }
 
-    pub async fn new_session(&self, config: Option<Config>, game_state: GameState) -> Result<CreatedSession, AppError> {
+    pub async fn new_session(&self, config: Option<Config>, game_state: GameState<{ RuleKind::Renju }>) -> Result<CreatedSession, AppError> {
         if let Some(config) = config
             && let Some(max_config) = self.preference.max_config
             && config > max_config

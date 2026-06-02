@@ -1,6 +1,25 @@
 ## Rust
 
-### Portable SIMD
+### Wasm32 SIMD
+Optimal Code:
+```rust
+#[inline(always)]
+fn pattern_bitmask(patterns: u8x16, mask: u8) -> u16 {
+    (patterns & Simd::splat(mask))
+        .simd_ne(Simd::splat(0))
+        .to_bitmask() as u16
+}
+```
+Current workaround:
+```rust
+#[cfg_attr(target_arch = "wasm32", inline(never))]
+#[cfg_attr(not(target_arch = "wasm32"), inline(always))]
+fn pattern_bitmask(patterns: u8x16, mask: u8) -> u16 {
+    (patterns & Simd::splat(mask))
+        .simd_ne(Simd::splat(0))
+        .to_bitmask() as u16
+}
+```
 
 ### ADT const params
 Optimal code:

@@ -1,9 +1,10 @@
+use std::fmt::Display;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
-#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "RuleKindSchema"))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(std::marker::ConstParamTy, Default, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum RuleKind {
@@ -12,7 +13,6 @@ pub enum RuleKind {
 }
 
 impl RuleKind {
-
     pub const fn relaxed(&self) -> Self {
         match self {
             Self::Renju => Self::Gomoku,
@@ -26,7 +26,15 @@ impl RuleKind {
             _ => Self::Renju
         }
     }
+}
 
+impl Display for RuleKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Gomoku => write!(f, "Gomoku"),
+            Self::Renju => write!(f, "Renju"),
+        }
+    }
 }
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]

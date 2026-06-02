@@ -3,6 +3,7 @@ mod renderer;
 
 use webp::Encoder;
 use rusty_renju::notation::ffi::into_pos_slice;
+use rusty_renju::notation::rule::RuleKind;
 
 #[repr(C)]
 pub struct ByteBuffer {
@@ -99,7 +100,7 @@ pub struct RenderPayloads<'a> {
 pub fn rusty_renju_image_render(
     image_format: u8, webp_quality: f32,
     option: u8, enable_forbidden: bool,
-    board: *const rusty_renju::board::Board,
+    board: *const rusty_renju::board::Board<{ RuleKind::Renju }>,
     actions: *const u8, actions_len: usize,
     offers: *const u8, offers_len: usize,
     blinds: *const u8, blinds_len: usize,

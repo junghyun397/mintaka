@@ -4,6 +4,7 @@ use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use std::sync::mpsc;
 use mintaka::game_state::GameState;
+use rusty_renju::notation::rule::RuleKind;
 
 pub enum Message {
     Command(MessageCommand),
@@ -24,7 +25,7 @@ pub enum MessageCommand {
 }
 
 impl MessageCommand {
-    pub fn into_command(self, state: &GameState) -> Command {
+    pub fn into_command(self, state: &GameState<{ RuleKind::Renju }>) -> Command {
         match self {
             MessageCommand::Play { pos } => Command::Play { hash: state.board.hash_key, pos },
             MessageCommand::Set { pos, color } => Command::Set { hash: state.board.hash_key, pos, color },

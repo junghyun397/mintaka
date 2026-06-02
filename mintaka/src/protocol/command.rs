@@ -3,7 +3,6 @@ use crate::game_state::GameStateData;
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
 #[allow(unused_imports)]
 use rusty_renju::utils::lang::DurationSchema;
@@ -54,7 +53,6 @@ pub enum Command {
     },
     Workers(u32),
     MaxMemory(ByteSize),
-    Rule(RuleKind),
     Config(Config),
 }
 
@@ -99,7 +97,6 @@ mod typeshare_workaround {
         },
         Workers(u32),
         MaxMemory(ByteSize),
-        Rule(RuleKind),
         Config(Config),
     }
 }

@@ -4,19 +4,21 @@ use rusty_renju::history::History;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::utils::empty::Empty;
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
+use rusty_renju::board_io::BoardData;
+use rusty_renju::notation::rule::RuleKind;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "GameStateData"))]
-#[derive(Debug, Copy, Clone)]
-pub struct GameState {
-    pub board: Board,
+#[derive(Copy, Clone)]
+pub struct GameState<const R: RuleKind> {
+    pub board: Board<R>,
     pub history: History,
     pub movegen_window: MovegenWindow,
 }
 
-impl Empty for GameState {
+impl<const R: RuleKind> Empty for GameState<R> {
     fn empty() -> Self {
         Self {
             board: Board::empty(),
@@ -30,22 +32,26 @@ impl Empty for GameState {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub struct GameStateData {
-    pub board: Board,
+    pub board_data: BoardData,
     pub history: History,
 }
 
-impl From<GameState> for GameStateData {
-    fn from(state: GameState) -> Self {
-        Self { board: state.board, history: state.history }
+impl<const R: RuleKind> From<GameState<R>> for GameStateData {
+    fn from(state: GameState<R>) -> Self {
+        Self { board_data: (&state.board).into(), history: state.history }
     }
 }
 
-impl From<GameStateData> for GameState {
+impl<const R: RuleKind> From<GameStateData> for GameState<R> {
     fn from(data: GameStateData) -> Self {
-        let movegen_window = MovegenWindow::from(&data.board.hot_field);
+        let Ok(board) = Board::try_from(data.board_data) else {
+            panic!("invalid rule kind");
+        };
+
+        let movegen_window = MovegenWindow::from(&board.hot_field);
 
         Self {
-            board: data.board,
+            board,
             history: data.history,
             movegen_window,
         }
@@ -63,8 +69,7 @@ impl RecoveryState {
     };
 }
 
-impl GameState {
-
+impl<const R: RuleKind> GameState<R> {
     pub fn recovery_state(&self) -> RecoveryState {
         RecoveryState {
             movegen_window: self.movegen_window
@@ -135,11 +140,10 @@ impl GameState {
     pub fn is_empty(&self) -> bool {
         self.board.hot_field.is_empty()
     }
-
 }
 
-impl From<Board> for GameState {
-    fn from(board: Board) -> Self {
+impl<const R: RuleKind> From<Board<R>> for GameState<R> {
+    fn from(board: Board<R>) -> Self {
         let history: History = (&board).try_into().unwrap_or_else(|_| History::empty());
 
         GameState {
@@ -150,7 +154,7 @@ impl From<Board> for GameState {
     }
 }
 
-impl From<History> for GameState {
+impl<const R: RuleKind> From<History> for GameState<R> {
     fn from(history: History) -> Self {
         let board = (&history).into();
 
@@ -163,23 +167,26 @@ impl From<History> for GameState {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for GameState {
+impl<const R: RuleKind> Serialize for GameState<R> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         GameStateData {
-            board: self.board,
+            board_data: (&self.board).into(),
             history: self.history,
         }.serialize(serializer)
     }
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for GameState {
+impl<'de, const R: RuleKind> Deserialize<'de> for GameState<R> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         let data = GameStateData::deserialize(deserializer)?;
 
+        let board = Board::try_from(data.board_data)
+            .map_err(de::Error::custom)?;
+
         Ok(GameState {
-            movegen_window: MovegenWindow::from(&data.board.hot_field),
-            board: data.board,
+            movegen_window: MovegenWindow::from(&board.hot_field),
+            board,
             history: data.history,
         })
     }

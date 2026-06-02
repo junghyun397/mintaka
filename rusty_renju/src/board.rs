@@ -13,31 +13,31 @@ use typeshare::typeshare;
 use crate::slice_pattern;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "BoardData"))]
-#[derive(Copy, Clone)]
-pub struct Board {
+#[derive(Debug, Copy, Clone)]
+pub struct Board<const R: RuleKind> {
     pub player_color: Color,
     pub stones: u8,
     pub slices: Slices,
-    pub patterns: Patterns,
+    pub patterns: Patterns<R>,
     pub hot_field: Bitfield,
     pub hash_key: HashKey,
 }
 
-impl PartialEq for Board {
+impl<const R: RuleKind> PartialEq for Board<R> {
     fn eq(&self, other: &Self) -> bool {
         self.slices.bitfield() == other.slices.bitfield()
     }
 }
 
-impl Eq for Board {}
+impl<const R: RuleKind> Eq for Board<R> {}
 
-impl Hash for Board {
+impl<const R: RuleKind> Hash for Board<R> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.hash_key.hash(state);
     }
 }
 
-impl Empty for Board {
+impl<const R: RuleKind> Empty for Board<R> {
     fn empty() -> Self {
         Self {
             player_color: Color::Black,
@@ -57,20 +57,22 @@ pub enum MoveType {
 
 pub type MoveArtifact = ColorContainer<DirectionContainer<u16>>;
 
-impl Board {
+impl<const R: RuleKind> Board<R> {
     pub fn is_pos_empty(&self, pos: Pos) -> bool {
         self.hot_field.is_cold(pos)
     }
 
     pub fn is_legal_move(&self, pos: Pos) -> bool {
-        self.is_pos_empty(pos)
-            && (self.player_color != Color::Black || !self.patterns.is_forbidden(pos))
+        match (R, self.player_color) {
+            (RuleKind::Renju, Color::Black) => self.is_pos_empty(pos) && !self.patterns.is_forbidden(pos),
+            _ => self.is_pos_empty(pos)
+        }
     }
 
     pub fn legal_field(&self, color: Color) -> Bitfield {
-        match color {
-            Color::Black => !(self.hot_field | self.patterns.forbidden_field),
-            Color::White => !self.hot_field
+        match (R, color) {
+            (RuleKind::Renju, Color::Black) => !(self.hot_field | self.patterns.forbidden_field),
+            _ => !self.hot_field
         }
     }
 
@@ -187,9 +189,9 @@ impl Board {
                     $slice.has_potential_pattern::<{ $color }>(),
                 ) {
                     (_, true) =>
-                        self.patterns.update_pattern_with_slice::<{ RuleKind::Renju }, { $color }, { $direction }>($slice),
+                        self.patterns.update_pattern_with_slice::<{ $color }, { $direction }>($slice),
                     (true, false) =>
-                        self.patterns.clear_pattern_with_slice::<{ RuleKind::Renju }, { $color }, { $direction }>($slice),
+                        self.patterns.clear_pattern_with_slice::<{ $color }, { $direction }>($slice),
                     _ => 0
                 };
 
@@ -225,8 +227,10 @@ impl Board {
             update_by_slice!(Direction::Descending, descending_slice, pos.col() - descending_slice.start_col);
         }
 
-        self.validate_overlines::<M>();
-        self.validate_forbidden_moves();
+        if R == RuleKind::Renju {
+            self.validate_overlines::<M>();
+            self.validate_forbidden_moves();
+        }
 
         artifact
     }
@@ -235,11 +239,11 @@ impl Board {
         macro_rules! update_by_slice {
             ($slice:expr,$direction:expr) => {{
                 if $slice.has_potential_pattern::<{ Color::Black }>() {
-                    self.patterns.update_pattern_with_slice::<{ RuleKind::Renju }, { Color::Black }, { $direction }>($slice);
+                    self.patterns.update_pattern_with_slice::<{ Color::Black }, { $direction }>($slice);
                 }
 
                 if $slice.has_potential_pattern::<{ Color::White }>() {
-                    self.patterns.update_pattern_with_slice::<{ RuleKind::Renju }, { Color::White }, { $direction }>($slice);
+                    self.patterns.update_pattern_with_slice::<{ Color::White }, { $direction }>($slice);
                 }
             }};
         }
@@ -262,8 +266,10 @@ impl Board {
             update_by_slice!(descending_slice, Direction::Descending);
         }
 
-        self.validate_overlines::<{ MoveType::Unset }>();
-        self.validate_forbidden_moves();
+        if R == RuleKind::Renju {
+            self.validate_overlines::<{ MoveType::Unset }>();
+            self.validate_forbidden_moves();
+        }
     }
 
     fn validate_overlines<const M: MoveType>(&mut self) {

@@ -6,6 +6,7 @@ use crate::board::Board;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
 use crate::notation::pos::Pos;
+use crate::notation::rule::RuleKind;
 use crate::slice::Slice;
 
 #[cfg_attr(feature = "typeshare", typeshare)]
@@ -15,7 +16,7 @@ pub struct BoardWinner {
     pub moves: [Pos; 5],
 }
 
-impl Board {
+impl<const R: RuleKind> Board<R> {
     pub fn find_winner(&self, pos: Pos) -> Option<Color> {
         [
             Some(&self.slices.horizontal_slices[pos.row_usize()]),

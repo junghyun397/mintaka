@@ -157,16 +157,16 @@ impl Pattern {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct Patterns {
+pub struct Patterns<const R: RuleKind> {
     pub field: AlignedColorContainer<[Pattern; PATTERN_SIZE]>,
-    pub indexes: ColorContainer<PatternIndex>,
+    pub indexes: ColorContainer<PatternIndex<R>>,
     pub unchecked_five_pos: ColorContainer<MaybePos>,
     pub candidate_overline_field: Bitfield,
     pub candidate_forbidden_field: Bitfield,
     pub forbidden_field: Bitfield,
 }
 
-impl Empty for Patterns {
+impl<const R: RuleKind> Empty for Patterns<R> {
     fn empty() -> Self {
         Self {
             field: unsafe { std::mem::zeroed() },
@@ -179,10 +179,10 @@ impl Empty for Patterns {
     }
 }
 
-impl Patterns {
+impl<const R: RuleKind> Patterns<R> {
     #[inline(always)]
     pub fn is_forbidden(&self, pos: Pos) -> bool {
-        self.forbidden_field.is_hot(pos)
+        R == RuleKind::Renju && self.forbidden_field.is_hot(pos)
     }
 
     pub fn forbidden_kind(&self, pos: Pos) -> Option<ForbiddenKind> {
@@ -218,22 +218,22 @@ impl Patterns {
     }
 
     #[inline(always)]
-    pub fn update_pattern_with_slice<const R: RuleKind, const C: Color, const D: Direction>(&mut self, slice: &mut Slice) -> u16 {
+    pub fn update_pattern_with_slice<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) -> u16 {
         let slice_pattern = slice.calculate_slice_pattern::<R, C>();
 
         let touched_bitmask = match (slice.pattern_bitmap[C] == 0, slice_pattern.is_empty()) {
-            (false, true) => self.clear_pattern_with_slice::<R, C, D>(slice),
-            (_, false) => self.update_with_slice_pattern::<R, C, D>(slice, slice_pattern),
+            (false, true) => self.clear_pattern_with_slice::<C, D>(slice),
+            (_, false) => self.update_with_slice_pattern::<C, D>(slice, slice_pattern),
             _ => 0
         };
 
-        self.update_overline_field::<R, C, D>(slice);
+        self.update_overline_field::<C, D>(slice);
 
         touched_bitmask
     }
 
     #[inline(always)]
-    pub fn clear_pattern_with_slice<const R: RuleKind, const C: Color, const D: Direction>(&mut self, slice: &mut Slice) -> u16 {
+    pub fn clear_pattern_with_slice<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) -> u16 {
         let start_idx = slice.start_pos.idx_usize();
 
         let old_bitmap = self.indexes[C]
@@ -251,13 +251,13 @@ impl Patterns {
         }
 
         self.indexes[C]
-            .update_slice_bitfields::<R, C, D>(&self.field[C], start_idx, old_bitmap, SlicePattern::EMPTY);
+            .update_slice_bitfields::<C, D>(&self.field[C], start_idx, old_bitmap, SlicePattern::EMPTY);
 
         changed_bitmask
     }
 
     #[inline(always)]
-    fn update_with_slice_pattern<const R: RuleKind, const C: Color, const D: Direction>(
+    fn update_with_slice_pattern<const C: Color, const D: Direction>(
         &mut self, slice: &mut Slice, slice_pattern: SlicePattern
     ) -> u16 {
         if (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK) != 0 {
@@ -293,13 +293,13 @@ impl Patterns {
         }
 
         self.indexes[C]
-            .update_slice_bitfields::<R, C, D>(&self.field[C], start_idx, old_slice_bitmap, slice_pattern);
+            .update_slice_bitfields::<C, D>(&self.field[C], start_idx, old_slice_bitmap, slice_pattern);
 
         changed_bitmask
     }
 
     #[inline(always)]
-    fn update_overline_field<const R: RuleKind, const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
+    fn update_overline_field<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) {
         if C == Color::Black && R == RuleKind::Renju {
             let mut overline_bitmask = slice_pattern::match_overline_positions(slice.stones[Color::Black], slice.blocks::<C>());
             while overline_bitmask != 0 {

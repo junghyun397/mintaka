@@ -4,8 +4,8 @@ use crate::movegen::neighbor_scores::NeighborScores;
 use rusty_renju::board::{Board, MoveArtifact};
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::{Color, ColorContainer};
-use rusty_renju::notation::pos::Pos;
-use rusty_renju::notation::rule::ForbiddenKind;
+use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::notation::rule::{ForbiddenKind, RuleKind};
 use rusty_renju::notation::score::Score;
 use rusty_renju::pattern::Pattern;
 use rusty_renju::slice::Slices;
@@ -14,15 +14,15 @@ use rusty_renju::{const_for, pattern};
 use rusty_renju::notation::pos;
 
 #[derive(Clone)]
-pub struct HeuristicEvaluator {
+pub struct HeuristicEvaluator<const R: RuleKind> {
     neighbor_scores: NeighborScores,
     scores: ColorContainer<[i16; pattern::PATTERN_SIZE]>,
     score_black: Score,
     hash_key: HashKey,
 }
 
-impl HeuristicEvaluator {
-    fn update(&mut self, board: &Board, artifact: MoveArtifact, plied: Pos) {
+impl<const R: RuleKind> HeuristicEvaluator<R> {
+    fn update(&mut self, board: &Board<R>, artifact: MoveArtifact, plied: Pos) {
         for (color, directions) in artifact.iter() {
             let mut score_delta = 0;
 
@@ -53,14 +53,14 @@ impl HeuristicEvaluator {
     }
 }
 
-impl Evaluator for HeuristicEvaluator {
+impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
     type EvaluatorParameter = ();
 
     fn require_stabilize(&self) -> bool {
         true
     }
 
-    fn from_state(state: &GameState) -> Self {
+    fn from_state(state: &GameState<R>) -> Self {
         let mut evaluator = Self {
             neighbor_scores: NeighborScores::EMPTY,
             scores: ColorContainer::new([0; pattern::PATTERN_SIZE], [0; pattern::PATTERN_SIZE]),
@@ -73,7 +73,7 @@ impl Evaluator for HeuristicEvaluator {
         evaluator
     }
 
-    fn init(&mut self, board: &Board) {
+    fn init(&mut self, board: &Board<R>) {
         self.neighbor_scores = (&board.hot_field).into();
         self.hash_key = board.hash_key;
 
@@ -89,23 +89,29 @@ impl Evaluator for HeuristicEvaluator {
                 - self.scores[Color::White].iter().map(|&score| score as Score).sum::<Score>();
     }
 
-    fn play(&mut self, board: &Board, artifact: MoveArtifact, plied: Pos) {
-        self.neighbor_scores.add_neighbor_score(plied);
-        self.update(&board, artifact, plied);
+    fn play(&mut self, board: &Board<R>, artifact: MoveArtifact, plied: MaybePos) {
+        if let Some(plied) = plied.ok() {
+            self.neighbor_scores.add_neighbor_score(plied);
+            self.update(&board, artifact, plied);
+        }
+
         self.hash_key = board.hash_key;
     }
 
-    fn undo(&mut self, board: &Board, artifact: MoveArtifact, removed: Pos) {
-        self.neighbor_scores.remove_neighbor_score(removed);
-        self.update(&board, artifact, removed);
+    fn undo(&mut self, board: &Board<R>, artifact: MoveArtifact, removed: MaybePos) {
+        if let Some(removed) = removed.ok() {
+            self.neighbor_scores.remove_neighbor_score(removed);
+            self.update(&board, artifact, removed);
+        }
+
         self.hash_key = board.hash_key;
     }
 
-    fn eval_policy(&mut self, state: &GameState) -> PolicyDistribution {
+    fn eval_policy(&mut self, state: &GameState<R>) -> PolicyDistribution {
         self.scores[state.board.player_color]
     }
 
-    fn eval_value(&mut self, state: &GameState) -> Score {
+    fn eval_value(&mut self, state: &GameState<R>) -> Score {
         let mut forbidden_score = 0;
         for pos in state.board.patterns.forbidden_field.iter_hot_pos() {
             forbidden_score += match state.board.patterns.forbidden_kind(pos).unwrap() {
@@ -185,12 +191,12 @@ impl HeuristicPatternScores {
     const OPEN_FOUR: i16            = 1000;
 
     const THREE_FOUR_FORK: i16      = 800 - Self::DOUBLE_THREE_FORK - Self::OPEN_FOUR;
-    const DOUBLE_THREE_FORK: i16  = 300 - Self::OPEN_THREE * 2;
-    const DOUBLE_FOUR_FORK: i16   = 1000 - Self::CLOSED_FOUR * 2;
+    const DOUBLE_THREE_FORK: i16    = 300 - Self::OPEN_THREE * 2;
+    const DOUBLE_FOUR_FORK: i16     = 1000 - Self::CLOSED_FOUR * 2;
 
     const OVERLINE_FORBID: i16      = 400;
-    const DOUBLE_FOUR_FORBID: i16  = Self::DOUBLE_FOUR_FORK + 200;
-    const DOUBLE_THREE_FORBID: i16 = Self::DOUBLE_THREE_FORK + 50;
+    const DOUBLE_FOUR_FORBID: i16   = Self::DOUBLE_FOUR_FORK + 200;
+    const DOUBLE_THREE_FORBID: i16  = Self::DOUBLE_THREE_FORK + 50;
 }
 
 const BLACK_SIGNUM: ColorContainer<Score> = ColorContainer::new(1, -1);

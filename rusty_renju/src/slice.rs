@@ -119,7 +119,7 @@ impl Slice {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Slices {
     pub horizontal_slices: [Slice; pos::U_BOARD_WIDTH],
     pub vertical_slices: [Slice; pos::U_BOARD_WIDTH],

@@ -243,11 +243,14 @@ fn match_command(
                 Some("rule") => {
                     if let Some(rule) = args.get(2).and_then(|value| value.parse::<usize>().ok()) {
                         let rule_kind = match rule {
+                            1 => RuleKind::Gomoku,
                             2 | 4 => RuleKind::Renju,
                             _ => return Err("unsupported rule"),
                         };
 
-                        message_sender.command(MessageCommand::Raw(Command::Rule(rule_kind)));
+                        if rule_kind != mintaka_interface::RULE {
+                            return Err("unsupported rule")
+                        }
                     }
                 }
                 _ => {}
@@ -293,7 +296,7 @@ fn match_command(
                 .map(|&(_, own)| if own { Color::Black } else { Color::White })
                 .unwrap_or(Color::Black);
 
-            let mut game_state = GameState::empty();
+            let mut game_state = GameState::<{ mintaka_interface::RULE }>::empty();
 
             for (pos, own) in sequence {
                 if own != (game_state.board.player_color == own_color) {

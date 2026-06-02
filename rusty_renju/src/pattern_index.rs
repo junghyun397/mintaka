@@ -13,7 +13,7 @@ use crate::notation::rule::RuleKind;
 
 #[derive(Debug, Copy, Clone)]
 #[repr(align(32))]
-pub struct PatternIndex {
+pub struct PatternIndex<const R: RuleKind> {
     pub open_threes: Bitfield,
     pub close_threes: Bitfield,
     pub fork_fours: Bitfield,
@@ -21,7 +21,7 @@ pub struct PatternIndex {
     pub slice_bitmap: [SlicePattern; slice::TOTAL_SLICE_AMOUNT],
 }
 
-impl Empty for PatternIndex {
+impl<const R: RuleKind> Empty for PatternIndex<R> {
     fn empty() -> Self {
         Self {
             open_threes: Bitfield::empty(),
@@ -33,7 +33,7 @@ impl Empty for PatternIndex {
     }
 }
 
-impl PatternIndex {
+impl<const R: RuleKind> PatternIndex<R> {
     #[inline(always)]
     pub fn has_any_four(&self) -> bool {
         !(self.closed_fours.is_empty() && self.fork_fours.is_empty())
@@ -52,7 +52,7 @@ impl PatternIndex {
     }
 
     #[inline(always)]
-    pub fn update_slice_bitfields<const R: RuleKind, const C: Color, const D: Direction>(
+    pub fn update_slice_bitfields<const C: Color, const D: Direction>(
         &mut self,
         pattern_field: &[Pattern; pattern::PATTERN_SIZE],
         start_idx: usize,
@@ -158,7 +158,8 @@ impl PatternIndex {
     }
 }
 
-#[inline(always)]
+#[cfg_attr(target_arch = "wasm32", inline(never))]
+#[cfg_attr(not(target_arch = "wasm32"), inline(always))]
 fn pattern_bitmask(patterns: u8x16, mask: u8) -> u16 {
     (patterns & Simd::splat(mask))
         .simd_ne(Simd::splat(0))

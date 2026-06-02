@@ -1,6 +1,7 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
+use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::empty::Empty;
 
 pub const COLOR_NONE: u8 = u8::MAX;
@@ -156,7 +157,7 @@ pub extern "C" fn rusty_renju_board_from_history(actions: *const u8, len: usize)
 pub extern "C" fn rusty_renju_board_from_string(source: *const c_char) -> *mut rusty_renju::notation::ffi::CBoard {
     if let Some(source) = unsafe { source.as_ref() }
         && let Ok(source) = unsafe { CStr::from_ptr(source) }.to_str()
-        && let Ok(board) = source.parse::<rusty_renju::board::Board>()
+        && let Ok(board) = source.parse::<rusty_renju::board::Board<{ RuleKind::Renju }>>()
     {
         Box::into_raw(Box::new(board.into()))
     } else {

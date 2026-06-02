@@ -38,7 +38,7 @@ mod bench_vcf {
                 history
             };
 
-            let state = GameStateData { board: $board, history }.into();
+            let state = GameStateData { board_data: (&$board).into(), history }.into();
 
             let evaluator = ActiveEvaluator::from_state(&state);
 

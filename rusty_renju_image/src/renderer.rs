@@ -12,10 +12,11 @@ use rusty_renju::board_iter::BoardExportItem;
 use rusty_renju::history::{History, MAX_HISTORY_SIZE};
 use rusty_renju::notation::color::{Color, ColorContainer};
 use rusty_renju::notation::pos::{Pos, BOARD_SIZE, U_BOARD_WIDTH};
+use rusty_renju::notation::rule::RuleKind;
 use crate::{HistoryRender, RenderPayloads};
 use crate::text::raster_text;
 
-pub fn render_pixmap(board: &Board, opts: RenderPayloads) -> Pixmap {
+pub fn render_pixmap(board: &Board<{ RuleKind::Renju }>, opts: RenderPayloads) -> Pixmap {
     let res = resources();
     let mut canvas = res.base.clone();
 
@@ -360,7 +361,7 @@ fn draw_positions(canvas: &mut Pixmap, res: &Resources, sprite: &Pixmap, positio
     }
 }
 
-fn draw_board(canvas: &mut Pixmap, board: &Board, opts: &RenderPayloads, res: &Resources) {
+fn draw_board(canvas: &mut Pixmap, board: &Board<{ RuleKind::Renju }>, opts: &RenderPayloads, res: &Resources) {
     for (cell, item) in res.cells.iter().zip(board.export_items()) {
         match item {
             BoardExportItem::Stone(color) => blit_cell(canvas, &res.lut.stone[color], cell),
@@ -384,7 +385,7 @@ fn draw_board(canvas: &mut Pixmap, board: &Board, opts: &RenderPayloads, res: &R
 fn draw_recent(
     canvas: &mut Pixmap,
     history: &History,
-    board: &Board,
+    board: &Board<{ RuleKind::Renju }>,
     res: &Resources,
     include_prev: bool,
 ) {

@@ -7,7 +7,7 @@ use serde::{de, Deserialize, Serialize, Serializer};
 use base64::engine::{general_purpose, Engine as _};
 use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
-use std::simd::u8x32;
+use std::simd::Simd;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 use crate::utils::empty::Empty;
@@ -97,7 +97,7 @@ impl Bitfield {
     }
 
     pub fn iter_hot_idx(&self) -> impl Iterator<Item=usize> + '_ {
-        BitfieldSetBitsIterator::from(self.to_chunks())
+        BitfieldHotBitsIterator::from(self.to_chunks())
     }
 
     pub fn iter_hot_pos(&self) -> impl Iterator<Item=Pos> + '_ {
@@ -125,8 +125,8 @@ impl Bitfield {
         self.0 == [0; 32]
     }
 
-    fn to_simd(self) -> u8x32 {
-        u8x32::from_array(self.0)
+    fn to_simd(self) -> Simd<u8, 32> {
+        Simd::<u8, 32>::from_array(self.0)
     }
 
     fn to_chunks(self) -> [u64; 4] {
@@ -143,7 +143,7 @@ impl Not for Bitfield {
     type Output = Self;
 
     fn not(self) -> Self::Output {
-        (!self.to_simd()).into()
+        Self((!self.to_simd()).into())
     }
 }
 
@@ -151,7 +151,7 @@ impl BitAnd for Bitfield {
     type Output = Self;
 
     fn bitand(self, rhs: Self) -> Self::Output {
-        (self.to_simd() & rhs.to_simd()).into()
+        Self((self.to_simd() & rhs.to_simd()).into())
     }
 }
 
@@ -159,7 +159,7 @@ impl BitOr for Bitfield {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
-        (self.to_simd() | rhs.to_simd()).into()
+        Self((self.to_simd() | rhs.to_simd()).into())
     }
 }
 
@@ -167,7 +167,7 @@ impl BitXor for Bitfield {
     type Output = Self;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
-        (self.to_simd() ^ rhs.to_simd()).into()
+        Self((self.to_simd() ^ rhs.to_simd()).into())
     }
 }
 
@@ -189,44 +189,15 @@ impl BitXorAssign for Bitfield {
     }
 }
 
-#[derive(Debug)]
-pub struct BitfieldSizeError;
-
-impl Display for BitfieldSizeError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "bitfield binary must exactly 32 bytes")
-    }
-}
-
-impl std::error::Error for BitfieldSizeError {}
-
-impl TryFrom<Vec<u8>> for Bitfield {
-    type Error = BitfieldSizeError;
-
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| BitfieldSizeError)?))
-    }
-}
-
-impl From<u8x32> for Bitfield {
-
-    fn from(x: u8x32) -> Self {
-        Self(x.to_array())
-    }
-
-}
-
 struct BitfieldIterator {
     chunks: [u64; 4],
     position: usize,
 }
 
 impl ExactSizeIterator for BitfieldIterator {
-
     fn len(&self) -> usize {
         pos::BOARD_SIZE
     }
-
 }
 
 impl Iterator for BitfieldIterator {
@@ -242,15 +213,14 @@ impl Iterator for BitfieldIterator {
         self.position += 1;
         Some(result)
     }
-
 }
 
-struct BitfieldSetBitsIterator {
+struct BitfieldHotBitsIterator {
     chunks: [u64; 4],
     chunk_mask: usize,
 }
 
-impl From<[u64; 4]> for BitfieldSetBitsIterator {
+impl From<[u64; 4]> for BitfieldHotBitsIterator {
     fn from(chunks: [u64; 4]) -> Self {
         let chunk_mask = (chunks[0] != 0) as usize
             | (((chunks[1] != 0) as usize) << 1)
@@ -264,7 +234,7 @@ impl From<[u64; 4]> for BitfieldSetBitsIterator {
     }
 }
 
-impl ExactSizeIterator for BitfieldSetBitsIterator {
+impl ExactSizeIterator for BitfieldHotBitsIterator {
     fn len(&self) -> usize {
         self.chunks.iter()
             .map(|x| x.count_ones() as usize)
@@ -272,7 +242,7 @@ impl ExactSizeIterator for BitfieldSetBitsIterator {
     }
 }
 
-impl Iterator for BitfieldSetBitsIterator {
+impl Iterator for BitfieldHotBitsIterator {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -322,6 +292,7 @@ impl<'de> Deserialize<'de> for Bitfield {
         general_purpose::URL_SAFE_NO_PAD.decode(&String::deserialize(deserializer)?)
             .map_err(de::Error::custom)?
             .try_into()
+            .map(|bin| Self(bin))
             .map_err(|_| de::Error::custom("invalid bitfield binary"))
     }
 }

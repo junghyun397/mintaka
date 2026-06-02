@@ -13,6 +13,7 @@ mod test_movegen {
     use rusty_renju::notation::pos::MaybePos;
     use rusty_renju::utils::empty::Empty;
     use std::sync::atomic::{AtomicBool, AtomicU32};
+    use rusty_renju::notation::rule::RuleKind;
 
     macro_rules! test_move_ordering {
         ($history:literal) => {{
@@ -21,7 +22,7 @@ mod test_movegen {
 
             let state = history.into();
 
-            let evaluator = ActiveEvaluator::from_state(&state);
+            let evaluator = ActiveEvaluator::<{ RuleKind::Renju }>::from_state(&state);
 
             let tt = TranspositionTable::new_with_size(config.tt_size);
             let ht = HistoryTable::empty();

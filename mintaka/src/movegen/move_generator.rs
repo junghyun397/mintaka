@@ -2,6 +2,7 @@ use rusty_renju::bitfield::Bitfield;
 use crate::search_endgame::{EndgameMovesUnchecked, ENDGAME_MAX_MOVES};
 use rusty_renju::board::Board;
 use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{Score, Scores};
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
@@ -14,7 +15,7 @@ pub const DIRECT_RESPONSE_SCORE: i16 = Score::INF as i16 - 500;
 pub const KILLER_MOVE_SCORE: i16 = Score::INF as i16 - 1000;
 pub const COUNTER_MOVE_BONUS: i16 = 100;
 
-pub fn generate_endgame_moves<const VCT: bool>(board: &Board, distance_window: u8, recent_move: Pos) -> EndgameMovesUnchecked {
+pub fn generate_endgame_moves<const R: RuleKind, const VCT: bool>(board: &Board<R>, distance_window: u8, recent_move: Pos) -> EndgameMovesUnchecked {
     let mut vcf_moves = [MaybePos::NONE; ENDGAME_MAX_MOVES];
     let mut vcf_moves_top = 0;
 
@@ -36,10 +37,10 @@ pub fn generate_endgame_moves<const VCT: bool>(board: &Board, distance_window: u
     EndgameMovesUnchecked { moves: vcf_moves, top: vcf_moves_top as u8 }
 }
 
-pub fn generate_threat_direct_response(
+pub fn generate_threat_direct_response<const R: RuleKind>(
     buffer: &mut MoveList,
-    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
-    state: &GameState,
+    td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+    state: &GameState<R>,
     field: &Bitfield,
 ) {
     for pos in field.iter_hot_pos() {
@@ -54,10 +55,10 @@ pub fn generate_threat_direct_response(
     }
 }
 
-pub fn generate_extend_four_response(
+pub fn generate_extend_four_response<const R: RuleKind>(
     buffer: &mut MoveList,
-    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
-    state: &GameState,
+    td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+    state: &GameState<R>,
 ) {
     let maybe_last_pos = state.history.last_action_or_none();
 
@@ -84,10 +85,10 @@ pub fn generate_extend_four_response(
     }
 }
 
-pub fn generate_all_moves(
+pub fn generate_all_moves<const R: RuleKind>(
     buffer: &mut MoveList,
-    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
-    state: &GameState,
+    td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+    state: &GameState<R>,
 ) {
     let policy_buffer = td.evaluator.eval_policy(state);
 
@@ -128,9 +129,9 @@ pub fn generate_all_moves(
     }
 }
 
-fn counter_move_from(
-    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
-    state: &GameState,
+fn counter_move_from<const R: RuleKind>(
+    td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+    state: &GameState<R>,
 ) -> Option<Pos> {
     state.history.last_action()
         .and_then(|action| action.ok())

@@ -8,6 +8,7 @@ use rusty_renju::bitfield::Bitfield;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::utils::empty::Empty;
 use std::cmp::PartialEq;
+use rusty_renju::notation::rule::RuleKind;
 use crate::thread_data;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -40,7 +41,7 @@ enum MoveKind {
     ExtendFour
 }
 
-pub struct MovePicker {
+pub struct MovePicker<const R: RuleKind> {
     threat_kind: Option<ThreatKind>,
     stage: MoveStage,
     moves_buffer: MoveList,
@@ -50,7 +51,7 @@ pub struct MovePicker {
     skip_lp_quiets: bool,
 }
 
-impl MovePicker {
+impl<const R: RuleKind> MovePicker<R> {
     pub fn init_new(
         tt_move: MaybePos,
         killer_moves: [MaybePos; thread_data::KILLER_MOVE_SLOTS],
@@ -73,8 +74,8 @@ impl MovePicker {
 
     pub fn next(
         &mut self,
-        td: &mut ThreadData<impl ThreadType, impl Evaluator>,
-        state: &GameState,
+        td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+        state: &GameState<R>,
     ) -> Option<MoveEntry> {
         loop {
             match self.stage {
@@ -162,7 +163,7 @@ impl MovePicker {
         }
     }
 
-    fn is_forced_legal(&self, state: &GameState, pos: Pos) -> bool {
+    fn is_forced_legal(&self, state: &GameState<R>, pos: Pos) -> bool {
         if let Some(threat_kind) = self.threat_kind {
             threat_kind.bitfield().is_hot(pos)
                 || state.board.patterns.field[state.board.player_color][pos.idx_usize()].has_closed_four()

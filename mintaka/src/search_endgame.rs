@@ -107,7 +107,7 @@ impl EndgameMovesUnchecked {
         next_move
     }
 
-    pub fn sort_moves(&mut self, board: &Board, ref_pos: Pos) {
+    pub fn sort_moves<const R: RuleKind>(&mut self, board: &Board<R>, ref_pos: Pos) {
         self.moves[..self.top as usize].sort_by_key(|pos| {
             let pos = pos.unwrap();
 
@@ -172,9 +172,9 @@ impl VcfDestination for VcfCounter {
 }
 
 pub fn endgame_search<const R: RuleKind, const VCT: bool>(
-    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
+    td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
     max_ply: Depth,
-    state: &GameState,
+    state: &GameState<R>,
     alpha: Score,
     beta: Score,
     static_eval: Score,
@@ -191,7 +191,7 @@ pub fn endgame_search<const R: RuleKind, const VCT: bool>(
 
     let recent_player_action = state.history.previous_action().unwrap_or(pos::CENTER);
 
-    let mut endgame_moves = generate_endgame_moves::<VCT>(&state.board, 8, recent_player_action);
+    let mut endgame_moves = generate_endgame_moves::<R, VCT>(&state.board, 8, recent_player_action);
 
     if endgame_moves.is_empty() {
         return static_eval;
@@ -212,10 +212,10 @@ pub fn endgame_search<const R: RuleKind, const VCT: bool>(
 }
 
 pub fn endgame_sequence<const R: RuleKind, const VCT: bool>(
-    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
-    state: &GameState
+    td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+    state: &GameState<R>
 ) -> Option<Vec<Pos>> {
-    let mut endgame_moves = generate_endgame_moves::<VCT>(&state.board, 5, pos::CENTER);
+    let mut endgame_moves = generate_endgame_moves::<R, VCT>(&state.board, 5, pos::CENTER);
 
     if endgame_moves.is_empty() {
         return None;
@@ -240,10 +240,10 @@ pub fn endgame_sequence<const R: RuleKind, const VCT: bool>(
 }
 
 fn vcf<const R: RuleKind, const DW: u8, Sq: SequenceTracker>(
-    td: &mut ThreadData<impl ThreadType, impl Evaluator>,
+    td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
     dest: impl VcfDestination,
     max_depth: Depth,
-    state: GameState,
+    state: GameState<R>,
     vcf_moves: EndgameMovesUnchecked,
     static_eval: Score,
     alpha: Score, beta: Score,
@@ -255,10 +255,10 @@ fn vcf<const R: RuleKind, const DW: u8, Sq: SequenceTracker>(
 }
 
 fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: SequenceTracker>(
-    td: &mut ThreadData<TH, impl Evaluator>,
+    td: &mut ThreadData<R, TH, impl Evaluator<R>>,
     dest: impl VcfDestination,
     mut vcf_depth_left: Depth,
-    mut state: GameState,
+    mut state: GameState<R>,
     mut vcf_moves: EndgameMovesUnchecked,
     static_eval: Score,
     mut alpha: Score, beta: Score,
@@ -267,8 +267,8 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
 
     let mut vcf_ply = 0;
 
-    fn backtrace_frames<Sq: SequenceTracker>(
-        td: &mut ThreadData<impl ThreadType, impl Evaluator>,
+    fn backtrace_frames<const R: RuleKind, Sq: SequenceTracker>(
+        td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
         mut hash_key: HashKey,
         player_color: Color,
         vcf_ply: usize,
@@ -332,7 +332,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
 
             td.batch_counter.increment();
             let artifact = state.board.set_mut(four_pos);
-            td.evaluator.play(&state.board, artifact, four_pos);
+            td.evaluator.play(&state.board, artifact, four_pos.into());
             vcf_ply += 1;
             vcf_depth_left -= 1;
 
@@ -351,7 +351,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                 _ => response_pattern.has_open_four() && !response_is_forbidden
             } || dest.conditional_abort(response_pattern) {
                 let artifact = state.board.unset_mut(four_pos);
-                td.evaluator.undo(&state.board, artifact, four_pos);
+                td.evaluator.undo(&state.board, artifact, four_pos.into());
                 vcf_ply -= 1;
                 vcf_depth_left += 1;
                 continue 'position_search;
@@ -379,7 +379,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                 || vcf_depth_left <= 0
             {
                 let artifact = state.board.unset_mut(four_pos);
-                td.evaluator.undo(&state.board, artifact, four_pos);
+                td.evaluator.undo(&state.board, artifact, four_pos.into());
                 vcf_ply -= 1;
                 vcf_depth_left += 1;
                 continue 'position_search;
@@ -403,7 +403,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                 // tt vcf cache
                 if vcf_depth_left.min(TTFlag::MAX_TT_ENDGAME_DEPTH as Depth) as u8 <= tt_endgame_depth {
                     let artifact = state.board.unset_mut(four_pos);
-                    td.evaluator.undo(&state.board, artifact, four_pos);
+                    td.evaluator.undo(&state.board, artifact, four_pos.into());
                     vcf_ply -= 1;
                     vcf_depth_left += 1;
                     continue 'position_search;
@@ -412,14 +412,14 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
 
             td.batch_counter.increment();
             let artifact = state.board.set_mut(response_pos);
-            td.evaluator.play(&state.board, artifact, response_pos);
+            td.evaluator.play(&state.board, artifact, response_pos.into());
             vcf_ply += 1;
 
             if !state.board.patterns.indexes[C].has_any_four() { // cold branch pruning
                 let artifact = state.board.unset_mut(response_pos);
-                td.evaluator.undo(&state.board, artifact, response_pos);
+                td.evaluator.undo(&state.board, artifact, response_pos.into());
                 let artifact = state.board.unset_mut(four_pos);
-                td.evaluator.undo(&state.board, artifact, four_pos);
+                td.evaluator.undo(&state.board, artifact, four_pos.into());
                 vcf_ply -= 2;
                 vcf_depth_left += 1;
                 continue 'position_search;
@@ -440,9 +440,9 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                 {
                     td.endgame_stack_top -= 1;
                     let artifact = state.board.unset_mut(response_pos);
-                    td.evaluator.undo(&state.board, artifact, response_pos);
+                    td.evaluator.undo(&state.board, artifact, response_pos.into());
                     let artifact = state.board.unset_mut(four_pos);
-                    td.evaluator.undo(&state.board, artifact, four_pos);
+                    td.evaluator.undo(&state.board, artifact, four_pos.into());
                     vcf_ply -= 2;
                     vcf_depth_left += 1;
                     continue 'position_search;
@@ -450,7 +450,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
 
                 vcf_moves = EndgameMovesUnchecked::unit(response_move);
             } else {
-                vcf_moves = generate_endgame_moves::<false>(&state.board, DW, four_pos);
+                vcf_moves = generate_endgame_moves::<R, false>(&state.board, DW, four_pos);
             }
 
             vcf_moves.init();
@@ -483,9 +483,9 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
 
         if let Some(frame) = td.pop_endgame_frame() {
             let artifact = state.board.unset_mut(frame.response_pos);
-            td.evaluator.undo(&state.board, artifact, frame.response_pos);
+            td.evaluator.undo(&state.board, artifact, frame.response_pos.into());
             let artifact = state.board.unset_mut(frame.four_pos);
-            td.evaluator.undo(&state.board, artifact, frame.four_pos);
+            td.evaluator.undo(&state.board, artifact, frame.four_pos.into());
             vcf_ply -= 2;
             vcf_depth_left += 1;
 

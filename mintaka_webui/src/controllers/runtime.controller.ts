@@ -191,7 +191,7 @@ export function createRuntimeController(
 
         setMintakaRuntime({ type: "loading", progress: { type: "server" } })
 
-        const session = await createSession(serverConfig, { board, history }, storedConfig)
+        const session = await createSession(serverConfig, { board_data: board, history }, storedConfig)
 
         const provider = new MintakaServerProvider(serverConfig, session)
 
@@ -237,7 +237,7 @@ export function createRuntimeController(
         let response = await runtime.provider.launch(snapshot.boardWorker.hashKey(), "Best")
 
         if (response === "snapshot-mismatch") {
-            await syncAll({ board: snapshot.boardWorker.value(), history: snapshot.historyTree.toHistory() })
+            await syncAll({ board_data: snapshot.boardWorker.value(), history: snapshot.historyTree.toHistory() })
 
             response = await runtime.provider.launch(snapshot.boardWorker.hashKey(), "Best")
 
@@ -278,7 +278,7 @@ export function createRuntimeController(
             let config = persistProviderConfigController.load({ type: "worker" }) ?? DefaultWorkerConfig
             const configs = { default_config: DefaultWorkerConfig, max_config: MaxWorkerConfig, config: config }
 
-            const provider = new MintakaWorkerProvider({ board, history }, config)
+            const provider = new MintakaWorkerProvider({ board_data: board, history }, config)
 
             const runtimeState = buildMintakaRuntime(board.hash_key)
             const runtime: MintakaRuntime = { type: "ready", provider, state: runtimeState, configs }

@@ -15,6 +15,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::notation::rule::RuleKind;
 
 impl From<&AppError> for StatusCode {
     fn from(error: &AppError) -> Self {
@@ -74,7 +75,7 @@ pub async fn check_session(
 pub struct CreateSessionRequest {
     api_password: Option<String>,
     config: Option<Config>,
-    state: GameState,
+    state: GameState<{ RuleKind::Renju }>,
 }
 
 #[derive(Serialize)]

@@ -17,6 +17,9 @@ extern "C" {
 
     #[wasm_bindgen(typescript_type = "Color")]
     pub type Color;
+    
+    #[wasm_bindgen(typescript_type = "RuleKind")]
+    pub type RuleKind;
 
     #[wasm_bindgen(typescript_type = "Board")]
     pub type Board;
@@ -33,7 +36,7 @@ extern "C" {
 
 #[wasm_bindgen(js_name = defaultBoard)]
 pub fn default_board() -> Board {
-    to_js_value(&rusty_renju::board::Board::empty())
+    to_js_value(&rusty_renju::board::Board::<{ rusty_renju::notation::rule::RuleKind::Renju }>::empty())
 }
 
 #[wasm_bindgen(js_name = emptyHash)]
@@ -49,7 +52,7 @@ pub fn calculate_win_rate(score: Score) -> f32 {
 }
 
 impl_wrapper! {
-    pub BoardWorker { inner: rusty_renju::board::Board } <-> Board
+    pub BoardWorker { inner: rusty_renju::board::Board<{ rusty_renju::notation::rule::RuleKind::Renju }> } <-> Board
 }
 
 #[wasm_bindgen]

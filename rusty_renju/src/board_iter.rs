@@ -2,7 +2,7 @@ use crate::board::Board;
 use crate::notation::color::{Color, ColorContainer};
 use crate::notation::pos;
 use crate::notation::pos::Pos;
-use crate::notation::rule::ForbiddenKind;
+use crate::notation::rule::{ForbiddenKind, RuleKind};
 use crate::pattern::Pattern;
 use crate::{index_to_col, index_to_row};
 use std::array;
@@ -41,8 +41,7 @@ mod typeshare_workaround {
     }
 }
 
-impl Board {
-
+impl<const R: RuleKind> Board<R> {
     pub fn iter_items(&self) -> impl Iterator<Item=BoardIterItem> + '_ {
         self.hot_field.iter()
             .enumerate()
@@ -77,5 +76,4 @@ impl Board {
                 .unwrap_or(BoardExportItem::Empty)
         })
     }
-
 }

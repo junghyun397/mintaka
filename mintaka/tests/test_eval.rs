@@ -5,10 +5,11 @@ mod test_eval {
     use mintaka::game_state::GameState;
     use rusty_renju::board;
     use rusty_renju::notation::pos;
+    use rusty_renju::notation::rule::RuleKind;
 
     macro_rules! eval {
         ($board:expr) => {{
-            let state: GameState = $board.into();
+            let state: GameState<{ RuleKind::Renju }> = $board.into();
 
             let mut evaluator = ActiveEvaluator::from_state(&state);
 
@@ -16,7 +17,7 @@ mod test_eval {
         }};
     }
 
-    fn eval_distribution(state: &GameState) -> [f32; pos::BOARD_SIZE] {
+    fn eval_distribution(state: &GameState<{ RuleKind::Renju }>) -> [f32; pos::BOARD_SIZE] {
         let mut evaluator = ActiveEvaluator::from_state(state);
 
         let movegen_field = state.movegen_window.movegen_field & !state.board.legal_field(state.board.player_color);
@@ -56,7 +57,7 @@ mod test_eval {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"});
 
-        let state: GameState = board.into();
+        let state: GameState<{ RuleKind::Renju }> = board.into();
 
         let scores = eval_distribution(&state);
 

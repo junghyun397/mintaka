@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::sync::Arc;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsError};
+use rusty_renju::notation::rule::RuleKind;
 
 #[wasm_bindgen]
 extern "C" {
@@ -33,7 +34,7 @@ extern "C" {
 
 #[wasm_bindgen]
 pub struct GameAgent {
-    pub(crate) inner: Arc<RefCell<mintaka::game_agent::GameAgent>>,
+    pub(crate) inner: Arc<RefCell<mintaka::game_agent::GameAgent<{ RuleKind::Renju }>>>,
 }
 
 #[wasm_bindgen]
@@ -42,7 +43,7 @@ impl GameAgent {
     #[wasm_bindgen(constructor)]
     pub fn new(config: Config, state: GameState) -> Self {
         let config: mintaka::config::Config = try_from_js_value(config).unwrap_or_default();
-        let state: mintaka::game_state::GameState = try_from_js_value(state).unwrap_or_else(|_| mintaka::game_state::GameState::empty());
+        let state: mintaka::game_state::GameState<{ RuleKind::Renju }> = try_from_js_value(state).unwrap_or_else(|_| mintaka::game_state::GameState::empty());
 
         Self {
             inner: Arc::new(RefCell::new(mintaka::game_agent::GameAgent::from_state(config, state))),

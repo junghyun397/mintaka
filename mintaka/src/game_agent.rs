@@ -1,13 +1,13 @@
 use crate::config::{Config, SearchObjective};
 use crate::eval::evaluator::{ActiveEvaluator, Evaluator};
 use crate::eval::heuristic_evaluator::HeuristicEvaluator;
+use crate::game_state::{GameState, GameStateData};
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
 use crate::protocol::command::Command;
 pub use crate::protocol::response::{ComputingResource, Response, ResponseSender};
 use crate::protocol::results::{BestMove, CommandResult, GameResult};
 use crate::search::iterative_deepening;
-use crate::game_state::{GameState, GameStateData};
 use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::time::{TimeManager, Timer};
@@ -20,14 +20,14 @@ use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
+use rusty_renju::utils::empty::Empty;
 #[cfg(feature = "serde")]
 use serde::ser::SerializeStruct;
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize, Deserializer, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
-use rusty_renju::utils::empty::Empty;
 
 #[cfg(not(feature = "rayon"))]
 macro_rules! search_scope {
@@ -84,23 +84,22 @@ impl Display for GameError {
 
 impl std::error::Error for GameError {}
 
-pub struct GameAgent {
+pub struct GameAgent<const R: RuleKind> {
     pub config: Config,
-    pub state: GameState,
-    pub evaluator: ActiveEvaluator,
+    pub state: GameState<R>,
+    pub evaluator: ActiveEvaluator<R>,
     tt: TranspositionTable,
     ht: HistoryTable,
     executed_moves: Bitfield,
     pub time_manager: TimeManager,
 }
 
-impl GameAgent {
-
+impl<const R: RuleKind> GameAgent<R> {
     pub fn new(config: Config) -> Self {
         Self::from_state(config, GameState::empty())
     }
 
-    pub fn from_state(config: Config, state: GameState) -> Self {
+    pub fn from_state(config: Config, state: GameState<R>) -> Self {
         let tt = TranspositionTable::new_with_size(config.tt_size);
 
         Self {
@@ -156,9 +155,7 @@ impl GameAgent {
                     Some(action) => {
                         let artifact = self.state.undo_rebuild_mut();
 
-                        if let Some(pos) = action.ok() {
-                            self.evaluator.undo(&self.state.board, artifact, pos);
-                        }
+                        self.evaluator.undo(&self.state.board, artifact, action);
 
                         if self.executed_moves.is_hot_idx(self.state.len()) {
                             self.executed_moves.unset_idx(self.state.len());
@@ -247,7 +244,7 @@ impl GameAgent {
             },
             Command::Clear => {
                 self.reinit_from_state(GameStateData {
-                    board: Board::empty(),
+                    board_data: (&Board::<R>::empty()).into(),
                     history: History::empty(),
                 });
             },
@@ -280,9 +277,6 @@ impl GameAgent {
             },
             Command::MaxMemory(size) => {
                 self.resize_tt(size);
-            },
-            Command::Rule(kind) => {
-                self.config.rule_kind = kind;
             },
             Command::Config(config) => {
                 let old_config = self.config;
@@ -365,7 +359,7 @@ impl GameAgent {
                 );
 
                 spawn_search_worker(s, move || {
-                    iterative_deepening::<CLK, { RuleKind::Renju }, WorkerThread>(
+                    iterative_deepening::<CLK, R, WorkerThread>(
                         &mut worker_td, state
                     );
                 });
@@ -387,7 +381,7 @@ impl GameAgent {
                 &aborted, &global_counter_in_1k,
             );
 
-            let (score, best_move) = iterative_deepening::<CLK, { RuleKind::Renju }, MainThread<_, _>>(
+            let (score, best_move) = iterative_deepening::<CLK, R, MainThread<_, _>>(
                 &mut main_td, state
             );
 
@@ -438,11 +432,10 @@ impl GameAgent {
 
         self.tt.resize(size - HEAP_MEMORY_MARGIN);
     }
-
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for GameAgent {
+impl<const R: RuleKind> Serialize for GameAgent<R> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         let mut state = serializer.serialize_struct("GameAgent", 6)?;
         state.serialize_field("config", &self.config)?;
@@ -456,12 +449,12 @@ impl Serialize for GameAgent {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for GameAgent {
+impl<'de, const R: RuleKind> Deserialize<'de> for GameAgent<R> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         #[derive(Deserialize)]
-        struct GameAgentData {
+        struct GameAgentData<const R: RuleKind> {
             config: Config,
-            state: GameState,
+            state: GameState<R>,
             tt: TranspositionTable,
             ht: HistoryTable,
             time_manager: TimeManager,

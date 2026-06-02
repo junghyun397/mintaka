@@ -12,6 +12,7 @@ use crate::{params, value};
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::{Score, Scores};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use rusty_renju::notation::rule::RuleKind;
 
 pub const KILLER_MOVE_SLOTS: usize = 2;
 
@@ -54,7 +55,7 @@ impl DebugStatics {
 }
 
 #[derive(Clone)]
-pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
+pub struct ThreadData<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> {
     pub thread_type: TH,
     pub search_objective: SearchObjective,
     pub tid: u32,
@@ -86,9 +87,7 @@ pub struct ThreadData<'a, TH: ThreadType, E: Evaluator> {
     pub ply: usize,
 }
 
-impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
-
-    #[allow(clippy::uninit_assumed_init)]
+impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, TH, E> {
     pub fn new(
         thread_type: TH, tid: u32,
         search_objective: SearchObjective,
@@ -191,7 +190,6 @@ impl<'a, TH: ThreadType, E: Evaluator> ThreadData<'a, TH, E> {
         self.endgame_stack_top -= 1;
         Some(self.endgame_stack[self.endgame_stack_top])
     }
-
 }
 
 fn build_lmr_table(config: Config) -> [[Depth; value::MAX_PLY_SLOTS]; 64] {

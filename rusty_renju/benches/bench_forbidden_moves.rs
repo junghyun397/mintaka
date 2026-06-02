@@ -8,6 +8,7 @@ mod bench_forbidden_moves {
     use rusty_renju::notation::pos::pos_unchecked;
     use test::Bencher;
     use rusty_renju::notation::color::Color;
+    use rusty_renju::notation::rule::RuleKind;
 
     #[bench]
     fn clean_position(b: &mut Bencher) {
@@ -30,7 +31,7 @@ mod bench_forbidden_moves {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        let board = case.parse::<Board>().unwrap();
+        let board = case.parse::<Board<{ RuleKind::Renju }>>().unwrap();
         let pos = pos_unchecked("i9");
         let validate_pos = pos_unchecked("i8");
 
@@ -61,7 +62,7 @@ mod bench_forbidden_moves {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        let board = case.parse::<Board>().unwrap();
+        let board = case.parse::<Board<{ RuleKind::Renju }>>().unwrap();
         let pos = pos_unchecked("h11");
 
         b.iter(|| {
@@ -91,7 +92,7 @@ mod bench_forbidden_moves {
          1 . . . . . . . . . . . . . . . 1
            A B C D E F G H I J K L M N O"};
 
-        let board = case.parse::<Board>().unwrap();
+        let board = case.parse::<Board<{ RuleKind::Renju }>>().unwrap();
         let pos = pos_unchecked("d8");
 
         b.iter(|| {

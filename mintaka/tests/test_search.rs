@@ -9,6 +9,7 @@ mod test_search {
     use std::sync::atomic::{AtomicBool, AtomicU32};
     use std::sync::Arc;
     use std::time::Instant;
+    use rusty_renju::notation::rule::RuleKind;
 
     macro_rules! test_search {
         ($source:expr) => {{
@@ -17,7 +18,7 @@ mod test_search {
                 config.workers = 8;
                 config.max_nodes_in_1k = Some(100);
 
-                let state: GameState = $source.into();
+                let state: GameState<{ RuleKind::Renju }> = $source.into();
 
                 GameAgent::from_state(config, state)
             };

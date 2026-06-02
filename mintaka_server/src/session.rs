@@ -24,6 +24,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast;
 use uuid::Uuid;
+use rusty_renju::notation::rule::RuleKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionKey(Uuid);
@@ -151,7 +152,7 @@ pub enum SessionResponse {
 }
 
 pub struct SessionResultResponse {
-    pub game_agent: GameAgent,
+    pub game_agent: GameAgent<{ RuleKind::Renju }>,
     pub best_move: BestMove,
 }
 
@@ -162,7 +163,7 @@ impl Debug for SessionResultResponse {
 }
 
 pub enum AgentState {
-    Agent(GameAgent),
+    Agent(GameAgent<{ RuleKind::Renju }>),
     Permit(WorkerPermit)
 }
 
@@ -183,14 +184,14 @@ pub struct Session {
 
 #[derive(Deserialize)]
 pub struct SessionData {
-    pub agent: GameAgent,
+    pub agent: GameAgent<{ RuleKind::Renju }>,
     pub best_move: Option<BestMove>,
     pub time_to_live: Option<Duration>,
 }
 
 impl Session {
 
-    pub fn new(config: Config, game_state: GameState, time_to_live: Option<Duration>, memory_permit: MemoryPermit, response_sender: SessionResponseSender) -> Self {
+    pub fn new(config: Config, game_state: GameState<{ RuleKind::Renju }>, time_to_live: Option<Duration>, memory_permit: MemoryPermit, response_sender: SessionResponseSender) -> Self {
         Self {
             state: AgentState::Agent(GameAgent::from_state(config, game_state)),
             response_sender,
@@ -216,14 +217,14 @@ impl Session {
         }
     }
 
-    pub fn game_agent(&self) -> Result<&GameAgent, AppError> {
+    pub fn game_agent(&self) -> Result<&GameAgent<{ RuleKind::Renju }>, AppError> {
         match &self.state {
             AgentState::Agent(agent) => Ok(agent),
             AgentState::Permit { .. } => Err(AppError::SessionInComputing),
         }
     }
 
-    pub fn game_agent_mut(&mut self) -> Result<&mut GameAgent, AppError> {
+    pub fn game_agent_mut(&mut self) -> Result<&mut GameAgent<{ RuleKind::Renju }>, AppError> {
         match &mut self.state {
             AgentState::Agent(agent) => Ok(agent),
             AgentState::Permit { .. } => Err(AppError::SessionInComputing),
@@ -295,7 +296,7 @@ impl Session {
         self.best_move
     }
 
-    pub fn restore(&mut self, game_agent: GameAgent) -> Result<(), AppError> {
+    pub fn restore(&mut self, game_agent: GameAgent<{ RuleKind::Renju }>) -> Result<(), AppError> {
         let permit = match std::mem::replace(&mut self.state, AgentState::Agent(game_agent)) {
             AgentState::Permit(permit) => permit,
             AgentState::Agent(prev_agent) => {

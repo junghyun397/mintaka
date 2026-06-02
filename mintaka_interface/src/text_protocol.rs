@@ -39,7 +39,7 @@ fn main() -> Result<(), GameError> {
 
 fn text_protocol(
     config: Config,
-    state: GameState,
+    state: GameState<{ mintaka_interface::RULE }>,
     command_sequence: Vec<String>,
 ) -> Result<(), GameError> {
     let aborted = Arc::new(AtomicBool::new(false));
@@ -99,7 +99,7 @@ fn text_protocol(
     Ok(())
 }
 
-fn execute_command(game_agent: &mut GameAgent, command: Command) {
+fn execute_command(game_agent: &mut GameAgent<{ mintaka_interface::RULE }>, command: Command) {
     match game_agent.command(command) {
         Ok(result) => match result.result {
             Some(result) => println!("= {result}"),
@@ -109,11 +109,11 @@ fn execute_command(game_agent: &mut GameAgent, command: Command) {
     }
 }
 
-fn print_status(game_agent: &GameAgent, command: StatusCommand) {
+fn print_status(game_agent: &GameAgent<{ mintaka_interface::RULE }>, command: StatusCommand) {
     match command {
         StatusCommand::Version => println!(
-            "= rusty-renju-{}, mintaka-{}, unknown",
-            rusty_renju::VERSION, mintaka::VERSION
+            "= rule-{}, rusty-renju-{}, mintaka-{}",
+            mintaka_interface::RULE, rusty_renju::VERSION, mintaka::VERSION
         ),
         StatusCommand::Board { show_last_moves: false } =>
             println!("=\x02\n{}\x03", game_agent.state.board),
@@ -249,18 +249,18 @@ fn handle_command(
         },
         "load" => match *args.get(1).ok_or("data type not provided.")? {
             "board" => {
-                let board: Board = buf.parse()?;
+                let board: Board<{ mintaka_interface::RULE }> = buf.parse()?;
 
                 let history = (&board).try_into().unwrap_or_else(|_| History::empty());
 
-                message_sender.command(MessageCommand::Raw(Command::Init(Box::new(GameStateData { board, history }))));
+                message_sender.command(MessageCommand::Raw(Command::Init(Box::new(GameStateData { board_data: (&board).into(), history }))));
             }
             "history" => {
                 let history: History = args.get(2).ok_or("history not provided.")?.parse()?;
 
-                let board: Board = (&history).into();
+                let board: Board<{ mintaka_interface::RULE }> = (&history).into();
 
-                message_sender.command(MessageCommand::Raw(Command::Init(Box::new(GameStateData { board, history }))));
+                message_sender.command(MessageCommand::Raw(Command::Init(Box::new(GameStateData { board_data: (&board).into(), history }))));
             }
             &_ => return Err("unknown data type.".to_string()),
         },

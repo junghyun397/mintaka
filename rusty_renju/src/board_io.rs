@@ -1,23 +1,24 @@
+use std::error::Error;
 use crate::bitfield::Bitfield;
 use crate::board::Board;
 use crate::board_iter::{BoardExportItem, BoardIterItem};
+use crate::board_utils::BoardWinner;
 use crate::history::History;
-use crate::impl_debug_from_display;
 use crate::memo::hash_key::HashKey;
 use crate::notation::color::{Color, ColorContainer};
 use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
+use crate::notation::rule::RuleKind;
 use crate::pattern::Pattern;
 use crate::slice::Slice;
+use crate::utils::empty::Empty;
 use crate::utils::str_utils::join_str_horizontally;
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
-use crate::board_utils::BoardWinner;
-use crate::utils::empty::Empty;
 
 pub const SYMBOL_BLACK: char = 'X';
 pub const SYMBOL_WHITE: char = 'O';
@@ -61,7 +62,7 @@ fn match_symbol(c: char) -> Option<BoardElement> {
     }
 }
 
-fn board_iter_item_to_symbol(board: &Board, pos: Pos, item: BoardIterItem) -> String {
+fn board_iter_item_to_symbol<const R: RuleKind>(board: &Board<R>, pos: Pos, item: BoardIterItem) -> String {
     match item {
         BoardIterItem::Stone(color) => char::from(color),
         BoardIterItem::Pattern(_) =>
@@ -110,8 +111,7 @@ fn extract_stones_by_color(color: Color, source: &[BoardElement]) -> Box<[Pos]> 
         .collect()
 }
 
-impl Board {
-
+impl<const R: RuleKind> Board<R> {
     pub fn to_string_with_highlighted_move(&self, pos: Pos) -> String {
         const MARKER: [char; 2] = ['[', ']'];
 
@@ -230,8 +230,8 @@ impl Board {
     }
 
     pub fn to_string_with_pattern_analysis(&self) -> String {
-        fn build_each_color_string(board: &Board, color: Color) -> String {
-            fn render_pattern(board: &Board, color: Color, extract: fn(&Pattern) -> u32) -> String {
+        fn build_each_color_string<const R: RuleKind>(board: &Board<R>, color: Color) -> String {
+            fn render_pattern<const R: RuleKind>(board: &Board<R>, color: Color, extract: fn(&Pattern) -> u32) -> String {
                 board.render_with_attributes(|_, item| {
                     match item {
                         &BoardIterItem::Stone(color) => char::from(color).to_string(),
@@ -262,8 +262,8 @@ impl Board {
         format!(
             "player={}\n{self}\nblack\n{}\nwhite\n{}",
             self.player_color,
-            build_each_color_string(self, Color::Black),
-            build_each_color_string(self, Color::White)
+            build_each_color_string::<R>(self, Color::Black),
+            build_each_color_string::<R>(self, Color::White)
         )
     }
 
@@ -278,7 +278,7 @@ impl Board {
 
 }
 
-impl From<&History> for Board {
+impl<const R: RuleKind> From<&History> for Board<R> {
     fn from(value: &History) -> Self {
         let mut board = Board::empty();
 
@@ -288,7 +288,7 @@ impl From<&History> for Board {
     }
 }
 
-impl Display for Board {
+impl<const R: RuleKind> Display for Board<R> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.render_with_attributes(
             |pos, &item| board_iter_item_to_symbol(self, pos, item),
@@ -297,9 +297,7 @@ impl Display for Board {
     }
 }
 
-impl_debug_from_display!(Board);
-
-impl FromStr for Board {
+impl<const R: RuleKind> FromStr for Board<R> {
     type Err = &'static str;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
@@ -365,45 +363,78 @@ impl Display for Slice {
     ($board_str:expr) => {{
         use std::str::FromStr;
 
-        $crate::board::Board::from_str($board_str).unwrap()
+        $crate::board::Board::<{ rusty_renju::notation::rule::RuleKind::Renju }>::from_str($board_str).unwrap()
     }};
     () => {
-        $crate::board::Board::default()
+        $crate::board::Board::<{ rusty_renju::notation::rule::RuleKind::Renju }>::empty()
     };
 }
 
 #[cfg_attr(feature = "typeshare", typeshare::typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[allow(dead_code)]
-struct BoardData {
+#[derive(Debug, Copy, Clone)]
+pub struct BoardData {
+    rule_kind: RuleKind,
     hash_key: HashKey,
     player_color: Color,
     bitfield: ColorContainer<Bitfield>,
 }
 
-#[cfg(feature = "serde")]
-impl Serialize for Board {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+impl<const R: RuleKind> From<&Board<R>> for BoardData {
+    fn from(board: &Board<R>) -> Self {
         BoardData {
-            hash_key: self.hash_key,
-            player_color: self.player_color,
-            bitfield: self.slices.bitfield()
-        }.serialize(serializer)
+            rule_kind: R,
+            hash_key: board.hash_key,
+            player_color: board.player_color,
+            bitfield: board.slices.bitfield()
+        }
     }
 }
 
-#[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for Board {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        let data = BoardData::deserialize(deserializer)?;
+#[derive(Debug, Copy, Clone)]
+pub enum BoardDeserializeError {
+    InvalidRuleKind,
+}
+
+impl Display for BoardDeserializeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BoardDeserializeError::InvalidRuleKind => write!(f, "Invalid rule kind."),
+        }
+    }
+}
+
+impl Error for BoardDeserializeError {}
+
+impl<const R: RuleKind> TryFrom<BoardData> for Board<R> {
+    type Error = BoardDeserializeError;
+
+    fn try_from(data: BoardData) -> Result<Self, Self::Error> {
+        if data.rule_kind != R {
+            return Err(BoardDeserializeError::InvalidRuleKind);
+        }
 
         let black_moves = data.bitfield[Color::Black].iter_hot_pos().collect::<Box<_>>();
         let white_moves = data.bitfield[Color::White].iter_hot_pos().collect::<Box<_>>();
 
-        let mut board = Board::empty();
-
+        let mut board = Board::<R>::empty();
         board.batch_set_each_color_mut(black_moves, white_moves, data.player_color);
 
         Ok(board)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<const R: RuleKind> Serialize for Board<R> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        BoardData::from(self).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, const R: RuleKind> Deserialize<'de> for Board<R> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        Board::<R>::try_from(BoardData::deserialize(deserializer)?)
+            .map_err(de::Error::custom)
     }
 }

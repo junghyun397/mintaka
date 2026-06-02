@@ -4,7 +4,8 @@ use crate::game_state::GameState;
 use rusty_renju::board::{Board, MoveArtifact};
 use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::pos;
-use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::pos::MaybePos;
+use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::Score;
 
 struct NNUEInput {
@@ -17,40 +18,40 @@ struct NNUEInput {
 }
 
 #[derive(Clone)]
-pub struct NnueEvaluator {
+pub struct NnueEvaluator<const R: RuleKind> {
     black_network: (),
     white_network: (),
     hash_key: HashKey,
 }
 
-impl Evaluator for NnueEvaluator {
+impl<const R: RuleKind> Evaluator<R> for NnueEvaluator<R> {
     type EvaluatorParameter = NnueNetworkParams;
 
     fn require_stabilize(&self) -> bool {
         false
     }
 
-    fn from_state(state: &GameState) -> Self {
+    fn from_state(state: &GameState<R>) -> Self {
         todo!()
     }
 
-    fn init(&mut self, board: &Board) {
+    fn init(&mut self, board: &Board<R>) {
         todo!()
     }
 
-    fn play(&mut self, board: &Board, artifact: MoveArtifact, pos: Pos) {
+    fn play(&mut self, board: &Board<R>, artifact: MoveArtifact, pos: MaybePos) {
         todo!()
     }
 
-    fn undo(&mut self, board: &Board, artifact: MoveArtifact, pos: Pos) {
+    fn undo(&mut self, board: &Board<R>, artifact: MoveArtifact, pos: MaybePos) {
         todo!()
     }
 
-    fn eval_policy(&mut self, state: &GameState) -> PolicyDistribution {
+    fn eval_policy(&mut self, state: &GameState<R>) -> PolicyDistribution {
         todo!()
     }
 
-    fn eval_value(&mut self, state: &GameState) -> Score {
+    fn eval_value(&mut self, state: &GameState<R>) -> Score {
         todo!()
     }
 
@@ -59,10 +60,8 @@ impl Evaluator for NnueEvaluator {
     }
 }
 
-impl NnueEvaluator {
-
-    fn shape_inputs(&self, board: &Board) -> [i8; pos::BOARD_SIZE] {
+impl<const R: RuleKind> NnueEvaluator<R> {
+    fn shape_inputs(&self, board: &Board<R>) -> [i8; pos::BOARD_SIZE] {
         todo!()
     }
-
 }

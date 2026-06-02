@@ -1,12 +1,11 @@
-use std::cmp::Ordering;
 use crate::time::Timer;
 use crate::value::{Depth, Depths};
 use rusty_renju::history;
 use rusty_renju::notation::pos;
-use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::fmt::Display;
 use std::time::Duration;
 #[cfg(feature = "typeshare")]
@@ -26,7 +25,6 @@ pub enum SearchObjective {
 #[cfg_attr(feature = "serde", serde_with::skip_serializing_none)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Config {
-    pub rule_kind: RuleKind,
     pub draw_condition: u32,
 
     pub max_nodes_in_1k: Option<u32>,
@@ -46,7 +44,6 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            rule_kind: RuleKind::Renju,
             draw_condition: pos::BOARD_SIZE as u32,
             max_nodes_in_1k: None,
             max_depth: None,
@@ -92,7 +89,6 @@ impl Ord for Config {
 
 impl Config {
     pub const UNLIMITED_CONFIG: Self = Self {
-        rule_kind: RuleKind::Renju,
         draw_condition: pos::BOARD_SIZE as u32,
         max_nodes_in_1k: None,
         max_depth: None,

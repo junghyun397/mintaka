@@ -12,7 +12,7 @@ use std::time::Duration;
 )]
 pub struct Preference {
     #[arg(short, long)]
-    pub board: Option<Board>,
+    pub board: Option<Board<{ crate::RULE }>>,
     #[arg(short, long)]
     pub history: Option<History>,
     #[arg(short, long, num_args = 3)]
@@ -30,7 +30,7 @@ pub struct Preference {
     #[arg(long)]
     pub command_sequence: Option<String>,
     #[clap(skip)]
-    pub game_state: Option<GameState>,
+    pub game_state: Option<GameState<{ crate::RULE }>>,
     #[clap(skip)]
     pub default_config: Config,
 }
@@ -50,7 +50,7 @@ impl Preference {
             self.game_state = Some(history.into());
         } else if let Some(board) = self.board {
             let history = (&board).try_into().unwrap();
-            self.game_state = Some(GameStateData { board, history }.into());
+            self.game_state = Some(GameStateData { board_data: (&board).into(), history }.into());
         }
 
         if let Some(&[total_time_in_ms, increment_time_in_ms, turn_time_in_ms]) = self.time.as_deref() {

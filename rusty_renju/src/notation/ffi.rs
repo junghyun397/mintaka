@@ -1,13 +1,14 @@
 use crate::board::Board;
 use crate::notation::pos::{MaybePos, Pos};
+use crate::notation::rule::RuleKind;
 
 #[repr(C)]
 pub struct CBoard {
-    pub inner: Board,
+    pub inner: Board<{ RuleKind::Renju }>,
 }
 
-impl From<Board> for CBoard {
-    fn from(value: Board) -> Self {
+impl From<Board<{ RuleKind::Renju }>> for CBoard {
+    fn from(value: Board<{ RuleKind::Renju }>) -> Self {
         Self { inner: value }
     }
 }

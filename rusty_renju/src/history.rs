@@ -12,6 +12,7 @@ use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
+use crate::notation::rule::RuleKind;
 use crate::utils::empty::Empty;
 
 pub const MAX_HISTORY_SIZE: usize = 248;
@@ -247,10 +248,10 @@ impl Display for HistoryError {
 
 impl std::error::Error for HistoryError {}
 
-impl TryFrom<&Board> for History {
+impl<const R: RuleKind> TryFrom<&Board<R>> for History {
     type Error = HistoryError;
 
-    fn try_from(value: &Board) -> Result<Self, Self::Error> {
+    fn try_from(value: &Board<R>) -> Result<Self, Self::Error> {
         let mut black_history = vec![];
         let mut white_history = vec![];
 
