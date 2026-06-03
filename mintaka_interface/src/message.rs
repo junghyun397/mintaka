@@ -1,10 +1,9 @@
 use mintaka::config::SearchObjective;
 use mintaka::protocol::command::Command;
+use rusty_renju::memo::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use std::sync::mpsc;
-use mintaka::game_state::GameState;
-use rusty_renju::notation::rule::RuleKind;
 
 pub enum Message {
     Command(MessageCommand),
@@ -25,12 +24,12 @@ pub enum MessageCommand {
 }
 
 impl MessageCommand {
-    pub fn into_command(self, state: &GameState<{ RuleKind::Renju }>) -> Command {
+    pub fn into_command(self, hash: HashKey) -> Command {
         match self {
-            MessageCommand::Play { pos } => Command::Play { hash: state.board.hash_key, pos },
-            MessageCommand::Set { pos, color } => Command::Set { hash: state.board.hash_key, pos, color },
-            MessageCommand::Unset { pos, color } => Command::Unset { hash: state.board.hash_key, pos, color },
-            MessageCommand::Undo => Command::Undo { hash: state.board.hash_key },
+            MessageCommand::Play { pos } => Command::Play { hash, pos },
+            MessageCommand::Set { pos, color } => Command::Set { hash, pos, color },
+            MessageCommand::Unset { pos, color } => Command::Unset { hash, pos, color },
+            MessageCommand::Undo => Command::Undo { hash },
             MessageCommand::Raw(command) => command,
         }
     }
@@ -41,6 +40,7 @@ pub const CHANNEL_CLOSED_MESSAGE: &str = "sender channel closed.";
 pub enum StatusCommand {
     Version,
     Board { show_last_moves: bool },
+    Forbid,
     History,
     Time,
 }

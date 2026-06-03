@@ -1,16 +1,13 @@
 #!/bin/bash
 
-# AVX512
-RUSTFLAGS="-C target-feature=+avx2,+bmi2,+avx512f,+avx512bw,+avx512cd,+avx512dq,+avx512vl,+avx512vnni" \
-  cargo build -p mintaka_interface --release --bin pbrain_mintaka
+# AVX512vnni
+RUSTFLAGS="-C target-cpu=x86-64-v4 -C target-feature=+avx512vnni" \
+  cargo build --release -p mintaka_interface --bin pbrain-mintaka_renju-15
 
-mv target/release/pbrain_mintaka target/release/pbrain_mintaka_avx512vnni_bmi2
+mv target/release/pbrain-mintaka_renju-15 target/release/pbrain-mintaka_renju-15_avx512vnni
 
-# AVX2
-RUSTFLAGS="-C target-feature=+avx2,+bmi2" \
-  cargo build -p mintaka_interface --release --bin pbrain_mintaka
+# AVX2+BMI2
+RUSTFLAGS="-C target-cpu=x86-64-v3" \
+  cargo build --release -p mintaka_interface --bin pbrain-mintaka_renju-15
 
 mv target/release/pbrain_mintaka target/release/pbrain_mintaka_avx2
-
-# baseline
-cargo build -p mintaka_interface --release --bin pbrain_mintaka

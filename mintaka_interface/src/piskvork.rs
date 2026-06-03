@@ -2,7 +2,7 @@ use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::response::{CallBackResponseSender, Response};
-use mintaka_interface::message::{Message, MessageCommand, MessageSender};
+use mintaka_interface::message::{Message, MessageCommand, MessageSender, StatusCommand};
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::rule::RuleKind;
@@ -23,6 +23,7 @@ enum PiskvorkResponse {
     Unknown(String),
     About(String),
     Pos(Pos),
+    Forbid(Vec<Pos>),
     Ok,
     None,
 }
@@ -50,32 +51,40 @@ fn stdio_out(piskvork_response: PiskvorkResponse) {
         PiskvorkResponse::Pos(pos) => {
             println!("{},{}", pos.col(), pos.row());
         }
+        PiskvorkResponse::Forbid(positions) => {
+            println!("FORBID {}",
+                 positions.iter()
+                     .map(|pos| format!("{:02}{:02}", pos.col(), pos.row()))
+                     .collect::<Vec<_>>()
+                     .join("")
+            );
+        }
         PiskvorkResponse::None => {}
     };
 
     std::io::stdout().flush().expect("failed to flush stdout");
 }
 
-fn main() -> Result<(), impl Error> {
+pub fn entry<const R: RuleKind>() -> Result<(), impl Error> {
     let aborted = Arc::new(AtomicBool::new(false));
 
     let config = Config::default();
 
-    let mut game_agent = GameAgent::new(config);
+    let mut game_agent = GameAgent::<R>::new(config);
 
     let (message_sender, message_receiver) = {
         let (tx, rx) = mpsc::channel();
         (MessageSender::new(tx), rx)
     };
 
-    spawn_command_listener(aborted.clone(), message_sender);
+    spawn_command_listener::<R>(aborted.clone(), message_sender);
 
     let mut command_failed = false;
 
     for message in message_receiver {
         match message {
             Message::Command(command) => {
-                let command = command.into_command(&game_agent.state);
+                let command = command.into_command(game_agent.state.board.hash_key);
 
                 command_failed = match game_agent.command(command) {
                     Ok(_) => false,
@@ -112,14 +121,21 @@ fn main() -> Result<(), impl Error> {
 
                 stdio_out(PiskvorkResponse::Pos(best_move.best_move.unwrap_or(Pos::from_cartesian(7, 7))));
             }
-            Message::Status(_) => unreachable!(),
+            Message::Status(command) => match command {
+                StatusCommand::Forbid => {
+                    stdio_out(
+                        PiskvorkResponse::Forbid(game_agent.state.board.patterns.forbidden_field.iter_hot_pos().collect())
+                    );
+                },
+                _ => unreachable!()
+            },
         }
     }
 
     Ok::<(), GameError>(())
 }
 
-fn spawn_command_listener(aborted: Arc<AtomicBool>, message_sender: MessageSender) {
+fn spawn_command_listener<const R: RuleKind>(aborted: Arc<AtomicBool>, message_sender: MessageSender) {
     std::thread::spawn(move || {
         let mut buf = String::new();
 
@@ -139,7 +155,7 @@ fn spawn_command_listener(aborted: Arc<AtomicBool>, message_sender: MessageSende
                 continue;
             }
 
-            let piskvork_response = match_command(&aborted, &message_sender, args)
+            let piskvork_response = match_command::<R>(&aborted, &message_sender, args)
                 .unwrap_or_else(|message| PiskvorkResponse::Error(message.to_string()));
 
             stdio_out(piskvork_response);
@@ -178,7 +194,7 @@ fn response_receiver(response: Response) {
 
 // https://plastovicka.github.io/protocl2en.htm
 // https://github.com/accreator/Yixin-protocol/blob/master/protocol.pdf
-fn match_command(
+fn match_command<const R: RuleKind>(
     aborted: &Arc<AtomicBool>,
     message_sender: &MessageSender,
     args: Vec<&str>,
@@ -248,7 +264,7 @@ fn match_command(
                             _ => return Err("unsupported rule"),
                         };
 
-                        if rule_kind != mintaka_interface::RULE {
+                        if rule_kind != R {
                             return Err("unsupported rule")
                         }
                     }
@@ -296,7 +312,7 @@ fn match_command(
                 .map(|&(_, own)| if own { Color::Black } else { Color::White })
                 .unwrap_or(Color::Black);
 
-            let mut game_state = GameState::<{ mintaka_interface::RULE }>::empty();
+            let mut game_state = GameState::<R>::empty();
 
             for (pos, own) in sequence {
                 if own != (game_state.board.player_color == own_color) {
@@ -351,6 +367,11 @@ fn match_command(
             "name=\"mintaka\", author=\"JeongHyeon Choi\", version=\"{}\", country=\"KOR\"",
             mintaka::VERSION
         )),
+        "YXSHOWFORBID" => {
+            message_sender.status(StatusCommand::Forbid);
+
+            PiskvorkResponse::None
+        }
         &_ => PiskvorkResponse::Unknown("unknown command.".to_string()),
     };
 

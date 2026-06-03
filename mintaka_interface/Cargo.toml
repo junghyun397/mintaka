@@ -6,29 +6,34 @@ edition = "2024"
 [features]
 clap = ["dep:clap"]
 text-protocol = ["clap"]
-rule-renju = []
-rule-gomoku = []
-default = ["rule-renju"]
+default = []
 
 [[bin]]
 name = "pbrain-mintaka_renju-15"
-path = "src/piskvork.rs"
-required-features = ["rule-renju"]
+path = "src/bin/piskvork_renju.rs"
+
+[[bin]]
+name = "pbrain-mintaka_gomoku-15"
+path = "src/bin/piskvork_gomoku.rs"
 
 [[bin]]
 name = "pbrain-mintaka_freestyle-15"
-path = "src/piskvork.rs"
-required-features = ["rule-gomoku"]
+path = "src/bin/piskvork_freestyle.rs"
 
 [[bin]]
 name = "mintaka_text_protocol_renju"
-path = "src/text_protocol.rs"
-required-features = ["text-protocol", "rule-renju"]
+path = "src/bin/text_protocol_renju.rs"
+required-features = ["text-protocol"]
 
 [[bin]]
 name = "mintaka_text_protocol_gomoku"
-path = "src/text_protocol.rs"
-required-features = ["text-protocol", "rule-gomoku"]
+path = "src/bin/text_protocol_gomoku.rs"
+required-features = ["text-protocol"]
+
+[[bin]]
+name = "mintaka_text_protocol_freestyle"
+path = "src/bin/text_protocol_freestyle.rs"
+required-features = ["text-protocol"]
 
 [dependencies]
 rusty_renju = { path = "../rusty_renju" }

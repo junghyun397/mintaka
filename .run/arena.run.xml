@@ -15,7 +15,7 @@
     <option name="DEBUG_JUST_MY_CODE" value="true" />
     <option name="RUN_TOOL" value="" />
     <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mintaka_trainer/arena/arena.py" />
-    <option name="PARAMETERS" value="--a-path &quot;target/release/mintaka_text_protocol_baseline&quot; --a-params --b-path &quot;target/release/mintaka_text_protocol_target&quot; --a-time 180000 0 30000 --b-time 180000 0 30000 --concurrency 10 --openings-file &quot;mintaka_trainer/arena/openings.csv&quot;" />
+    <option name="PARAMETERS" value="--a-path &quot;target/release/mintaka_text_protocol_renju_baseline&quot; --b-path &quot;target/release/mintaka_text_protocol_renju_target&quot; --a-time 180000 0 3000 --b-time 180000 0 3000 --concurrency 10 --openings-file &quot;mintaka_trainer/arena/openings.csv&quot;" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

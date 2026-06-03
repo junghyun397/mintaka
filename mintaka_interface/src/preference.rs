@@ -5,14 +5,15 @@ use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::utils::byte_size::ByteSize;
 use std::time::Duration;
+use rusty_renju::notation::rule::RuleKind;
 
 #[derive(Clone, Parser)]
 #[clap(
     disable_help_flag = true,
 )]
-pub struct Preference {
+pub struct Preference<const R: RuleKind> {
     #[arg(short, long)]
-    pub board: Option<Board<{ crate::RULE }>>,
+    pub board: Option<Board<R>>,
     #[arg(short, long)]
     pub history: Option<History>,
     #[arg(short, long, num_args = 3)]
@@ -30,12 +31,12 @@ pub struct Preference {
     #[arg(long)]
     pub command_sequence: Option<String>,
     #[clap(skip)]
-    pub game_state: Option<GameState<{ crate::RULE }>>,
+    pub game_state: Option<GameState<R>>,
     #[clap(skip)]
     pub default_config: Config,
 }
 
-impl Preference {
+impl<const R: RuleKind> Preference<R> {
 
     pub fn parse() -> Self {
         let mut pref = Self::parse_from(std::env::args());

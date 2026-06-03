@@ -15,9 +15,10 @@ use std::io::BufRead;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
+use rusty_renju::notation::rule::RuleKind;
 
-fn main() -> Result<(), GameError> {
-    let pref = Preference::parse();
+pub fn entry<const R: RuleKind>() -> Result<(), GameError> {
+    let pref = Preference::<R>::parse();
 
     let command_sequence: Vec<String> = pref
         .command_sequence
@@ -37,9 +38,9 @@ fn main() -> Result<(), GameError> {
     )
 }
 
-fn text_protocol(
+fn text_protocol<const R: RuleKind>(
     config: Config,
-    state: GameState<{ mintaka_interface::RULE }>,
+    state: GameState<R>,
     command_sequence: Vec<String>,
 ) -> Result<(), GameError> {
     let aborted = Arc::new(AtomicBool::new(false));
@@ -51,12 +52,12 @@ fn text_protocol(
         (MessageSender::new(tx), rx)
     };
 
-    spawn_command_listener(aborted.clone(), message_sender, command_sequence);
+    spawn_command_listener::<R>(aborted.clone(), message_sender, command_sequence);
 
     for message in message_receiver {
         match message {
             Message::Command(command) => {
-                let command = command.into_command(&game_agent.state);
+                let command = command.into_command(game_agent.state.board.hash_key);
 
                 execute_command(&mut game_agent, command);
             }
@@ -99,7 +100,7 @@ fn text_protocol(
     Ok(())
 }
 
-fn execute_command(game_agent: &mut GameAgent<{ mintaka_interface::RULE }>, command: Command) {
+fn execute_command<const R: RuleKind>(game_agent: &mut GameAgent<R>, command: Command) {
     match game_agent.command(command) {
         Ok(result) => match result.result {
             Some(result) => println!("= {result}"),
@@ -109,11 +110,11 @@ fn execute_command(game_agent: &mut GameAgent<{ mintaka_interface::RULE }>, comm
     }
 }
 
-fn print_status(game_agent: &GameAgent<{ mintaka_interface::RULE }>, command: StatusCommand) {
+fn print_status<const R: RuleKind>(game_agent: &GameAgent<R>, command: StatusCommand) {
     match command {
         StatusCommand::Version => println!(
             "= rule-{}, rusty-renju-{}, mintaka-{}",
-            mintaka_interface::RULE, rusty_renju::VERSION, mintaka::VERSION
+            R, rusty_renju::VERSION, mintaka::VERSION
         ),
         StatusCommand::Board { show_last_moves: false } =>
             println!("=\x02\n{}\x03", game_agent.state.board),
@@ -126,6 +127,7 @@ fn print_status(game_agent: &GameAgent<{ mintaka_interface::RULE }>, command: St
         ),
         StatusCommand::History => println!("= {}", game_agent.state.history),
         StatusCommand::Time => println!("= {:?}", game_agent.time_manager.timer),
+        _ => {}
     }
 }
 
@@ -138,7 +140,7 @@ fn print_response(response: Response) {
     }
 }
 
-fn spawn_command_listener(
+fn spawn_command_listener<const R: RuleKind>(
     abort: Arc<AtomicBool>,
     message_sender: MessageSender,
     initial_sequence: Vec<String>,
@@ -157,7 +159,7 @@ fn spawn_command_listener(
                 continue;
             }
 
-            match handle_command(&abort, &message_sender, &line, args) {
+            match handle_command::<R>(&abort, &message_sender, &line, args) {
                 Err(err) => println!("? {err}"),
                 _ => {}
             }
@@ -165,7 +167,7 @@ fn spawn_command_listener(
     });
 }
 
-fn handle_command(
+fn handle_command<const R: RuleKind>(
     abort: &Arc<AtomicBool>,
     message_sender: &MessageSender,
     buf: &str,
@@ -249,7 +251,7 @@ fn handle_command(
         },
         "load" => match *args.get(1).ok_or("data type not provided.")? {
             "board" => {
-                let board: Board<{ mintaka_interface::RULE }> = buf.parse()?;
+                let board: Board<R> = buf.parse()?;
 
                 let history = (&board).try_into().unwrap_or_else(|_| History::empty());
 
@@ -258,7 +260,7 @@ fn handle_command(
             "history" => {
                 let history: History = args.get(2).ok_or("history not provided.")?.parse()?;
 
-                let board: Board<{ mintaka_interface::RULE }> = (&history).into();
+                let board: Board<R> = (&history).into();
 
                 message_sender.command(MessageCommand::Raw(Command::Init(Box::new(GameStateData { board_data: (&board).into(), history }))));
             }
