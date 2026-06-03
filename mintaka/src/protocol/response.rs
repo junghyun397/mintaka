@@ -1,7 +1,7 @@
 use std::time::Duration;
 use crate::principal_variation::PrincipalVariation;
 use crate::value::Depth;
-use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::score::Score;
 #[cfg(feature = "serde")]

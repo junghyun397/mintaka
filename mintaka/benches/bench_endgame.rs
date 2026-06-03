@@ -16,7 +16,6 @@ mod bench_vcf {
     use mintaka::value::Depth;
     use rusty_renju::board;
     use rusty_renju::history::History;
-    use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use rusty_renju::notation::pos::pos_unchecked;
     use rusty_renju::notation::rule::RuleKind;
     use rusty_renju::notation::score::{Score, Scores};
@@ -53,7 +52,7 @@ mod bench_vcf {
             $bencher.iter(|| {
                 let result = search_endgame::endgame_search::<{ RuleKind::Renju }, false>(&mut td.clone(), Depth::MAX, &state, -Score::INF, Score::INF, Score::DRAW);
 
-                tt.clear(1);
+                tt.clear();
 
                 assert_eq!(Score::is_mate(result), $expect_vcf)
             })

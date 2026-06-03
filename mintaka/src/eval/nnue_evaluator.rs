@@ -2,7 +2,7 @@ use crate::eval::evaluator::{Evaluator, PolicyDistribution};
 use crate::eval::nn::network_params::NnueNetworkParams;
 use crate::game_state::GameState;
 use rusty_renju::board::{Board, MoveArtifact};
-use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;

@@ -1,7 +1,6 @@
 use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucket, TTFlag};
 use crate::value::{Depth, Depths};
-use rusty_renju::memo::abstract_transposition_table::{AbstractTTEntry, AbstractTranspositionTable};
-use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::{Score, Scores};
 use rusty_renju::utils::byte_size::ByteSize;
@@ -51,30 +50,6 @@ pub struct TranspositionTable {
     age: AtomicU32,
 }
 
-impl AbstractTranspositionTable for TranspositionTable {
-    type EntryType = TTEntryBucket;
-
-    fn internal_table(&self) -> &Vec<TTEntryBucket> {
-        &self.table
-    }
-
-    fn internal_table_mut(&mut self) -> &mut Vec<TTEntryBucket> {
-        &mut self.table
-    }
-
-    fn fetch_age(&self) -> u32 {
-        self.age.load(Ordering::Relaxed)
-    }
-
-    fn increase_age(&self) {
-        self.age.fetch_add(1, Ordering::Relaxed);
-    }
-
-    fn clear_age(&self) {
-        self.age.store(0, Ordering::Relaxed);
-    }
-}
-
 impl TranspositionTable {
     pub fn new_with_size(size: ByteSize) -> Self {
         let mut new = Self {
@@ -87,6 +62,51 @@ impl TranspositionTable {
         new
     }
 
+    pub fn size(&self) -> ByteSize {
+        ByteSize::from_bytes((self.table.len() * size_of::<TTEntryBucket>()) as u64)
+    }
+
+    fn calculate_table_len(size: ByteSize) -> usize {
+        size.bytes() as usize / size_of::<TTEntryBucket>()
+    }
+
+    pub fn fetch_age(&self) -> u32 {
+        self.age.load(Ordering::Relaxed)
+    }
+
+    pub fn increase_age(&self) {
+        self.age.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn clear_age(&self) {
+        self.age.store(0, Ordering::Relaxed);
+    }
+
+    pub fn clear(&self) {
+        self.clear_age();
+
+        for entry in self.table.iter() {
+            entry.clear();
+        }
+    }
+
+    pub fn resize(&mut self, size: ByteSize) {
+        self.clear_age();
+
+        let len = Self::calculate_table_len(size);
+
+        self.table = Vec::new();
+
+        unsafe {
+            self.table = Vec::from_raw_parts(
+                std::alloc::alloc_zeroed(
+                    std::alloc::Layout::array::<TTEntryBucket>(len).unwrap()
+                ).cast(),
+                len, len
+            );
+        };
+    }
+
     pub fn view(&self) -> TTView<'_> {
         TTView {
             table: &self.table,
@@ -96,7 +116,7 @@ impl TranspositionTable {
 
     pub fn optimal_size(nps: usize, expected_runtime: Duration) -> ByteSize {
         const FILL_FACTOR: f64 = 0.75;
-        const ENTRY_SIZE: f64 = size_of::<TTEntryBucket>() as f64 * TTEntryBucket::BUCKET_SIZE as f64;
+        const ENTRY_SIZE: f64 = size_of::<TTEntryBucket>() as f64 / TTEntryBucket::BUCKET_SIZE as f64;
 
         let total_nodes = nps as f64 * expected_runtime.as_secs() as f64;
         ByteSize::from_bytes((total_nodes / ENTRY_SIZE * FILL_FACTOR) as u64)

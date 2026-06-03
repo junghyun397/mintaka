@@ -1,15 +1,12 @@
 #![allow(incomplete_features)]
 #![feature(adt_const_params)]
 #![feature(portable_simd)]
-
 #![cfg_attr(target_arch = "aarch64", feature(stdarch_aarch64_prefetch))]
-
 extern crate core;
 
 pub mod board;
 pub mod board_io;
 pub mod slice;
-pub mod memo;
 pub mod notation;
 pub mod utils;
 pub mod opening;
@@ -21,5 +18,7 @@ pub mod history;
 pub mod win_rate;
 pub mod board_utils;
 pub mod pattern_index;
+pub mod hash_key;
+mod hash_table;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

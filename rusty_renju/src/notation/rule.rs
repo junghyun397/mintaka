@@ -8,31 +8,17 @@ use typeshare::typeshare;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(std::marker::ConstParamTy, Default, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum RuleKind {
-    Gomoku = 0,
-    #[default] Renju = 1
-}
-
-impl RuleKind {
-    pub const fn relaxed(&self) -> Self {
-        match self {
-            Self::Renju => Self::Gomoku,
-            _ => Self::Gomoku
-        }
-    }
-
-    pub const fn stricter(&self) -> Self {
-        match self {
-            Self::Gomoku => Self::Renju,
-            _ => Self::Renju
-        }
-    }
+    #[default] Renju = 0,
+    Gomoku = 1,
+    Freestyle = 2,
 }
 
 impl Display for RuleKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Gomoku => write!(f, "Gomoku"),
             Self::Renju => write!(f, "Renju"),
+            Self::Gomoku => write!(f, "Gomoku"),
+            Self::Freestyle => write!(f, "Freestyle"),
         }
     }
 }

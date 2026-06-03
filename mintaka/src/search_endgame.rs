@@ -9,7 +9,7 @@ use crate::movegen::move_generator::generate_endgame_moves;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use crate::value::Depth;
-use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};

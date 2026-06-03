@@ -1,6 +1,6 @@
 use mintaka::config::SearchObjective;
 use mintaka::protocol::command::Command;
-use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use std::sync::mpsc;

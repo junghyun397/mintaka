@@ -1,6 +1,6 @@
 use crate::protocol::response::{Response, ResponseSender};
 use crate::utils::time::MonotonicClock;
-use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::hash_key::HashKey;
 use std::time::Duration;
 
 pub trait ThreadType {

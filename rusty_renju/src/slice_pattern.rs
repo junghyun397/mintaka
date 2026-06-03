@@ -77,17 +77,19 @@ fn lookup_patterns<const R: RuleKind, const C: Color>(
     }
 
     let patch_pointer = match (R, C) {
-        (RuleKind::Renju, Color::Black) => SLICE_PATTERN_LUT.vector.black[key],
-        _ => SLICE_PATTERN_LUT.vector.white[key],
+        (RuleKind::Renju, Color::Black) | (RuleKind::Gomoku, _) => SLICE_PATTERN_LUT.vector.black[key],
+        (RuleKind::Renju, Color::White) | (RuleKind::Freestyle, _) => SLICE_PATTERN_LUT.vector.white[key],
     };
 
     if patch_pointer != 0 {
         let slice_patch_data = unsafe { match (R, C) {
-            (RuleKind::Renju, Color::Black) => SLICE_PATTERN_LUT.patch.black.get_unchecked(patch_pointer as usize),
-            _ => SLICE_PATTERN_LUT.patch.white.get_unchecked(patch_pointer as usize),
+            (RuleKind::Renju, Color::Black) | (RuleKind::Gomoku, _) =>
+                SLICE_PATTERN_LUT.patch.black.get_unchecked(patch_pointer as usize),
+            (RuleKind::Renju, Color::White) | (RuleKind::Freestyle, _) =>
+                SLICE_PATTERN_LUT.patch.white.get_unchecked(patch_pointer as usize),
         } };
 
-        if R == RuleKind::Renju && C == Color::Black
+        if ((R == RuleKind::Renju && C == Color::Black) || R == RuleKind::Gomoku)
             && let Some(extended_match) = slice_patch_data.extended_match
             && !extended_match_for_black(extended_match, raw, shift)
         {

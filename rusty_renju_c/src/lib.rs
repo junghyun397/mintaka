@@ -1,7 +1,6 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
-use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::empty::Empty;
 
 pub const COLOR_NONE: u8 = u8::MAX;
@@ -14,9 +13,11 @@ pub extern "C" fn rusty_renju_color_white() -> u8 { rusty_renju::notation::color
 pub extern "C" fn rusty_renju_color_none() -> u8 { COLOR_NONE }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn rusty_renju_rule_renju() -> u8 { rusty_renju::notation::rule::RuleKind::Renju as u8 }
+#[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_rule_gomoku() -> u8 { rusty_renju::notation::rule::RuleKind::Gomoku as u8 }
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_rule_renju() -> u8 { rusty_renju::notation::rule::RuleKind::Renju as u8 }
+pub extern "C" fn rusty_renju_rule_freestyle() -> u8 { rusty_renju::notation::rule::RuleKind::Freestyle as u8 }
 
 const FORBIDDEN_KIND_NONE: u8 = 0;
 
@@ -141,7 +142,7 @@ pub extern "C" fn rusty_renju_default_board() -> *mut rusty_renju::notation::ffi
 
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_empty_hash() -> u64 {
-    u64::from(rusty_renju::memo::hash_key::HashKey::EMPTY)
+    rusty_renju::hash_key::HashKey::empty().into()
 }
 
 #[unsafe(no_mangle)]
@@ -157,7 +158,7 @@ pub extern "C" fn rusty_renju_board_from_history(actions: *const u8, len: usize)
 pub extern "C" fn rusty_renju_board_from_string(source: *const c_char) -> *mut rusty_renju::notation::ffi::CBoard {
     if let Some(source) = unsafe { source.as_ref() }
         && let Ok(source) = unsafe { CStr::from_ptr(source) }.to_str()
-        && let Ok(board) = source.parse::<rusty_renju::board::Board<{ RuleKind::Renju }>>()
+        && let Ok(board) = source.parse::<rusty_renju::board::Board<{ rusty_renju::notation::rule::RuleKind::Renju }>>()
     {
         Box::into_raw(Box::new(board.into()))
     } else {

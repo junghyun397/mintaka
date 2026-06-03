@@ -1,5 +1,5 @@
 use crate::bitfield::Bitfield;
-use crate::memo::hash_key::HashKey;
+use crate::hash_key::HashKey;
 use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::{Direction, DirectionContainer};
 use crate::notation::pos::{MaybePos, Pos};
@@ -160,17 +160,18 @@ impl<const R: RuleKind> Board<R> {
         for pos in blacks {
             self.slices.set(Color::Black, pos);
             self.hot_field.set(pos);
+            self.hash_key = self.hash_key.set(Color::Black, pos);
         }
 
         for pos in whites {
             self.slices.set(Color::White, pos);
             self.hot_field.set(pos);
+            self.hash_key = self.hash_key.set(Color::White, pos);
         }
 
         self.player_color = player;
 
         self.full_update();
-        self.hash_key = HashKey::from(&self.slices.horizontal_slices);
     }
 
     pub fn switch_player_mut(&mut self) {

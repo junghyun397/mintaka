@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::game_state::GameStateData;
-use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::utils::byte_size::ByteSize;

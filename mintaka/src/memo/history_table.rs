@@ -92,6 +92,7 @@ impl HistoryTable {
     }
 }
 
+#[cfg(feature = "serde")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct HistoryTableData {
     #[cfg_attr(

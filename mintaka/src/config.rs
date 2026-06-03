@@ -48,7 +48,7 @@ impl Default for Config {
             max_nodes_in_1k: None,
             max_depth: None,
             max_vcf_depth: None,
-            tt_size: ByteSize::from_mib(512),
+            tt_size: ByteSize::from_mib(128),
             workers: 1,
             pondering: false,
             dynamic_time: false,

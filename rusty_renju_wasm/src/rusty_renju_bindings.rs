@@ -41,7 +41,7 @@ pub fn default_board() -> Board {
 
 #[wasm_bindgen(js_name = emptyHash)]
 pub fn empty_hash() -> HashKey {
-    to_js_value(&rusty_renju::memo::hash_key::HashKey::EMPTY)
+    to_js_value(&rusty_renju::hash_key::HashKey::EMPTY)
 }
 
 #[wasm_bindgen(js_name = calculateWinRate)]

@@ -1,5 +1,5 @@
 use rusty_renju::impl_debug_from_display;
-use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

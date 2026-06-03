@@ -10,7 +10,6 @@ mod test_vcf {
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
     use rusty_renju::board;
-    use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
     use rusty_renju::notation::pos::{pos_unchecked, MaybePos, Pos};
     use rusty_renju::utils::empty::Empty;
     use rusty_renju::notation::rule::RuleKind;
@@ -52,7 +51,6 @@ mod test_vcf {
             println!("length: {}", vcf_result.len());
             println!("sequence: {vcf_result:?}");
             println!("time: {time:?}");
-            println!("hash usage: {}", tt.hash_usage());
             println!("nodes: {}", td.batch_counter.count_local_total());
 
             last_move.unwrap()

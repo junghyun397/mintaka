@@ -16,7 +16,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use mintaka::game_agent::GameError;
 use mintaka::protocol::results::{BestMove, CommandResult};
-use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::rule::RuleKind;
 use crate::app_error::AppError::SessionInComputing;
 

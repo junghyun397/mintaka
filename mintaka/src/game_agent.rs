@@ -15,7 +15,6 @@ use crate::utils::time::MonotonicClock;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
-use rusty_renju::memo::abstract_transposition_table::AbstractTranspositionTable;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::rule::RuleKind;
@@ -423,7 +422,8 @@ impl<const R: RuleKind> GameAgent<R> {
 
         self.evaluator = ActiveEvaluator::from_state(&self.state);
 
-        self.tt.clear(self.config.workers);
+        self.tt.clear();
+        self.ht = HistoryTable::empty();
         self.executed_moves = Bitfield::empty();
     }
 

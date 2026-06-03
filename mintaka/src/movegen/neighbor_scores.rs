@@ -1,11 +1,11 @@
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
-use rusty_renju::notation::score::Score;
 use rusty_renju::utils::platform;
 use rusty_renju::{cartesian_to_index, const_for, const_max, const_min, pattern};
 use std::simd::Simd;
 use std::slice;
+use rusty_renju::utils::empty::Empty;
 
 #[derive(Debug, Copy, Clone)]
 #[repr(align(32))]
@@ -13,15 +13,9 @@ pub struct NeighborScores {
     pub scores: [u8; pattern::PATTERN_SIZE],
 }
 
-impl Default for NeighborScores {
-    fn default() -> Self {
-        Self::EMPTY
-    }
-}
-
 impl From<&Bitfield> for NeighborScores {
     fn from(value: &Bitfield) -> Self {
-        let mut acc = Self::default();
+        let mut acc = Self::empty();
 
         for pos in value.iter_hot_pos() {
             acc.add_neighbor_score(pos);
@@ -31,12 +25,15 @@ impl From<&Bitfield> for NeighborScores {
     }
 }
 
+impl Empty for NeighborScores {
+    fn empty() -> Self {
+        Self {
+            scores: [0; 256],
+        }
+    }
+}
+
 impl NeighborScores {
-
-    pub const EMPTY: NeighborScores = NeighborScores {
-        scores: [0; 256],
-    };
-
     pub fn add_neighbor_score(&mut self, pos: Pos) {
         self.adjust_neighbor_score::<true>(pos);
     }
@@ -85,17 +82,6 @@ impl NeighborScores {
             }
         }
     }
-
-    pub fn sum_scores(&self) -> Score {
-        self.scores.iter()
-            .map(|&score| {
-                let mut score = score as Score;
-                score = score.pow(2);
-                score
-            })
-            .sum::<Score>()
-    }
-
 }
 
 #[repr(align(64))]

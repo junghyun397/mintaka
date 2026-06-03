@@ -2,7 +2,7 @@ use crate::eval::evaluator::{Evaluator, PolicyDistribution};
 use crate::game_state::GameState;
 use crate::movegen::neighbor_scores::NeighborScores;
 use rusty_renju::board::{Board, MoveArtifact};
-use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::color::{Color, ColorContainer};
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::{ForbiddenKind, RuleKind};
@@ -62,7 +62,7 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
 
     fn from_state(state: &GameState<R>) -> Self {
         let mut evaluator = Self {
-            neighbor_scores: NeighborScores::EMPTY,
+            neighbor_scores: NeighborScores::empty(),
             scores: ColorContainer::new([0; pattern::PATTERN_SIZE], [0; pattern::PATTERN_SIZE]),
             score_black: 0,
             hash_key: HashKey::empty(),
@@ -108,7 +108,11 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
     }
 
     fn eval_policy(&mut self, state: &GameState<R>) -> PolicyDistribution {
-        self.scores[state.board.player_color]
+        std::array::from_fn(|idx|
+            self.scores[state.board.player_color][idx]
+                + self.scores[!state.board.player_color][idx]
+                + (self.neighbor_scores.scores[idx] as i16)
+        )
     }
 
     fn eval_value(&mut self, state: &GameState<R>) -> Score {
@@ -130,12 +134,12 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
     }
 }
 
-// open_fours(1), fours(2), open_threes(2), potential(3) 8 bits
-fn encode_value_key(pattern: Pattern) -> usize {
-    let has_open_four = pattern.has_open_four() as u32;
-    let total_fours = (pattern.count_closed_fours() & 0b11) << 1;
-    let open_threes = (pattern.count_open_threes() & 0b11) << 3;
-    let potentials = (pattern.count_any_potential() & 0b111) << 5;
+// open-fours(1), fours(2), open-threes(2), potential(3) 8 bits
+fn encode_value_key(player_pattern: Pattern) -> usize {
+    let has_open_four = player_pattern.has_open_four() as u32;
+    let total_fours = (player_pattern.count_closed_fours() & 0b11) << 1;
+    let open_threes = (player_pattern.count_open_threes() & 0b11) << 3;
+    let potentials = (player_pattern.count_any_potential() & 0b111) << 5;
 
     (has_open_four | total_fours | open_threes | potentials) as usize
 }

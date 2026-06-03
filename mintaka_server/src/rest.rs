@@ -14,7 +14,7 @@ use std::convert::Infallible;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::rule::RuleKind;
 
 impl From<&AppError> for StatusCode {

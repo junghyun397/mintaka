@@ -11,7 +11,7 @@ use mintaka::protocol::command::Command;
 use mintaka::protocol::results::{BestMove, CommandResult};
 use mintaka::protocol::response::Response;
 use mintaka::game_state::GameState;
-use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::hash_key::HashKey;
 use serde::ser::SerializeStruct;
 use serde::{ser, Deserialize, Serialize, Serializer};
 use std::cmp::Reverse;

@@ -1,6 +1,5 @@
 use rusty_renju::assert_struct_sizes;
-use rusty_renju::memo::abstract_transposition_table::AbstractTTEntry;
-use rusty_renju::memo::hash_key::HashKey;
+use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -126,31 +125,9 @@ pub struct TTEntryBucket {
 
 assert_struct_sizes!(TTEntryBucket, size=64, align=64);
 
-impl AbstractTTEntry for TTEntryBucket {
-    const BUCKET_SIZE: u64 = 6;
-
-    fn clear_mut(&self) {
-        for keys in &self.keys {
-            keys.store(0, Ordering::Relaxed);
-        }
-
-        for entry in &self.entries {
-            entry.store(0, Ordering::Relaxed);
-        }
-    }
-
-    fn usage(&self) -> usize {
-        let mut count = 0;
-
-        for idx in 0 ..6 {
-            count += self.entries[idx].load(Ordering::Relaxed).min(1);
-        }
-
-        count as usize
-    }
-}
-
 impl TTEntryBucket {
+    pub const BUCKET_SIZE: u64 = 6;
+
     fn pack_hash_key(key: HashKey) -> u64 {
         u64::from(key) & KEY_MASK
     }
@@ -200,6 +177,16 @@ impl TTEntryBucket {
 
         self.store_key(slot_idx, packed_key ^ Self::shuffle_pack_entry(entry));
         self.entries[slot_idx].store(entry, Ordering::Relaxed);
+    }
+
+    pub fn clear(&self) {
+        for keys in &self.keys {
+            keys.store(0, Ordering::Relaxed);
+        }
+
+        for entry in &self.entries {
+            entry.store(0, Ordering::Relaxed);
+        }
     }
 
     pub fn usage(&self, age: u8) -> usize {

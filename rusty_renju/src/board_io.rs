@@ -4,7 +4,7 @@ use crate::board::Board;
 use crate::board_iter::{BoardExportItem, BoardIterItem};
 use crate::board_utils::BoardWinner;
 use crate::history::History;
-use crate::memo::hash_key::HashKey;
+use crate::hash_key::HashKey;
 use crate::notation::color::{Color, ColorContainer};
 use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
