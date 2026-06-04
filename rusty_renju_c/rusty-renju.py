@@ -42,14 +42,32 @@ class Color(Enum):
         return self.name.lower()
 
 
+class RuleKind(Enum):
+    RENJU = 0
+    GOMOKU = 1
+    FREESTYLE = 2
+
+    def __str__(self) -> str:
+        return self.name.lower()
+
+
 class Board:
-    def __init__(self, lib: RustyRenjuLib, ptr: int):
+    def __init__(self, lib: RustyRenjuLib, rule: RuleKind, ptr: int):
         self.__lib = lib
         self.__ptr = ptr
         self.__describe = None
+        self.rule = rule
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+    @classmethod
+    def empty(cls) -> 'Board':
+        pass
+
+    @classmethod
+    def from_history(cls, history: list[Pos]) -> 'Board':
+        pass
 
     def close(self):
         if self.__ptr:

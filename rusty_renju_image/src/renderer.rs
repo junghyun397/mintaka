@@ -7,20 +7,23 @@ use std::array;
 use std::sync::OnceLock;
 use fontdue::Font;
 use tiny_skia::{FillRule, Paint, Path, PathBuilder, Pixmap, PixmapPaint, PremultipliedColorU8, Rect, Transform};
-use rusty_renju::board::Board;
 use rusty_renju::board_iter::BoardExportItem;
+use rusty_renju::dispatch_any_board;
 use rusty_renju::history::{History, MAX_HISTORY_SIZE};
 use rusty_renju::notation::color::{Color, ColorContainer};
+use rusty_renju::notation::ffi::AnyBoard;
 use rusty_renju::notation::pos::{Pos, BOARD_SIZE, U_BOARD_WIDTH};
-use rusty_renju::notation::rule::RuleKind;
 use crate::{HistoryRender, RenderPayloads};
 use crate::text::raster_text;
 
-pub fn render_pixmap(board: &Board<{ RuleKind::Renju }>, opts: RenderPayloads) -> Pixmap {
+pub fn render_pixmap(
+    board: &AnyBoard,
+    opts: &RenderPayloads,
+) -> Pixmap {
     let res = resources();
     let mut canvas = res.base.clone();
 
-    draw_board(&mut canvas, board, &opts, res);
+    draw_board(&mut canvas, board, opts, res);
 
     canvas
 }
@@ -361,8 +364,14 @@ fn draw_positions(canvas: &mut Pixmap, res: &Resources, sprite: &Pixmap, positio
     }
 }
 
-fn draw_board(canvas: &mut Pixmap, board: &Board<{ RuleKind::Renju }>, opts: &RenderPayloads, res: &Resources) {
-    for (cell, item) in res.cells.iter().zip(board.export_items()) {
+fn draw_board(canvas: &mut Pixmap,
+    board: &AnyBoard,
+    opts: &RenderPayloads,
+    res: &Resources,
+) {
+    let export_items = dispatch_any_board!(board, board => board.export_items());
+
+    for (cell, item) in res.cells.iter().zip(export_items) {
         match item {
             BoardExportItem::Stone(color) => blit_cell(canvas, &res.lut.stone[color], cell),
             BoardExportItem::Forbidden(_) if opts.enable_forbidden => blit_cell(canvas, &res.lut.forbidden, cell),
@@ -370,7 +379,8 @@ fn draw_board(canvas: &mut Pixmap, board: &Board<{ RuleKind::Renju }>, opts: &Re
         }
     }
 
-    let offer = &res.lut.offer[board.player_color];
+    let player_color = dispatch_any_board!(board, board => board.player_color);
+    let offer = &res.lut.offer[player_color];
     draw_positions(canvas, res, offer, opts.offers);
     draw_positions(canvas, res, &res.lut.blind, opts.blinds);
 
@@ -385,7 +395,7 @@ fn draw_board(canvas: &mut Pixmap, board: &Board<{ RuleKind::Renju }>, opts: &Re
 fn draw_recent(
     canvas: &mut Pixmap,
     history: &History,
-    board: &Board<{ RuleKind::Renju }>,
+    board: &AnyBoard,
     res: &Resources,
     include_prev: bool,
 ) {
@@ -393,7 +403,7 @@ fn draw_recent(
 
     let mut draw = |pos: Option<Pos>, sprite: &ColorContainer<Pixmap>| {
         if let Some(pos) = pos
-            && let Some(stone_color) = board.stone_kind(pos)
+            && let Some(stone_color) = dispatch_any_board!(board, board => board.stone_kind(pos))
         {
             blit_cell(canvas, &sprite[stone_color], &res.cells[pos.idx_usize()]);
         }
