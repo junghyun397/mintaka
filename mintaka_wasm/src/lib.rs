@@ -2,7 +2,7 @@ pub mod mintaka_bindings;
 
 pub use wasm_bindgen_rayon::init_thread_pool;
 
-use mintaka::utils::time::MonotonicClock;
+use mintaka::utils::monotonic_clock::MonotonicClock;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::time::Duration;

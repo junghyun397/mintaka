@@ -336,7 +336,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
             vcf_ply += 1;
             vcf_depth_left -= 1;
 
-            let response_pos = state.board.patterns.unchecked_five_pos[C].unwrap();
+            let response_pos = state.board.patterns.five_pos[C].unwrap();
             let tt_key = state.board.hash_key.set(C.reversed(), response_pos);
             td.tt.prefetch(tt_key);
 
@@ -433,7 +433,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
             });
 
             if response_four_count != 0 {
-                let response_move = state.board.patterns.unchecked_five_pos[!C].unwrap();
+                let response_move = state.board.patterns.five_pos[!C].unwrap();
 
                 if !state.board.patterns.field[C][response_move.idx_usize()].has_any_four()
                     || (C == Color::Black && state.board.patterns.is_forbidden(response_move))

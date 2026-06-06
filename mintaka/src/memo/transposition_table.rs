@@ -4,8 +4,6 @@ use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::{Score, Scores};
 use rusty_renju::utils::byte_size::ByteSize;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize, Serializer};
 #[cfg(feature = "compress-tt")]
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -303,14 +301,14 @@ impl TTView<'_> {
     pub fn prefetch(&self, key: HashKey) {
         #[cfg(target_arch = "x86_64")]
         unsafe {
-            use std::arch::x86_64::{_MM_HINT_T0, _mm_prefetch};
+            use std::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
             let idx = self.calculate_index(key);
             let entry = &self.table[idx];
             _mm_prefetch::<_MM_HINT_T0>((entry as *const TTEntryBucket).cast());
         }
         #[cfg(target_arch = "aarch64")]
         unsafe {
-            use std::arch::aarch64::{_PREFETCH_LOCALITY3, _PREFETCH_READ, _prefetch};
+            use std::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY3, _PREFETCH_READ};
             let idx = self.calculate_index(key);
             let entry = &self.table[idx];
             _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY3>(
@@ -337,27 +335,5 @@ pub fn decode_mate_distance(score: Score, ply: usize) -> Score {
         score - (ply as Score) * score.signum()
     } else {
         score
-    }
-}
-
-#[cfg(feature = "serde")]
-impl Serialize for TranspositionTable {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_bytes(&self.export(9))
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for TranspositionTable {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let bytes = Vec::<u8>::deserialize(deserializer)?;
-
-        Self::import(bytes).map_err(serde::de::Error::custom)
     }
 }

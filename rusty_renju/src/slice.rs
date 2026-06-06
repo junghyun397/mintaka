@@ -199,16 +199,16 @@ impl Slices {
         }
     }
 
-    pub fn simulate_set_slices(&self, color: Color, pos: Pos) -> [Option<u16>; 4] {
+    pub fn simulate_set_slices(&self, color: Color, pos: Pos) -> [u16; 4] {
         [
-            Some(self.horizontal_slices[pos.row_usize()].stones[color] | 0b1 << pos.col_usize()),
-            Some(self.vertical_slices[pos.col_usize()].stones[color] | 0b1 << pos.row_usize()),
+            self.horizontal_slices[pos.row_usize()].stones[color] | 0b1 << pos.col_usize(),
+            self.vertical_slices[pos.col_usize()].stones[color] | 0b1 << pos.row_usize(),
             Self::ascending_slice_idx(pos).map(|idx|
                 self.ascending_slices[idx].stones[color] | 0b1 << (pos.col() - self.ascending_slices[idx].start_col)
-            ),
+            ).unwrap_or(0),
             Self::descending_slice_idx(pos).map(|idx|
                 self.descending_slices[idx].stones[color] | 0b1 << (pos.col() - self.descending_slices[idx].start_col)
-            ),
+            ).unwrap_or(0),
         ]
     }
 

@@ -1,10 +1,12 @@
-import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective } from "../wasm/pkg/rusty_renju_wasm"
+import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective, Timer } from "../wasm/pkg/rusty_renju_wasm"
 import type { MintakaLaunchResponse, MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand } from "./mintaka.provider"
 import { duration, InfiniteDuration } from "./mintaka"
+import { Mutex } from "../utils/mutex"
 
 export type MintakaWorkerMessage =
+    | { type: "config", config: Config }
     | { type: "command", id: number, command: Command }
-    | { type: "launch", id: number, expectedHash: HashKey, objective: SearchObjective }
+    | { type: "launch", id: number, expectedHash: HashKey, timer: Timer, objective: SearchObjective }
     | { type: "init", config: Config, state: GameState }
 
 export type MintakaWorkerResponse =
@@ -37,14 +39,12 @@ export class MintakaWorkerControl {
 }
 
 export const DefaultWorkerConfig: Config = {
-    draw_condition: 225,
     max_nodes_in_1k: undefined,
     max_depth: undefined,
     max_vcf_depth: undefined,
     tt_size: 1024 * 1024 * 128,
     workers: Math.max(1, navigator.hardwareConcurrency - 1),
     pondering: false,
-    dynamic_time: false,
     initial_timer: {
         total_remaining: undefined,
         increment: duration(0),
@@ -77,9 +77,9 @@ export class MintakaWorkerProvider implements MintakaProvider {
     private workerControl?: MintakaWorkerControl
     private nodesPollingInterval?: ReturnType<typeof setInterval>
 
+    private readonly workerMutex = new Mutex()
     private commandId = 0
-    private readonly pendingCommands = new Map<number, PendingRequest<CommandResult>>()
-    private readonly pendingLaunches = new Map<number, PendingRequest<MintakaLaunchResponse>>()
+    private pendingRequest?: PendingRequest
 
     private onResponse?: (message: MintakaProviderResponse) => void
 
@@ -99,11 +99,11 @@ export class MintakaWorkerProvider implements MintakaProvider {
                     return
                 }
                 case "CommandResult": {
-                    this.resolvePending(this.pendingCommands, event.data.id, event.data.content)
+                    this.resolvePending(event.data)
                     return
                 }
                 case "LaunchResult": {
-                    this.resolvePending(this.pendingLaunches, event.data.id, event.data.content)
+                    this.resolvePending(event.data)
                     return
                 }
                 case "Begins": {
@@ -115,7 +115,7 @@ export class MintakaWorkerProvider implements MintakaProvider {
                     break
                 }
                 case "Error": {
-                    this.rejectAllPending(event.data.content)
+                    this.rejectPending(event.data.content)
                     break
                 }
             }
@@ -126,7 +126,7 @@ export class MintakaWorkerProvider implements MintakaProvider {
         this.worker.onerror = (event) => {
             const error = event.error ?? event.message
             this.stopNodesPolling()
-            this.rejectAllPending(error)
+            this.rejectPending(error)
             this.onResponse && this.onResponse({ type: "Error", content: error })
         }
 
@@ -140,20 +140,28 @@ export class MintakaWorkerProvider implements MintakaProvider {
     dispose() {
         this.onResponse = undefined
         this.stopNodesPolling()
-        this.rejectAllPending(new Error("worker provider disposed"))
+        this.pendingRequest = undefined
         this.worker.terminate()
     }
 
-    async command(command: Command) {
-        const id = this.nextId()
-
-        return this.postMessageForResponse(this.pendingCommands, id, { type: "command", id, command })
+    async config(config: Config) {
+        return // TODO
     }
 
-    async launch(expectedHash: HashKey, objective: SearchObjective): Promise<MintakaLaunchResponse> {
-        const id = this.nextId()
+    async command(command: Command) {
+        return await this.workerMutex.run(async () => {
+            const id = this.nextId()
 
-        return this.postMessageForResponse(this.pendingLaunches, id, { type: "launch", expectedHash, objective, id })
+            return await this.postMessageForResponse("CommandResult", id, { type: "command", id, command })
+        })
+    }
+
+    async launch(expectedHash: HashKey, timer: Timer, objective: SearchObjective): Promise<MintakaLaunchResponse> {
+        return await this.workerMutex.run(async () => {
+            const id = this.nextId()
+
+            return await this.postMessageForResponse("LaunchResult", id, { type: "launch", timer, expectedHash, objective, id })
+        })
     }
 
     control(command: MintakaProviderRuntimeCommand) {
@@ -192,39 +200,55 @@ export class MintakaWorkerProvider implements MintakaProvider {
         this.nodesPollingInterval = undefined
     }
 
-    private postMessageForResponse<T>(pending: Map<number, PendingRequest<T>>, id: number, message: MintakaWorkerMessage) {
-        return new Promise<T>((resolve, reject) => {
-            pending.set(id, { resolve, reject })
+    private postMessageForResponse(responseType: "CommandResult", id: number, message: MintakaWorkerMessage): Promise<CommandResult>
+    private postMessageForResponse(responseType: "LaunchResult", id: number, message: MintakaWorkerMessage): Promise<MintakaLaunchResponse>
+    private postMessageForResponse(responseType: WorkerResultResponseType, id: number, message: MintakaWorkerMessage) {
+        return new Promise<CommandResult | MintakaLaunchResponse>((resolve, reject) => {
+            this.pendingRequest = { id, responseType, resolve, reject }
 
             try {
                 this.postMessage(message)
             } catch (error: unknown) {
-                pending.delete(id)
+                if (this.pendingRequest?.id === id)
+                    this.pendingRequest = undefined
+
                 reject(error)
             }
         })
     }
 
-    private resolvePending<T>(pending: Map<number, PendingRequest<T>>, id: number, content: T) {
-        const request = pending.get(id)
+    private resolvePending(response: WorkerResultResponse) {
+        const request = this.pendingRequest
         if (request === undefined)
             return
 
-        pending.delete(id)
-        request.resolve(content)
+        if (request.id !== response.id || request.responseType !== response.type)
+            return
+
+        this.pendingRequest = undefined
+        request.resolve(response.content)
     }
 
-    private rejectAllPending(error: unknown) {
-        this.pendingCommands.forEach(request => request.reject(error))
-        this.pendingCommands.clear()
+    private rejectPending(error: unknown) {
+        const request = this.pendingRequest
+        if (request === undefined)
+            return
 
-        this.pendingLaunches.forEach(request => request.reject(error))
-        this.pendingLaunches.clear()
+        this.pendingRequest = undefined
+        request.reject(error)
     }
 
 }
 
-type PendingRequest<T> = {
-    readonly resolve: (value: T) => void,
+type WorkerResultResponse =
+    | { type: "CommandResult", id: number, content: CommandResult }
+    | { type: "LaunchResult", id: number, content: MintakaLaunchResponse }
+
+type WorkerResultResponseType = WorkerResultResponse["type"]
+
+type PendingRequest = {
+    readonly id: number,
+    readonly responseType: WorkerResultResponseType,
+    readonly resolve: (value: CommandResult | MintakaLaunchResponse) => void,
     readonly reject: (reason?: unknown) => void,
 }

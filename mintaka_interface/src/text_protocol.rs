@@ -3,19 +3,20 @@ use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::game_state::{GameState, GameStateData};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::response::{CallBackResponseSender, Response};
-use mintaka_interface::message::{Message, MessageCommand, MessageSender, StatusCommand};
+use mintaka_interface::message::{ConfigCommand, Message, MessageCommand, MessageSender, StatusCommand};
 use mintaka_interface::preference::Preference;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::notation::color::UnknownColorError;
 use rusty_renju::notation::pos::{MaybePos, PosError};
+use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
 use rusty_renju::utils::empty::Empty;
 use std::io::BufRead;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
-use rusty_renju::notation::rule::RuleKind;
+use mintaka::value::Depth;
 
 pub fn entry<const R: RuleKind>() -> Result<(), GameError> {
     let pref = Preference::<R>::parse();
@@ -32,20 +33,22 @@ pub fn entry<const R: RuleKind>() -> Result<(), GameError> {
         .unwrap_or_default();
 
     text_protocol(
-        pref.default_config,
+        pref.config,
         pref.game_state.unwrap_or_else(|| GameState::empty()),
         command_sequence,
     )
 }
 
 fn text_protocol<const R: RuleKind>(
-    config: Config,
+    mut config: Config,
     state: GameState<R>,
     command_sequence: Vec<String>,
 ) -> Result<(), GameError> {
     let aborted = Arc::new(AtomicBool::new(false));
 
     let mut game_agent = GameAgent::from_state(config, state);
+
+    let mut timer = config.initial_timer;
 
     let (message_sender, message_receiver) = {
         let (tx, rx) = mpsc::channel();
@@ -56,14 +59,44 @@ fn text_protocol<const R: RuleKind>(
 
     for message in message_receiver {
         match message {
+            Message::Config(command) => {
+                match command {
+                    ConfigCommand::TotalTime(total) => {
+                        timer.total_remaining = Some(total);
+                    }
+                    ConfigCommand::IncrementTime(increment) => {
+                        config.initial_timer.increment = increment;
+                        timer.increment = increment;
+                    }
+                    ConfigCommand::TurnTime(turn) => {
+                        config.initial_timer.turn = Some(turn);
+                        timer.turn = Some(turn)
+                    }
+                    ConfigCommand::MaxNodes { in_1k } => {
+                        config.max_nodes_in_1k = Some(in_1k);
+                    }
+                    ConfigCommand::MaxDepth(max_depth) => {
+                        config.max_depth = Some(max_depth as Depth);
+                    }
+                    ConfigCommand::Workers(workers) => {
+                        config.workers = workers;
+                    }
+                    ConfigCommand::ResizeTT(size) => {
+                        config.tt_size = size;
+                        let _ = game_agent.command(Command::RebuildTT(config.tt_size));
+                    }
+                }
+            }
             Message::Command(command) => {
-                let command = command.into_command(game_agent.state.board.hash_key);
+                let command = command.into_command(&config, game_agent.state.board.hash_key);
 
                 execute_command(&mut game_agent, command);
             }
             Message::Status(command) => print_status(&game_agent, command),
             Message::Launch { objective, apply, interactive } => {
                 let best_move = game_agent.launch::<Instant>(
+                    config,
+                    timer,
                     objective,
                     CallBackResponseSender::new(print_response),
                     Arc::new(AtomicU32::new(0)),
@@ -85,6 +118,7 @@ fn text_protocol<const R: RuleKind>(
                     let command = Command::Play {
                         hash: game_agent.state.board.hash_key,
                         pos: best_move.best_move.into(),
+                        draw_condition: config.draw_condition,
                     };
 
                     execute_command(&mut game_agent, command);
@@ -126,15 +160,14 @@ fn print_status<const R: RuleKind>(game_agent: &GameAgent<R>, command: StatusCom
                 .to_string_with_last_moves(game_agent.state.history.last_action_pair())
         ),
         StatusCommand::History => println!("= {}", game_agent.state.history),
-        StatusCommand::Time => println!("= {:?}", game_agent.time_manager.timer),
         _ => {}
     }
 }
 
 fn print_response(response: Response) {
     match response {
-        Response::Begins(ComputingResource { workers, time, nodes_in_1k, tt_size }) =>
-            println!("begins: workers={workers}, running-time={time:?}, nodes={nodes_in_1k:?}, tt-size={tt_size}"),
+        Response::Begins(ComputingResource { workers, time_limit, nodes_in_1k }) =>
+            println!("begins: workers={workers}, running-time={time_limit:?}, nodes={nodes_in_1k:?}"),
         Response::Status { best_move, score, pv, total_nodes_in_1k, selective_depth, .. } =>
             println!("status: depth={selective_depth}, score={score}, best_move={best_move}, total_nodes_in_1k={total_nodes_in_1k}, pv={pv:?}"),
     }
@@ -188,7 +221,7 @@ fn handle_command<const R: RuleKind>(
 
                     println!("info: workers={cores}");
 
-                    message_sender.command(MessageCommand::Raw(Command::Workers(cores)));
+                    message_sender.config(ConfigCommand::Workers(cores));
                 }
                 &_ => {
                     let workers = args.get(2).ok_or("workers not provided.")?
@@ -197,7 +230,7 @@ fn handle_command<const R: RuleKind>(
                         .filter(|&workers| workers > 0)
                         .ok_or("invalid workers number.")?;
 
-                    message_sender.command(MessageCommand::Raw(Command::Workers(workers)));
+                    message_sender.config(ConfigCommand::Workers(workers));
                 }
             },
             "memory" => {
@@ -205,9 +238,7 @@ fn handle_command<const R: RuleKind>(
                     .parse::<u64>()
                     .map_err(|_| "invalid memory size.")?;
 
-                message_sender.command(MessageCommand::Raw(Command::MaxMemory(
-                    ByteSize::from_kib(memory_size_in_kib),
-                )));
+                message_sender.config(ConfigCommand::ResizeTT(ByteSize::from_kib(memory_size_in_kib)));
             }
             &_ => return Err("data type not provided.".to_string()),
         },
@@ -223,19 +254,13 @@ fn handle_command<const R: RuleKind>(
 
                 match *args.get(2).ok_or("data type not provided.")? {
                     "total" => {
-                        message_sender.command(MessageCommand::Raw(Command::TotalTime(
-                            parse_time_in_milliseconds(&args)?,
-                        )));
+                        message_sender.config(ConfigCommand::TotalTime(parse_time_in_milliseconds(&args)?));
                     }
                     "turn" => {
-                        message_sender.command(MessageCommand::Raw(Command::TurnTime(
-                            parse_time_in_milliseconds(&args)?,
-                        )));
+                        message_sender.config(ConfigCommand::TurnTime(parse_time_in_milliseconds(&args)?));
                     }
                     "increment" => {
-                        message_sender.command(MessageCommand::Raw(Command::IncrementTime(
-                            parse_time_in_milliseconds(&args)?,
-                        )));
+                        message_sender.config(ConfigCommand::IncrementTime(parse_time_in_milliseconds(&args)?));
                     }
                     &_ => return Err("unknown time type.".to_string()),
                 }
@@ -245,7 +270,7 @@ fn handle_command<const R: RuleKind>(
                     .parse::<u32>()
                     .map_err(|_| "invalid nodes number.")?;
 
-                message_sender.command(MessageCommand::Raw(Command::MaxNodes { in_1k: nodes }));
+                message_sender.config(ConfigCommand::MaxNodes { in_1k: nodes });
             }
             &_ => return Err("unknown limit type.".to_string()),
         },
@@ -255,19 +280,19 @@ fn handle_command<const R: RuleKind>(
 
                 let history = (&board).try_into().unwrap_or_else(|_| History::empty());
 
-                message_sender.command(MessageCommand::Raw(Command::Init(Box::new(GameStateData { board_data: (&board).into(), history }))));
+                message_sender.command(MessageCommand::Command(Command::Init(Box::new(GameStateData { board_data: (&board).into(), history }))));
             }
             "history" => {
                 let history: History = args.get(2).ok_or("history not provided.")?.parse()?;
 
                 let board: Board<R> = (&history).into();
 
-                message_sender.command(MessageCommand::Raw(Command::Init(Box::new(GameStateData { board_data: (&board).into(), history }))));
+                message_sender.command(MessageCommand::Command(Command::Init(Box::new(GameStateData { board_data: (&board).into(), history }))));
             }
             &_ => return Err("unknown data type.".to_string()),
         },
         "clear" => {
-            message_sender.command(MessageCommand::Raw(Command::Clear));
+            message_sender.command(MessageCommand::Command(Command::Clear));
         }
         "board" => {
             message_sender.status(StatusCommand::Board {

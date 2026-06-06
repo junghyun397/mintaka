@@ -89,7 +89,6 @@ fn new_session_response_sender() -> SessionResponseSender {
 }
 
 impl AppState {
-
     pub fn new(preference: Preference) -> Result<Self, AppError> {
         Ok(Self {
             sessions: Arc::new(Sessions::default()),
@@ -229,7 +228,6 @@ impl AppState {
     pub fn configs_session(&self, session_key: SessionKey) -> Result<Configs, AppError> {
         let config = self.sessions.get(&session_key)
             .ok_or(AppError::SessionNotFound)?
-            .game_agent()?
             .config;
 
         Ok(Configs {
@@ -323,7 +321,7 @@ impl AppState {
 
         let (file_path, session_data) = self.load_hibernated_session(session_key).await?;
 
-        let memory_permit = self.acquire_memory(session_data.agent.config.tt_size, true, RESOURCE_ACQUIRE_TIMEOUT)
+        let memory_permit = self.acquire_memory(session_data.config.tt_size, true, RESOURCE_ACQUIRE_TIMEOUT)
             .await?;
 
         let response_sender = new_session_response_sender();
@@ -445,7 +443,7 @@ impl AppState {
             return Err(AppError::GameError(GameError::HashMismatch))
         }
 
-        let worker_permit = self.acquire_workers(session.game_agent()?.config.workers, timeout).await?;
+        let worker_permit = self.acquire_workers(session.config.workers, timeout).await?;
 
         let response_sender = session.response_sender.clone();
 
@@ -506,7 +504,7 @@ impl AppState {
     fn destroy_active_session(&self, session_key: SessionKey) -> Result<SessionResource, AppError> {
         let session = self.sessions.remove_idle(&session_key, None)?;
 
-        let resource = (&session.game_agent()?.config).into();
+        let resource = (&session.config).into();
 
         tracing::info!("session destroyed; resource={resource:?}");
 
@@ -549,5 +547,4 @@ impl AppState {
 
         Ok(())
     }
-
 }

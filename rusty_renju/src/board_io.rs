@@ -394,12 +394,14 @@ impl<const R: RuleKind> From<&Board<R>> for BoardData {
 #[derive(Debug, Copy, Clone)]
 pub enum BoardDeserializeError {
     InvalidRuleKind,
+    HashMismatch,
 }
 
 impl Display for BoardDeserializeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             BoardDeserializeError::InvalidRuleKind => write!(f, "Invalid rule kind."),
+            BoardDeserializeError::HashMismatch => write!(f, "Hash mismatch."),
         }
     }
 }
@@ -419,6 +421,10 @@ impl<const R: RuleKind> TryFrom<BoardData> for Board<R> {
 
         let mut board = Board::<R>::empty();
         board.batch_set_each_color_mut(black_moves, white_moves, data.player_color);
+
+        if board.hash_key != data.hash_key {
+            return Err(BoardDeserializeError::HashMismatch);
+        }
 
         Ok(board)
     }

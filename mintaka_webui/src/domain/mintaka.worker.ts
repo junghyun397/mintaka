@@ -54,6 +54,10 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
                 ctx.post({ type: "Ready", version: mintakaVersion(), sab: memory!, counterPtr: counterPtr, abortPtr: abortPtr })
                 break
             }
+            case "config": {
+                ctx.state!.agent.config(event.data.config)
+                break
+            }
             case "command": {
                 const result = ctx.state!.agent.command(event.data.command)
 
@@ -73,7 +77,7 @@ self.addEventListener("message", async (event: MessageEvent<MintakaWorkerMessage
 
                 ctx.post({ type: "LaunchResult", id: event.data.id, content: "launched" })
 
-                const bestMove = ctx.state.agent.launch(event.data.objective, ctx.state.counter, ctx.state.abort)
+                const bestMove = ctx.state.agent.launch(event.data.timer, event.data.objective, ctx.state.counter, ctx.state.abort)
 
                 ctx.post({ type: "BestMove", content: bestMove })
                 break

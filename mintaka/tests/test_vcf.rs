@@ -15,6 +15,7 @@ mod test_vcf {
     use rusty_renju::notation::rule::RuleKind;
     use rusty_renju::utils::byte_size::ByteSize;
     use std::sync::atomic::{AtomicBool, AtomicU32};
+    use std::time::Instant;
 
     macro_rules! vcf {
         ($board:expr) => {{
@@ -31,7 +32,7 @@ mod test_vcf {
             let aborted = AtomicBool::new(false);
 
             let mut td = ThreadData::new(
-                WorkerThread, 0, SearchObjective::Best, config, evaluator,
+                WorkerThread::<Instant>::new(), 0, SearchObjective::Best, config, evaluator,
                 tt.view(), ht, &aborted, &global_counter_in_1k
             );
 
@@ -51,7 +52,7 @@ mod test_vcf {
             println!("length: {}", vcf_result.len());
             println!("sequence: {vcf_result:?}");
             println!("time: {time:?}");
-            println!("nodes: {}", td.batch_counter.count_local_total());
+            println!("nodes: {}", td.batch_counter.count_local_in_1k());
 
             last_move.unwrap()
         }};

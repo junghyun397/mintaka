@@ -18,8 +18,6 @@ pub struct Preference<const R: RuleKind> {
     pub history: Option<History>,
     #[arg(short, long, num_args = 3)]
     pub time: Option<Vec<u32>>,
-    #[arg(long)]
-    pub dynamic_time: bool,
     #[arg(short, long)]
     pub nodes_in_1k: Option<u32>,
     #[arg(short, long)]
@@ -33,11 +31,10 @@ pub struct Preference<const R: RuleKind> {
     #[clap(skip)]
     pub game_state: Option<GameState<R>>,
     #[clap(skip)]
-    pub default_config: Config,
+    pub config: Config,
 }
 
 impl<const R: RuleKind> Preference<R> {
-
     pub fn parse() -> Self {
         let mut pref = Self::parse_from(std::env::args());
 
@@ -55,28 +52,25 @@ impl<const R: RuleKind> Preference<R> {
         }
 
         if let Some(&[total_time_in_ms, increment_time_in_ms, turn_time_in_ms]) = self.time.as_deref() {
-            self.default_config.initial_timer.total_remaining = Some(Duration::from_millis(total_time_in_ms as u64));
-            self.default_config.initial_timer.increment = Duration::from_millis(increment_time_in_ms as u64);
-            self.default_config.initial_timer.turn = Some(Duration::from_millis(turn_time_in_ms as u64));
+            self.config.initial_timer.total_remaining = (total_time_in_ms != 0).then_some(Duration::from_millis(total_time_in_ms as u64));
+            self.config.initial_timer.turn = (turn_time_in_ms != 0).then_some(Duration::from_millis(turn_time_in_ms as u64));
+            self.config.initial_timer.increment = Duration::from_millis(increment_time_in_ms as u64);
         }
 
-        self.default_config.dynamic_time = self.dynamic_time;
-
-        self.default_config.pondering = self.pondering;
+        self.config.pondering = self.pondering;
 
         if let Some(memory_in_mib) = self.memory_in_mib {
-            self.default_config.tt_size = ByteSize::from_mib(memory_in_mib as u64);
+            self.config.tt_size = ByteSize::from_mib(memory_in_mib as u64);
         }
 
         match self.workers {
-            Some(workers) => self.default_config.workers = workers,
-            None => self.default_config.workers = std::thread::available_parallelism()
+            Some(workers) => self.config.workers = workers,
+            None => self.config.workers = std::thread::available_parallelism()
                 .map_or_else(|_| 1, |n| n.get()) as u32,
         }
 
-        self.default_config.max_nodes_in_1k = self.nodes_in_1k;
+        self.config.max_nodes_in_1k = self.nodes_in_1k;
 
-        self.default_config = self.default_config.validate().unwrap();
+        self.config = self.config.validate().unwrap();
     }
-
 }

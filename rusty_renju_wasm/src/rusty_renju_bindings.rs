@@ -123,23 +123,45 @@ impl BoardWorker {
             .map(to_js_value)
     }
 
-    pub fn set(self, pos: MaybePos) -> Self {
-        let maybe_pos: rusty_renju::notation::pos::MaybePos = try_from_js_value(pos).unwrap();
+    #[wasm_bindgen(js_name = setMut)]
+    pub fn set_mut(&mut self, action: MaybePos) {
+        let maybe_pos: rusty_renju::notation::pos::MaybePos = try_from_js_value(action).unwrap();
 
         if let Some(pos) = maybe_pos.ok() {
-            self.inner.set(pos).into()
+            self.inner.set_mut(pos);
         } else {
-            self.inner.pass().into()
+            self.inner.pass_mut();
         }
     }
 
-    pub fn unset(self, pos: MaybePos) -> Self {
-        let maybe_pos: rusty_renju::notation::pos::MaybePos = try_from_js_value(pos).unwrap();
+    pub fn set(&self, action: MaybePos) -> Self {
+        let maybe_pos: rusty_renju::notation::pos::MaybePos = try_from_js_value(action).unwrap();
 
         if let Some(pos) = maybe_pos.ok() {
-            self.inner.unset(pos).into()
+            self.inner.clone().set(pos).into()
         } else {
-            self.inner.pass().into()
+            self.inner.clone().pass().into()
+        }
+    }
+
+    #[wasm_bindgen(js_name = unsetMut)]
+    pub fn unset_mut(&mut self, action: MaybePos) {
+        let maybe_pos: rusty_renju::notation::pos::MaybePos = try_from_js_value(action).unwrap();
+
+        if let Some(pos) = maybe_pos.ok() {
+            self.inner.unset_mut(pos);
+        } else {
+            self.inner.unpass_mut();
+        }
+    }
+
+    pub fn unset(&self, action: MaybePos) -> Self {
+        let maybe_pos: rusty_renju::notation::pos::MaybePos = try_from_js_value(action).unwrap();
+
+        if let Some(pos) = maybe_pos.ok() {
+            self.inner.clone().unset(pos).into()
+        } else {
+            self.inner.clone().pass().into()
         }
     }
 

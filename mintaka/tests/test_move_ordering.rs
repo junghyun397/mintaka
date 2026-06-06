@@ -13,6 +13,7 @@ mod test_movegen {
     use rusty_renju::notation::pos::MaybePos;
     use rusty_renju::utils::empty::Empty;
     use std::sync::atomic::{AtomicBool, AtomicU32};
+    use std::time::Instant;
     use rusty_renju::notation::rule::RuleKind;
 
     macro_rules! test_move_ordering {
@@ -31,7 +32,7 @@ mod test_movegen {
             let aborted = AtomicBool::new(false);
 
             let mut td = ThreadData::new(
-                WorkerThread, 0,
+                WorkerThread::<Instant>::new(), 0,
                 SearchObjective::Best,
                 config,
                 evaluator,

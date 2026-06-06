@@ -212,7 +212,6 @@ impl<const R: RuleKind> Board<R> {
             }};
         }
 
-        self.patterns.unchecked_five_pos = ColorContainer::new(MaybePos::NONE, MaybePos::NONE);
 
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
         update_by_slice!(Direction::Horizontal, horizontal_slice, pos.col());
@@ -227,6 +226,8 @@ impl<const R: RuleKind> Board<R> {
         if let Some(descending_slice) = self.slices.descending_slice_mut(pos) {
             update_by_slice!(Direction::Descending, descending_slice, pos.col() - descending_slice.start_col);
         }
+
+        self.validate_five();
 
         if R == RuleKind::Renju {
             self.validate_overlines::<M>();
@@ -249,8 +250,6 @@ impl<const R: RuleKind> Board<R> {
             }};
         }
 
-        self.patterns.unchecked_five_pos = ColorContainer::new(MaybePos::NONE, MaybePos::NONE);
-
         for horizontal_slice in self.slices.horizontal_slices.iter_mut() {
             update_by_slice!(horizontal_slice, Direction::Horizontal);
         }
@@ -267,9 +266,21 @@ impl<const R: RuleKind> Board<R> {
             update_by_slice!(descending_slice, Direction::Descending);
         }
 
+        self.validate_five();
+
         if R == RuleKind::Renju {
             self.validate_overlines::<{ MoveType::Unset }>();
             self.validate_forbidden_moves();
+        }
+    }
+
+    fn validate_five(&mut self) {
+        for (color, maybe_five) in self.patterns.five_pos.clone().iter() {
+            if let Some(pos) = maybe_five.ok()
+                && !self.patterns.field[color][pos.idx_usize()].has_five()
+            {
+                self.patterns.five_pos[color] = MaybePos::NONE;
+            }
         }
     }
 
@@ -280,10 +291,8 @@ impl<const R: RuleKind> Board<R> {
         {
             for overline_pos in self.patterns.candidate_overline_field.clone().iter_hot_pos() {
                 if !self.slices.simulate_set_slices(Color::Black, overline_pos)
-                    .iter()
-                    .any(|&stones|
-                        stones.is_some_and(slice_pattern::contains_overline)
-                    )
+                    .into_iter()
+                    .any(slice_pattern::contains_overline)
                 {
                     self.patterns.candidate_overline_field.unset(overline_pos);
                 }

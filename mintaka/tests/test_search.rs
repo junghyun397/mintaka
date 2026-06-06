@@ -13,17 +13,19 @@ mod test_search {
 
     macro_rules! test_search {
         ($source:expr) => {{
-            let mut agent = {
-                let mut config = Config::default();
-                config.workers = 8;
-                config.max_nodes_in_1k = Some(100);
+            let mut config = Config::default();
+            config.workers = 8;
+            config.max_nodes_in_1k = Some(100);
 
+            let mut agent = {
                 let state: GameState<{ RuleKind::Renju }> = $source.into();
 
                 GameAgent::from_state(config, state)
             };
 
             let best_move = agent.launch::<Instant>(
+                config,
+                config.initial_timer,
                 SearchObjective::Best,
                 NullResponseSender,
                 Arc::new(AtomicU32::new(0)),

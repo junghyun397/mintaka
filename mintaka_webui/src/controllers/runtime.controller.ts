@@ -209,9 +209,7 @@ export function createRuntimeController(
         runtime !== undefined && runtime.type === "ready" && runtime.state.type === "idle"
 
     const storeConfig = async (runtime: MintakaReadyRuntime & { state: IdleState }, config: Config) => {
-        const commandResult = await runtime.provider.command({ type: "Config", content: config })
-
-        handleCommandResult(runtime, runtime.state, commandResult)
+        await runtime.provider.config(config)
 
         setMintakaRuntime({ ...runtime, configs: { ...runtime.configs, config } })
 
@@ -234,12 +232,14 @@ export function createRuntimeController(
         if (runtime?.type !== "ready" || runtime?.state.type !== "idle")
             return
 
-        let response = await runtime.provider.launch(snapshot.boardWorker.hashKey(), "Best")
+        let positionHash = snapshot.boardWorker.hashKey()
+
+        let response = await runtime.provider.launch(positionHash, runtime.configs.config.initial_timer, "Best")
 
         if (response === "snapshot-mismatch") {
             await syncAll({ board_data: snapshot.boardWorker.value(), history: snapshot.historyTree.toHistory() })
 
-            response = await runtime.provider.launch(snapshot.boardWorker.hashKey(), "Best")
+            response = await runtime.provider.launch(positionHash, runtime.configs.config.initial_timer, "Best")
 
             if (response === "snapshot-mismatch") {
                 throw new Error("broken provider")

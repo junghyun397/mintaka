@@ -1,7 +1,5 @@
-use crate::time::Timer;
+use crate::protocol::timer::Timer;
 use crate::value::{Depth, Depths};
-use rusty_renju::history;
-use rusty_renju::notation::pos;
 use rusty_renju::utils::byte_size::ByteSize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -25,7 +23,7 @@ pub enum SearchObjective {
 #[cfg_attr(feature = "serde", serde_with::skip_serializing_none)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Config {
-    pub draw_condition: u32,
+    pub draw_condition: Option<u32>,
 
     pub max_nodes_in_1k: Option<u32>,
     pub max_depth: Option<Depth>,
@@ -35,7 +33,6 @@ pub struct Config {
     pub workers: u32,
     pub pondering: bool,
 
-    pub dynamic_time: bool,
     pub initial_timer: Timer,
 
     pub spawn_depth_specialist: bool,
@@ -44,14 +41,13 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            draw_condition: pos::BOARD_SIZE as u32,
+            draw_condition: None,
             max_nodes_in_1k: None,
             max_depth: None,
             max_vcf_depth: None,
             tt_size: ByteSize::from_mib(128),
             workers: 1,
             pondering: false,
-            dynamic_time: false,
             initial_timer: Timer::default(),
             spawn_depth_specialist: false,
         }
@@ -89,14 +85,13 @@ impl Ord for Config {
 
 impl Config {
     pub const UNLIMITED_CONFIG: Self = Self {
-        draw_condition: pos::BOARD_SIZE as u32,
+        draw_condition: None,
         max_nodes_in_1k: None,
         max_depth: None,
         max_vcf_depth: None,
         tt_size: ByteSize::from_mib(1024 * 1024 * 1024),
         workers: 2048,
         pondering: true,
-        dynamic_time: true,
         initial_timer: Timer {
             total_remaining: None,
             increment: Duration::from_secs(u32::MAX as u64),
@@ -112,7 +107,6 @@ impl Config {
 
 #[derive(Debug)]
 pub enum ConfigValidationError {
-    DrawConditionDeeperThenMaxHistory,
     DepthDeeperThanMaxPly,
     VCFDepthDeeperThanMaxPly,
 }
@@ -127,9 +121,7 @@ impl std::error::Error for ConfigValidationError {}
 
 impl Config {
     pub fn validate(self) -> Result<Self, ConfigValidationError> {
-        if self.draw_condition > history::MAX_HISTORY_SIZE as u32 {
-            Err(ConfigValidationError::DrawConditionDeeperThenMaxHistory)
-        } else if self.max_depth > Some(Depth::PLY_LIMIT) {
+        if self.max_depth > Some(Depth::PLY_LIMIT) {
             Err(ConfigValidationError::DepthDeeperThanMaxPly)
         } else if self.max_vcf_depth > Some(Depth::PLY_LIMIT) {
             Err(ConfigValidationError::VCFDepthDeeperThanMaxPly)

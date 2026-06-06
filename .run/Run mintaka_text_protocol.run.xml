@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Run mintaka_text_protocol" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
     <option name="buildProfileId" value="dev" />
-    <option name="command" value="run --package mintaka_interface --bin mintaka_text_protocol" />
+    <option name="command" value="run --package mintaka_interface --bin mintaka_text_protocol_renju -- -t 0 1000 0" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <envs />
     <option name="emulateTerminal" value="true" />

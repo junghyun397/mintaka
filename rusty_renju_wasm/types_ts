@@ -55,17 +55,7 @@ export type CommandSchema =
 	player_moves: Pos[];
 	opponent_moves: Pos[];
 }}
-	| { type: "TurnTime", content: DurationSchema }
-	| { type: "IncrementTime", content: DurationSchema }
-	| { type: "TotalTime", content: DurationSchema }
-	| { type: "ConsumeTime", content: DurationSchema }
-	| { type: "Pondering", content: boolean }
-	| { type: "MaxNodes", content: {
-	in_1k: number;
-}}
-	| { type: "Workers", content: number }
-	| { type: "MaxMemory", content: ByteSize }
-	| { type: "Config", content: Config };
+	| { type: "RebuildTT", content?: undefined };
 
 export type Command = CommandSchema;
 
@@ -147,8 +137,7 @@ export interface CommandResult {
 
 export interface ComputingResource {
 	workers: number;
-	tt_size: ByteSize;
-	time?: DurationSchema;
+	time_limit?: DurationSchema;
 	nodes_in_1k?: number;
 }
 
@@ -159,14 +148,13 @@ export interface Timer {
 }
 
 export interface Config {
-	draw_condition: number;
+	draw_condition?: number;
 	max_nodes_in_1k?: number;
 	max_depth?: Depth;
 	max_vcf_depth?: Depth;
 	tt_size: ByteSize;
 	workers: number;
 	pondering: boolean;
-	dynamic_time: boolean;
 	initial_timer: Timer;
 	spawn_depth_specialist: boolean;
 }

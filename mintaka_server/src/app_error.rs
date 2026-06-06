@@ -33,7 +33,6 @@ impl Display for AppError {
             Self::MemoryAcquireTimeout => write!(f, "MEMORY_ACQUIRE_TIMEOUT"),
             Self::WorkerAcquireTimeout => write!(f, "WORKER_ACQUIRE_TIMEOUT"),
             Self::GameError(err) => match err {
-                GameError::InvalidConfig => write!(f, "INVALID_CONFIG"),
                 GameError::HashMismatch => write!(f, "HASH_MISMATCH"),
                 GameError::StoneAlreadyExist => write!(f, "STONE_ALREADY_EXIST"),
                 GameError::StoneDoesNotExist => write!(f, "STONE_DOES_NOT_EXIST"),
@@ -52,7 +51,6 @@ impl std::error::Error for AppError {}
 impl From<GameError> for AppError {
     fn from(err: GameError) -> Self {
         match err {
-            GameError::InvalidConfig => Self::InvalidConfig,
             _ => Self::GameError(err),
         }
     }

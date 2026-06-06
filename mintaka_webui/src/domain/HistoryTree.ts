@@ -7,6 +7,16 @@ export type HistoryEntry = {
 
 export type ForwardMethod = "continue" | "return"
 
+export type HistoryTreeNode =
+    | { type: "history", history: History }
+    | {
+        type: "branch",
+        current?: History,
+        currentBranchHead: History,
+        branchHead: History,
+        before: HistoryTreeNode,
+    }
+
 export class HistoryTree {
     private readonly root?: HistoryTree
     private readonly history: readonly HistoryEntry[]
@@ -38,10 +48,6 @@ export class HistoryTree {
         return this.length % 2 === 0 ? "Black" : "White"
     }
 
-    get opponentColor(): Color {
-        return this.length % 2 === 1 ? "Black" : "White"
-    }
-
     linear(): HistoryEntry[] {
         const acc = [this.history.slice(0, this.top)]
 
@@ -56,6 +62,27 @@ export class HistoryTree {
 
     toHistory(): History {
         return this.linear().map(entry => entry.pos)
+    }
+
+    tree(): HistoryTreeNode {
+        if (!this.root)
+            return { type: "history", history: this.toHistory() }
+
+        const branch = {
+            type: "branch",
+            currentBranchHead: this.root.linear().concat(this.history.slice(0, 1)).map(entry => entry.pos),
+            branchHead: this.root.nextHistory(),
+            before: this.root.tree(),
+        } as const
+
+        return this.inBranchHead ? branch : {
+            ...branch,
+            current: this.toHistory(),
+        }
+    }
+
+    private nextHistory(): History {
+        return this.linear().concat(this.history.slice(this.top, this.top + 1)).map(entry => entry.pos)
     }
 
     push(entry: HistoryEntry): HistoryTree {

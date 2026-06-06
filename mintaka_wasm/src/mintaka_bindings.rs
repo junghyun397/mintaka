@@ -16,6 +16,9 @@ extern "C" {
     #[wasm_bindgen(typescript_type = "SearchObjective")]
     pub type SearchObjective;
 
+    #[wasm_bindgen(typescript_type = "Timer")]
+    pub type Timer;
+
     #[wasm_bindgen(typescript_type = "Command")]
     pub type Command;
 
@@ -34,20 +37,31 @@ extern "C" {
 
 #[wasm_bindgen]
 pub struct GameAgent {
-    pub(crate) inner: Arc<RefCell<mintaka::game_agent::GameAgent<{ RuleKind::Renju }>>>,
+    config: mintaka::config::Config,
+    inner: Arc<RefCell<mintaka::game_agent::GameAgent<{ RuleKind::Renju }>>>,
 }
 
 #[wasm_bindgen]
 impl GameAgent {
-
     #[wasm_bindgen(constructor)]
     pub fn new(config: Config, state: GameState) -> Self {
         let config: mintaka::config::Config = try_from_js_value(config).unwrap_or_default();
         let state: mintaka::game_state::GameState<{ RuleKind::Renju }> = try_from_js_value(state).unwrap_or_else(|_| mintaka::game_state::GameState::empty());
 
         Self {
+            config,
             inner: Arc::new(RefCell::new(mintaka::game_agent::GameAgent::from_state(config, state))),
         }
+    }
+
+    pub fn config(&mut self, config: Config) {
+        let config: mintaka::config::Config = try_from_js_value(config).unwrap_or_default();
+
+        if config.tt_size != self.config.tt_size {
+            let _ = self.inner.borrow_mut().command(mintaka::protocol::command::Command::RebuildTT(config.tt_size));
+        }
+
+        self.config = config;
     }
 
     pub fn command(&mut self, command: Command) -> Result<CommandResult, JsError> {
@@ -62,14 +76,18 @@ impl GameAgent {
     #[wasm_bindgen]
     pub fn launch(
         &mut self,
+        timer: Timer,
         search_objective: SearchObjective,
         counter_handle: &JsCounterHandle,
         abort_handle: &JsAbortHandle,
     ) -> Result<BestMove, JsError> {
         let inner = Arc::clone(&self.inner);
+        let timer = try_from_js_value(timer)?;
         let search_objective = try_from_js_value(search_objective)?;
 
         let best_move = inner.borrow_mut().launch::<WebClock>(
+            self.config,
+            timer,
             search_objective,
             JsResponseSender,
             counter_handle.inner.clone(),
@@ -83,7 +101,6 @@ impl GameAgent {
     pub fn hash_key(&self) -> HashKey {
         to_js_value(&self.inner.borrow().state.board.hash_key)
     }
-
 }
 
 pub struct JsResponseSender;

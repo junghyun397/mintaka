@@ -8,7 +8,6 @@ use rusty_renju::notation::score::Score;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
-use rusty_renju::utils::byte_size::ByteSize;
 
 #[cfg_attr(feature = "typeshare", typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -16,9 +15,8 @@ use rusty_renju::utils::byte_size::ByteSize;
 #[derive(Debug, Copy, Clone)]
 pub struct ComputingResource {
     pub workers: u32,
-    pub tt_size: ByteSize,
     #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Option<DurationSchema>"))]
-    pub time: Option<Duration>,
+    pub time_limit: Option<Duration>,
     pub nodes_in_1k: Option<u32>,
 }
 

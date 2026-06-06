@@ -160,7 +160,7 @@ impl Pattern {
 pub struct Patterns<const R: RuleKind> {
     pub field: AlignedColorContainer<[Pattern; PATTERN_SIZE]>,
     pub indexes: ColorContainer<PatternIndex<R>>,
-    pub unchecked_five_pos: ColorContainer<MaybePos>,
+    pub five_pos: ColorContainer<MaybePos>,
     pub candidate_overline_field: Bitfield,
     pub candidate_forbidden_field: Bitfield,
     pub forbidden_field: Bitfield,
@@ -171,7 +171,7 @@ impl<const R: RuleKind> Empty for Patterns<R> {
         Self {
             field: unsafe { std::mem::zeroed() },
             indexes: ColorContainer::new(PatternIndex::empty(), PatternIndex::empty()),
-            unchecked_five_pos: ColorContainer::new(MaybePos::NONE, MaybePos::NONE),
+            five_pos: ColorContainer::new(MaybePos::NONE, MaybePos::NONE),
             candidate_overline_field: Bitfield::ZERO_FILLED,
             candidate_forbidden_field: Bitfield::ZERO_FILLED,
             forbidden_field: Bitfield::ZERO_FILLED,
@@ -264,7 +264,7 @@ impl<const R: RuleKind> Patterns<R> {
             let slice_idx = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8;
             let pos = Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8));
 
-            self.unchecked_five_pos[C] = pos.into();
+            self.five_pos[C] = pos.into();
         }
 
         slice.pattern_bitmap[C] = slice_pattern.pattern_bitmap();

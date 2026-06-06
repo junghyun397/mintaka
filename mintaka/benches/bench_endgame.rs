@@ -22,6 +22,7 @@ mod bench_vcf {
     use rusty_renju::utils::byte_size::ByteSize;
     use rusty_renju::utils::empty::Empty;
     use std::sync::atomic::{AtomicBool, AtomicU32};
+    use std::time::Instant;
     use test::Bencher;
 
     macro_rules! bench_vcf {
@@ -47,7 +48,7 @@ mod bench_vcf {
             let global_counter_in_1k = AtomicU32::new(0);
             let aborted = AtomicBool::new(false);
 
-            let td = ThreadData::new(WorkerThread, 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
+            let td = ThreadData::new(WorkerThread::<Instant>::new(), 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
                 let result = search_endgame::endgame_search::<{ RuleKind::Renju }, false>(&mut td.clone(), Depth::MAX, &state, -Score::INF, Score::INF, Score::DRAW);

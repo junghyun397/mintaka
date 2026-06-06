@@ -1,18 +1,31 @@
-use mintaka::config::SearchObjective;
+use mintaka::config::{Config, SearchObjective};
 use mintaka::protocol::command::Command;
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use std::sync::mpsc;
+use std::time::Duration;
+use rusty_renju::utils::byte_size::ByteSize;
 
 pub enum Message {
+    Config(ConfigCommand),
     Command(MessageCommand),
-    Status(StatusCommand),
     Launch {
         objective: SearchObjective,
         apply: bool,
         interactive: bool,
     },
+    Status(StatusCommand),
+}
+
+pub enum ConfigCommand {
+    TotalTime(Duration),
+    IncrementTime(Duration),
+    TurnTime(Duration),
+    MaxNodes { in_1k: u32 },
+    MaxDepth(u32),
+    Workers(u32),
+    ResizeTT(ByteSize),
 }
 
 pub enum MessageCommand {
@@ -20,17 +33,17 @@ pub enum MessageCommand {
     Set { pos: Pos, color: Color },
     Undo,
     Unset { pos: Pos, color: Color },
-    Raw(Command),
+    Command(Command),
 }
 
 impl MessageCommand {
-    pub fn into_command(self, hash: HashKey) -> Command {
+    pub fn into_command(self, config: &Config, hash: HashKey) -> Command {
         match self {
-            MessageCommand::Play { pos } => Command::Play { hash, pos },
+            MessageCommand::Play { pos } => Command::Play { hash, pos, draw_condition: config.draw_condition },
             MessageCommand::Set { pos, color } => Command::Set { hash, pos, color },
             MessageCommand::Unset { pos, color } => Command::Unset { hash, pos, color },
             MessageCommand::Undo => Command::Undo { hash },
-            MessageCommand::Raw(command) => command,
+            MessageCommand::Command(command) => command,
         }
     }
 }
@@ -58,6 +71,12 @@ impl MessageSender {
     pub fn command(&self, command: MessageCommand) {
         self.sender
             .send(Message::Command(command))
+            .expect(CHANNEL_CLOSED_MESSAGE);
+    }
+    
+    pub fn config(&self, command: ConfigCommand) {
+        self.sender
+            .send(Message::Config(command))
             .expect(CHANNEL_CLOSED_MESSAGE);
     }
 

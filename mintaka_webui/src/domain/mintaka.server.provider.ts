@@ -2,7 +2,7 @@ import { MintakaLaunchResponse, MintakaProvider, MintakaProviderResponse, Mintak
 import type {
     BestMove, Command, CommandResult, Config,
     CreateSessionRequest, CreateSessionResponse, GameState, HashKey,
-    Health, LaunchSessionRequest, Response as MintakaResponse, SearchObjective,
+    Health, LaunchSessionRequest, Response as MintakaResponse, SearchObjective, Timer,
 } from "../wasm/pkg/rusty_renju_wasm"
 import { SERVER_PROTOCOL } from "../config"
 import type { Configs } from "./mintaka"
@@ -97,11 +97,15 @@ export class MintakaServerProvider implements MintakaProvider {
         void this.disconnect()
     }
 
+    async config(config: Config) {
+        return // TODO
+    }
+
     async command(command: Command) {
         return await this.sendCommand(command)
     }
 
-    async launch(expectedHash: HashKey, objective: SearchObjective): Promise<MintakaLaunchResponse> {
+    async launch(expectedHash: HashKey, timer: Timer, objective: SearchObjective): Promise<MintakaLaunchResponse> {
         if (this.currentHash !== expectedHash)
             return "snapshot-mismatch"
 

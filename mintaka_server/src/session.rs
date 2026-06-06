@@ -24,6 +24,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast;
 use uuid::Uuid;
+use mintaka::protocol::timer::Timer;
 use rusty_renju::notation::rule::RuleKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -171,6 +172,8 @@ pub type SessionResponseSender = broadcast::Sender<SessionResponse>;
 pub type SessionResponseReceiver = broadcast::Receiver<SessionResponse>;
 
 pub struct Session {
+    pub config: Config,
+    timer: Timer,
     state: AgentState,
     pub response_sender: SessionResponseSender,
     #[allow(dead_code)]
@@ -184,15 +187,18 @@ pub struct Session {
 
 #[derive(Deserialize)]
 pub struct SessionData {
+    pub config: Config,
+    pub timer: Timer,
     pub agent: GameAgent<{ RuleKind::Renju }>,
     pub best_move: Option<BestMove>,
     pub time_to_live: Option<Duration>,
 }
 
 impl Session {
-
     pub fn new(config: Config, game_state: GameState<{ RuleKind::Renju }>, time_to_live: Option<Duration>, memory_permit: MemoryPermit, response_sender: SessionResponseSender) -> Self {
         Self {
+            config,
+            timer: config.initial_timer,
             state: AgentState::Agent(GameAgent::from_state(config, game_state)),
             response_sender,
             memory_permit,
@@ -206,6 +212,8 @@ impl Session {
 
     pub fn from_data(data: SessionData, memory_permit: MemoryPermit, response_sender: SessionResponseSender) -> Self {
         Self {
+            config: data.config,
+            timer: data.timer,
             state: AgentState::Agent(data.agent),
             response_sender,
             memory_permit,
@@ -237,9 +245,7 @@ impl Session {
     }
 
     pub fn command(&mut self, command: Command) -> Result<CommandResult, AppError> {
-        let game_agent = self.game_agent_mut()?;
-
-        game_agent.command(command)
+        self.game_agent_mut()?.command(command)
             .map_err(AppError::GameError)
     }
 
@@ -257,8 +263,13 @@ impl Session {
         self.abort_handle.store(false, Ordering::Relaxed);
         let abort_flag = self.abort_handle.clone();
 
+        let config = self.config;
+        let timer = self.timer;
+
         tokio::task::spawn_blocking(move || {
             let best_move = game_agent.launch::<Instant>(
+                config,
+                timer,
                 SearchObjective::Best,
                 response_sender,
                 Arc::new(AtomicU32::new(0)),
@@ -478,5 +489,4 @@ impl Sessions {
             .map(|entry| *entry.key())
             .collect()
     }
-
 }

@@ -17,6 +17,7 @@ use rusty_renju::notation::pos;
 pub struct HeuristicEvaluator<const R: RuleKind> {
     neighbor_scores: NeighborScores,
     scores: ColorContainer<[i16; pattern::PATTERN_SIZE]>,
+    policy_score: [i16; pattern::PATTERN_SIZE],
     score_black: Score,
     hash_key: HashKey,
 }
@@ -43,8 +44,11 @@ impl<const R: RuleKind> HeuristicEvaluator<R> {
 
                     let score = PATTERN_SCORE_LUT[key];
                     let old_score = std::mem::replace(&mut self.scores[color][pos.idx_usize()], score);
+                    let pattern_delta = score - old_score;
 
-                    score_delta += (score - old_score) as Score;
+                    self.policy_score[pos.idx_usize()] += pattern_delta;
+
+                    score_delta += pattern_delta as Score;
                 }
             }
 
@@ -64,6 +68,7 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
         let mut evaluator = Self {
             neighbor_scores: NeighborScores::empty(),
             scores: ColorContainer::new([0; pattern::PATTERN_SIZE], [0; pattern::PATTERN_SIZE]),
+            policy_score: [0; pattern::PATTERN_SIZE],
             score_black: 0,
             hash_key: HashKey::empty(),
         };
@@ -77,10 +82,13 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
         self.neighbor_scores = (&board.hot_field).into();
         self.hash_key = board.hash_key;
 
-        for idx in 0 .. pos::BOARD_SIZE {
-            for color in [Color::Black, Color::White] {
+        for color in [Color::Black, Color::White] {
+            for idx in 0 .. pos::BOARD_SIZE {
                 let key = encode_value_key(board.patterns.field[color][idx]);
-                self.scores[color][idx] = PATTERN_SCORE_LUT[key];
+                let pattern_score = PATTERN_SCORE_LUT[key];
+
+                self.scores[color][idx] = pattern_score;
+                self.policy_score[idx] += pattern_score;
             }
         }
 
@@ -107,12 +115,8 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
         self.hash_key = board.hash_key;
     }
 
-    fn eval_policy(&mut self, state: &GameState<R>) -> PolicyDistribution {
-        std::array::from_fn(|idx|
-            self.scores[state.board.player_color][idx]
-                + self.scores[!state.board.player_color][idx]
-                + (self.neighbor_scores.scores[idx] as i16)
-        )
+    fn eval_policy(&mut self, _state: &GameState<R>) -> PolicyDistribution {
+        self.policy_score
     }
 
     fn eval_value(&mut self, state: &GameState<R>) -> Score {
