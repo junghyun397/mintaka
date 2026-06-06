@@ -1,18 +1,19 @@
 use crate::batch_counter::BatchCounter;
 use crate::config::{Config, SearchObjective};
 use crate::eval::evaluator::Evaluator;
+use crate::game_state::RecoveryState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_endgame::EndgameFrame;
-use crate::game_state::RecoveryState;
 use crate::thread_type::ThreadType;
 use crate::value::Depth;
 use crate::{params, value};
+use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{Score, Scores};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use rusty_renju::notation::rule::RuleKind;
 
 pub const KILLER_MOVE_SLOTS: usize = 2;
 
@@ -73,6 +74,7 @@ pub struct ThreadData<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> {
     pub lmr_table: Box<[[Depth; value::MAX_PLY_SLOTS]; 64]>,
 
     pub root_pv: PrincipalVariation,
+    pub root_moves_in_1k: [u32; pos::BOARD_SIZE],
     pub singular_root: bool,
 
     pub endgame_stack: Box<[EndgameFrame; value::MAX_PLY_SLOTS]>,
@@ -112,6 +114,7 @@ impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, T
             lmr_table: Box::new(build_lmr_table(config)),
             debug_statics: Box::new([DebugStatics::EMPTY; value::MAX_PLY_SLOTS]),
             root_pv: PrincipalVariation::EMPTY,
+            root_moves_in_1k: [0; pos::BOARD_SIZE],
             singular_root: false,
             endgame_stack: Box::new([EndgameFrame::EMPTY; value::MAX_PLY_SLOTS]),
             endgame_stack_top: 0,
@@ -128,7 +131,7 @@ impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, T
     }
 
     pub fn search_limit_exceeded(&self) -> bool {
-        self.thread_type.time_exceeded()
+        self.thread_type.time_manager().is_hard_limit_reached()
             || self.config.max_nodes_in_1k.is_some_and(|in_1k|
                 self.batch_counter.count_global_in_1k() >= in_1k
             )

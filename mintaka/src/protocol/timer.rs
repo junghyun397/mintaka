@@ -1,9 +1,8 @@
-use rusty_renju::notation::pos::MaybePos;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use std::time::Duration;
 #[allow(unused_imports)]
 use rusty_renju::utils::lang::DurationSchema;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 #[cfg_attr(feature = "typeshare", typeshare::typeshare)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -43,10 +42,6 @@ impl Timer {
         }
     }
 
-    pub fn is_infinite(&self) -> bool {
-        self.total_remaining.is_none() && self.turn.is_none()
-    }
-
     pub fn consume(&mut self, running_time: Duration) {
         if let Some(total_remaining) = &mut self.total_remaining {
             *total_remaining = total_remaining.saturating_sub(running_time);
@@ -63,46 +58,5 @@ impl Timer {
         if let Some(total_remaining) = &mut self.total_remaining {
             *total_remaining += additional_time;
         }
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug)]
-pub struct TimeManager {
-    pub timer: Timer,
-    pub time_history: Vec<(MaybePos, Duration)>,
-    pub dynamic_time: bool,
-}
-
-impl TimeManager {
-    pub fn new(timer: Timer, dynamic_time: bool) -> Self {
-        Self {
-            timer,
-            time_history: Vec::new(),
-            dynamic_time,
-        }
-    }
-
-    pub fn next_running_time(&self) -> Option<Duration> {
-        if self.timer.is_infinite() {
-            return None
-        }
-
-        if self.dynamic_time {
-            return self.timer.total_remaining
-                .map(|total_remaining| {
-                    let mut base = total_remaining / 20
-                        + self.timer.increment / 2;
-
-                    if let &Some(turn) = &self.timer.turn {
-                        base = base.min(turn);
-                    }
-
-                    base
-                })
-                .or(self.timer.turn)
-        }
-
-        self.timer.turn
     }
 }

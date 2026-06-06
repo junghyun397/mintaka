@@ -2,13 +2,12 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 #[derive(Clone)]
 pub struct BatchCounter<'a> {
-    buffer: u64,
+    buffer: u32,
     global_counter_in_1k: &'a AtomicU32,
-    local_counter_in_1k: u64,
+    local_counter_in_1k: u32,
 }
 
 impl<'a> BatchCounter<'a> {
-
     pub const fn new(global_counter_in_1k: &'a AtomicU32) -> Self {
         Self {
             buffer: 0,
@@ -30,12 +29,11 @@ impl<'a> BatchCounter<'a> {
         self.global_counter_in_1k.load(Ordering::Relaxed)
     }
 
-    pub fn count_local_total(&self) -> u64 {
-        self.local_counter_in_1k * 1000 + self.buffer
+    pub fn count_local_in_1k(&self) -> u32 {
+        self.local_counter_in_1k + (self.buffer / 1000)
     }
 
     pub fn buffer_zero(&self) -> bool {
         self.buffer == 0
     }
-
 }

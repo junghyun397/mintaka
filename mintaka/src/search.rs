@@ -11,7 +11,6 @@ use crate::protocol::response::Response;
 use crate::search_endgame::endgame_search;
 use crate::thread_data::{SearchFrame, ThreadData};
 use crate::thread_type::ThreadType;
-use crate::utils::time::MonotonicClock;
 use crate::value::Depth;
 use crate::{params, value};
 use rusty_renju::const_for;
@@ -45,28 +44,34 @@ struct OffPVNode; impl NodeType for OffPVNode {
     type NextType = Self;
 }
 
-pub fn iterative_deepening<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType>(
+pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<R, TH, impl Evaluator<R>>,
     mut state: GameState<R>,
 ) -> (Score, MaybePos) {
+    let position_hash = state.board.hash_key;
+
     let mut score: Score = 0;
     let mut best_move = MaybePos::NONE;
     let mut root_pv = PrincipalVariation::EMPTY;
     let mut selective_depth = 0;
 
     let mut mate_count = 0;
+    let mut best_move_changes = 0;
 
     let starting_depth = (td.tid % 10 + 1) as Depth;
-
     'iterative_deepening: for depth in starting_depth ..= td.config.max_depth() {
         let iter_score = if depth < 5 {
-            pvs::<CLK, R, TH, RootNode>(td, &mut state, depth, -Score::INF, Score::INF, false)
+            pvs::<R, TH, RootNode>(td, &mut state, depth, -Score::INF, Score::INF, false)
         } else {
-            aspiration::<CLK, R, TH>(td, &mut state, depth, score)
+            aspiration::<R, TH>(td, &mut state, depth, score)
         };
 
         if td.is_aborted() {
             break 'iterative_deepening;
+        }
+
+        if best_move != td.best_move {
+            best_move_changes += 1;
         }
 
         score = iter_score;
@@ -76,12 +81,12 @@ pub fn iterative_deepening<CLK: MonotonicClock, const R: RuleKind, TH: ThreadTyp
 
         if TH::IS_MAIN {
             td.thread_type.make_response(Response::Status {
-                hash: td.thread_type.position_hash(),
+                hash: position_hash,
                 best_move,
                 score,
                 pv: td.pvs[0],
                 total_nodes_in_1k: td.batch_counter.count_global_in_1k(),
-                time_elapsed: td.thread_type.time_elapsed(),
+                time_elapsed: td.thread_type.time_manager().elapsed(),
                 selective_depth: selective_depth as Depth,
             })
         }
@@ -90,11 +95,35 @@ pub fn iterative_deepening<CLK: MonotonicClock, const R: RuleKind, TH: ThreadTyp
             mate_count += 1;
 
             if depth - starting_depth > 10
-                && mate_count > 2
+                && mate_count > 4
             {
                 break 'iterative_deepening;
             }
+        } else {
+            mate_count = 0;
         }
+        
+        if TH::IS_MAIN {
+            let best_move_search_share = best_move.ok()
+                .map(|pos|
+                    td.root_moves_in_1k[pos.idx_usize()] as f64 / td.batch_counter.count_local_in_1k().max(1) as f64
+                )
+                .unwrap_or(0.0);
+
+            td.thread_type.time_manager_mut().update_each_depth(
+                td.singular_root,
+                best_move_changes,
+                best_move_search_share,
+            )
+        }
+
+        if TH::IS_MAIN
+            && td.thread_type.time_manager().is_soft_limit_reached()
+        {
+            break 'iterative_deepening;
+        }
+
+        best_move_changes = 0;
 
         td.singular_root = false;
     }
@@ -109,7 +138,7 @@ pub fn iterative_deepening<CLK: MonotonicClock, const R: RuleKind, TH: ThreadTyp
     (score, best_move)
 }
 
-fn aspiration<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType>(
+fn aspiration<const R: RuleKind, TH: ThreadType>(
     td: &mut ThreadData<R, TH, impl Evaluator<R>>,
     state: &mut GameState<R>,
     max_depth: Depth,
@@ -122,7 +151,7 @@ fn aspiration<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType>(
     let mut beta = (prev_score + delta).min(Score::INF);
 
     loop {
-        let score = pvs::<CLK, R, TH, RootNode>(td, state, depth, alpha, beta, false);
+        let score = pvs::<R, TH, RootNode>(td, state, depth, alpha, beta, false);
 
         if td.is_aborted() {
             return Score::DRAW;
@@ -132,6 +161,10 @@ fn aspiration<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType>(
             beta = (alpha + beta) / 2;
             alpha = (score - delta).max(-Score::INF);
             depth = max_depth;
+
+            if TH::IS_MAIN {
+                td.thread_type.time_manager_mut().update_fail_low();
+            }
         } else if score >= beta { // fail-high
             beta = (score + delta).min(Score::INF);
             depth = max_depth;
@@ -143,7 +176,7 @@ fn aspiration<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType>(
     }
 }
 
-fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
+fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     td: &mut ThreadData<R, TH, impl Evaluator<R>>,
     state: &mut GameState<R>,
     depth_left: Depth,
@@ -163,7 +196,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
         return Score::ABORT;
     }
 
-    if state.board.stones >= td.config.draw_condition as u8 {
+    if td.config.draw_condition.is_some_and(|draw_in| state.len() as u32 >= draw_in) {
         return Score::DRAW;
     }
 
@@ -210,7 +243,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
             td.evaluator.play(&state.board, artifact, pos.into());
 
             // no depth reduction for forced response
-            let score = -pvs::<CLK, R, TH, NT::NextType>(td, state, depth_left, -beta, -alpha, cut_node);
+            let score = -pvs::<R, TH, NT::NextType>(td, state, depth_left, -beta, -alpha, cut_node);
 
             td.pop_ply();
             let artifact = state.undo_mut(td.ss[td.ply].recovery_state);
@@ -394,6 +427,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
     let mut move_picker = MovePicker::init_new(tt_move, td.killers[td.ply], threat_kind);
     let mut moves_made = 0;
+    let mut searched_moves = 0;
 
     let mut quiet_plied = QuietPlied::EMPTY;
     let mut three_plied = TacticalPlied::EMPTY;
@@ -491,17 +525,21 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         let new_depth = (new_full_depth - reduction).clamp(0, new_full_depth);
 
+        let nodes_before = td.batch_counter.count_local_in_1k();
+
+        searched_moves += 1;
+
         let score = if moves_made == 1 { // full-window search
-            -pvs::<CLK, R, TH, NT::NextType>(td, state, new_depth, -beta, -alpha, !NT::IS_PV && !cut_node)
+            -pvs::<R, TH, NT::NextType>(td, state, new_depth, -beta, -alpha, !NT::IS_PV && !cut_node)
         } else { // zero-window search
-            let mut score = -pvs::<CLK, R, TH, OffPVNode>(
+            let mut score = -pvs::<R, TH, OffPVNode>(
                 td, state, new_depth, -alpha - 1, -alpha, true
             );
 
             if score > alpha
                 && new_depth < new_full_depth
             { // zero-window failed, full-depth null-window search
-                score = -pvs::<CLK, R, TH, OffPVNode>(
+                score = -pvs::<R, TH, OffPVNode>(
                     td, state, new_full_depth, -alpha - 1, -alpha, !cut_node
                 );
             }
@@ -509,13 +547,17 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
             if NT::IS_PV
                 && alpha < score && score < beta
             { // exact value required, full-window search
-                score = -pvs::<CLK, R, TH, NT::NextType>(
+                score = -pvs::<R, TH, NT::NextType>(
                     td, state, new_full_depth, -beta, -alpha, false,
                 );
             }
 
             score
         };
+
+        if NT::IS_ROOT {
+            td.root_moves_in_1k[pos.idx_usize()] += td.batch_counter.count_local_in_1k() - nodes_before;
+        }
 
         td.pop_ply();
         let artifact = state.undo_mut(td.ss[td.ply].recovery_state);
@@ -546,7 +588,7 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
         }
     }
 
-    if moves_made == 0 {
+    if moves_made == 0 || searched_moves == 0 {
         best_score = static_eval;
     }
 
@@ -594,12 +636,12 @@ fn pvs<CLK: MonotonicClock, const R: RuleKind, TH: ThreadType, NT: NodeType>(
 }
 
 fn find_immediate_win<const R: RuleKind>(state: &GameState<R>, ply: usize) -> (Score, MaybePos) {
-    if let Some(pos) = state.board.patterns.unchecked_five_pos[state.board.player_color].ok()
+    if let Some(pos) = state.board.patterns.five_pos[state.board.player_color].ok()
     { // five
         return (Score::win_in(ply + 1), pos.into())
     }
 
-    if let Some(pos) = state.board.patterns.unchecked_five_pos[!state.board.player_color].ok() {
+    if let Some(pos) = state.board.patterns.five_pos[!state.board.player_color].ok() {
         if state.board.player_color == Color::Black
             && state.board.patterns.is_forbidden(pos)
         { // trap

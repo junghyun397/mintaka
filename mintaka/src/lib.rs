@@ -17,7 +17,7 @@ pub mod search;
 pub mod tablebase;
 pub mod thread_data;
 pub mod thread_type;
-pub mod time;
+pub mod time_manager;
 pub mod value;
 pub mod utils;
 pub mod search_endgame;

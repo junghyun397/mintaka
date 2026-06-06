@@ -1,4 +1,4 @@
-pub trait MonotonicClock : Send + Sync + Copy {
+pub trait MonotonicClock : Send + Sync + Copy + Clone {
     fn now() -> Self;
 
     fn elapsed_since(&self, start: Self) -> std::time::Duration;
