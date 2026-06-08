@@ -3,7 +3,7 @@ use crate::eval::evaluator::{ActiveEvaluator, Evaluator};
 use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::game_state::{GameState, GameStateData};
 use crate::memo::history_table::HistoryTable;
-use crate::memo::transposition_table::TranspositionTable;
+use crate::memo::transposition_table::{TTImportError, TranspositionTable};
 use crate::protocol::command::Command;
 pub use crate::protocol::response::{ComputingResource, Response, ResponseSender};
 use crate::protocol::results::{BestMove, CommandResult, GameResult};
@@ -20,7 +20,7 @@ use rusty_renju::notation::pos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::empty::Empty;
 #[cfg(feature = "serde")]
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
@@ -78,6 +78,8 @@ impl Display for GameError {
 
 impl std::error::Error for GameError {}
 
+#[cfg_attr(feature = "serde", derive(Deserialize))]
+#[cfg_attr(feature = "serde", serde(try_from = "GameAgentData<R>"))]
 pub struct GameAgent<const R: RuleKind> {
     pub state: GameState<R>,
     pub evaluator: ActiveEvaluator<R>,
@@ -354,39 +356,42 @@ impl<const R: RuleKind> GameAgent<R> {
     }
 }
 
-#[cfg(feature = "serde")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-struct GameAgentData<const R: RuleKind> {
+pub struct GameAgentData<const R: RuleKind> {
     state: GameState<R>,
     tt: Vec<u8>,
     ht: HistoryTable,
 }
 
-#[cfg(feature = "serde")]
-impl<const R: RuleKind> Serialize for GameAgent<R> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        let data = GameAgentData {
-            state: self.state,
-            tt: self.tt.export(9),
-            ht: self.ht,
-        };
-
-        data.serialize(serializer)
+impl<const R: RuleKind> From<&GameAgent<R>> for GameAgentData<R> {
+    fn from(agent: &GameAgent<R>) -> Self {
+        Self {
+            state: agent.state,
+            tt: agent.tt.export(9),
+            ht: agent.ht,
+        }
     }
 }
 
-#[cfg(feature = "serde")]
-impl<'de, const R: RuleKind> Deserialize<'de> for GameAgent<R> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        let data = GameAgentData::deserialize(deserializer)?;
+impl<const R: RuleKind> TryFrom<GameAgentData<R>> for GameAgent<R> {
+    type Error = TTImportError;
 
+    fn try_from(data: GameAgentData<R>) -> Result<Self, Self::Error> {
+        let tt = TranspositionTable::import(data.tt)?;
         let evaluator = ActiveEvaluator::from_state(&data.state);
 
         Ok(Self {
             state: data.state,
             evaluator,
-            tt: TranspositionTable::import(data.tt).map_err(de::Error::custom)?,
+            tt,
             ht: data.ht,
         })
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<const R: RuleKind> Serialize for GameAgent<R> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        GameAgentData::from(self).serialize(serializer)
     }
 }

@@ -1,4 +1,4 @@
-import type { BestMove, Board, Color, CommandResult, Config, GameState, HashKey, History, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
+import { BestMove, Board, BoardWorker, Color, CommandResult, Config, GameState, HashKey, History, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
 import { defaultBoard, calculateWinRate } from "../wasm/pkg/rusty_renju_wasm"
 import type { HistoryTree } from "../domain/HistoryTree"
 import { DefaultWorkerConfig, MaxWorkerConfig, MintakaWorkerProvider } from "../domain/mintaka.worker.provider"
@@ -184,7 +184,7 @@ export function createRuntimeController(
     }
 
     const loadServerRuntime = async (serverConfig: MintakaServerConfig) => {
-        const board: Board = defaultBoard()
+        const board: Board = defaultBoard("Renju")
         const history: History = []
 
         let storedConfig = persistProviderConfigController.load({ type: "server", config: serverConfig })
@@ -272,7 +272,7 @@ export function createRuntimeController(
         loadWorkerRuntime: () => {
             unloadRuntime()
 
-            const board: Board = defaultBoard()
+            const board: Board = defaultBoard("Renju")
             const history: History = []
 
             let config = persistProviderConfigController.load({ type: "worker" }) ?? DefaultWorkerConfig

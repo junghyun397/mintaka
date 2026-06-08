@@ -1,58 +1,45 @@
 use mintaka::game_agent::GameError;
-use std::fmt::{Debug, Display};
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum AppError {
+    #[error("UNAUTHORIZED")]
     Unauthorized,
+    #[error("INVALID_SESSION_ID")]
     InvalidSessionId,
+    #[error("INVALID_CONFIG")]
     InvalidConfig,
+    #[error("SESSION_NOT_FOUND")]
     SessionNotFound,
+    #[error("SESSION_IN_COMPUTING")]
     SessionInComputing,
+    #[error("SESSION_IDLE")]
     SessionIdle,
+    #[error("SESSION_NEVER_LAUNCHED")]
     SessionNeverLaunched,
+    #[error("SESSION_FILE_ALREADY_EXISTS")]
     SessionFileAlreadyExists,
+    #[error("SESSION_FILE_NOT_FOUND")]
     SessionFileNotFound,
+    #[error("MEMORY_ACQUIRE_TIMEOUT")]
     MemoryAcquireTimeout,
+    #[error("WORKER_ACQUIRE_TIMEOUT")]
     WorkerAcquireTimeout,
-    GameError(GameError),
+    #[error("{}", game_error_code(.0))]
+    GameError(#[from] GameError),
+    #[error("INTERNAL_ERROR")]
     InternalError(String),
 }
 
-impl Display for AppError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Unauthorized => write!(f, "UNAUTHORIZED"),
-            Self::InvalidSessionId => write!(f, "INVALID_SESSION_ID"),
-            Self::InvalidConfig => write!(f, "INVALID_CONFIG"),
-            Self::SessionNotFound => write!(f, "SESSION_NOT_FOUND"),
-            Self::SessionInComputing => write!(f, "SESSION_IN_COMPUTING"),
-            Self::SessionIdle => write!(f, "SESSION_IDLE"),
-            Self::SessionNeverLaunched => write!(f, "SESSION_NEVER_LAUNCHED"),
-            Self::SessionFileAlreadyExists => write!(f, "SESSION_FILE_ALREADY_EXISTS"),
-            Self::SessionFileNotFound => write!(f, "SESSION_FILE_NOT_FOUND"),
-            Self::MemoryAcquireTimeout => write!(f, "MEMORY_ACQUIRE_TIMEOUT"),
-            Self::WorkerAcquireTimeout => write!(f, "WORKER_ACQUIRE_TIMEOUT"),
-            Self::GameError(err) => match err {
-                GameError::HashMismatch => write!(f, "HASH_MISMATCH"),
-                GameError::StoneAlreadyExist => write!(f, "STONE_ALREADY_EXIST"),
-                GameError::StoneDoesNotExist => write!(f, "STONE_DOES_NOT_EXIST"),
-                GameError::StoneColorMismatch => write!(f, "STONE_COLOR_MISMATCH"),
-                GameError::ForbiddenMove => write!(f, "FORBIDDEN_MOVE"),
-                GameError::NoHistoryToUndo => write!(f, "NO_HISTORY_TO_UNDO"),
-                GameError::NoTimeManagement => write!(f, "NO_TIME_MANAGEMENT"),
-            },
-            Self::InternalError(_) => write!(f, "INTERNAL_ERROR"),
-        }
-    }
-}
-
-impl std::error::Error for AppError {}
-
-impl From<GameError> for AppError {
-    fn from(err: GameError) -> Self {
-        match err {
-            _ => Self::GameError(err),
-        }
+fn game_error_code(error: &GameError) -> &'static str {
+    match error {
+        GameError::HashMismatch => "HASH_MISMATCH",
+        GameError::StoneAlreadyExist => "STONE_ALREADY_EXIST",
+        GameError::StoneDoesNotExist => "STONE_DOES_NOT_EXIST",
+        GameError::StoneColorMismatch => "STONE_COLOR_MISMATCH",
+        GameError::ForbiddenMove => "FORBIDDEN_MOVE",
+        GameError::NoHistoryToUndo => "NO_HISTORY_TO_UNDO",
+        GameError::NoTimeManagement => "NO_TIME_MANAGEMENT",
     }
 }
 

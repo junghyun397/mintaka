@@ -9,6 +9,6 @@ crate-type = ["rlib", "cdylib"]
 
 [dependencies]
 rusty_renju = { path = "../rusty_renju" }
-tiny-skia = "0.11"
+tiny-skia = "0.12"
 webp = "0.3"
 fontdue = "0.9"

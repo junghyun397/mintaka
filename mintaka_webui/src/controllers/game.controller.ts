@@ -87,7 +87,7 @@ export function createGameController(
 
             if (bestMove.position_hash !== boardWorker.hashKey()) {
                 historyTree = historySnapshot
-                boardWorker = BoardWorker.fromHistory(historyTree.toHistory())
+                boardWorker = BoardWorker.fromHistory(historyTree.toHistory(), "Renju")
             }
 
             boardWorker = boardWorker.set(bestMove.best_move)

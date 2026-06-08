@@ -8,7 +8,7 @@ import {
 import { nextHistoryDisplay, nextTheme } from "../stores/persist.config"
 import { About } from "./About"
 import { Portal } from "solid-js/web"
-import { Branch } from "./Branch"
+import { History } from "./History"
 import { Dashboard } from "./Dashboard"
 
 export function Control() {
@@ -205,7 +205,7 @@ function ConfigButton() {
                     <IconGitBranch />
                 </button>
                 <Portal>
-                    <Branch open={openBranch()} onClose={() => setOpenBranch(false)} />
+                    <History open={openBranch()} onClose={() => setOpenBranch(false)} />
                 </Portal>
             </li>
             <li>

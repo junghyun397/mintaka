@@ -9,4 +9,3 @@ crate-type = ["cdylib"]
 
 [dependencies]
 rusty_renju = { path = "../rusty_renju" }
-mintaka = { path = "../mintaka" }

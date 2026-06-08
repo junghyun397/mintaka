@@ -98,7 +98,7 @@ pub struct RenderPayloads<'a> {
 pub fn rusty_renju_image_render(
     image_format: u8, webp_quality: f32,
     option: u8, enable_forbidden: bool,
-    board: *const rusty_renju::notation::ffi::AnyBoard,
+    board: *const rusty_renju::board_io::AnyBoard,
     actions: *const u8, actions_len: usize,
     offers: *const u8, offers_len: usize,
     blinds: *const u8, blinds_len: usize,

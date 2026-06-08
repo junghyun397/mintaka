@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Display};
 use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucket, TTFlag};
 use crate::value::{Depth, Depths};
 use rusty_renju::hash_key::HashKey;
@@ -8,40 +9,6 @@ use rusty_renju::utils::byte_size::ByteSize;
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
-
-#[cfg(feature = "compress-tt")]
-fn tt_compress(bytes: &[u8], compression_level: u32) -> Vec<u8> {
-    let mut encoder = lz4::EncoderBuilder::new()
-        .level(compression_level)
-        .build(Vec::new())
-        .unwrap();
-
-    encoder.write_all(bytes).unwrap();
-
-    let (compressed, _) = encoder.finish();
-    compressed
-}
-
-#[cfg(not(feature = "compress-tt"))]
-fn tt_compress(bytes: &[u8], _compression_level: u32) -> Vec<u8> {
-    bytes.to_vec()
-}
-
-#[cfg(feature = "compress-tt")]
-fn tt_decompress(source: Vec<u8>) -> Result<Vec<u8>, &'static str> {
-    let mut decoder =
-        lz4::Decoder::new(std::io::Cursor::new(source)).map_err(|_| "failed to build decoder")?;
-    let mut decompressed = Vec::new();
-    decoder
-        .read_to_end(&mut decompressed)
-        .map_err(|_| "failed to decompress")?;
-    Ok(decompressed)
-}
-
-#[cfg(not(feature = "compress-tt"))]
-fn tt_decompress(source: Vec<u8>) -> Result<Vec<u8>, &'static str> {
-    Ok(source)
-}
 
 pub struct TranspositionTable {
     table: Vec<TTEntryBucket>,
@@ -146,7 +113,7 @@ impl TranspositionTable {
     }
 
     #[allow(clippy::uninit_vec)]
-    pub fn import(source: Vec<u8>) -> Result<Self, &'static str> {
+    pub fn import(source: Vec<u8>) -> Result<Self, TTImportError> {
         let decompressed = tt_decompress(source)?;
 
         let age: u32 = (&decompressed[0..4])
@@ -157,7 +124,7 @@ impl TranspositionTable {
         let payload = &decompressed[4..];
 
         if !payload.len().is_multiple_of(size_of::<TTEntryBucket>()) {
-            return Err("illegal payload size");
+            return Err(TTImportError::BrokenPayload);
         }
 
         let tt_len = payload.len() / size_of::<TTEntryBucket>();
@@ -337,3 +304,57 @@ pub fn decode_mate_distance(score: Score, ply: usize) -> Score {
         score
     }
 }
+
+#[derive(Debug)]
+pub enum TTImportError {
+    FailedDecompress,
+    BrokenPayload,
+}
+
+impl Display for TTImportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TTImportError::FailedDecompress => write!(f, "failed to decompress"),
+            TTImportError::BrokenPayload => write!(f, "broken payload"),
+        }
+    }
+}
+
+impl std::error::Error for TTImportError {}
+
+#[cfg(feature = "compress-tt")]
+fn tt_compress(bytes: &[u8], compression_level: u32) -> Vec<u8> {
+    let mut encoder = lz4::EncoderBuilder::new()
+        .level(compression_level)
+        .build(Vec::new())
+        .unwrap();
+
+    encoder.write_all(bytes).unwrap();
+
+    let (compressed, _) = encoder.finish();
+    compressed
+}
+
+#[cfg(not(feature = "compress-tt"))]
+fn tt_compress(bytes: &[u8], _compression_level: u32) -> Vec<u8> {
+    bytes.to_vec()
+}
+
+#[cfg(feature = "compress-tt")]
+fn tt_decompress(source: Vec<u8>) -> Result<Vec<u8>, TTImportError> {
+    let mut decoder =
+        lz4::Decoder::new(std::io::Cursor::new(source)).map_err(|_| TTImportError::FailedDecompress)?;
+
+    let mut decompressed = Vec::new();
+    decoder
+        .read_to_end(&mut decompressed)
+        .map_err(|_| TTImportError::FailedDecompress)?;
+
+    Ok(decompressed)
+}
+
+#[cfg(not(feature = "compress-tt"))]
+fn tt_decompress(source: Vec<u8>) -> Result<Vec<u8>, TTImportError> {
+    Ok(source)
+}
+

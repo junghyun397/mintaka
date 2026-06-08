@@ -2,7 +2,7 @@ use crate::{impl_wrapper, to_js_value, try_from_js_value};
 use std::str::FromStr;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsError;
-use rusty_renju::utils::empty::Empty;
+use rusty_renju::dispatch_any_board;
 
 #[wasm_bindgen]
 extern "C" {
@@ -35,8 +35,10 @@ extern "C" {
 }
 
 #[wasm_bindgen(js_name = defaultBoard)]
-pub fn default_board() -> Board {
-    to_js_value(&rusty_renju::board::Board::<{ rusty_renju::notation::rule::RuleKind::Renju }>::empty())
+pub fn default_board(rule_kind: RuleKind) -> Board {
+    let rule_kind = try_from_js_value(rule_kind).unwrap();
+
+    to_js_value(&rusty_renju::board_io::AnyBoard::empty(rule_kind))
 }
 
 #[wasm_bindgen(js_name = emptyHash)]
@@ -52,117 +54,135 @@ pub fn calculate_win_rate(score: Score) -> f32 {
 }
 
 impl_wrapper! {
-    pub BoardWorker { inner: rusty_renju::board::Board<{ rusty_renju::notation::rule::RuleKind::Renju }> } <-> Board
+    pub BoardWorker { inner: rusty_renju::board_io::AnyBoard } <-> Board
 }
 
 #[wasm_bindgen]
 impl BoardWorker {
 
     #[wasm_bindgen(js_name = fromHistory)]
-    pub fn from_history(source: History) -> Result<Self, JsError> {
+    pub fn from_history(source: History, rule_kind: RuleKind) -> Result<Self, JsError> {
+        let rule_kind = try_from_js_value(rule_kind)?;
         let history: rusty_renju::history::History = try_from_js_value(source)?;
 
-        Ok(Self { inner: (&history).into() })
+        let board = dispatch_any_board!(wrap rule_kind, (&history).into());
+
+        Ok(Self { inner: board })
     }
 
     #[wasm_bindgen(js_name = fromString)]
-    pub fn from_string(source: &str) -> Result<Self, JsError> {
-        let board = rusty_renju::board::Board::from_str(source).map_err(JsError::new)?;
+    pub fn from_string(source: &str, rule_kind: RuleKind) -> Result<Self, JsError> {
+        let rule_kind = try_from_js_value(rule_kind)?;
+
+        let board = dispatch_any_board!(wrap rule_kind,
+            rusty_renju::board::Board::from_str(source).map_err(JsError::new)?
+        );
+
         Ok(Self { inner: board })
     }
 
     #[wasm_bindgen]
-    pub fn empty() -> Self {
-        Self { inner: rusty_renju::board::Board::empty() }
+    pub fn empty(rule_kind: RuleKind) -> Self {
+        let rule_kind = try_from_js_value(rule_kind).unwrap();
+
+        Self { inner: rusty_renju::board_io::AnyBoard::empty(rule_kind) }
     }
 
     #[wasm_bindgen(js_name = toString)]
     pub fn to_string(&self) -> String {
-        self.inner.to_string()
+        dispatch_any_board!(self.inner, board => board.to_string())
     }
 
     #[wasm_bindgen(js_name = hashKey)]
     pub fn hash_key(&self) -> HashKey {
-        to_js_value(&self.inner.hash_key)
+        let hash_key = dispatch_any_board!(self.inner, board => board.hash_key);
+
+        to_js_value(&hash_key)
     }
 
     #[wasm_bindgen(js_name = playerColor)]
     pub fn player_color(&self) -> Color {
-        to_js_value(&self.inner.player_color)
+        let player_color = dispatch_any_board!(self.inner, board => board.player_color);
+
+        to_js_value(&player_color)
     }
 
     pub fn stones(&self) -> u8 {
-        self.inner.stones
-    }
-
-    pub fn pattern(&self, color: Color, pos: Pos) -> u32 {
-        let color: rusty_renju::notation::color::Color = try_from_js_value(color).unwrap();
-        let pos: rusty_renju::notation::pos::Pos = try_from_js_value(pos).unwrap();
-
-        self.inner.patterns.field[color][pos.idx_usize()].into()
+        dispatch_any_board!(self.inner, board => board.stones)
     }
 
     pub fn describe(&self) -> BoardDescribe {
-        to_js_value(&self.inner.describe())
-    }
+        let describe = dispatch_any_board!(self.inner, board => board.describe());
 
-    #[wasm_bindgen(js_name = isPosEmpty)]
-    pub fn is_pos_empty(&self, pos: Pos) -> bool {
-        self.inner.is_pos_empty(try_from_js_value(pos).unwrap())
+        to_js_value(&describe)
     }
 
     #[wasm_bindgen(js_name = isLegalMove)]
     pub fn is_legal_move(&self, pos: Pos) -> bool {
-        self.inner.is_legal_move(try_from_js_value(pos).unwrap())
+        let pos = try_from_js_value(pos).unwrap();
+
+        dispatch_any_board!(self.inner, board => board.is_legal_move(pos))
     }
 
     #[wasm_bindgen(js_name = stoneKind)]
     pub fn stone_kind(&self, pos: Pos) -> Option<Color> {
-        self.inner.stone_kind(try_from_js_value(pos).unwrap())
+        let pos = try_from_js_value(pos).unwrap();
+
+        dispatch_any_board!(self.inner, board => board
+            .stone_kind(pos)
             .as_ref()
             .map(to_js_value)
+        )
     }
 
     #[wasm_bindgen(js_name = setMut)]
     pub fn set_mut(&mut self, action: MaybePos) {
         let maybe_pos: rusty_renju::notation::pos::MaybePos = try_from_js_value(action).unwrap();
 
-        if let Some(pos) = maybe_pos.ok() {
-            self.inner.set_mut(pos);
-        } else {
-            self.inner.pass_mut();
-        }
+        dispatch_any_board!(&mut self.inner, board => {
+            if let Some(pos) = maybe_pos.ok() {
+                board.set_mut(pos);
+            } else {
+                board.pass_mut();
+            }
+        });
     }
 
     pub fn set(&self, action: MaybePos) -> Self {
         let maybe_pos: rusty_renju::notation::pos::MaybePos = try_from_js_value(action).unwrap();
 
-        if let Some(pos) = maybe_pos.ok() {
-            self.inner.clone().set(pos).into()
-        } else {
-            self.inner.clone().pass().into()
-        }
+        dispatch_any_board!(wrap self.inner, board => {
+            if let Some(pos) = maybe_pos.ok() {
+                board.clone().set(pos)
+            } else {
+                board.clone().pass()
+            }
+        }).into()
     }
 
     #[wasm_bindgen(js_name = unsetMut)]
     pub fn unset_mut(&mut self, action: MaybePos) {
         let maybe_pos: rusty_renju::notation::pos::MaybePos = try_from_js_value(action).unwrap();
 
-        if let Some(pos) = maybe_pos.ok() {
-            self.inner.unset_mut(pos);
-        } else {
-            self.inner.unpass_mut();
-        }
+        dispatch_any_board!(&mut self.inner, board => {
+            if let Some(pos) = maybe_pos.ok() {
+                board.unset_mut(pos);
+            } else {
+                board.unpass_mut();
+            }
+        });
     }
 
     pub fn unset(&self, action: MaybePos) -> Self {
         let maybe_pos: rusty_renju::notation::pos::MaybePos = try_from_js_value(action).unwrap();
 
-        if let Some(pos) = maybe_pos.ok() {
-            self.inner.clone().unset(pos).into()
-        } else {
-            self.inner.clone().pass().into()
-        }
+        dispatch_any_board!(wrap self.inner, board => {
+            if let Some(pos) = maybe_pos.ok() {
+                board.clone().unset(pos)
+            } else {
+                board.clone().pass()
+            }
+        }).into()
     }
 
 }

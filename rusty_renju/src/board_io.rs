@@ -374,10 +374,10 @@ impl Display for Slice {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub struct BoardData {
-    rule_kind: RuleKind,
-    hash_key: HashKey,
-    player_color: Color,
-    bitfield: ColorContainer<Bitfield>,
+    pub rule_kind: RuleKind,
+    pub hash_key: HashKey,
+    pub player_color: Color,
+    pub bitfield: ColorContainer<Bitfield>,
 }
 
 impl<const R: RuleKind> From<&Board<R>> for BoardData {
@@ -442,5 +442,71 @@ impl<'de, const R: RuleKind> Deserialize<'de> for Board<R> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         Board::<R>::try_from(BoardData::deserialize(deserializer)?)
             .map_err(de::Error::custom)
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Deserialize))]
+#[cfg_attr(feature = "serde", serde(from = "BoardData"))]
+#[derive(Debug, Clone, Copy)]
+pub enum AnyBoard {
+    Renju(Board<{ RuleKind::Renju }>),
+    Gomoku(Board<{ RuleKind::Gomoku }>),
+    Freestyle(Board<{ RuleKind::Freestyle }>),
+}
+
+#[macro_export] macro_rules! dispatch_any_board {
+    ($board:expr,$inner:ident => $body:expr) => {
+        match $board {
+            $crate::board_io::AnyBoard::Renju($inner) => $body,
+            $crate::board_io::AnyBoard::Gomoku($inner) => $body,
+            $crate::board_io::AnyBoard::Freestyle($inner) => $body,
+        }
+    };
+    (wrap $board:expr,$inner:ident => $body:expr) => {
+        match $board {
+            $crate::board_io::AnyBoard::Renju($inner) => $crate::board_io::AnyBoard::Renju($body),
+            $crate::board_io::AnyBoard::Gomoku($inner) => $crate::board_io::AnyBoard::Gomoku($body),
+            $crate::board_io::AnyBoard::Freestyle($inner) => $crate::board_io::AnyBoard::Freestyle($body),
+        }
+    };
+    (wrap $rule_kind:expr,$body:expr) => {
+        match $rule_kind {
+            $crate::notation::rule::RuleKind::Renju => $crate::board_io::AnyBoard::Renju($body),
+            $crate::notation::rule::RuleKind::Gomoku => $crate::board_io::AnyBoard::Gomoku($body),
+            $crate::notation::rule::RuleKind::Freestyle => $crate::board_io::AnyBoard::Freestyle($body),
+        }
+    }
+}
+
+impl AnyBoard {
+    pub fn empty(rule_kind: RuleKind) -> AnyBoard {
+        dispatch_any_board!(wrap rule_kind, Board::empty())
+    }
+
+    pub fn rule_kind(&self) -> RuleKind {
+        match self {
+            Self::Renju(_) => RuleKind::Renju,
+            Self::Gomoku(_) => RuleKind::Gomoku,
+            Self::Freestyle(_) => RuleKind::Freestyle,
+        }
+    }
+}
+
+impl From<&AnyBoard> for BoardData {
+    fn from(value: &AnyBoard) -> Self {
+        dispatch_any_board!(value, board => board.into())
+    }
+}
+
+impl From<BoardData> for AnyBoard {
+    fn from(value: BoardData) -> Self {
+        dispatch_any_board!(wrap value.rule_kind, value.try_into().unwrap())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for AnyBoard {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        BoardData::from(self).serialize(serializer)
     }
 }

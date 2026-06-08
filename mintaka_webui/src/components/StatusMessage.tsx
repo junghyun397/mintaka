@@ -4,13 +4,20 @@ import { formatNodes } from "../domain/mintaka"
 import { flatmap } from "../utils/undefined"
 
 export function StatusMessage() {
-    const { appSettings, runtimeSelectors } = useContext(AppContext)!
+    const { appSettings, runtimeSelectors, gameSelectors } = useContext(AppContext)!
 
     const nodes = () =>
         flatmap(runtimeSelectors.statics()?.totalNodesIn1k, valid => formatNodes(valid))
 
     const statusMessage = () => {
         const status = runtimeSelectors.runtimeState()?.type
+
+        if (gameSelectors.finished()) {
+            if (gameSelectors.boardDescribe.winner !== undefined)
+                return `${gameSelectors.boardDescribe.winner.color} wins.`
+
+            return "Game finished."
+        }
 
         if (status === undefined)
             return ""

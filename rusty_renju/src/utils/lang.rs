@@ -28,23 +28,12 @@ use typeshare::typeshare;
     ($a:expr,$b:expr) => ({ if $a > $b { $a } else { $b } });
 }
 
-#[macro_export] macro_rules! boxed_slice {
-    () => {
-        Box::from([])
-    };
-    ($($elem:expr),+ $(,)?) => {
-        Box::from([$($elem),*])
-    };
-}
-
 #[macro_export] macro_rules! impl_debug_from_display {
     ($name:ident) => {
         impl std::fmt::Debug for $name {
-
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 std::fmt::Display::fmt(self, f)
             }
-
         }
     };
 }

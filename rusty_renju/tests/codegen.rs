@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod codegen {
     use rand::rngs::StdRng;
-    use rand::{Rng, SeedableRng};
+    use rand::{RngExt, SeedableRng};
     use rusty_renju::notation::pos;
 
     #[allow(dead_code)]

@@ -2,7 +2,7 @@
 mod test_image {
     use rusty_renju::board::Board;
     use rusty_renju::history::History;
-    use rusty_renju::notation::ffi::AnyBoard;
+    use rusty_renju::board_io::AnyBoard;
     use rusty_renju::notation::pos::pos_unchecked;
     use rusty_renju::utils::empty::Empty;
     use rusty_renju_image::{rusty_renju_image_format_png, rusty_renju_image_render, rusty_renju_image_renderer_sequence};

@@ -13,7 +13,7 @@ export type AppGameState = {
 }
 
 export function emptyAppGameState(): AppGameState {
-    return { boardWorker: BoardWorker.empty(), historyTree: EmptyHistoryTree }
+    return { boardWorker: BoardWorker.empty("Renju"), historyTree: EmptyHistoryTree }
 }
 
 export function flip(color: Color): Color {
@@ -51,7 +51,7 @@ export function buildGameStateFromHistorySource(historySource: HistorySource): A
         case "history": {
             const historyEntries: HistoryEntry[] = []
 
-            let boardWorker = BoardWorker.empty()
+            let boardWorker = BoardWorker.empty("Renju")
             for (const pos of historySource.content) {
                 boardWorker = boardWorker.set(pos)
                 historyEntries.push({ hashKey: boardWorker.hashKey(), pos })
@@ -61,7 +61,7 @@ export function buildGameStateFromHistorySource(historySource: HistorySource): A
         }
         case "history-tree": {
             return {
-                boardWorker: BoardWorker.fromHistory(historySource.content.toHistory()),
+                boardWorker: BoardWorker.fromHistory(historySource.content.toHistory(), "Renju"),
                 historyTree: historySource.content,
             }
         }

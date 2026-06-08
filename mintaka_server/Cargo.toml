@@ -8,6 +8,7 @@ rusty_renju = { path = "../rusty_renju", features = ["serde"] }
 mintaka = { path = "../mintaka", features = ["serde", "compress-tt"] }
 
 typeshare = "1.0"
+thiserror = "2.0"
 
 uuid = { version = "1.17", features = ["v4", "v7", "serde"] }
 dashmap = "6.1"

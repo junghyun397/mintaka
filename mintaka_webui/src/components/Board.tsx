@@ -113,7 +113,7 @@ function Cell(props: {
         onClick={[gameActions.play, pos]}
     >
         <Switch>
-            <Match when={stone()}>{stone =>
+            <Match when={stone()}>
                 <svg viewBox="0 0 100 100">
                     <circle
                         stroke-width="4"
@@ -151,10 +151,10 @@ function Cell(props: {
                         </Match>
                     </Switch>
                 </svg>
-            }</Match>
+            </Match>
             <Match when={cell().type === "Forbidden"}>
                 <svg
-                    class="forbidden fill-error stroke-0"
+                    class="forbidden fill-[#ff0000] stroke-0"
                     viewBox="0 0 100 100"
                 >
                     <circle cx="50" cy="50" r="10"/>

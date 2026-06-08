@@ -11,7 +11,7 @@ use rusty_renju::board_iter::BoardExportItem;
 use rusty_renju::dispatch_any_board;
 use rusty_renju::history::{History, MAX_HISTORY_SIZE};
 use rusty_renju::notation::color::{Color, ColorContainer};
-use rusty_renju::notation::ffi::AnyBoard;
+use rusty_renju::board_io::AnyBoard;
 use rusty_renju::notation::pos::{Pos, BOARD_SIZE, U_BOARD_WIDTH};
 use crate::{HistoryRender, RenderPayloads};
 use crate::text::raster_text;
