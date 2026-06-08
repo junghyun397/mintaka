@@ -268,7 +268,7 @@ mod test_slice_pattern {
         test_pattern!(
             color               = Color::Black,
             case                = "X . . X X X . . X",
-            // closed_four_single  = "X . V X X X V . X", // TODO
+            closed_four_single  = "X . V X X X V . X",
             closed_four_double  = "X . . X X X . . X",
             open_four           = "X . . X X X . . X",
             close_three         = "X . . X X X . . X",
@@ -292,21 +292,12 @@ mod test_slice_pattern {
             close_three         = ". X . X . X X . .",
         );
 
-        // TODO
-        // test_pattern!(
-        //     color               = Color::Black,
-        //     case                = "X . X X X . . .",
-        //     closed_four_single  = "X . X X X V V .",
-        //     closed_four_double  = "X . X X X . . .",
-        // );
-        //
-        // test_pattern!(
-        //     color               = Color::Black,
-        //     case                = ". X X X . . X",
-        //     closed_four_single  = "V X X X V . X",
-        //     closed_four_double  = ". X X X . . X",
-        //     open_four           = ". X X X . . X",
-        // );
+        test_pattern!(
+            color               = Color::Black,
+            case                = "X . X X X . . .",
+            closed_four_single  = "X . X X X V V .",
+            closed_four_double  = "X . X X X . . .",
+        );
     }
 
     #[test]
