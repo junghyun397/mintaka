@@ -49,6 +49,7 @@ impl IntoResponse for AppError {
 #[derive(Serialize)]
 #[typeshare::typeshare]
 pub struct Health {
+    version: String,
     available_workers: u32,
     available_memory_in_mib: u32,
 }
@@ -57,6 +58,7 @@ pub async fn status(
     State(state): State<Arc<AppState>>
 ) -> impl IntoResponse {
     Json(Health {
+        version: mintaka::VERSION.to_string(),
         available_workers: state.available_workers(),
         available_memory_in_mib: state.available_memory().mib() as u32,
     })

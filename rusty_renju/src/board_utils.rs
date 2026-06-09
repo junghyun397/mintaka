@@ -1,5 +1,3 @@
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 use crate::board::Board;
@@ -10,7 +8,7 @@ use crate::notation::rule::RuleKind;
 use crate::slice::Slice;
 
 #[cfg_attr(feature = "typeshare", typeshare)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BoardWinner {
     pub color: Color,
     pub moves: [Pos; 5],

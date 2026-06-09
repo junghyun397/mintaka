@@ -30,7 +30,7 @@ jobs:
           ${{ runner.os }}-cargo-
 
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --workspace --verbose
 
   test:
     if: "!contains(github.event.head_commit.message, 'skip ci')"

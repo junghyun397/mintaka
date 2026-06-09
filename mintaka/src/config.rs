@@ -1,16 +1,11 @@
 use crate::protocol::timer::Timer;
 use crate::value::{Depth, Depths};
 use rusty_renju::utils::byte_size::ByteSize;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::time::Duration;
-#[cfg(feature = "typeshare")]
-use typeshare::typeshare;
 
-#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum SearchObjective {
     #[default] Best = 0,
@@ -18,8 +13,8 @@ pub enum SearchObjective {
     Pondering = 2
 }
 
-#[cfg_attr(feature = "typeshare", typeshare)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "typeshare", typeshare::typeshare)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde_with::skip_serializing_none)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Config {

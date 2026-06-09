@@ -1,11 +1,8 @@
 use std::fmt::Display;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
-#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "RuleKindSchema"))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(std::marker::ConstParamTy, Default, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum RuleKind {
     #[default] Renju = 0,
@@ -24,7 +21,7 @@ impl Display for RuleKind {
 }
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 #[repr(u8)]
 pub enum ForbiddenKind {

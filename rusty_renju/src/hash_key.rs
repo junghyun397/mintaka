@@ -3,8 +3,6 @@ use crate::notation::color::Color;
 use crate::notation::pos::Pos;
 use crate::utils::empty::Empty;
 use crate::impl_debug_from_display;
-#[cfg(feature = "serde")]
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
@@ -66,8 +64,8 @@ impl FromStr for HashKey {
 impl_debug_from_display!(HashKey);
 
 #[cfg(feature = "serde")]
-impl Serialize for HashKey {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+impl serde::Serialize for HashKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
         if serializer.is_human_readable() {
             self.to_string().serialize(serializer)
         } else {
@@ -77,11 +75,11 @@ impl Serialize for HashKey {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for HashKey {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+impl<'de> serde::Deserialize<'de> for HashKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
         if deserializer.is_human_readable() {
             Self::from_str(&String::deserialize(deserializer)?)
-                .map_err(de::Error::custom)
+                .map_err(serde::de::Error::custom)
         } else {
             Ok(Self(u64::deserialize(deserializer)?))
         }

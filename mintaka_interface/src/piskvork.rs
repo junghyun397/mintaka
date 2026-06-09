@@ -336,7 +336,7 @@ fn match_command<const R: RuleKind>(
                 game_state.play_mut(pos);
             }
 
-            message_sender.command(MessageCommand::Command(Command::Init(Box::new(game_state.into()))));
+            message_sender.command(MessageCommand::Command(Command::Init(Box::new((&game_state).into()))));
 
             if command_kind.as_str() == "BOARD" {
                 message_sender.launch(SearchObjective::Best, true, false);

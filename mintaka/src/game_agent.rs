@@ -13,14 +13,10 @@ use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::time_manager::TimeManager;
 use crate::utils::monotonic_clock::MonotonicClock;
-use rusty_renju::board::Board;
-use rusty_renju::history::History;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::empty::Empty;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
@@ -78,7 +74,7 @@ impl Display for GameError {
 
 impl std::error::Error for GameError {}
 
-#[cfg_attr(feature = "serde", derive(Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(try_from = "GameAgentData<R>"))]
 pub struct GameAgent<const R: RuleKind> {
     pub state: GameState<R>,
@@ -103,8 +99,8 @@ impl<const R: RuleKind> GameAgent<R> {
         }
     }
 
-    fn reinit_from_state(&mut self, data: GameStateData) {
-        self.state = data.into();
+    fn reinit_from_state(&mut self, state: GameState<R>) {
+        self.state = state;
 
         self.evaluator = ActiveEvaluator::from_state(&self.state);
 
@@ -158,7 +154,6 @@ impl<const R: RuleKind> GameAgent<R> {
                     None => return Err(GameError::NoHistoryToUndo),
                     Some(action) => {
                         let artifact = self.state.undo_rebuild_mut();
-
                         self.evaluator.undo(&self.state.board, artifact, action);
                     }
                 }
@@ -226,13 +221,10 @@ impl<const R: RuleKind> GameAgent<R> {
                 self.evaluator = HeuristicEvaluator::from_state(&self.state);
             },
             Command::Clear => {
-                self.reinit_from_state(GameStateData {
-                    board_data: (&Board::<R>::empty()).into(),
-                    history: History::empty(),
-                });
+                self.reinit_from_state(GameState::empty());
             },
             Command::Init(state) => {
-                self.reinit_from_state(*state);
+                self.reinit_from_state((*state).into());
             },
             Command::Sync(state) => {
                 self.sync_state(*state);
@@ -356,7 +348,7 @@ impl<const R: RuleKind> GameAgent<R> {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GameAgentData<const R: RuleKind> {
     state: GameState<R>,
     tt: Vec<u8>,
@@ -390,8 +382,8 @@ impl<const R: RuleKind> TryFrom<GameAgentData<R>> for GameAgent<R> {
 }
 
 #[cfg(feature = "serde")]
-impl<const R: RuleKind> Serialize for GameAgent<R> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+impl<const R: RuleKind> serde::Serialize for GameAgent<R> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
         GameAgentData::from(self).serialize(serializer)
     }
 }

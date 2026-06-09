@@ -174,11 +174,15 @@ const fn build_pattern_score_lut() -> ValueScoreLut {
                 acc = HeuristicPatternScores::THREE_FOUR_FORK;
             } else if open_threes > 1 { // double-three fork
                 acc = HeuristicPatternScores::DOUBLE_THREE_FORK;
+            } else if open_threes != 0 {
+                acc += HeuristicPatternScores::OPEN_THREE;
+                acc += HeuristicPatternScores::POTENTIAL_FORK_BONUS[potentials];
+            } else if closed_fours != 0 {
+                acc += HeuristicPatternScores::CLOSED_FOUR;
+                acc += HeuristicPatternScores::POTENTIAL_FORK_BONUS[potentials];
+            } else {
+                acc += HeuristicPatternScores::POTENTIAL[potentials];
             }
-
-            acc += open_threes as i16 * HeuristicPatternScores::OPEN_THREE;
-            acc += closed_fours as i16 * HeuristicPatternScores::CLOSED_FOUR;
-            acc += HeuristicPatternScores::POTENTIAL[potentials];
 
             lut[pattern_key] = acc;
         });
@@ -193,6 +197,8 @@ struct HeuristicPatternScores;
 
 impl HeuristicPatternScores {
     const POTENTIAL: [i16; 8]       = [0, 4, 12, 24, 40, 60, 84, 112];
+
+    const POTENTIAL_FORK_BONUS: [i16; 8] = [0, 28, 30, 36, 40, 60, 84, 112];
 
     const CLOSED_FOUR: i16          = 300;
     const OPEN_THREE: i16           = 160;

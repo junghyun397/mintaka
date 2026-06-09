@@ -4,11 +4,7 @@
 
 export type Bitfield = string;
 
-export type RuleKind = RuleKindSchema;
-
 export type HashKey = string;
-
-export type Color = ColorSchema;
 
 export type ColorContainer<T> = [T, T];
 
@@ -21,56 +17,11 @@ export interface BoardData {
 
 export type Board = BoardData;
 
-export type BoardExportItemSchema = 
-	| { type: "Stone", content: Color }
-	| { type: "Empty", content?: undefined }
-	| { type: "Forbidden", content: ForbiddenKind };
-
-export type BoardExportItem = BoardExportItemSchema;
-
 export type ByteSize = LongInt;
-
-export type CommandSchema = 
-	| { type: "Clear", content?: undefined }
-	| { type: "Init", content: GameStateData }
-	| { type: "Sync", content: GameStateData }
-	| { type: "Play", content: {
-	hash: HashKey;
-	pos: MaybePos;
-}}
-	| { type: "Set", content: {
-	hash: HashKey;
-	pos: Pos;
-	color: Color;
-}}
-	| { type: "Unset", content: {
-	hash: HashKey;
-	pos: Pos;
-	color: Color;
-}}
-	| { type: "Undo", content: {
-	hash: HashKey;
-}}
-	| { type: "BatchSet", content: {
-	player_moves: Pos[];
-	opponent_moves: Pos[];
-}}
-	| { type: "RebuildTT", content?: undefined };
-
-export type Command = CommandSchema;
 
 export type Depth = number;
 
 export type ForbiddenKind = string;
-
-export type GameResultSchema = 
-	| { type: "Win", content: Color }
-	| { type: "Draw", content?: undefined }
-	| { type: "Full", content?: undefined };
-
-export type GameResult = GameResultSchema;
-
-export type Pos = PosSchema;
 
 export type MaybePos = Pos | undefined;
 
@@ -85,28 +36,7 @@ export type GameState = GameStateData;
 
 export type PrincipalVariation = MaybePos[];
 
-export type ResponseSchema = 
-	| { type: "Begins", content: ComputingResource }
-	| { type: "Status", content: {
-	hash: HashKey;
-	best_move: MaybePos;
-	score: Score;
-	selective_depth: Depth;
-	total_nodes_in_1k: number;
-	pv: PrincipalVariation;
-	time_elapsed: DurationSchema;
-}};
-
-export type Response = ResponseSchema;
-
 export type Score = number;
-
-export type SearchObjective = string;
-
-export interface DurationSchema {
-	secs: LongInt;
-	nanos: number;
-}
 
 export interface BestMove {
 	position_hash: HashKey;
@@ -115,8 +45,13 @@ export interface BestMove {
 	selective_depth: number;
 	total_nodes_in_1k: number;
 	pv: PrincipalVariation;
-	time_elapsed: DurationSchema;
+	time_elapsed: Duration;
 }
+
+export type BoardExportItem = 
+	| { type: "Stone", content: Color }
+	| { type: "Empty", content?: undefined }
+	| { type: "Forbidden", content: ForbiddenKind };
 
 export interface BoardWinner {
 	color: Color;
@@ -130,6 +65,11 @@ export interface BoardDescribe {
 	winner?: BoardWinner;
 }
 
+export type GameResult = 
+	| { type: "Win", content: Color }
+	| { type: "Draw", content?: undefined }
+	| { type: "Full", content?: undefined };
+
 export interface CommandResult {
 	hash_key: HashKey;
 	result?: GameResult;
@@ -137,14 +77,14 @@ export interface CommandResult {
 
 export interface ComputingResource {
 	workers: number;
-	time_limit?: DurationSchema;
+	time_limit?: Duration;
 	nodes_in_1k?: number;
 }
 
 export interface Timer {
-	total_remaining?: DurationSchema;
-	increment: DurationSchema;
-	turn?: DurationSchema;
+	total_remaining?: Duration;
+	increment: Duration;
+	turn?: Duration;
 }
 
 export interface Config {
@@ -173,6 +113,7 @@ export interface CreateSessionResponse {
 }
 
 export interface Health {
+	version: string;
 	available_workers: number;
 	available_memory_in_mib: number;
 }
@@ -181,4 +122,44 @@ export interface LaunchSessionRequest {
 	position_hash: HashKey;
 	nodes_polling_interval_in_ms?: number;
 }
+
+export type Command = 
+	| { type: "Clear", content?: undefined }
+	| { type: "Init", content: GameStateData }
+	| { type: "Sync", content: GameStateData }
+	| { type: "Play", content: {
+	hash: HashKey;
+	pos: MaybePos;
+	draw_condition?: number;
+}}
+	| { type: "Set", content: {
+	hash: HashKey;
+	pos: Pos;
+	color: Color;
+}}
+	| { type: "Unset", content: {
+	hash: HashKey;
+	pos: Pos;
+	color: Color;
+}}
+	| { type: "Undo", content: {
+	hash: HashKey;
+}}
+	| { type: "BatchSet", content: {
+	player_moves: Pos[];
+	opponent_moves: Pos[];
+}}
+	| { type: "RebuildTT", content: ByteSize };
+
+export type Response = 
+	| { type: "Begins", content: ComputingResource }
+	| { type: "Status", content: {
+	hash: HashKey;
+	best_move: MaybePos;
+	score: Score;
+	selective_depth: Depth;
+	total_nodes_in_1k: number;
+	pv: PrincipalVariation;
+	time_elapsed: Duration;
+}};
 

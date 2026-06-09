@@ -1,14 +1,11 @@
 use crate::board_io::{SYMBOL_BLACK, SYMBOL_WHITE};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
 use std::ops::Not;
 use std::str::FromStr;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
-#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "ColorSchema"))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(std::marker::ConstParamTy, PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]
 pub enum Color {
@@ -182,7 +179,7 @@ macro_rules! impl_color_container {
 }
 
 #[cfg_attr(feature = "typeshare", typeshare)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ColorContainer<T>(pub [T; 2]);
 impl_color_container!(ColorContainer);
 

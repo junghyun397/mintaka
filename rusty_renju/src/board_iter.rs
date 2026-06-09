@@ -6,10 +6,6 @@ use crate::notation::rule::{ForbiddenKind, RuleKind};
 use crate::pattern::Pattern;
 use crate::{index_to_col, index_to_row};
 use std::array;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-#[cfg(feature = "typeshare")]
-use typeshare::typeshare;
 
 #[repr(u64)]
 #[derive(Copy, Clone)]
@@ -18,27 +14,22 @@ pub enum BoardIterItem {
     Pattern(ColorContainer<Pattern>),
 }
 
-#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "BoardExportItemSchema"))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(tag = "type", content = "content"))]
+#[cfg(feature = "serde")]
+#[cfg_attr(feature = "typeshare", typeshare::typeshare)]
+#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", content = "content")]
+pub enum BoardExportItem {
+    Stone(Color),
+    Empty,
+    Forbidden(ForbiddenKind),
+}
+
+#[cfg(not(feature = "serde"))]
 #[derive(Debug, Copy, Clone)]
 pub enum BoardExportItem {
     Stone(Color),
     Empty,
-    Forbidden(ForbiddenKind)
-}
-
-#[cfg(any())]
-mod typeshare_workaround {
-    use super::*;
-    #[typeshare]
-    #[derive(Serialize, Deserialize)]
-    #[serde(tag = "type", content = "content")]
-    pub enum BoardExportItemSchema {
-        Stone(Color),
-        Empty,
-        Forbidden(ForbiddenKind)
-    }
+    Forbidden(ForbiddenKind),
 }
 
 impl<const R: RuleKind> Board<R> {

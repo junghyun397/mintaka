@@ -13,6 +13,8 @@ use typeshare::typeshare;
 use crate::slice_pattern;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "BoardData"))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(try_from = "crate::board_io::BoardData"))]
 #[derive(Debug, Copy, Clone)]
 pub struct Board<const R: RuleKind> {
     pub player_color: Color,

@@ -2,10 +2,7 @@ use rusty_renju::bitfield::Bitfield;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::{cartesian_to_index, const_for, const_max, const_min};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub struct MovegenWindow {
     start_row: u8,

@@ -1,13 +1,11 @@
 use crate::impl_debug_from_display;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "LongInt"))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Default)]
 pub struct ByteSize(u64);
 

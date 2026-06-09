@@ -1,19 +1,12 @@
 use std::time::Duration;
-#[allow(unused_imports)]
-use rusty_renju::utils::lang::DurationSchema;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 
 #[cfg_attr(feature = "typeshare", typeshare::typeshare)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde_with::skip_serializing_none)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Timer {
-    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Option<DurationSchema>"))]
     pub total_remaining: Option<Duration>,
-    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "DurationSchema"))]
     pub increment: Duration,
-    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Option<DurationSchema>"))]
     pub turn: Option<Duration>,
 }
 

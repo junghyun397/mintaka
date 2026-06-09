@@ -59,11 +59,3 @@ pub const fn repeat_4x(source: u8) -> u32 {
 pub const fn repeat_16x(source: u8) -> u128 {
     u128::from_le_bytes([source, source, source, source, source, source, source, source, source, source, source, source, source, source, source, source])
 }
-
-#[allow(dead_code)]
-#[cfg_attr(feature = "typeshare", typeshare)]
-pub struct DurationSchema {
-    #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "LongInt"))]
-    secs: u64,
-    nanos: u32,
-}

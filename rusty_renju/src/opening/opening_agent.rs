@@ -2,11 +2,9 @@ use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::opening::opening_utils::find_forbidden_symmetry_moves;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub enum OpeningKind {
     Soosyrv8,
@@ -14,7 +12,7 @@ pub enum OpeningKind {
     Random4,
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Eq, PartialEq, Clone)]
 pub enum OpeningStage {
     Move(OpeningMove),
@@ -75,7 +73,7 @@ macro_rules! impl_opening_agent {
     };
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Eq, PartialEq, Clone)]
 pub struct OpeningMove {
     moves: usize,
@@ -137,7 +135,7 @@ impl OpeningMove {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Eq, PartialEq, Clone)]
 pub struct OpeningSwap {
     moves: usize,
@@ -189,7 +187,7 @@ impl OpeningSwap {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Eq, PartialEq, Clone)]
 pub struct OpeningDeclare {
     moves: usize,
@@ -221,7 +219,7 @@ impl OpeningDeclare {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Eq, PartialEq, Clone)]
 pub struct OpeningOffer {
     moves: usize,
@@ -272,7 +270,7 @@ impl OpeningOffer {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Eq, PartialEq, Clone)]
 pub struct OpeningSelect {
     moves: usize,
@@ -301,7 +299,7 @@ impl OpeningSelect {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Eq, PartialEq, Clone)]
 pub struct OpeningBranch {
     moves: usize,

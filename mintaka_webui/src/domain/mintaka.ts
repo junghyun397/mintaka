@@ -1,17 +1,17 @@
-import type { Config, DurationSchema, Response } from "../wasm/pkg/rusty_renju_wasm"
+import type { Config, Duration, Response } from "../wasm/pkg/rusty_renju_wasm"
 
 export type StatusResponseBody = Extract<Response, { type: "Status" }>["content"]
 
 export const InfiniteDuration = duration(9271584000)
 
-export function duration(secs: number, nanos?: number): DurationSchema {
+export function duration(secs: number, nanos?: number): Duration {
     return {
         secs,
         nanos: nanos ?? 0,
     }
 }
 
-export function durationSeconds(duration: DurationSchema): number {
+export function durationSeconds(duration: Duration): number {
     return duration.secs + duration.nanos / 1_000_000_000
 }
 
@@ -29,11 +29,11 @@ export type Configs = {
 }
 
 export type MintakaStatics = {
-    readonly totalRuntime: DurationSchema,
+    readonly totalRuntime: Duration,
     readonly totalNodesIn1k: number,
 }
 
-export function extractStatics(response: { total_nodes_in_1k: number, time_elapsed: DurationSchema }): MintakaStatics {
+export function extractStatics(response: { total_nodes_in_1k: number, time_elapsed: Duration }): MintakaStatics {
     return { totalNodesIn1k: response.total_nodes_in_1k, totalRuntime: response.time_elapsed }
 }
 

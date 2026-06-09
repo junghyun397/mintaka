@@ -1,16 +1,16 @@
 use crate::movegen::movegen_window::MovegenWindow;
 use rusty_renju::board::{Board, MoveArtifact};
+use rusty_renju::board_io::BoardData;
 use rusty_renju::history::History;
 use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::empty::Empty;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
-use rusty_renju::board_io::BoardData;
-use rusty_renju::notation::rule::RuleKind;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "GameStateData"))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(try_from = "GameStateData"))]
 #[derive(Copy, Clone)]
 pub struct GameState<const R: RuleKind> {
     pub board: Board<R>,
@@ -24,36 +24,6 @@ impl<const R: RuleKind> Empty for GameState<R> {
             board: Board::empty(),
             history: History::empty(),
             movegen_window: MovegenWindow::default(),
-        }
-    }
-}
-
-#[cfg_attr(feature = "typeshare", typeshare)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Copy, Clone)]
-pub struct GameStateData {
-    pub board_data: BoardData,
-    pub history: History,
-}
-
-impl<const R: RuleKind> From<GameState<R>> for GameStateData {
-    fn from(state: GameState<R>) -> Self {
-        Self { board_data: (&state.board).into(), history: state.history }
-    }
-}
-
-impl<const R: RuleKind> From<GameStateData> for GameState<R> {
-    fn from(data: GameStateData) -> Self {
-        let Ok(board) = Board::try_from(data.board_data) else {
-            panic!("invalid rule kind");
-        };
-
-        let movegen_window = MovegenWindow::from(&board.hot_field);
-
-        Self {
-            board,
-            history: data.history,
-            movegen_window,
         }
     }
 }
@@ -166,28 +136,39 @@ impl<const R: RuleKind> From<History> for GameState<R> {
     }
 }
 
-#[cfg(feature = "serde")]
-impl<const R: RuleKind> Serialize for GameState<R> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        GameStateData {
-            board_data: (&self.board).into(),
-            history: self.history,
-        }.serialize(serializer)
+#[cfg_attr(feature = "typeshare", typeshare)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Copy, Clone)]
+pub struct GameStateData {
+    pub board_data: BoardData,
+    pub history: History,
+}
+
+impl<const R: RuleKind> From<&GameState<R>> for GameStateData {
+    fn from(state: &GameState<R>) -> Self {
+        Self { board_data: (&state.board).into(), history: state.history }
+    }
+}
+
+impl<const R: RuleKind> From<GameStateData> for GameState<R> {
+    fn from(data: GameStateData) -> Self {
+        let Ok(board) = Board::try_from(data.board_data) else {
+            panic!("invalid rule kind");
+        };
+
+        let movegen_window = MovegenWindow::from(&board.hot_field);
+
+        Self {
+            board,
+            history: data.history,
+            movegen_window,
+        }
     }
 }
 
 #[cfg(feature = "serde")]
-impl<'de, const R: RuleKind> Deserialize<'de> for GameState<R> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        let data = GameStateData::deserialize(deserializer)?;
-
-        let board = Board::try_from(data.board_data)
-            .map_err(de::Error::custom)?;
-
-        Ok(GameState {
-            movegen_window: MovegenWindow::from(&board.hot_field),
-            board,
-            history: data.history,
-        })
+impl<const R: RuleKind> serde::Serialize for GameState<R> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+        GameStateData::from(self).serialize(serializer)
     }
 }

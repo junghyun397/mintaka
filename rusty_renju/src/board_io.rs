@@ -13,8 +13,6 @@ use crate::pattern::Pattern;
 use crate::slice::Slice;
 use crate::utils::empty::Empty;
 use crate::utils::str_utils::join_str_horizontally;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 #[cfg(feature = "typeshare")]
@@ -36,7 +34,7 @@ enum BoardElement {
 }
 
 #[cfg_attr(feature = "typeshare", typeshare)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BoardDescribe {
     pub hash_key: HashKey,
     pub player_color: Color,
@@ -371,7 +369,7 @@ impl Display for Slice {
 }
 
 #[cfg_attr(feature = "typeshare", typeshare::typeshare)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub struct BoardData {
     pub rule_kind: RuleKind,
@@ -391,16 +389,23 @@ impl<const R: RuleKind> From<&Board<R>> for BoardData {
     }
 }
 
+#[cfg(feature = "serde")]
+impl<const R: RuleKind> serde::Serialize for Board<R> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+        BoardData::from(self).serialize(serializer)
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum BoardDeserializeError {
-    InvalidRuleKind,
+    RuleKindMismatch,
     HashMismatch,
 }
 
 impl Display for BoardDeserializeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            BoardDeserializeError::InvalidRuleKind => write!(f, "Invalid rule kind."),
+            BoardDeserializeError::RuleKindMismatch => write!(f, "Invalid rule kind."),
             BoardDeserializeError::HashMismatch => write!(f, "Hash mismatch."),
         }
     }
@@ -413,7 +418,7 @@ impl<const R: RuleKind> TryFrom<BoardData> for Board<R> {
 
     fn try_from(data: BoardData) -> Result<Self, Self::Error> {
         if data.rule_kind != R {
-            return Err(BoardDeserializeError::InvalidRuleKind);
+            return Err(BoardDeserializeError::RuleKindMismatch);
         }
 
         let black_moves = data.bitfield[Color::Black].iter_hot_pos().collect::<Box<_>>();
@@ -430,22 +435,7 @@ impl<const R: RuleKind> TryFrom<BoardData> for Board<R> {
     }
 }
 
-#[cfg(feature = "serde")]
-impl<const R: RuleKind> Serialize for Board<R> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        BoardData::from(self).serialize(serializer)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de, const R: RuleKind> Deserialize<'de> for Board<R> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        Board::<R>::try_from(BoardData::deserialize(deserializer)?)
-            .map_err(de::Error::custom)
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(from = "BoardData"))]
 #[derive(Debug, Clone, Copy)]
 pub enum AnyBoard {
@@ -505,8 +495,8 @@ impl From<BoardData> for AnyBoard {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for AnyBoard {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+impl serde::Serialize for AnyBoard {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
         BoardData::from(self).serialize(serializer)
     }
 }

@@ -2,8 +2,6 @@ use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::{assert_struct_sizes, impl_debug_from_display};
 #[cfg(feature = "serde")]
-use serde::{de, Deserialize, Serialize, Serializer};
-#[cfg(feature = "serde")]
 use base64::engine::{general_purpose, Engine as _};
 use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
@@ -280,19 +278,30 @@ impl Display for Bitfield {
 impl_debug_from_display!(Bitfield);
 
 #[cfg(feature = "serde")]
-impl Serialize for Bitfield {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        serializer.serialize_str(&general_purpose::URL_SAFE_NO_PAD.encode(&self.0))
+impl serde::Serialize for Bitfield {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&general_purpose::URL_SAFE_NO_PAD.encode(&self.0))
+        } else {
+            serializer.serialize_bytes(&self.0)
+        }
     }
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for Bitfield {
+impl<'de> serde::Deserialize<'de> for Bitfield {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
-        general_purpose::URL_SAFE_NO_PAD.decode(&String::deserialize(deserializer)?)
-            .map_err(de::Error::custom)?
+        let vec = if deserializer.is_human_readable() {
+            general_purpose::URL_SAFE_NO_PAD.decode(&String::deserialize(deserializer)?)
+                .map_err(serde::de::Error::custom)?
+        } else {
+            Vec::<u8>::deserialize(deserializer)
+                .map_err(serde::de::Error::custom)?
+        };
+
+        vec
             .try_into()
-            .map(|bin| Self(bin))
-            .map_err(|_| de::Error::custom("invalid bitfield binary"))
+            .map_err(|_| serde::de::Error::custom("invalid bitfield binary"))
+            .map(Self)
     }
 }

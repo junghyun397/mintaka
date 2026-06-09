@@ -2,10 +2,17 @@ type Num = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15
 
 type Letter = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o'
 
-export type PosSchema = `${Letter}${Num}`
+export type Pos = `${Letter}${Num}`
 
-export type RuleKindSchema = "Renju" | "Gomoku" | "Freestyle"
+export type RuleKind = "Renju" | "Gomoku" | "Freestyle"
 
-export type ColorSchema = "Black" | "White"
+export type Color = "Black" | "White"
+
+export type SearchObjective = "Best" | "Zeroing" | "Pondering"
+
+export interface Duration {
+    secs: number
+    nanos: number
+}
 
 export type LongInt = number

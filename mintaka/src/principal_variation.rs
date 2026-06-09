@@ -1,13 +1,13 @@
 use crate::value::MAX_PLY;
 use rusty_renju::impl_debug_from_display;
 use rusty_renju::notation::pos::MaybePos;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::{Display, Formatter};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "Vec<MaybePos>"))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(try_from = "Vec<MaybePos>"))]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct PrincipalVariation {
     pub line: [MaybePos; MAX_PLY],
@@ -45,23 +45,32 @@ impl Display for PrincipalVariation {
 
 impl_debug_from_display!(PrincipalVariation);
 
-#[cfg(feature = "serde")]
-impl Serialize for PrincipalVariation {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
-        serializer.collect_seq(self.moves())
+impl TryFrom<Vec<MaybePos>> for PrincipalVariation {
+    type Error = &'static str;
+
+    fn try_from(vec: Vec<MaybePos>) -> Result<Self, Self::Error> {
+        let top = vec.len();
+        
+        if top > MAX_PLY {
+            return Err("moves longer than max ply");
+        }
+
+        let mut line = [MaybePos::NONE; MAX_PLY];
+        line[..top].copy_from_slice(&vec);
+
+        Ok(Self { line, top })
+    }
+}
+
+impl From<&PrincipalVariation> for Vec<MaybePos> {
+    fn from(pv: &PrincipalVariation) -> Self {
+        pv.moves().to_vec()
     }
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for PrincipalVariation {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        let vec = Vec::<MaybePos>::deserialize(deserializer)?;
-
-        let mut line = [MaybePos::NONE; MAX_PLY];
-        let top = vec.len();
-
-        line[..top].copy_from_slice(&vec);
-
-        Ok(Self { line, top })
+impl serde::Serialize for PrincipalVariation {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+        Vec::from(self).serialize(serializer)
     }
 }
