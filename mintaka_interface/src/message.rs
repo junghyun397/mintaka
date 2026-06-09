@@ -13,7 +13,7 @@ pub enum Message {
     Launch {
         objective: SearchObjective,
         apply: bool,
-        interactive: bool,
+        print: bool,
     },
     Status(StatusCommand),
 }
@@ -86,9 +86,9 @@ impl MessageSender {
             .expect(CHANNEL_CLOSED_MESSAGE);
     }
 
-    pub fn launch(&self, objective: SearchObjective, apply: bool, interactive: bool) {
+    pub fn launch(&self, objective: SearchObjective, apply: bool, print: bool) {
         self.sender
-            .send(Message::Launch { objective, apply, interactive })
+            .send(Message::Launch { objective, apply, print })
             .expect(CHANNEL_CLOSED_MESSAGE);
     }
 }

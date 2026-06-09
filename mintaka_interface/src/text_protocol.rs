@@ -12,7 +12,7 @@ use rusty_renju::notation::pos::{MaybePos, PosError};
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
 use rusty_renju::utils::empty::Empty;
-use std::io::BufRead;
+use std::io::{BufRead, Write};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
@@ -27,7 +27,7 @@ pub fn entry<const R: RuleKind>() -> Result<(), GameError> {
             sequence
                 .split('\n')
                 .filter(|&line| !line.is_empty())
-                .map(String::from)
+                .map(str::to_string)
                 .collect()
         })
         .unwrap_or_default();
@@ -37,6 +37,56 @@ pub fn entry<const R: RuleKind>() -> Result<(), GameError> {
         pref.game_state.unwrap_or_else(|| GameState::empty()),
         command_sequence,
     )
+}
+
+enum TextProtocolResponse {
+    Log(String),
+    Response(String),
+    Ack,
+    Multiline(String),
+}
+
+fn stdio_out(text_protocol_response: Result<TextProtocolResponse, String>) {
+    match text_protocol_response { 
+        Ok(TextProtocolResponse::Log(message)) => {
+            println!("% {}", message);
+        }
+        Ok(TextProtocolResponse::Response(response)) => {
+            println!("= {}", response);
+        }
+        Ok(TextProtocolResponse::Ack) => {
+            println!("=");
+        }
+        Ok(TextProtocolResponse::Multiline(content)) => {
+            println!("=\x02\n{}\x03", content);
+        }
+        Err(error) => {
+            println!("? {}", error);
+        }
+    }
+
+    std::io::stdout().flush().expect("failed to flush stdout");
+}
+
+fn print_response(response: Response) {
+    let log = match response {
+        Response::Begins(ComputingResource { workers, time_limit, nodes_in_1k }) =>
+            format!("begins: workers={workers}, running-time={time_limit:?}, nodes={nodes_in_1k:?}"),
+        Response::Status { best_move, score, pv, total_nodes_in_1k, selective_depth, .. } =>
+            format!("status: depth={selective_depth}, score={score}, best_move={best_move}, total_nodes_in_1k={total_nodes_in_1k}, pv={pv:?}"),
+    };
+
+    stdio_out(Ok(TextProtocolResponse::Log(log)));
+}
+
+fn print_board<const R: RuleKind>(state: &GameState<R>, show_last_moves: bool) {
+    let string = if show_last_moves {
+        state.board.to_string_with_last_moves(state.history.last_action_pair())
+    } else {
+        state.board.to_string()
+    };
+
+    stdio_out(Ok(TextProtocolResponse::Multiline(string)));
 }
 
 fn text_protocol<const R: RuleKind>(
@@ -59,41 +109,12 @@ fn text_protocol<const R: RuleKind>(
 
     for message in message_receiver {
         match message {
-            Message::Config(command) => {
-                match command {
-                    ConfigCommand::TotalTime(total) => {
-                        timer.total_remaining = Some(total);
-                    }
-                    ConfigCommand::IncrementTime(increment) => {
-                        config.initial_timer.increment = increment;
-                        timer.increment = increment;
-                    }
-                    ConfigCommand::TurnTime(turn) => {
-                        config.initial_timer.turn = Some(turn);
-                        timer.turn = Some(turn)
-                    }
-                    ConfigCommand::MaxNodes { in_1k } => {
-                        config.max_nodes_in_1k = Some(in_1k);
-                    }
-                    ConfigCommand::MaxDepth(max_depth) => {
-                        config.max_depth = Some(max_depth as Depth);
-                    }
-                    ConfigCommand::Workers(workers) => {
-                        config.workers = workers;
-                    }
-                    ConfigCommand::ResizeTT(size) => {
-                        config.tt_size = size;
-                        let _ = game_agent.command(Command::RebuildTT(config.tt_size));
-                    }
-                }
-            }
             Message::Command(command) => {
                 let command = command.into_command(&config, game_agent.state.board.hash_key);
 
                 execute_command(&mut game_agent, command);
             }
-            Message::Status(command) => print_status(&game_agent, command),
-            Message::Launch { objective, apply, interactive } => {
+            Message::Launch { objective, apply, print: interactive } => {
                 let best_move = game_agent.launch::<Instant>(
                     config,
                     timer,
@@ -102,8 +123,8 @@ fn text_protocol<const R: RuleKind>(
                     Arc::new(AtomicU32::new(0)),
                     aborted.clone(),
                 );
-
-                println!(
+                
+                let log = format!(
                     "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}",
                     best_move.best_move,
                     best_move.score,
@@ -112,7 +133,9 @@ fn text_protocol<const R: RuleKind>(
                     best_move.time_elapsed,
                 );
 
-                println!("= {}", best_move.best_move);
+                stdio_out(Ok(TextProtocolResponse::Log(log)));
+
+                stdio_out(Ok(TextProtocolResponse::Response(best_move.best_move.to_string())));
 
                 if apply {
                     let command = Command::Play {
@@ -125,90 +148,67 @@ fn text_protocol<const R: RuleKind>(
                 }
 
                 if interactive {
-                    print_status(&game_agent, StatusCommand::Board { show_last_moves: true });
+                    print_board(&game_agent.state, true);
                 }
             }
+            Message::Config(ConfigCommand::TotalTime(total)) => {
+                timer.total_remaining = Some(total);
+            }
+            Message::Config(ConfigCommand::IncrementTime(increment)) => {
+                config.initial_timer.increment = increment;
+                timer.increment = increment;
+            }
+            Message::Config(ConfigCommand::TurnTime(turn)) => {
+                config.initial_timer.turn = Some(turn);
+                timer.turn = Some(turn)
+            }
+            Message::Config(ConfigCommand::MaxNodes { in_1k }) => {
+                config.max_nodes_in_1k = Some(in_1k);
+            }
+            Message::Config(ConfigCommand::MaxDepth(max_depth)) => {
+                config.max_depth = Some(max_depth as Depth);
+            }
+            Message::Config(ConfigCommand::Workers(workers)) => {
+                config.workers = workers;
+            }
+            Message::Config(ConfigCommand::ResizeTT(size)) => {
+                config.tt_size = size;
+
+                let _ = game_agent.command(Command::RebuildTT(config.tt_size));
+            }
+            Message::Status(StatusCommand::Version) => {
+                stdio_out(Ok(TextProtocolResponse::Response(
+                    format!(
+                        "rule-{}, rusty-renju-{}, mintaka-{}",
+                        R, rusty_renju::VERSION, mintaka::VERSION
+                    )
+                )));
+            }
+            Message::Status(StatusCommand::Board { show_last_moves }) => {
+                print_board::<R>(&game_agent.state, show_last_moves);
+            }
+            Message::Status(StatusCommand::History) => {
+                stdio_out(Ok(TextProtocolResponse::Response(
+                    game_agent.state.history.to_string()
+                )));
+            }
+            Message::Status(StatusCommand::Forbid) => unreachable!(),
+            Message::Status(StatusCommand::Time) => unreachable!(),
         }
     }
 
     Ok(())
 }
 
-fn execute_command<const R: RuleKind>(game_agent: &mut GameAgent<R>, command: Command) {
-    match game_agent.command(command) {
-        Ok(result) => match result.result {
-            Some(result) => println!("= {result}"),
-            None => println!("="),
-        },
-        Err(err) => println!("? {err}"),
-    }
-}
-
-fn print_status<const R: RuleKind>(game_agent: &GameAgent<R>, command: StatusCommand) {
-    match command {
-        StatusCommand::Version => println!(
-            "= rule-{}, rusty-renju-{}, mintaka-{}",
-            R, rusty_renju::VERSION, mintaka::VERSION
-        ),
-        StatusCommand::Board { show_last_moves: false } =>
-            println!("=\x02\n{}\x03", game_agent.state.board),
-        StatusCommand::Board { show_last_moves: true } => println!(
-            "=\x02\n{}\x03",
-            game_agent
-                .state
-                .board
-                .to_string_with_last_moves(game_agent.state.history.last_action_pair())
-        ),
-        StatusCommand::History => println!("= {}", game_agent.state.history),
-        _ => {}
-    }
-}
-
-fn print_response(response: Response) {
-    match response {
-        Response::Begins(ComputingResource { workers, time_limit, nodes_in_1k }) =>
-            println!("begins: workers={workers}, running-time={time_limit:?}, nodes={nodes_in_1k:?}"),
-        Response::Status { best_move, score, pv, total_nodes_in_1k, selective_depth, .. } =>
-            println!("status: depth={selective_depth}, score={score}, best_move={best_move}, total_nodes_in_1k={total_nodes_in_1k}, pv={pv:?}"),
-    }
-}
-
-fn spawn_command_listener<const R: RuleKind>(
-    abort: Arc<AtomicBool>,
-    message_sender: MessageSender,
-    initial_sequence: Vec<String>,
-) {
-    std::thread::spawn(move || {
-        let stdin = std::io::stdin();
-        let stdin_lines = stdin.lock().lines();
-
-        for line in initial_sequence
-            .into_iter()
-            .chain(stdin_lines.map(Result::unwrap))
-        {
-            let args = line.trim().split(' ').collect::<Vec<&str>>();
-
-            if args.is_empty() {
-                continue;
-            }
-
-            match handle_command::<R>(&abort, &message_sender, &line, args) {
-                Err(err) => println!("? {err}"),
-                _ => {}
-            }
-        }
-    });
-}
-
-fn handle_command<const R: RuleKind>(
-    abort: &Arc<AtomicBool>,
+fn match_command<const R: RuleKind>(
+    aborted: &Arc<AtomicBool>,
     message_sender: &MessageSender,
-    buf: &str,
     args: Vec<&str>,
+    buf: &str,
 ) -> Result<(), String> {
-    match args[0].to_ascii_lowercase().as_str() {
+    match args[0] {
         "abort" => {
-            abort.store(true, Ordering::Relaxed);
+            aborted.store(true, Ordering::Relaxed);
         }
         "quit" => {
             std::process::exit(0);
@@ -218,8 +218,6 @@ fn handle_command<const R: RuleKind>(
                 "auto" => {
                     let cores =
                         std::thread::available_parallelism().map_or_else(|_| 1, |n| n.get()) as u32;
-
-                    println!("info: workers={cores}");
 
                     message_sender.config(ConfigCommand::Workers(cores));
                 }
@@ -349,8 +347,52 @@ fn handle_command<const R: RuleKind>(
         "zero" => {
             message_sender.launch(SearchObjective::Zeroing, true, true);
         }
+        "ponder" => {
+            message_sender.launch(SearchObjective::Pondering, false, false);
+        }
         &_ => return Err("unknown command.".to_string()),
-    }
-
+    };
+    
     Ok(())
+}
+
+fn execute_command<const R: RuleKind>(game_agent: &mut GameAgent<R>, command: Command) {
+    let result = game_agent.command(command);
+
+    let response = result
+        .map(|command_result| command_result.result
+            .map(|game_result| TextProtocolResponse::Response(game_result.to_string()))
+            .unwrap_or_else(|| TextProtocolResponse::Ack)
+        )
+        .map_err(|err| err.to_string());
+
+    stdio_out(response);
+}
+
+fn spawn_command_listener<const R: RuleKind>(
+    aborted: Arc<AtomicBool>,
+    message_sender: MessageSender,
+    initial_sequence: Vec<String>,
+) {
+    std::thread::spawn(move || {
+        let stdin = std::io::stdin();
+        let stdin_lines = stdin.lock().lines();
+
+        for line in initial_sequence
+            .into_iter()
+            .chain(stdin_lines.map(Result::unwrap))
+        {
+            let args = line.trim().split(' ').collect::<Vec<&str>>();
+
+            if args.is_empty() {
+                continue;
+            }
+
+            let result = match_command::<R>(&aborted, &message_sender, args, &line);
+
+            if let Err(error) = result {
+                stdio_out(Err(error));
+            }
+        }
+    });
 }

@@ -8,7 +8,7 @@ use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::byte_size::ByteSize;
 use std::error::Error;
-use std::io::Write;
+use std::io::{BufRead, Write};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
@@ -17,44 +17,43 @@ use mintaka::protocol::timer::Timer;
 use rusty_renju::notation::color::Color;
 use rusty_renju::utils::empty::Empty;
 
+pub fn entry<const R: RuleKind>() -> Result<(), impl Error> {
+    piskvork_protocol::<R>()
+}
+
 const PROTOCOL_MARGIN: Duration = Duration::from_millis(30);
 
 enum PiskvorkResponse {
     Message(String),
     Debug(String),
-    Error(String),
     Unknown(String),
     About(String),
     Pos(Pos),
     Forbid(Vec<Pos>),
     Ok,
-    None,
 }
 
-fn stdio_out(piskvork_response: PiskvorkResponse) {
+fn stdio_out(piskvork_response: Result<PiskvorkResponse, String>) {
     match piskvork_response {
-        PiskvorkResponse::Message(message) => {
+        Ok(PiskvorkResponse::Message(message)) => {
             println!("MESSAGE {}", message);
         }
-        PiskvorkResponse::Debug(message) => {
+        Ok(PiskvorkResponse::Debug(message)) => {
             println!("DEBUG {}", message);
         }
-        PiskvorkResponse::Error(message) => {
-            println!("ERROR {}", message);
-        }
-        PiskvorkResponse::Unknown(message) => {
+        Ok(PiskvorkResponse::Unknown(message)) => {
             println!("UNKNOWN {}", message);
         }
-        PiskvorkResponse::About(message) => {
+        Ok(PiskvorkResponse::About(message)) => {
             println!("{}", message);
         }
-        PiskvorkResponse::Ok => {
+        Ok(PiskvorkResponse::Ok) => {
             println!("OK");
         }
-        PiskvorkResponse::Pos(pos) => {
+        Ok(PiskvorkResponse::Pos(pos)) => {
             println!("{},{}", pos.col(), pos.row());
         }
-        PiskvorkResponse::Forbid(positions) => {
+        Ok(PiskvorkResponse::Forbid(positions)) => {
             println!("FORBID {}",
                  positions.iter()
                      .map(|pos| format!("{:02}{:02}", pos.col(), pos.row()))
@@ -62,16 +61,37 @@ fn stdio_out(piskvork_response: PiskvorkResponse) {
                      .join("")
             );
         }
-        PiskvorkResponse::None => {}
+        Err(message) => {
+            println!("ERROR {}", message);
+        }
     };
 
     std::io::stdout().flush().expect("failed to flush stdout");
 }
 
-pub fn entry<const R: RuleKind>() -> Result<(), impl Error> {
+fn print_response(response: Response) {
+    let response = match response {
+        Response::Begins(ComputingResource { workers, time_limit, nodes_in_1k }) =>
+            format!(
+                "begins workers={workers}, running-time={time_limit:?}, nodes={nodes_in_1k:?}k"
+            ),
+        Response::Status { best_move, score, pv, total_nodes_in_1k, selective_depth, .. } =>
+            format!(
+                "status score={score}, \
+                best-move={best_move:?}, \
+                depth={selective_depth}, \
+                total_nodes_in_1k={total_nodes_in_1k}, \
+                pv={pv:?}"
+            ),
+    };
+
+    stdio_out(Ok(PiskvorkResponse::Debug(response)));
+}
+
+fn piskvork_protocol<const R: RuleKind>() -> Result<(), impl Error> {
     let aborted = Arc::new(AtomicBool::new(false));
 
-    let mut config = Config::default();
+    let mut config = Presets::FASTGAME_PRESET;
 
     let mut game_agent = GameAgent::<R>::new(config);
 
@@ -90,34 +110,11 @@ pub fn entry<const R: RuleKind>() -> Result<(), impl Error> {
 
     for message in message_receiver {
         match message {
-            Message::Config(command) => {
-                match command {
-                    ConfigCommand::TotalTime(total) => {
-                        timer.total_remaining = Some(total);
-                    }
-                    ConfigCommand::IncrementTime(increment) => {
-                        config.initial_timer.increment = increment;
-                        timer.increment = increment;
-                    }
-                    ConfigCommand::TurnTime(turn) => {
-                        config.initial_timer.turn = Some(turn);
-                        timer.turn = Some(turn)
-                    }
-                    ConfigCommand::Workers(workers) => {
-                        config.workers = workers;
-                    }
-                    ConfigCommand::ResizeTT(size) => {
-                        config.tt_size = size;
-                        let _ = game_agent.command(Command::RebuildTT(size));
-                    }
-                    _ => unreachable!(),
-                }
-            }
             Message::Command(command) => {
                 let result = game_agent.command(command.into_command(&config, game_agent.state.board.hash_key));
 
                 if let Err(err) = result {
-                    stdio_out(PiskvorkResponse::Error(err.to_string()));
+                    stdio_out(Err(err.to_string()));
                 }
             }
             Message::Launch { objective, apply, .. } => {
@@ -125,7 +122,7 @@ pub fn entry<const R: RuleKind>() -> Result<(), impl Error> {
                     config,
                     timer,
                     objective,
-                    CallBackResponseSender::new(response_receiver),
+                    CallBackResponseSender::new(print_response),
                     Arc::new(AtomicU32::new(0)),
                     aborted.clone(),
                 );
@@ -138,72 +135,53 @@ pub fn entry<const R: RuleKind>() -> Result<(), impl Error> {
                     });
 
                     if let Err(err) = result {
-                        stdio_out(PiskvorkResponse::Error(err.to_string()));
+                        stdio_out(Err(err.to_string()));
                         continue;
                     }
                 }
 
-                stdio_out(PiskvorkResponse::Pos(best_move.best_move.unwrap_or(Pos::from_cartesian(7, 7))));
+                stdio_out(Ok(PiskvorkResponse::Pos(best_move.best_move.unwrap_or(Pos::from_cartesian(7, 7)))));
             }
-            Message::Status(command) => match command {
-                StatusCommand::Forbid => {
-                    stdio_out(
-                        PiskvorkResponse::Forbid(game_agent.state.board.patterns.forbidden_field.iter_hot_pos().collect())
-                    );
-                },
-                _ => unreachable!()
-            },
+            Message::Config(ConfigCommand::TotalTime(total)) => {
+                timer.total_remaining = Some(total);
+            }
+            Message::Config(ConfigCommand::IncrementTime(increment)) => {
+                config.initial_timer.increment = increment;
+                timer.increment = increment;
+            }
+            Message::Config(ConfigCommand::TurnTime(turn)) => {
+                config.initial_timer.turn = Some(turn);
+                timer.turn = Some(turn)
+            }
+            Message::Config(ConfigCommand::MaxNodes { in_1k }) => {
+                config.max_nodes_in_1k = Some(in_1k);
+            }
+            Message::Config(ConfigCommand::Workers(workers)) => {
+                config.workers = workers;
+            }
+            Message::Config(ConfigCommand::ResizeTT(size)) => {
+                config.tt_size = size;
+                let _ = game_agent.command(Command::RebuildTT(config.tt_size));
+            }
+            Message::Config(_) => unreachable!(),
+            Message::Status(StatusCommand::Forbid) => {
+                stdio_out(Ok(PiskvorkResponse::Forbid(
+                    game_agent.state.board.patterns.forbidden_field.iter_hot_pos().collect()
+                )));
+            }
+            Message::Status(StatusCommand::Version) => {
+                stdio_out(Ok(PiskvorkResponse::About(
+                    format!(
+                        "name=\"mintaka\", author=\"JeongHyeon Choi\", version=\"{}\", country=\"KOR\"",
+                        mintaka::VERSION
+                    )
+                )));
+            }
+            Message::Status(_) => unreachable!()
         }
     }
 
     Ok::<(), GameError>(())
-}
-
-fn spawn_command_listener<const R: RuleKind>(aborted: Arc<AtomicBool>, message_sender: MessageSender) {
-    std::thread::spawn(move || {
-        let mut buf = String::new();
-
-        loop {
-            buf.clear();
-            if std::io::stdin()
-                .read_line(&mut buf)
-                .expect("failed to read line")
-                == 0
-            {
-                break;
-            }
-
-            let args = buf.trim().split_whitespace().collect::<Vec<&str>>();
-
-            if args.is_empty() {
-                continue;
-            }
-
-            let piskvork_response = match_command::<R>(&aborted, &message_sender, args)
-                .unwrap_or_else(|message| PiskvorkResponse::Error(message.to_string()));
-
-            stdio_out(piskvork_response);
-        }
-    });
-}
-
-fn response_receiver(response: Response) {
-    let piskvork_response = match response {
-        Response::Begins(ComputingResource { workers, time_limit, nodes_in_1k }) =>
-            PiskvorkResponse::Message(format!(
-                "begins workers={workers}, running-time={time_limit:?}, nodes={nodes_in_1k:?}k"
-            )),
-        Response::Status { best_move, score, pv, total_nodes_in_1k, selective_depth, .. } =>
-            PiskvorkResponse::Debug(format!(
-                "status score={score}, \
-                best-move={best_move:?}, \
-                depth={selective_depth}, \
-                total_nodes_in_1k={total_nodes_in_1k}, \
-                pv={pv:?}"
-            )),
-    };
-
-    stdio_out(piskvork_response);
 }
 
 // https://plastovicka.github.io/protocl2en.htm
@@ -212,10 +190,10 @@ fn match_command<const R: RuleKind>(
     aborted: &Arc<AtomicBool>,
     message_sender: &MessageSender,
     args: Vec<&str>,
-) -> Result<PiskvorkResponse, &'static str> {
+) -> Result<(), &'static str> {
     let command_kind = args[0].to_uppercase();
 
-    let response = match command_kind.as_str() {
+    match command_kind.as_str() {
         // basic commands
         "START" => {
             let size: usize = args
@@ -226,41 +204,44 @@ fn match_command<const R: RuleKind>(
 
             if size == pos::U_BOARD_WIDTH {
                 message_sender.command(MessageCommand::Command(Command::Clear));
-
-                PiskvorkResponse::Ok
             } else {
                 return Err("unsupported size");
             }
         }
         "BEGIN" => {
             message_sender.launch(SearchObjective::Best, true, false);
-
-            PiskvorkResponse::None
         }
         "INFO" => {
             match args.get(1).copied().map(str::to_lowercase).as_deref() {
                 Some("timeout_match") | Some("time_left") => {
                     if let Ok(time) = parse_time(&args) {
                         message_sender.config(ConfigCommand::TotalTime(time - PROTOCOL_MARGIN));
+                    } else {
+                        return Err("invalid time value");
                     }
                 }
                 Some("timeout_turn") => {
                     if let Ok(time) = parse_time(&args) {
                         message_sender.config(ConfigCommand::TurnTime(time - PROTOCOL_MARGIN));
+                    } else {
+                        return Err("invalid time value");
                     }
                 }
                 Some("max_memory") => {
                     if let Some(max_memory_in_bytes) = args.get(2)
-                        .and_then(|value| value.parse::<u64>().ok())
+                        && let Some(max_memory_in_bytes) = max_memory_in_bytes.parse::<u64>().ok()
+                        && max_memory_in_bytes > 10 * 1024 * 1024
                     {
-                        if max_memory_in_bytes > 10 * 1024 * 1024 {
-                            message_sender.config(ConfigCommand::ResizeTT(ByteSize::from_bytes(max_memory_in_bytes)))
-                        }
+                        message_sender.config(ConfigCommand::ResizeTT(ByteSize::from_bytes(max_memory_in_bytes)));
+                    } else {
+                        return Err("invalid memory value");
                     }
                 }
                 Some("thread_num") => {
                     if let Some(workers) = args.get(2).and_then(|value| value.parse::<u32>().ok()) {
                         message_sender.config(ConfigCommand::Workers(workers));
+                    } else {
+                        return Err("invalid thread value");
                     }
                 }
                 Some("game_type") => {
@@ -275,14 +256,14 @@ fn match_command<const R: RuleKind>(
                         };
 
                         if rule_kind != R {
-                            return Err("unsupported rule")
+                            return Err("unsupported rule");
                         }
+                    } else {
+                        return Err("invalid rule value");
                     }
                 }
-                _ => {}
+                _ => return Err("unknown info token"),
             }
-
-            PiskvorkResponse::None
         }
         "BOARD" | "YXBOARD" => {
             const DONE_TOKEN: &str = "DONE";
@@ -315,7 +296,6 @@ fn match_command<const R: RuleKind>(
                     "3" => {},
                     &_ => return Err("unknown color token")
                 }
-
             }
 
             let own_color = sequence.first()
@@ -341,51 +321,63 @@ fn match_command<const R: RuleKind>(
             if command_kind.as_str() == "BOARD" {
                 message_sender.launch(SearchObjective::Best, true, false);
             }
-
-            PiskvorkResponse::None
         }
         "TURN" => {
             let pos = parse_command_pos(&args)?;
 
             message_sender.command(MessageCommand::Play { pos: pos.into() });
             message_sender.launch(SearchObjective::Best, true, false);
-
-            PiskvorkResponse::None
         }
         "END" => {
             std::process::exit(0);
         }
         "STOP" | "YXSTOP" => {
             aborted.store(true, Ordering::Relaxed);
-
-            PiskvorkResponse::None
         }
         // extended commands
         "RECTSTART" => return Err("rectangular board is not supported"),
         "RESTART" => {
             message_sender.command(MessageCommand::Command(Command::Clear));
-            PiskvorkResponse::Ok
         }
         "TAKEBACK" => {
             parse_command_pos(&args)?;
 
             message_sender.command(MessageCommand::Undo);
-
-            PiskvorkResponse::Ok
         }
-        "ABOUT" => PiskvorkResponse::About(format!(
-            "name=\"mintaka\", author=\"JeongHyeon Choi\", version=\"{}\", country=\"KOR\"",
-            mintaka::VERSION
-        )),
+        "ABOUT" => {
+            message_sender.status(StatusCommand::Version);
+        },
         "YXSHOWFORBID" => {
             message_sender.status(StatusCommand::Forbid);
-
-            PiskvorkResponse::None
         }
-        &_ => PiskvorkResponse::Unknown("unknown command.".to_string()),
-    };
+        &_ => return Err("unknown command."),
+    }
 
-    Ok(response)
+    Ok(())
+}
+
+fn spawn_command_listener<const R: RuleKind>(
+    aborted: Arc<AtomicBool>,
+    message_sender: MessageSender,
+) {
+    std::thread::spawn(move || {
+        let stdin = std::io::stdin();
+        let stdin_lines = stdin.lock().lines();
+
+        for line in stdin_lines.map(Result::unwrap) {
+            let args = line.trim().split(' ').collect::<Vec<&str>>();
+
+            if args.is_empty() {
+                continue;
+            }
+
+            let result = match_command::<R>(&aborted, &message_sender, args);
+
+            if let Err(error) = result {
+                stdio_out(Err(error.to_string()));
+            }
+        }
+    });
 }
 
 fn parse_command_pos(args: &Vec<&str>) -> Result<Pos, &'static str> {
@@ -424,4 +416,59 @@ fn parse_time(parameters: &Vec<&str>) -> Result<Duration, &'static str> {
         .ok_or("missing info value.")
         .and_then(|token| token.parse::<u64>().map_err(|_| "time parsing failed."))
         .map(Duration::from_millis)
+}
+
+struct Presets;
+
+impl Presets {
+    const FASTGAME_PRESET: Config = Config {
+        draw_condition: None,
+        max_nodes_in_1k: None,
+        max_depth: None,
+        max_vcf_depth: None,
+
+        tt_size: ByteSize::from_mib(64),
+        workers: 1,
+        pondering: false,
+        initial_timer: Timer {
+            total_remaining: Some(Duration::from_secs(120)),
+            increment: Duration::ZERO,
+            turn: Some(Duration::from_secs(5)),
+        },
+        spawn_depth_specialist: false,
+    };
+
+    const STANDARD_PRESET: Config = Config {
+        draw_condition: None,
+        max_nodes_in_1k: None,
+        max_depth: None,
+        max_vcf_depth: None,
+
+        tt_size: ByteSize::from_mib(128),
+        workers: 1,
+        pondering: false,
+        initial_timer: Timer {
+            total_remaining: Some(Duration::from_secs(180)),
+            increment: Duration::ZERO,
+            turn: Some(Duration::from_secs(30)),
+        },
+        spawn_depth_specialist: false,
+    };
+
+    const FINAL_PRESET: Config = Config {
+        draw_condition: None,
+        max_nodes_in_1k: None,
+        max_depth: None,
+        max_vcf_depth: None,
+
+        tt_size: ByteSize::from_mib(768),
+        workers: 1,
+        pondering: false,
+        initial_timer: Timer {
+            total_remaining: Some(Duration::from_secs(1000)),
+            increment: Duration::ZERO,
+            turn: Some(Duration::from_secs(300)),
+        },
+        spawn_depth_specialist: false,
+    };
 }
