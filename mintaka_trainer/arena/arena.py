@@ -120,8 +120,7 @@ def spawn_process(path, params, time_manager: TimeManager, opening: Opening | No
     )
 
 
-def command_process(config, process, command,
-                    println=False, filter_prefix: list[str] | None = None, println_prefix: str = "") -> str | None:
+def command_process(config, process, command, filter_prefix: list[str] | None = None, println_prefix: str = "") -> str | None:
     process.stdin.write(f"{command}\n")
     process.stdin.flush()
 
@@ -152,8 +151,8 @@ def command_process(config, process, command,
         if response.startswith("="):
             return response[2:]
 
-        if not config.args.concise and println and (filter_prefix is None or response.startswith(tuple(filter_prefix))):
-            print(f"{datetime_prefix(config)}{println_prefix}{response}")
+        if response.startswith("%") and filter_prefix is not None and response[2:].startswith(tuple(filter_prefix)):
+            print(f"{datetime_prefix(config)}{println_prefix}{response[2:]}")
 
 
 def play_game(config, game_no: int, opening: Opening | None) -> GameResult:
@@ -188,7 +187,6 @@ def play_game(config, game_no: int, opening: Opening | None) -> GameResult:
             move = command_process(
                 config,
                 engines[player].process, "gen",
-                println=True,
                 filter_prefix=config.args.log_prefix_filter,
                 println_prefix=f"{game_prefix(config, game_no)}{turn_prefix(turn_no, player, color[player])}"
             )

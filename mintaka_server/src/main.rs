@@ -5,7 +5,7 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{middleware, Router};
 use axum_server::tls_rustls::RustlsConfig;
-use mintaka_server::app_state::AppState;
+use mintaka_server::app_state::{parse_hibernated_session_file_name, AppState};
 use mintaka_server::preference::{Preference, TlsConfig};
 use mintaka_server::rest;
 use mintaka_server::session::{SessionKey, SessionStatus, SessionToken};
@@ -27,16 +27,25 @@ async fn auth_with_header(
     request: Request,
     next: Next
 ) -> Result<impl IntoResponse, StatusCode> {
-    auth_session(state, session_key, session_token_from_header(&request), request, next).await
+    auth_session(state, session_key, session_token_from_header(&request), request, next, false).await
 }
 
-async fn auth_with_query(
+async fn auth_and_wake_with_header(
     State(state): State<Arc<AppState>>,
     Path(session_key): Path<String>,
     request: Request,
     next: Next
 ) -> Result<impl IntoResponse, StatusCode> {
-    auth_session(state, session_key, session_token_from_query(&request), request, next).await
+    auth_session(state, session_key, session_token_from_header(&request), request, next, true).await
+}
+
+async fn auth_and_wake_with_query(
+    State(state): State<Arc<AppState>>,
+    Path(session_key): Path<String>,
+    request: Request,
+    next: Next
+) -> Result<impl IntoResponse, StatusCode> {
+    auth_session(state, session_key, session_token_from_query(&request), request, next, true).await
 }
 
 async fn auth_session(
@@ -44,15 +53,17 @@ async fn auth_session(
     session_key: String,
     session_token: Option<SessionToken>,
     request: Request,
-    next: Next
+    next: Next,
+    wakeup: bool,
 ) -> Result<impl IntoResponse, StatusCode> {
     if request.method() != Method::OPTIONS {
         let session_key = SessionKey::from_str(&session_key)
             .map_err(|_| StatusCode::BAD_REQUEST)?;
+
         let session_token = session_token
             .ok_or(StatusCode::NOT_FOUND)?;
 
-        state.authorize_session(session_key, session_token)
+        state.authorize_session(session_key, session_token, wakeup)
             .await
             .map_err(|_| StatusCode::NOT_FOUND)?;
     }
@@ -92,23 +103,29 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let state = Arc::new(AppState::new(pref.clone())?);
 
     let session_routes = Router::new()
-        .route("/{sid}", get(rest::check_session).delete(rest::destroy_session))
         .route("/{sid}/configs", get(rest::get_session_configs))
         .route("/{sid}/commands", post(rest::command_session))
         .route("/{sid}/launch", post(rest::launch_session))
         .route("/{sid}/abort", post(rest::abort_session))
         .route("/{sid}/result", get(rest::get_session_result))
         .route("/{sid}/hibernate", post(rest::hibernate_session))
+        .route_layer(middleware::from_fn_with_state(state.clone(), auth_and_wake_with_header));
+
+    let session_destroy_route = Router::new()
+        .route("/{sid}", get(rest::check_session).delete(rest::destroy_session))
         .route_layer(middleware::from_fn_with_state(state.clone(), auth_with_header));
 
     let session_stream_routes = Router::new()
         .route("/{sid}/stream", get(rest::subscribe_session_response))
-        .route_layer(middleware::from_fn_with_state(state.clone(), auth_with_query));
+        .route_layer(middleware::from_fn_with_state(state.clone(), auth_and_wake_with_query));
 
     let mut api = Router::new()
         .route("/status", get(rest::status))
         .route("/sessions", post(rest::new_session))
-        .nest("/sessions", session_routes.merge(session_stream_routes))
+        .nest("/sessions", session_routes
+            .merge(session_destroy_route)
+            .merge(session_stream_routes)
+        )
         .layer(CorsLayer::very_permissive())
         .layer(
             TraceLayer::new_for_http()
@@ -311,20 +328,10 @@ fn spawn_hibernation_cleaner(directory: &str) {
                 let file_name = entry.file_name();
                 let file_name = file_name.to_string_lossy();
 
-                let Some((sid_str, expiry_str)) = file_name.split_once('_') else {
+                let Some((session_key, _, expiry_epoch_secs)) =
+                    parse_hibernated_session_file_name(file_name.as_ref())
+                else {
                     continue;
-                };
-
-                let Ok(session_key) = SessionKey::from_str(sid_str) else {
-                    continue;
-                };
-
-                let expiry_epoch_secs = match expiry_str {
-                    "none" => None,
-                    value => Some(match value.parse::<u64>() {
-                        Ok(expiry) => expiry,
-                        Err(_) => continue,
-                    }),
                 };
 
                 if expiry_epoch_secs.is_none_or(|expiry| expiry >= now_epoch_secs) {

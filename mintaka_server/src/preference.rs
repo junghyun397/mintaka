@@ -50,7 +50,7 @@ pub struct Preference {
     pub api_password: Option<String>,
     #[arg(long, env = "TOKEN_SECRET", default_value = "verycomplexedsecret")]
     pub session_token_secret: String,
-    #[arg(long, env = "HIBERNATE_TIMEOUT", default_value = "None")]
+    #[arg(long, env = "HIBERNATE_TIMEOUT", default_value = None)]
     pub hibernate_timeout_secs: Option<u64>,
     #[clap(skip)]
     pub hibernate_timeout: Option<Duration>,

@@ -2,18 +2,20 @@ use crate::app_state::{AppError, MemoryPermit, WorkerPermit};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use aes_gcm::aead::{Aead, AeadCore, KeyInit, OsRng};
 use aes_gcm::{Aes256Gcm, Key, Nonce};
-use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
 use dashmap::DashMap;
 use mintaka::config::{Config, SearchObjective};
-use mintaka::game_agent::GameAgent;
-use mintaka::protocol::command::Command;
-use mintaka::protocol::results::{BestMove, CommandResult};
-use mintaka::protocol::response::Response;
+use mintaka::game_agent::{GameAgent, GameAgentData};
 use mintaka::game_state::GameState;
+use mintaka::memo::transposition_table::TTImportError;
+use mintaka::protocol::command::Command;
+use mintaka::protocol::response::Response;
+use mintaka::protocol::results::{BestMove, CommandResult};
+use mintaka::protocol::timer::Timer;
 use rusty_renju::hash_key::HashKey;
-use serde::ser::SerializeStruct;
-use serde::{ser, Deserialize, Serialize, Serializer};
+use rusty_renju::notation::rule::RuleKind;
+use serde::{ser, Deserialize, Serialize};
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::fmt::{Debug, Display, Formatter};
@@ -24,8 +26,6 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast;
 use uuid::Uuid;
-use mintaka::protocol::timer::Timer;
-use rusty_renju::notation::rule::RuleKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionKey(Uuid);
@@ -97,23 +97,33 @@ impl FromStr for SessionToken {
 
 #[derive(Clone)]
 pub struct SessionTokenCipher {
-    cipher: Aes256Gcm,
+    secret: Arc<str>,
 }
 
 impl SessionTokenCipher {
     const NONCE_LEN: usize = 12;
 
     pub fn new(secret: &str) -> Self {
-        let digest = ring::digest::digest(&ring::digest::SHA256, secret.as_bytes());
-        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(digest.as_ref()));
-
-        Self { cipher }
+        Self {
+            secret: Arc::from(secret),
+        }
     }
 
-    pub fn seal_session_key(&self, session_key: SessionKey) -> Result<SessionToken, AppError> {
+    fn cipher(&self, salt: u64) -> Aes256Gcm {
+        let mut digest = ring::digest::Context::new(&ring::digest::SHA256);
+        digest.update(b"mintaka-session-token-v1");
+        digest.update(self.secret.as_bytes());
+        digest.update(&salt.to_be_bytes());
+
+        let key = digest.finish();
+        Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key.as_ref()))
+    }
+
+    pub fn seal_session_key(&self, session_key: SessionKey, salt: u64) -> Result<SessionToken, AppError> {
         let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+        let cipher = self.cipher(salt);
         let session_key = Into::<[u8; 16]>::into(session_key);
-        let ciphertext = self.cipher.encrypt(&nonce, session_key.as_slice()).unwrap();
+        let ciphertext = cipher.encrypt(&nonce, session_key.as_slice()).unwrap();
 
         let mut token = Vec::with_capacity(Self::NONCE_LEN + ciphertext.len());
         token.extend_from_slice(&nonce);
@@ -122,14 +132,15 @@ impl SessionTokenCipher {
         Ok(SessionToken(URL_SAFE_NO_PAD.encode(token)))
     }
 
-    pub fn open_session_token(&self, session_token: &SessionToken) -> Result<SessionKey, AppError> {
+    pub fn open_session_token(&self, session_token: &SessionToken, salt: u64) -> Result<SessionKey, AppError> {
         let token = URL_SAFE_NO_PAD.decode(session_token.0.as_str())
             .map_err(|_| AppError::Unauthorized)?;
 
         let (nonce, text) = token.split_at_checked(Self::NONCE_LEN)
             .ok_or(AppError::Unauthorized)?;
 
-        let session_key = self.cipher.decrypt(Nonce::from_slice(nonce), text)
+        let cipher = self.cipher(salt);
+        let session_key = cipher.decrypt(Nonce::from_slice(nonce), text)
             .map_err(|_| AppError::Unauthorized)?;
 
         let session_key = <[u8; 16]>::try_from(session_key.as_slice())
@@ -173,6 +184,7 @@ pub type SessionResponseReceiver = broadcast::Receiver<SessionResponse>;
 
 pub struct Session {
     pub config: Config,
+    pub salt: u64,
     timer: Timer,
     state: AgentState,
     pub response_sender: SessionResponseSender,
@@ -185,19 +197,20 @@ pub struct Session {
     pub last_active_seq: u32,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct SessionData {
     pub config: Config,
     pub timer: Timer,
-    pub agent: GameAgent<{ RuleKind::Renju }>,
+    pub agent: GameAgentData<{ RuleKind::Renju }>,
     pub best_move: Option<BestMove>,
     pub time_to_live: Option<Duration>,
 }
 
 impl Session {
-    pub fn new(config: Config, game_state: GameState<{ RuleKind::Renju }>, time_to_live: Option<Duration>, memory_permit: MemoryPermit, response_sender: SessionResponseSender) -> Self {
+    pub fn new(config: Config, salt: u64, game_state: GameState<{ RuleKind::Renju }>, time_to_live: Option<Duration>, memory_permit: MemoryPermit, response_sender: SessionResponseSender) -> Self {
         Self {
             config,
+            salt,
             timer: config.initial_timer,
             state: AgentState::Agent(GameAgent::from_state(config, game_state)),
             response_sender,
@@ -210,11 +223,14 @@ impl Session {
         }
     }
 
-    pub fn from_data(data: SessionData, memory_permit: MemoryPermit, response_sender: SessionResponseSender) -> Self {
-        Self {
+    pub fn from_data(data: SessionData, salt: u64, memory_permit: MemoryPermit, response_sender: SessionResponseSender) -> Result<Self, TTImportError> {
+        let agent = data.agent.try_into()?;
+
+        Ok(Self {
             config: data.config,
+            salt,
             timer: data.timer,
-            state: AgentState::Agent(data.agent),
+            state: AgentState::Agent(agent),
             response_sender,
             memory_permit,
             best_move: data.best_move,
@@ -222,7 +238,7 @@ impl Session {
             time_to_live: data.time_to_live,
             last_active: Instant::now(),
             last_active_seq: 0,
-        }
+        })
     }
 
     pub fn game_agent(&self) -> Result<&GameAgent<{ RuleKind::Renju }>, AppError> {
@@ -357,17 +373,29 @@ impl Drop for Session {
     }
 }
 
-impl Serialize for Session {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        let AgentState::Agent(agent) = &self.state else {
-            return Err(ser::Error::custom("session is not idle"));
+impl<'a> TryFrom<&'a Session> for SessionData {
+    type Error = AppError;
+
+    fn try_from(session: &'a Session) -> Result<Self, Self::Error> {
+        let AgentState::Agent(agent) = &session.state else {
+            return Err(AppError::SessionInComputing);
         };
 
-        let mut state = serializer.serialize_struct("Session", 3)?;
-        state.serialize_field("agent", &agent)?;
-        state.serialize_field("best_move", &self.best_move)?;
-        state.serialize_field("time_to_live", &self.time_to_live)?;
-        state.end()
+        Ok(Self {
+            config: session.config,
+            timer: session.timer,
+            agent: GameAgentData::from(agent),
+            best_move: session.best_move,
+            time_to_live: session.time_to_live,
+        })
+    }
+}
+
+impl Serialize for Session {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+        SessionData::try_from(self)
+            .map_err(ser::Error::custom)?
+            .serialize(serializer)
     }
 }
 

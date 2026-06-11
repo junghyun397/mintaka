@@ -1441,6 +1441,7 @@ dependencies = [
  "futures-util",
  "mintaka",
  "num_cpus",
+ "rand 0.10.1",
  "ring",
  "rmp-serde",
  "rusty_renju",

@@ -112,7 +112,9 @@ fn text_protocol<const R: RuleKind>(
             Message::Command(command) => {
                 let command = command.into_command(&config, game_agent.state.board.hash_key);
 
-                execute_command(&mut game_agent, command);
+                let response = execute_command(&mut game_agent, command);
+
+                stdio_out(response);
             }
             Message::Launch { objective, apply, print: interactive } => {
                 let best_move = game_agent.launch::<Instant>(
@@ -123,7 +125,7 @@ fn text_protocol<const R: RuleKind>(
                     Arc::new(AtomicU32::new(0)),
                     aborted.clone(),
                 );
-                
+
                 let log = format!(
                     "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}",
                     best_move.best_move,
@@ -144,7 +146,9 @@ fn text_protocol<const R: RuleKind>(
                         draw_condition: config.draw_condition,
                     };
 
-                    execute_command(&mut game_agent, command);
+                    let response = execute_command(&mut game_agent, command);
+
+                    stdio_out(response);
                 }
 
                 if interactive {
@@ -153,28 +157,42 @@ fn text_protocol<const R: RuleKind>(
             }
             Message::Config(ConfigCommand::TotalTime(total)) => {
                 timer.total_remaining = Some(total);
+
+                stdio_out(Ok(TextProtocolResponse::Ack));
             }
             Message::Config(ConfigCommand::IncrementTime(increment)) => {
                 config.initial_timer.increment = increment;
                 timer.increment = increment;
+
+                stdio_out(Ok(TextProtocolResponse::Ack));
             }
             Message::Config(ConfigCommand::TurnTime(turn)) => {
                 config.initial_timer.turn = Some(turn);
-                timer.turn = Some(turn)
+                timer.turn = Some(turn);
+
+                stdio_out(Ok(TextProtocolResponse::Ack));
             }
             Message::Config(ConfigCommand::MaxNodes { in_1k }) => {
                 config.max_nodes_in_1k = Some(in_1k);
+
+                stdio_out(Ok(TextProtocolResponse::Ack));
             }
             Message::Config(ConfigCommand::MaxDepth(max_depth)) => {
                 config.max_depth = Some(max_depth as Depth);
+
+                stdio_out(Ok(TextProtocolResponse::Ack));
             }
             Message::Config(ConfigCommand::Workers(workers)) => {
                 config.workers = workers;
+
+                stdio_out(Ok(TextProtocolResponse::Ack));
             }
             Message::Config(ConfigCommand::ResizeTT(size)) => {
                 config.tt_size = size;
 
                 let _ = game_agent.command(Command::RebuildTT(config.tt_size));
+
+                stdio_out(Ok(TextProtocolResponse::Ack));
             }
             Message::Status(StatusCommand::Version) => {
                 stdio_out(Ok(TextProtocolResponse::Response(
@@ -352,21 +370,19 @@ fn match_command<const R: RuleKind>(
         }
         &_ => return Err("unknown command.".to_string()),
     };
-    
+
     Ok(())
 }
 
-fn execute_command<const R: RuleKind>(game_agent: &mut GameAgent<R>, command: Command) {
+fn execute_command<const R: RuleKind>(game_agent: &mut GameAgent<R>, command: Command) -> Result<TextProtocolResponse, String> {
     let result = game_agent.command(command);
 
-    let response = result
+    result
         .map(|command_result| command_result.result
             .map(|game_result| TextProtocolResponse::Response(game_result.to_string()))
             .unwrap_or_else(|| TextProtocolResponse::Ack)
         )
-        .map_err(|err| err.to_string());
-
-    stdio_out(response);
+        .map_err(|err| err.to_string())
 }
 
 fn spawn_command_listener<const R: RuleKind>(

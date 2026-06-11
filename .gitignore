@@ -1,5 +1,6 @@
 /.idea
 /.venv
+/bins
 /target
 /sessions
 /temp
