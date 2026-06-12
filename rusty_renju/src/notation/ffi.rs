@@ -1,25 +1,19 @@
-use crate::notation::pos::{MaybePos, Pos};
-
-pub fn from_raw_maybe_pos_slice<'a>(slice: *const u8, len: usize) -> Option<&'a [MaybePos]> {
+pub fn try_from_raw_slice<T: TryFrom<u32>>(slice: *const u32, len: usize) -> Option<Vec<T>> {
     if len == 0 {
-        return Some(&[]);
+        return Some(vec![]);
     }
 
     if slice.is_null() {
         return None;
     }
 
-    Some(unsafe { std::slice::from_raw_parts(slice as *const MaybePos, len) })
-}
+    let mut acc = Vec::with_capacity(len);
 
-pub fn from_raw_pos_slice<'a>(slice: *const u8, len: usize) -> Option<&'a [Pos]> {
-    if len == 0 {
-        return Some(&[]);
+    for &idx in unsafe { std::slice::from_raw_parts(slice, len) }.iter() {
+        if let Ok(pos) = T::try_from(idx) {
+            acc.push(pos)
+        }
     }
-
-    if slice.is_null() {
-        return None;
-    }
-
-    Some(unsafe { std::slice::from_raw_parts(slice as *const Pos, len) })
+    
+    Some(acc)
 }

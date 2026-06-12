@@ -67,17 +67,29 @@ impl From<usize> for Pos {
 
 impl TryFrom<u8> for Pos {
     type Error = PosError;
+
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if value > U8_BOARD_BOUND {
-            Err(PosError::ColumnOrRowOutOfRange)
-        } else {
+        if value < U8_BOARD_SIZE {
             Ok(Pos::from_index(value))
+        } else {
+            Err(PosError::OutOfRange)
+        }
+    }
+}
+
+impl TryFrom<u32> for Pos {
+    type Error = PosError;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        if value < BOARD_SIZE as u32 {
+            Ok(Pos::from_index(value as u8))
+        } else {
+            Err(PosError::OutOfRange)
         }
     }
 }
 
 impl Pos {
-
     pub const fn from_index(index: u8) -> Self {
         debug_assert!(index < U8_BOARD_SIZE);
 
@@ -143,20 +155,19 @@ impl Pos {
     pub fn distance(&self, other: Self) -> u8 {
         CHEBYSHEV_DISTANCE_LUT[self.idx_usize()][other.idx_usize()]
     }
-
 }
 
 #[derive(Debug)]
 pub enum PosError {
     InvalidRowCharter,
-    ColumnOrRowOutOfRange,
+    OutOfRange,
 }
 
 impl Display for PosError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidRowCharter => write!(f, "Invalid row charter"),
-            Self::ColumnOrRowOutOfRange => write!(f, "Column or row out of range"),
+            Self::OutOfRange => write!(f, "Out of range"),
         }
     }
 }
@@ -174,7 +185,7 @@ impl FromStr for Pos {
 
                 (col < BOARD_WIDTH && row <= BOARD_WIDTH)
                     .then(|| Pos::from_cartesian(row - 1 , col))
-                    .ok_or(PosError::ColumnOrRowOutOfRange)
+                    .ok_or(PosError::OutOfRange)
             })
     }
 }
@@ -217,7 +228,6 @@ impl<'de> serde::Deserialize<'de> for Pos {
 pub struct MaybePos(Pos);
 
 impl MaybePos {
-
     pub const INVALID_POS: Pos = Pos(u8::MAX);
 
     pub const NONE: Self = Self(Self::INVALID_POS);
@@ -259,13 +269,26 @@ impl MaybePos {
             Self(pos) => pos.distance(other)
         }
     }
-
 }
 
 impl TryFrom<u8> for MaybePos {
     type Error = PosError;
+
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         const INVALID_POS_IDX: u8 = MaybePos::INVALID_POS.idx();
+
+        match value {
+            INVALID_POS_IDX => Ok(Self::NONE),
+            _ => Pos::try_from(value).map(Self)
+        }
+    }
+}
+
+impl TryFrom<u32> for MaybePos {
+    type Error = PosError;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        const INVALID_POS_IDX: u32 = MaybePos::INVALID_POS.idx() as u32;
 
         match value {
             INVALID_POS_IDX => Ok(Self::NONE),

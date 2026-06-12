@@ -2,6 +2,7 @@ mod text;
 mod renderer;
 
 use webp::Encoder;
+use rusty_renju::notation::pos::MaybePos;
 
 #[repr(C)]
 pub struct ByteBuffer {
@@ -86,11 +87,11 @@ pub extern "C" fn rusty_renju_image_renderer_pair() -> u8 { HistoryRender::Pair 
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_image_renderer_sequence() -> u8 { HistoryRender::Sequence as u8 }
 
-pub struct RenderPayloads<'a> {
+pub struct RenderPayloads {
     pub history: rusty_renju::history::History,
     pub history_render: HistoryRender,
-    pub offers: &'a [rusty_renju::notation::pos::Pos],
-    pub blinds: &'a [rusty_renju::notation::pos::Pos],
+    pub offers: Vec<rusty_renju::notation::pos::Pos>,
+    pub blinds: Vec<rusty_renju::notation::pos::Pos>,
     pub enable_forbidden: bool,
 }
 
@@ -99,18 +100,18 @@ pub fn rusty_renju_image_render(
     image_format: u8, webp_quality: f32,
     option: u8, enable_forbidden: bool,
     board: *const rusty_renju::board_io::AnyBoard,
-    actions: *const u8, actions_len: usize,
-    offers: *const u8, offers_len: usize,
-    blinds: *const u8, blinds_len: usize,
+    actions: *const u32, actions_len: usize,
+    offers: *const u32, offers_len: usize,
+    blinds: *const u32, blinds_len: usize,
 ) -> ByteBuffer {
     if let Some(board) = unsafe { board.as_ref() }
         && let Ok(image_format) = ImageFormat::try_from(image_format)
         && let Ok(history_render) = HistoryRender::try_from(option)
-        && let Some(actions) = rusty_renju::notation::ffi::from_raw_maybe_pos_slice(actions, actions_len)
-        && let Some(offers) = rusty_renju::notation::ffi::from_raw_pos_slice(offers, offers_len)
-        && let Some(blinds) = rusty_renju::notation::ffi::from_raw_pos_slice(blinds, blinds_len)
+        && let Some(actions) = rusty_renju::notation::ffi::try_from_raw_slice::<MaybePos>(actions, actions_len)
+        && let Some(offers) = rusty_renju::notation::ffi::try_from_raw_slice(offers, offers_len)
+        && let Some(blinds) = rusty_renju::notation::ffi::try_from_raw_slice(blinds, blinds_len)
     {
-        let history = actions.into();
+        let history = actions.as_slice().into();
         let payloads = RenderPayloads {
             history, history_render, offers, blinds, enable_forbidden,
         };

@@ -35,10 +35,10 @@ pub extern "C" fn rusty_renju_forbidden_kind_double_four() -> u8 { rusty_renju::
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_forbidden_kind_overline() -> u8 { rusty_renju::notation::rule::ForbiddenKind::Overline as u8 }
 
-const MAYBE_POS_NONE: u8 = rusty_renju::notation::pos::MaybePos::INVALID_POS.idx();
+const MAYBE_POS_NONE: u32 = rusty_renju::notation::pos::MaybePos::INVALID_POS.idx() as u32;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_pos_none() -> u8 { MAYBE_POS_NONE }
+pub extern "C" fn rusty_renju_pos_none() -> u32 { MAYBE_POS_NONE }
 
 const BOARD_EXPORT_ITEM_EMPTY: u8 = 0;
 const BOARD_EXPORT_ITEM_STONE: u8 = 1;
@@ -63,8 +63,7 @@ pub extern "C" fn rusty_renju_close_three_mask() -> u32 { rusty_renju::pattern::
 #[repr(C)]
 pub struct BoardExportItem {
     pub kind: u8,
-    pub stone: u8,
-    pub forbidden_kind: u8,
+    pub content: u8,
 }
 
 impl From<rusty_renju::board_iter::BoardExportItem> for BoardExportItem {
@@ -72,18 +71,15 @@ impl From<rusty_renju::board_iter::BoardExportItem> for BoardExportItem {
         match value {
             rusty_renju::board_iter::BoardExportItem::Empty => BoardExportItem {
                 kind: BOARD_EXPORT_ITEM_EMPTY,
-                stone: COLOR_NONE,
-                forbidden_kind: 0,
+                content: COLOR_NONE,
             },
-            rusty_renju::board_iter::BoardExportItem::Stone(stone) => BoardExportItem {
+            rusty_renju::board_iter::BoardExportItem::Stone(color) => BoardExportItem {
                 kind: BOARD_EXPORT_ITEM_STONE,
-                stone: stone as u8,
-                forbidden_kind: 0
+                content: color as u8,
             },
             rusty_renju::board_iter::BoardExportItem::Forbidden(kind) => BoardExportItem {
                 kind: BOARD_EXPORT_ITEM_FORBIDDEN,
-                stone: COLOR_NONE,
-                forbidden_kind: kind as u8,
+                content: kind as u8,
             },
         }
     }
@@ -93,7 +89,7 @@ impl From<rusty_renju::board_iter::BoardExportItem> for BoardExportItem {
 pub struct BoardWinner {
     pub is_some: u8,
     pub color: u8,
-    pub sequence: [u8; 5],
+    pub sequence: [u32; 5],
 }
 
 impl From<Option<rusty_renju::board_utils::BoardWinner>> for BoardWinner {
@@ -104,7 +100,7 @@ impl From<Option<rusty_renju::board_utils::BoardWinner>> for BoardWinner {
                 winner.color as u8
             ),
             sequence: value.as_ref().map_or([MAYBE_POS_NONE; 5], |winner|
-                winner.moves.map(|pos| pos.idx())
+                winner.moves.map(|pos| pos.idx() as u32)
             ),
         }
     }
@@ -176,10 +172,10 @@ fn any_board_from_string(
 
 fn any_board_from_history(
     rule_kind: rusty_renju::notation::rule::RuleKind,
-    actions: &[rusty_renju::notation::pos::MaybePos],
+    actions: Vec<rusty_renju::notation::pos::MaybePos>,
 ) -> rusty_renju::board_io::AnyBoard {
     dispatch_any_board!(wrap rule_kind, 
-        rusty_renju::board::Board::from(&actions.into())
+        rusty_renju::board::Board::from(&actions.as_slice().into())
     )
 }
 
@@ -197,11 +193,12 @@ pub extern "C" fn rusty_renju_empty_board(rule_kind: u8) -> *mut rusty_renju::bo
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_board_from_history(
     rule_kind: u8,
-    actions: *const u8,
+    actions: *const u32,
     len: usize,
 ) -> *mut rusty_renju::board_io::AnyBoard {
     if let Some(rule_kind) = rule_kind_from_u8(rule_kind)
-        && let Some(actions) = rusty_renju::notation::ffi::from_raw_maybe_pos_slice(actions, len)
+        && let Some(actions)
+            = rusty_renju::notation::ffi::try_from_raw_slice::<rusty_renju::notation::pos::MaybePos>(actions, len)
     {
         into_raw_board(any_board_from_history(rule_kind, actions))
     } else {
@@ -241,10 +238,10 @@ pub extern "C" fn rusty_renju_board_to_string(
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_board_set(
     board: *const rusty_renju::board_io::AnyBoard,
-    pos: u8,
+    pos: u32,
 ) -> *mut rusty_renju::board_io::AnyBoard {
     if let Some(board) = unsafe { board.as_ref() }
-        && let Ok(action) = rusty_renju::notation::pos::MaybePos::try_from(pos)
+        && let Ok(action) = rusty_renju::notation::pos::MaybePos::try_from(pos as u8)
     {
         let board = dispatch_any_board!(wrap board, board => {
             if let Some(pos) = action.ok() {
@@ -263,10 +260,10 @@ pub extern "C" fn rusty_renju_board_set(
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_board_unset(
     board: *const rusty_renju::board_io::AnyBoard,
-    pos: u8,
+    pos: u32,
 ) -> *mut rusty_renju::board_io::AnyBoard {
     if let Some(board) = unsafe { board.as_ref() }
-        && let Ok(maybe_pos) = rusty_renju::notation::pos::MaybePos::try_from(pos)
+        && let Ok(maybe_pos) = rusty_renju::notation::pos::MaybePos::try_from(pos as u8)
     {
         let board = dispatch_any_board!(wrap board, board => {
             if let Some(pos) = maybe_pos.ok() {

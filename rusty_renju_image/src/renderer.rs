@@ -381,8 +381,8 @@ fn draw_board(canvas: &mut Pixmap,
 
     let player_color = dispatch_any_board!(board, board => board.player_color);
     let offer = &res.lut.offer[player_color];
-    draw_positions(canvas, res, offer, opts.offers);
-    draw_positions(canvas, res, &res.lut.blind, opts.blinds);
+    draw_positions(canvas, res, offer, &opts.offers);
+    draw_positions(canvas, res, &res.lut.blind, &opts.blinds);
 
     match opts.history_render {
         HistoryRender::Sequence => draw_sequence(canvas, &opts.history, res),
