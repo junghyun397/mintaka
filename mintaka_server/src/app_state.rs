@@ -6,7 +6,6 @@ use mintaka::config::Config;
 use mintaka::protocol::command::Command;
 use mintaka::game_state::GameState;
 use rusty_renju::utils::byte_size::ByteSize;
-use std::cmp::Reverse;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -147,31 +146,13 @@ impl AppState {
         let available = ByteSize::from_mib(self.memory_resource.available_permits() as u64);
 
         if memory_size > available && force_acquire {
-            let mut acquired_memory = ByteSize::ZERO;
-
-            let mut eviction_queue = self.sessions.eviction_queue.lock().unwrap();
-            let mut deferred_entries = vec![];
-
-            while acquired_memory < memory_size
-                && let Some(Reverse(entry)) = eviction_queue.pop()
-            {
-                match self.sessions.get(&entry.key)
-                    .map(|session|
-                        (session.last_active_seq == entry.last_active_seq, session.status() == SessionStatus::Idle)
-                    )
-                    .unwrap_or((false, false))
-                {
-                    (true, false) => deferred_entries.push(Reverse(entry)),
-                    (true, true) => {
-                        if let Ok(freed_resource) = self.destroy_active_session(entry.key) {
-                            acquired_memory += freed_resource.memory;
-                        }
-                    }
-                    _ => {}
+            for (session_key, session) in self.sessions.remove_lru_idle_until_memory(memory_size) {
+                if let Err(err) = self.hibernate_session(session_key, session).await {
+                    tracing::warn!(
+                        "failed to hibernate session for memory acquire: sid={session_key}, err={err}; skipping"
+                    );
                 }
             }
-
-            eviction_queue.extend(deferred_entries);
         }
 
         let memory_permit = tokio::time::timeout(
@@ -186,8 +167,8 @@ impl AppState {
     }
 
     pub async fn check_session(&self, session_key: SessionKey) -> Result<SessionStatus, AppError> {
-        match self.sessions.get(&session_key) {
-            Some(session) => Ok(session.status()),
+        match self.sessions.with(&session_key, |session| session.status()) {
+            Some(status) => Ok(status),
             None => self.check_hibernated_session(session_key)
                 .await
                 .then_some(SessionStatus::Hibernating)
@@ -199,7 +180,7 @@ impl AppState {
         &self,
         config: Option<Config>,
         game_state: GameState<{ RuleKind::Renju }>,
-        time_to_suspend: Option<Duration>,
+        time_to_hibernate: Option<Duration>,
         time_to_live: Option<Duration>,
     ) -> Result<CreatedSession, AppError> {
         if let Some(config) = config
@@ -226,7 +207,7 @@ impl AppState {
             config,
             session_token,
             game_state,
-            time_to_suspend, time_to_live,
+            time_to_hibernate, time_to_live,
             memory_permit,
             response_sender,
         );
@@ -243,8 +224,7 @@ impl AppState {
     }
 
     pub async fn authorize_session(&self, session_key: SessionKey, session_token: SessionToken, wakeup: bool) -> Result<(), AppError> {
-        let active_session_token = self.sessions.get(&session_key)
-            .map(|session| session.token);
+        let active_session_token = self.sessions.with(&session_key, |session| session.token);
 
         let expected_token = match active_session_token {
             Some(token) => token,
@@ -266,9 +246,8 @@ impl AppState {
     }
 
     pub fn configs_session(&self, session_key: SessionKey) -> Result<Configs, AppError> {
-        let config = self.sessions.get(&session_key)
-            .ok_or(AppError::SessionNotFound)?
-            .config;
+        let config = self.sessions.with(&session_key, |session| session.config)
+            .ok_or(AppError::SessionNotFound)?;
 
         Ok(Configs {
             default_config: self.preference.default_config,
@@ -277,24 +256,22 @@ impl AppState {
         })
     }
 
-    pub async fn hibernate_session(&self, session_key: SessionKey) -> Result<(), AppError> {
-        let (encoded, last_active_seq, meta) = {
-            let session = self.sessions.get(&session_key)
-                .ok_or(AppError::SessionNotFound)?;
+    pub async fn hibernate_active_session(&self, session_key: SessionKey) -> Result<(), AppError> {
+        let session = self.sessions.remove_idle(&session_key, None)?;
 
-            if session.status() != SessionStatus::Idle {
-                return Err(SessionInComputing)
-            }
+        self.hibernate_session(session_key, session).await
+    }
 
-            (
-                rmp_serde::to_vec(&*session)
-                    .map_err(AppError::from_general_error)?,
-                session.last_active_seq,
-                HibernatedSessionMeta {
-                    token: session.token,
-                    expiry_epoch_secs: session.live_until_epoch_secs(),
-                },
-            )
+    async fn hibernate_session(&self, session_key: SessionKey, session: Session) -> Result<(), AppError> {
+        if session.status() != SessionStatus::Idle {
+            return Err(SessionInComputing)
+        }
+
+        let encoded = rmp_serde::to_vec(&session)
+            .map_err(AppError::from_general_error)?;
+        let meta = HibernatedSessionMeta {
+            token: session.token,
+            expiry_epoch_secs: session.live_until_epoch_secs(),
         };
 
         let expiry_epoch_secs = hibernated_session_expiry_file_part(meta.expiry_epoch_secs);
@@ -347,13 +324,6 @@ impl AppState {
             return Err(AppError::from_general_error(err));
         }
 
-        if let Err(err) = self.sessions.remove_idle(&session_key, Some(last_active_seq)) {
-            let _ = tokio::fs::remove_file(&meta_path).await;
-            let _ = tokio::fs::remove_file(&file_path).await;
-
-            return Err(err);
-        }
-
         tracing::info!("session hibernated");
 
         Ok(())
@@ -368,7 +338,7 @@ impl AppState {
     }
 
     pub async fn wakeup_session(&self, session_key: SessionKey) -> Result<(), AppError> {
-        if self.sessions.get(&session_key).is_some() {
+        if self.sessions.with(&session_key, |_| ()).is_some() {
             let _ = self.remove_hibernated_session_file(session_key).await;
 
             return Ok(());
@@ -498,9 +468,8 @@ impl AppState {
         session_key: SessionKey,
         command: Command,
     ) -> Result<CommandResult, AppError> {
-        self.sessions.get_mut_with_touch(&session_key)
+        self.sessions.with_mut_touch(&session_key, |session| session.command(command))
             .ok_or(AppError::SessionNotFound)?
-            .command(command)
     }
 
     pub async fn launch_session(
@@ -510,39 +479,54 @@ impl AppState {
         position_hash: HashKey,
         nodes_polling_interval_ms: Option<u32>,
     ) -> Result<(), AppError> {
-        let mut session = self.sessions.get_mut_with_touch(&session_key)
-            .ok_or(AppError::SessionNotFound)?;
+        let workers = self.sessions.with_touch(&session_key, |session| {
+            if session.status() != SessionStatus::Idle {
+                return Err(SessionInComputing)
+            }
 
-        if session.status() != SessionStatus::Idle {
-            return Err(SessionInComputing)
-        }
+            if position_hash != session.game_agent()?.state.board.hash_key {
+                return Err(AppError::GameError(GameError::HashMismatch))
+            }
 
-        if position_hash != session.game_agent()?.state.board.hash_key {
-            return Err(AppError::GameError(GameError::HashMismatch))
-        }
+            Ok(session.config.workers)
+        })
+            .ok_or(AppError::SessionNotFound)??;
 
-        let worker_permit = self.acquire_workers(session.config.workers, timeout).await?;
-
-        let response_sender = session.response_sender.clone();
+        let worker_permit = self.acquire_workers(workers, timeout).await?;
 
         let (result_tx, result_rx) = tokio::sync::oneshot::channel();
 
-        session.launch(
-            StreamSessionResponseSender::new(response_sender.clone()),
-            result_tx,
-            worker_permit,
-            nodes_polling_interval_ms,
-        )?;
+        let response_sender = self.sessions.with_mut_touch(&session_key, move |session| {
+            if session.status() != SessionStatus::Idle {
+                return Err(SessionInComputing)
+            }
+
+            if position_hash != session.game_agent()?.state.board.hash_key {
+                return Err(AppError::GameError(GameError::HashMismatch))
+            }
+
+            let response_sender = session.response_sender.clone();
+
+            session.launch(
+                StreamSessionResponseSender::new(response_sender.clone()),
+                result_tx,
+                worker_permit,
+                nodes_polling_interval_ms,
+            )?;
+
+            Ok(response_sender)
+        })
+            .ok_or(AppError::SessionNotFound)??;
 
         let sessions = self.sessions.clone();
 
         tokio::spawn(async move {
             match result_rx.await {
                 Ok(SessionResultResponse { game_agent, best_move, .. }) => {
-                    if let Some(mut session) = sessions.get_mut_with_touch(&session_key) {
+                    let _ = sessions.with_mut_touch(&session_key, |session| {
                         session.store_best_move(best_move);
                         session.restore(game_agent).unwrap();
-                    }
+                    });
 
                     let _ = response_sender.send(SessionResponse::BestMove(best_move));
                 }
@@ -558,14 +542,14 @@ impl AppState {
     }
 
     pub fn abort_session(&self, session_key: SessionKey) -> Result<(), AppError> {
-        let session = self.sessions.get_with_touch(&session_key)
-            .ok_or(AppError::SessionNotFound)?;
+        self.sessions.with_touch(&session_key, |session| {
+            if session.status() == SessionStatus::Idle {
+                return Err(AppError::SessionIdle);
+            }
 
-        if session.status() == SessionStatus::Idle {
-            return Err(AppError::SessionIdle);
-        }
-
-        session.abort()?;
+            session.abort()
+        })
+            .ok_or(AppError::SessionNotFound)??;
 
         tracing::info!("session aborted");
 
@@ -573,9 +557,8 @@ impl AppState {
     }
 
     pub fn get_session_result(&self, session_key: SessionKey) -> Result<BestMove, AppError> {
-        self.sessions.get(&session_key)
+        self.sessions.with(&session_key, |session| session.last_best_move())
             .ok_or(AppError::SessionNotFound)?
-            .last_best_move()
             .ok_or(AppError::SessionNeverLaunched)
     }
 
@@ -608,17 +591,17 @@ impl AppState {
     }
 
     pub fn subscribe_session_response(&self, session_key: SessionKey) -> Result<SessionResponseReceiver, AppError> {
-        let response_receiver = self.sessions.get_with_touch(&session_key)
-            .ok_or(AppError::SessionNotFound)?
-            .response_sender
-            .subscribe();
+        let response_receiver = self.sessions.with_touch(&session_key, |session| {
+            session.response_sender.subscribe()
+        })
+            .ok_or(AppError::SessionNotFound)?;
 
         Ok(response_receiver)
     }
 
     pub async fn hibernate_all_sessions(&self) -> Result<(), AppError> {
         for session_key in self.sessions.keys() {
-            if let Err(err) = self.hibernate_session(session_key).await {
+            if let Err(err) = self.hibernate_active_session(session_key).await {
                 tracing::warn!("failed to hibernate session: sid={session_key}, err={err}; skipping");
             }
         }

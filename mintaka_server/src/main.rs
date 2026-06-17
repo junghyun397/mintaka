@@ -8,7 +8,7 @@ use axum_server::tls_rustls::RustlsConfig;
 use mintaka_server::app_state::AppState;
 use mintaka_server::preference::{Preference, TlsConfig};
 use mintaka_server::rest;
-use mintaka_server::session::{SessionKey, SessionStatus, SessionToken};
+use mintaka_server::session::{SessionKey, SessionToken};
 use std::error::Error;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -277,21 +277,10 @@ fn spawn_session_cleaner(state: &Arc<AppState>) {
 
             let now = Instant::now();
 
-            let mut hibernation_keys = vec![];
-            let mut expired_keys = vec![];
-
-            for session in state.sessions.map.iter()
-                .filter(|session| session.status() == SessionStatus::Idle)
-            {
-                if session.is_expired(now) {
-                    expired_keys.push(*session.key());
-                } else if session.should_suspend(now) {
-                    hibernation_keys.push(*session.key());
-                }
-            }
+            let (hibernation_keys, expired_keys) = state.sessions.idle_keys_by_expiration(now);
 
             for session_key in hibernation_keys {
-                let _ = state.hibernate_session(session_key).await;
+                let _ = state.hibernate_active_session(session_key).await;
             }
 
             for session_key in expired_keys {

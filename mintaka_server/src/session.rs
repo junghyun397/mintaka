@@ -11,6 +11,7 @@ use mintaka::protocol::results::{BestMove, CommandResult};
 use mintaka::protocol::timer::Timer;
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::rule::RuleKind;
+use rusty_renju::utils::byte_size::ByteSize;
 use serde::{ser, Deserialize, Serialize};
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -133,7 +134,7 @@ pub struct Session {
     pub response_sender: SessionResponseSender,
     best_move: Option<BestMove>,
     abort_handle: Arc<AtomicBool>,
-    time_to_suspend: Option<Duration>,
+    time_to_hibernate: Option<Duration>,
     time_to_live: Option<Duration>,
     pub last_active: Instant,
     pub last_active_seq: u32,
@@ -147,7 +148,7 @@ pub struct SessionData {
     pub timer: Timer,
     pub agent: GameAgentData<{ RuleKind::Renju }>,
     pub best_move: Option<BestMove>,
-    pub time_to_suspend: Option<Duration>,
+    pub time_to_hibernate: Option<Duration>,
     pub time_to_live: Option<Duration>,
 }
 
@@ -156,7 +157,7 @@ impl Session {
         config: Config,
         token: SessionToken,
         game_state: GameState<{ RuleKind::Renju }>,
-        time_to_suspend: Option<Duration>, time_to_live: Option<Duration>,
+        time_to_hibernate: Option<Duration>, time_to_live: Option<Duration>,
         memory_permit: MemoryPermit,
         response_sender: SessionResponseSender,
     ) -> Self {
@@ -168,7 +169,7 @@ impl Session {
             response_sender,
             best_move: None,
             abort_handle: Arc::new(AtomicBool::new(false)),
-            time_to_suspend,
+            time_to_hibernate,
             time_to_live,
             last_active: Instant::now(),
             last_active_seq: 0,
@@ -193,7 +194,7 @@ impl Session {
             memory_permit,
             best_move: data.best_move,
             abort_handle: Arc::new(AtomicBool::new(false)),
-            time_to_suspend: data.time_to_suspend,
+            time_to_hibernate: data.time_to_hibernate,
             time_to_live: data.time_to_live,
             last_active: Instant::now(),
             last_active_seq: 0,
@@ -231,9 +232,13 @@ impl Session {
         worker_permit: WorkerPermit,
         _nodes_polling_interval_ms: Option<u32>,
     ) -> Result<(), AppError> {
+        if !matches!(self.state, AgentState::Agent(_)) {
+            return Err(AppError::SessionInComputing);
+        }
+
         let AgentState::Agent(mut game_agent)
             = std::mem::replace(&mut self.state, AgentState::Permit(worker_permit))
-                else { return Err(AppError::SessionInComputing) };
+                else { unreachable!("agent state checked before launch") };
 
         self.abort_handle.store(false, Ordering::Relaxed);
         let abort_flag = self.abort_handle.clone();
@@ -313,9 +318,9 @@ impl Session {
         }
     }
 
-    pub fn should_suspend(&self, now: Instant) -> bool {
-        match self.time_to_suspend {
-            Some(time_to_suspend) => now.saturating_duration_since(self.last_active) >= time_to_suspend,
+    pub fn should_hibernate(&self, now: Instant) -> bool {
+        match self.time_to_hibernate {
+            Some(time_to_hibernate) => now.saturating_duration_since(self.last_active) >= time_to_hibernate,
             None => false,
         }
     }
@@ -353,7 +358,7 @@ impl<'a> TryFrom<&'a Session> for SessionData {
             timer: session.timer,
             agent: GameAgentData::from(agent),
             best_move: session.best_move,
-            time_to_suspend: session.time_to_suspend,
+            time_to_hibernate: session.time_to_hibernate,
             time_to_live: session.time_to_live,
         })
     }
@@ -367,10 +372,10 @@ impl Serialize for Session {
     }
 }
 
-pub struct EvictionEntry {
-    pub last_active: Instant,
-    pub last_active_seq: u32,
-    pub key: SessionKey,
+struct EvictionEntry {
+    last_active: Instant,
+    last_active_seq: u32,
+    key: SessionKey,
 }
 
 impl PartialEq<Self> for EvictionEntry {
@@ -394,53 +399,137 @@ impl Ord for EvictionEntry {
 }
 
 pub struct Sessions {
-    pub map: Arc<DashMap<SessionKey, Session>>,
-    pub eviction_queue: Arc<Mutex<BinaryHeap<Reverse<EvictionEntry>>>>,
+    map: DashMap<SessionKey, Session>,
+    eviction_queue: Mutex<BinaryHeap<Reverse<EvictionEntry>>>,
 }
 
 impl Default for Sessions {
     fn default() -> Self {
         Self {
-            map: Arc::new(DashMap::new()),
-            eviction_queue: Arc::new(Mutex::new(BinaryHeap::new())),
+            map: DashMap::new(),
+            eviction_queue: Mutex::new(BinaryHeap::new()),
         }
     }
 }
 
 impl Sessions {
-    fn push_eviction_entry(&self, key: SessionKey, last_active: Instant, last_active_seq: u32) {
+    fn push_eviction_entry(&self, entry: EvictionEntry) {
         let mut queue = self.eviction_queue.lock().unwrap();
-        queue.push(Reverse(EvictionEntry {
-            last_active,
-            last_active_seq,
+        queue.push(Reverse(entry));
+    }
+
+    fn push_eviction_entries(&self, entries: Vec<Reverse<EvictionEntry>>) {
+        let mut queue = self.eviction_queue.lock().unwrap();
+        queue.extend(entries);
+    }
+
+    fn pop_eviction_entry(&self) -> Option<Reverse<EvictionEntry>> {
+        self.eviction_queue.lock().unwrap().pop()
+    }
+
+    fn eviction_entry_from_session(key: SessionKey, session: &Session) -> EvictionEntry {
+        EvictionEntry {
             key,
-        }));
+            last_active: session.last_active,
+            last_active_seq: session.last_active_seq,
+        }
     }
 
-    pub fn get(&self, key: &SessionKey) -> Option<dashmap::mapref::one::Ref<'_, SessionKey, Session>> {
+    pub fn with<R>(&self, key: &SessionKey, f: impl FnOnce(&Session) -> R) -> Option<R> {
         self.map.get(key)
+            .map(|session| f(&session))
     }
 
-    pub fn get_with_touch(&self, key: &SessionKey) -> Option<dashmap::mapref::one::Ref<'_, SessionKey, Session>> {
-        if let Some(mut session) = self.map.get_mut(key) {
+    pub fn with_touch<R>(&self, key: &SessionKey, f: impl FnOnce(&Session) -> R) -> Option<R> {
+        let (result, entry) = {
+            let mut session = self.map.get_mut(key)?;
             session.touch_last_active();
 
-            self.push_eviction_entry(*session.key(), session.last_active, session.last_active_seq);
+            let entry = Self::eviction_entry_from_session(*key, &session);
+            let result = f(&session);
+
+            (result, entry)
         };
 
-        self.map.get(key)
+        self.push_eviction_entry(entry);
+
+        Some(result)
     }
 
-    pub fn get_mut_with_touch(&self, key: &SessionKey) -> Option<dashmap::mapref::one::RefMut<'_, SessionKey, Session>> {
-        if let Some(mut session) = self.map.get_mut(key) {
+    pub fn with_mut_touch<R>(&self, key: &SessionKey, f: impl FnOnce(&mut Session) -> R) -> Option<R> {
+        let (result, entry) = {
+            let mut session = self.map.get_mut(key)?;
             session.touch_last_active();
 
-            self.push_eviction_entry(*session.key(), session.last_active, session.last_active_seq);
+            let entry = Self::eviction_entry_from_session(*key, &session);
+            let result = f(&mut session);
 
-            Some(session)
-        } else {
-            None
+            (result, entry)
+        };
+
+        self.push_eviction_entry(entry);
+
+        Some(result)
+    }
+
+    pub fn remove_lru_idle_until_memory(&self, memory_size: ByteSize) -> Vec<(SessionKey, Session)> {
+        enum Candidate {
+            Idle,
+            Launched,
+            Stale,
         }
+
+        let mut removed_sessions = vec![];
+        let mut deferred_entries = vec![];
+        let mut acquired_memory = ByteSize::ZERO;
+
+        while acquired_memory < memory_size {
+            let Some(Reverse(entry)) = self.pop_eviction_entry() else {
+                break;
+            };
+
+            match self.with(&entry.key, |session| {
+                if session.last_active_seq != entry.last_active_seq {
+                    Candidate::Stale
+                } else if session.status() == SessionStatus::Idle {
+                    Candidate::Idle
+                } else {
+                    Candidate::Launched
+                }
+            }).unwrap_or(Candidate::Stale) {
+                Candidate::Idle => {
+                    if let Ok(session) = self.remove_idle(&entry.key, Some(entry.last_active_seq)) {
+                        acquired_memory += session.config.tt_size;
+                        removed_sessions.push((entry.key, session));
+                    }
+                }
+                Candidate::Launched => deferred_entries.push(Reverse(entry)),
+                Candidate::Stale => {}
+            }
+        }
+
+        if !deferred_entries.is_empty() {
+            self.push_eviction_entries(deferred_entries);
+        }
+
+        removed_sessions
+    }
+
+    pub fn idle_keys_by_expiration(&self, now: Instant) -> (Vec<SessionKey>, Vec<SessionKey>) {
+        let mut hibernation_keys = vec![];
+        let mut expired_keys = vec![];
+
+        for session in self.map.iter()
+            .filter(|session| session.status() == SessionStatus::Idle)
+        {
+            if session.is_expired(now) {
+                expired_keys.push(*session.key());
+            } else if session.should_hibernate(now) {
+                hibernation_keys.push(*session.key());
+            }
+        }
+
+        (hibernation_keys, expired_keys)
     }
 
     pub fn remove_idle(&self, key: &SessionKey, last_active_seq: Option<u32>) -> Result<Session, AppError> {
@@ -462,7 +551,11 @@ impl Sessions {
         let last_active_seq = session.last_active_seq;
 
         self.map.insert(key, session);
-        self.push_eviction_entry(key, last_active, last_active_seq);
+        self.push_eviction_entry(EvictionEntry {
+            key,
+            last_active,
+            last_active_seq,
+        });
     }
 
     pub fn try_insert(&self, key: SessionKey, session: Session) -> Result<(), Session> {
@@ -470,14 +563,19 @@ impl Sessions {
         let last_active_seq = session.last_active_seq;
 
         match self.map.entry(key) {
-            dashmap::mapref::entry::Entry::Occupied(_) => Err(session),
+            dashmap::mapref::entry::Entry::Occupied(_) => return Err(session),
             dashmap::mapref::entry::Entry::Vacant(entry) => {
                 entry.insert(session);
-                self.push_eviction_entry(key, last_active, last_active_seq);
-
-                Ok(())
             }
         }
+
+        self.push_eviction_entry(EvictionEntry {
+            key,
+            last_active,
+            last_active_seq,
+        });
+
+        Ok(())
     }
 
     pub fn keys(&self) -> Vec<SessionKey> {

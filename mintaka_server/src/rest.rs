@@ -78,7 +78,7 @@ pub struct CreateSessionRequest {
     api_password: Option<String>,
     config: Option<Config>,
     state: GameState<{ RuleKind::Renju }>,
-    time_to_suspend: Option<Duration>,
+    time_to_hibernate: Option<Duration>,
     time_to_live: Option<Duration>,
 }
 
@@ -104,7 +104,7 @@ pub async fn new_session(
         return Err(AppError::Unauthorized);
     }
 
-    let session = state.new_session(payload.config, payload.state, payload.time_to_suspend, payload.time_to_live).await?;
+    let session = state.new_session(payload.config, payload.state, payload.time_to_hibernate, payload.time_to_live).await?;
 
     Ok((
         StatusCode::CREATED,
@@ -218,7 +218,7 @@ pub async fn hibernate_session(
     Path(sid): Path<SessionKey>,
     State(state): State<Arc<AppState>>
 ) -> impl IntoResponse {
-    state.hibernate_session(sid)
+    state.hibernate_active_session(sid)
         .await
         .map(|_| StatusCode::NO_CONTENT)
 }
