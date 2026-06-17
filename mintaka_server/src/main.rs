@@ -5,7 +5,7 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{middleware, Router};
 use axum_server::tls_rustls::RustlsConfig;
-use mintaka_server::app_state::{parse_hibernated_session_file_name, AppState};
+use mintaka_server::app_state::AppState;
 use mintaka_server::preference::{Preference, TlsConfig};
 use mintaka_server::rest;
 use mintaka_server::session::{SessionKey, SessionStatus, SessionToken};
@@ -13,7 +13,7 @@ use std::error::Error;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 use tokio::signal::unix::SignalKind;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
@@ -154,7 +154,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     spawn_session_cleaner(&state);
     spawn_sigterm_watcher(&state);
-    spawn_hibernation_cleaner(&pref.sessions_directory);
 
     let url = if pref.tls_config.is_some() {
         format!("https://{}", pref.address)
@@ -277,7 +276,6 @@ fn spawn_session_cleaner(state: &Arc<AppState>) {
             interval.tick().await;
 
             let now = Instant::now();
-            let hibernate_timeout = state.preference.hibernate_timeout;
 
             let mut hibernation_keys = vec![];
             let mut expired_keys = vec![];
@@ -287,9 +285,7 @@ fn spawn_session_cleaner(state: &Arc<AppState>) {
             {
                 if session.is_expired(now) {
                     expired_keys.push(*session.key());
-                } else if hibernate_timeout
-                    .is_some_and(|timeout| now.duration_since(session.last_active) > timeout)
-                {
+                } else if session.should_suspend(now) {
                     hibernation_keys.push(*session.key());
                 }
             }
@@ -300,55 +296,6 @@ fn spawn_session_cleaner(state: &Arc<AppState>) {
 
             for session_key in expired_keys {
                 let _ = state.destroy_session(session_key).await;
-            }
-        }
-    });
-}
-
-fn spawn_hibernation_cleaner(directory: &str) {
-    let directory = directory.to_string();
-
-    tracing::info!("watching hibernated sessions for expiry");
-
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(60));
-
-        loop {
-            interval.tick().await;
-
-            let now_epoch_secs = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-
-
-            let mut read_dir = tokio::fs::read_dir(&directory).await.unwrap();
-
-            while let Some(entry) = read_dir.next_entry().await.unwrap() {
-                let file_name = entry.file_name();
-                let file_name = file_name.to_string_lossy();
-
-                let Some((session_key, _, expiry_epoch_secs)) =
-                    parse_hibernated_session_file_name(file_name.as_ref())
-                else {
-                    continue;
-                };
-
-                if expiry_epoch_secs.is_none_or(|expiry| expiry >= now_epoch_secs) {
-                    continue;
-                }
-
-                let file_path = entry.path();
-
-                let result = tokio::fs::remove_file(&file_path).await;
-
-                if let Err(err) = result {
-                    tracing::warn!("failed to remove expired hibernated session: path={}, err={err}",file_path.display());
-
-                    continue;
-                }
-
-                tracing::info!("removed expired hibernated session: sid={session_key}");
             }
         }
     });

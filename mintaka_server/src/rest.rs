@@ -78,6 +78,8 @@ pub struct CreateSessionRequest {
     api_password: Option<String>,
     config: Option<Config>,
     state: GameState<{ RuleKind::Renju }>,
+    time_to_suspend: Option<Duration>,
+    time_to_live: Option<Duration>,
 }
 
 #[derive(Serialize)]
@@ -102,7 +104,7 @@ pub async fn new_session(
         return Err(AppError::Unauthorized);
     }
 
-    let session = state.new_session(payload.config, payload.state).await?;
+    let session = state.new_session(payload.config, payload.state, payload.time_to_suspend, payload.time_to_live).await?;
 
     Ok((
         StatusCode::CREATED,

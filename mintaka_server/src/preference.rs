@@ -1,4 +1,3 @@
-use std::time::Duration;
 use clap::Parser;
 use mintaka::config::Config;
 use rusty_renju::utils::byte_size::ByteSize;
@@ -34,7 +33,7 @@ pub struct Preference {
     pub open_webui: bool,
     #[arg(short, env = "ADDRESS", long, default_value = "default")]
     pub address: String,
-    #[arg(short, long, default_value_t = num_cpus::get_physical())]
+    #[arg(short, env = "CORES", default_value_t = num_cpus::get_physical())]
     pub cores: usize,
     #[arg(short, env = "MEMORY_LIMIT_MIB", long, help = "Total memory limit in MiB")]
     memory_limit_mib: Option<u64>,
@@ -48,12 +47,6 @@ pub struct Preference {
     pub sessions_directory: String,
     #[arg(long, env = "API_PASSWORD", default_value = None)]
     pub api_password: Option<String>,
-    #[arg(long, env = "TOKEN_SECRET", default_value = "verycomplexedsecret")]
-    pub session_token_secret: String,
-    #[arg(long, env = "HIBERNATE_TIMEOUT", default_value = None)]
-    pub hibernate_timeout_secs: Option<u64>,
-    #[clap(skip)]
-    pub hibernate_timeout: Option<Duration>,
     #[clap(skip)]
     pub memory_limit: ByteSize,
     #[clap(skip)]
@@ -94,8 +87,6 @@ impl Preference {
                 observe_sighup: self.tls_renew,
             });
         }
-
-        self.hibernate_timeout = self.hibernate_timeout_secs.map(Duration::from_secs);
 
         self.max_config = Self::parse_config("max_config.toml");
         self.default_config = Self::parse_config("default_config.toml").unwrap_or(Config::default());

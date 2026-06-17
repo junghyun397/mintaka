@@ -103,6 +103,8 @@ export interface CreateSessionRequest {
 	api_password?: string;
 	config?: Config;
 	state: GameState;
+	time_to_suspend?: Duration;
+	time_to_live?: Duration;
 }
 
 export interface CreateSessionResponse {

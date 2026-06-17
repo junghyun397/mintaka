@@ -1,6 +1,6 @@
 pub(crate) use crate::app_error::AppError;
 use crate::preference::Preference;
-use crate::session::{Session, SessionData, SessionKey, SessionResponse, SessionResponseReceiver, SessionResponseSender, SessionResultResponse, SessionStatus, SessionToken, SessionTokenCipher, Sessions};
+use crate::session::{Session, SessionData, SessionKey, SessionResponse, SessionResponseReceiver, SessionResponseSender, SessionResultResponse, SessionStatus, SessionToken, Sessions};
 use crate::stream_response_sender::StreamSessionResponseSender;
 use mintaka::config::Config;
 use mintaka::protocol::command::Command;
@@ -8,11 +8,9 @@ use mintaka::game_state::GameState;
 use rusty_renju::utils::byte_size::ByteSize;
 use std::cmp::Reverse;
 use std::io::ErrorKind;
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
@@ -24,31 +22,26 @@ use crate::app_error::AppError::SessionInComputing;
 
 const SESSION_RESPONSE_CHANNEL_CAPACITY: usize = 4;
 const RESOURCE_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(3);
-const SESSION_FILE_NO_EXPIRY: &str = "none";
 
 struct HibernatedSessionFile {
     path: PathBuf,
-    salt: u64,
+    meta_path: PathBuf,
+    token: SessionToken,
 }
 
-pub fn parse_hibernated_session_file_name(file_name: &str) -> Option<(SessionKey, u64, Option<u64>)> {
-    let mut parts = file_name.split('_');
-    let session_key = SessionKey::from_str(parts.next()?).ok()?;
-    let salt = parts.next()?.parse::<u64>().ok()?;
-    let expiry_epoch_secs = match parts.next()? {
-        SESSION_FILE_NO_EXPIRY => None,
-        value => Some(value.parse::<u64>().ok()?),
-    };
-
-    if parts.next().is_some() {
-        return None;
-    }
-
-    Some((session_key, salt, expiry_epoch_secs))
+#[derive(Serialize, Deserialize)]
+struct HibernatedSessionMeta {
+    token: SessionToken,
+    expiry_epoch_secs: Option<u64>,
 }
 
-fn hibernated_session_file_name(session_key: SessionKey, salt: u64, expiry_epoch_secs: &str) -> String {
-    format!("{session_key}_{salt}_{expiry_epoch_secs}")
+fn hibernated_session_file_name(session_key: SessionKey, expiry_epoch_secs: &str) -> String {
+    format!("{session_key}_{expiry_epoch_secs}")
+}
+
+fn hibernated_session_expiry_file_part(expiry_epoch_secs: Option<u64>) -> String {
+    expiry_epoch_secs
+        .map_or_else(|| "none".to_string(), |expiry| expiry.to_string())
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -104,7 +97,6 @@ impl SessionResource {
 
 pub struct AppState {
     pub sessions: Arc<Sessions>,
-    token_cipher: SessionTokenCipher,
     memory_acquire_lock: Arc<Mutex<()>>,
     worker_resource: Arc<Semaphore>,
     memory_resource: Arc<Semaphore>,
@@ -120,7 +112,6 @@ impl AppState {
     pub fn new(preference: Preference) -> Result<Self, AppError> {
         Ok(Self {
             sessions: Arc::new(Sessions::default()),
-            token_cipher: SessionTokenCipher::new(&preference.session_token_secret),
             memory_acquire_lock: Arc::new(Mutex::new(())),
             worker_resource: Arc::new(Semaphore::new(preference.cores)),
             memory_resource: Arc::new(Semaphore::new(preference.memory_limit.mib() as usize)),
@@ -204,7 +195,13 @@ impl AppState {
         }
     }
 
-    pub async fn new_session(&self, config: Option<Config>, game_state: GameState<{ RuleKind::Renju }>) -> Result<CreatedSession, AppError> {
+    pub async fn new_session(
+        &self,
+        config: Option<Config>,
+        game_state: GameState<{ RuleKind::Renju }>,
+        time_to_suspend: Option<Duration>,
+        time_to_live: Option<Duration>,
+    ) -> Result<CreatedSession, AppError> {
         if let Some(config) = config
             && let Some(max_config) = self.preference.max_config
             && config > max_config
@@ -215,8 +212,7 @@ impl AppState {
         let config = config.unwrap_or(self.preference.default_config);
 
         let session_key = SessionKey::new_random();
-        let session_salt = rand::rng().random();
-        let session_token = self.token_cipher.seal_session_key(session_key, session_salt)?;
+        let session_token = SessionToken::new_random();
 
         let _memory_acquire_guard = self.memory_acquire_lock.lock().await;
         let memory_permit = self.acquire_memory(config.tt_size, true, RESOURCE_ACQUIRE_TIMEOUT)
@@ -226,7 +222,14 @@ impl AppState {
 
         let hash_key = game_state.board.hash_key;
 
-        let session = Session::new(config, session_salt, game_state, None, memory_permit, response_sender);
+        let session = Session::new(
+            config,
+            session_token,
+            game_state,
+            time_to_suspend, time_to_live,
+            memory_permit,
+            response_sender,
+        );
 
         self.sessions.insert(session_key, session);
 
@@ -240,24 +243,22 @@ impl AppState {
     }
 
     pub async fn authorize_session(&self, session_key: SessionKey, session_token: SessionToken, wakeup: bool) -> Result<(), AppError> {
-        let active_session_salt = self.sessions.get(&session_key)
-            .map(|session| session.salt);
+        let active_session_token = self.sessions.get(&session_key)
+            .map(|session| session.token);
 
-        let salt = match active_session_salt {
-            Some(salt) => salt,
+        let expected_token = match active_session_token {
+            Some(token) => token,
             None => self.hibernated_session_file(session_key)
                 .await?
                 .ok_or(AppError::SessionNotFound)?
-                .salt,
+                .token,
         };
 
-        let token_session_key = self.token_cipher.open_session_token(&session_token, salt)?;
-
-        if token_session_key != session_key {
+        if expected_token != session_token {
             return Err(AppError::Unauthorized);
         }
 
-        if active_session_salt.is_none() && wakeup {
+        if active_session_token.is_none() && wakeup {
             let _ = self.wakeup_session(session_key).await?;
         }
 
@@ -277,7 +278,7 @@ impl AppState {
     }
 
     pub async fn hibernate_session(&self, session_key: SessionKey) -> Result<(), AppError> {
-        let (encoded, last_active_seq, session_salt, expiry_epoch_secs) = {
+        let (encoded, last_active_seq, meta) = {
             let session = self.sessions.get(&session_key)
                 .ok_or(AppError::SessionNotFound)?;
 
@@ -289,16 +290,21 @@ impl AppState {
                 rmp_serde::to_vec(&*session)
                     .map_err(AppError::from_general_error)?,
                 session.last_active_seq,
-                session.salt,
-                session.live_until_epoch_secs()
-                    .map_or_else(|| SESSION_FILE_NO_EXPIRY.to_string(), |expiry| expiry.to_string()),
+                HibernatedSessionMeta {
+                    token: session.token,
+                    expiry_epoch_secs: session.live_until_epoch_secs(),
+                },
             )
         };
 
-        let file_name = hibernated_session_file_name(session_key, session_salt, &expiry_epoch_secs);
-        let file_path = format!("{}/{}", self.preference.sessions_directory, file_name);
+        let expiry_epoch_secs = hibernated_session_expiry_file_part(meta.expiry_epoch_secs);
+        let file_name = hibernated_session_file_name(session_key, &expiry_epoch_secs);
+        let file_path = self.hibernated_session_file_path(&file_name);
+        let tmp_file_path = file_path.with_extension("tmp");
+        let meta_path = self.hibernated_session_meta_file_path(session_key);
+        let tmp_meta_path = meta_path.with_extension("meta.tmp");
 
-        let tmp_file_path = format!("{}/{}.tmp", self.preference.sessions_directory, file_name);
+        let _ = self.remove_hibernated_session_file(session_key).await;
 
         let mut file = tokio::fs::File::create(&tmp_file_path)
             .await
@@ -324,7 +330,25 @@ impl AppState {
             return Err(AppError::from_general_error(err));
         }
 
+        let encoded_meta = rmp_serde::to_vec(&meta)
+            .map_err(AppError::from_general_error)?;
+
+        if let Err(err) = tokio::fs::write(&tmp_meta_path, encoded_meta).await {
+            let _ = tokio::fs::remove_file(&tmp_meta_path).await;
+            let _ = tokio::fs::remove_file(&file_path).await;
+
+            return Err(AppError::from_general_error(err));
+        }
+
+        if let Err(err) = tokio::fs::rename(&tmp_meta_path, &meta_path).await {
+            let _ = tokio::fs::remove_file(&tmp_meta_path).await;
+            let _ = tokio::fs::remove_file(&file_path).await;
+
+            return Err(AppError::from_general_error(err));
+        }
+
         if let Err(err) = self.sessions.remove_idle(&session_key, Some(last_active_seq)) {
+            let _ = tokio::fs::remove_file(&meta_path).await;
             let _ = tokio::fs::remove_file(&file_path).await;
 
             return Err(err);
@@ -345,14 +369,13 @@ impl AppState {
 
     pub async fn wakeup_session(&self, session_key: SessionKey) -> Result<(), AppError> {
         if self.sessions.get(&session_key).is_some() {
-            if let Ok(Some(file_path)) = self.hibernated_session_path(session_key).await {
-                let _ = tokio::fs::remove_file(file_path).await;
-            }
+            let _ = self.remove_hibernated_session_file(session_key).await;
 
             return Ok(());
         }
 
-        let (file_path, session_salt, session_data) = self.load_hibernated_session(session_key).await?;
+        let (file, session_data) = self.load_hibernated_session(session_key).await?;
+        let session_token = file.token;
 
         let _memory_acquire_guard = self.memory_acquire_lock.lock().await;
         let memory_permit = self.acquire_memory(session_data.config.tt_size, true, RESOURCE_ACQUIRE_TIMEOUT)
@@ -360,27 +383,27 @@ impl AppState {
 
         let response_sender = new_session_response_sender();
 
-        let session = tokio::task::spawn_blocking(move || Session::from_data(session_data, session_salt, memory_permit, response_sender))
+        let session = tokio::task::spawn_blocking(move ||
+            Session::from_data(session_data, session_token, memory_permit, response_sender)
+        )
             .await
             .map_err(AppError::from_general_error)?
             .map_err(AppError::from_general_error)?;
 
         if self.sessions.try_insert(session_key, session).is_err() {
-            let _ = tokio::fs::remove_file(&file_path).await;
+            let _ = self.remove_hibernated_session_file(session_key).await;
 
             return Ok(());
         }
 
-        tokio::fs::remove_file(&file_path)
-            .await
-            .map_err(AppError::from_general_error)?;
+        self.remove_hibernated_session_file(session_key).await?;
 
         tracing::info!("session woken up");
 
         Ok(())
     }
 
-    async fn load_hibernated_session(&self, session_key: SessionKey) -> Result<(PathBuf, u64, SessionData), AppError> {
+    async fn load_hibernated_session(&self, session_key: SessionKey) -> Result<(HibernatedSessionFile, SessionData), AppError> {
         let file = self.hibernated_session_file(session_key)
             .await?
             .ok_or(AppError::SessionFileNotFound)?;
@@ -392,7 +415,15 @@ impl AppState {
         let session_data = rmp_serde::from_slice(&buf)
             .map_err(AppError::from_general_error)?;
 
-        Ok((file.path, file.salt, session_data))
+        Ok((file, session_data))
+    }
+
+    fn hibernated_session_meta_file_path(&self, session_key: SessionKey) -> PathBuf {
+        Path::new(&self.preference.sessions_directory).join(format!("{session_key}.meta"))
+    }
+
+    fn hibernated_session_file_path(&self, file_name: &str) -> PathBuf {
+        Path::new(&self.preference.sessions_directory).join(file_name)
     }
 
     async fn hibernated_session_path(&self, session_key: SessionKey) -> Result<Option<PathBuf>, AppError> {
@@ -406,50 +437,60 @@ impl AppState {
             .duration_since(UNIX_EPOCH).unwrap()
             .as_secs();
 
-        let mut read_dir = tokio::fs::read_dir(&self.preference.sessions_directory)
-            .await
+        let meta_path = self.hibernated_session_meta_file_path(session_key);
+        let meta_buf = match tokio::fs::read(&meta_path).await {
+            Ok(buf) => buf,
+            Err(err) if err.kind() == ErrorKind::NotFound => return Ok(None),
+            Err(err) => return Err(AppError::from_general_error(err)),
+        };
+
+        let meta: HibernatedSessionMeta = rmp_serde::from_slice(&meta_buf)
             .map_err(AppError::from_general_error)?;
 
-        while let Some(entry) = read_dir.next_entry()
-            .await
-            .map_err(AppError::from_general_error)?
-        {
-            let file_name = entry.file_name();
-            let file_name = file_name.to_string_lossy();
+        let expiry_file_part = hibernated_session_expiry_file_part(meta.expiry_epoch_secs);
+        let file_name = hibernated_session_file_name(session_key, &expiry_file_part);
+        let path = self.hibernated_session_file_path(&file_name);
 
-            let Some((parsed_session_key, salt, expiry_epoch_secs))
-                = parse_hibernated_session_file_name(file_name.as_ref())
-            else {
-                continue;
-            };
+        if meta.expiry_epoch_secs.is_some_and(|expiry| expiry < now_epoch_secs) {
+            let _ = tokio::fs::remove_file(&path).await;
+            let _ = tokio::fs::remove_file(&meta_path).await;
 
-            if parsed_session_key == session_key {
-                if expiry_epoch_secs.is_some_and(|expiry| expiry < now_epoch_secs) {
-                    let _ = tokio::fs::remove_file(entry.path()).await;
-
-                    continue;
-                }
-
-                return Ok(Some(HibernatedSessionFile {
-                    path: entry.path(),
-                    salt,
-                }));
-            }
+            return Ok(None);
         }
 
-        Ok(None)
+        match tokio::fs::metadata(&path).await {
+            Ok(_) => {}
+            Err(err) if err.kind() == ErrorKind::NotFound => {
+                let _ = tokio::fs::remove_file(&meta_path).await;
+
+                return Ok(None);
+            }
+            Err(err) => return Err(AppError::from_general_error(err)),
+        }
+
+        Ok(Some(HibernatedSessionFile {
+            path,
+            meta_path,
+            token: meta.token,
+        }))
     }
 
     async fn remove_hibernated_session_file(&self, session_key: SessionKey) -> Result<bool, AppError> {
-        let Some(file_path) = self.hibernated_session_path(session_key).await? else {
+        let Some(file) = self.hibernated_session_file(session_key).await? else {
             return Ok(false);
         };
 
-        match tokio::fs::remove_file(&file_path).await {
-            Ok(()) => Ok(true),
-            Err(err) if err.kind() == ErrorKind::NotFound => Ok(false),
-            Err(err) => Err(AppError::from_general_error(err)),
+        let mut removed = false;
+
+        for path in [&file.path, &file.meta_path] {
+            match tokio::fs::remove_file(path).await {
+                Ok(()) => removed = true,
+                Err(err) if err.kind() == ErrorKind::NotFound => {}
+                Err(err) => return Err(AppError::from_general_error(err)),
+            }
         }
+
+        Ok(removed)
     }
 
     pub fn command_session(
