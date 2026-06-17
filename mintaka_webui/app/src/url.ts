@@ -1,5 +1,4 @@
-import type { History } from "./wasm/pkg/rusty_renju_wasm"
-import { historyToString, parseHistory } from "./domain/rusty-renju"
+import { historyToString, parseHistory, type History } from "rusty-renju-web/rusty-renju"
 import { createEffect, type Accessor } from "solid-js"
 
 export type UrlParams = {

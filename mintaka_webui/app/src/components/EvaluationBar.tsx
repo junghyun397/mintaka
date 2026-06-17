@@ -1,7 +1,7 @@
 import { useContext } from "solid-js"
 import { AppContext } from "../context"
 import { flatmap } from "../utils/undefined"
-import type { HashKey } from "../wasm/pkg/rusty_renju_wasm"
+import type { HashKey } from "rusty-renju-web/rusty-renju"
 import { useStableSignal } from "../utils/signal"
 
 export function RootEvaluationBar() {

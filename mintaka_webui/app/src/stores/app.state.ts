@@ -1,7 +1,7 @@
-import type { HashKey } from "../wasm/pkg/rusty_renju_wasm"
+import type { HashKey } from "rusty-renju-web/rusty-renju"
 import { createSignal, type Accessor, type Setter } from "solid-js"
 import { createStore, type SetStoreFunction } from "solid-js/store"
-import type { AppGameState } from "../domain/rusty-renju"
+import type { AppGameState } from "rusty-renju-web/rusty-renju"
 import type { MintakaRuntime } from "../controllers/runtime.controller"
 
 export type AppState = {

@@ -1,4 +1,4 @@
-import init, { GameAgent, initThreadPool, JsAbortHandle, JsCounterHandle, mintakaVersion } from "../wasm/pkg/mintaka_wasm"
+import init, { GameAgent, initThreadPool, JsAbortHandle, JsCounterHandle, mintakaVersion } from "../../wasm/pkg/mintaka_wasm"
 import type { MintakaWorkerMessage, MintakaWorkerResponse } from "./mintaka.worker.provider"
 
 let readyPromise: Promise<void> | undefined

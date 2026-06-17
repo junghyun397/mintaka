@@ -1,4 +1,4 @@
-import type { BestMove, Command, CommandResult, Config, HashKey, Response, SearchObjective, Timer } from "../wasm/pkg/rusty_renju_wasm"
+import type { BestMove, Command, CommandResult, Config, HashKey, Response, SearchObjective, Timer } from "../../wasm/pkg/rusty_renju_wasm"
 
 export type MintakaProviderType = "server" | "worker"
 

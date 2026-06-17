@@ -4,6 +4,7 @@
 /target
 /sessions
 /temp
+/.pnpm-store
 __pycache__
 max_config.toml
 **/playground.rs

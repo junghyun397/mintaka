@@ -1,15 +1,13 @@
 import { Modal, type ModalControlProps } from "./Modal"
 import { createMemo, Match, Switch, useContext } from "solid-js"
-import { BoardWorker, type History, type RuleKind } from "../wasm/pkg/rusty_renju_wasm"
 import { filter } from "../utils/undefined"
 import { AppContext } from "../context"
-import type { HistoryTreeNode } from "../domain/HistoryTree"
+import type { HistoryTreeNode } from "rusty-renju-web/HistoryTree"
 import { MiniBoard } from "./MiniBoard"
+import { describeHistory, type History } from "rusty-renju-web/rusty-renju"
 
 export function History(props: ModalControlProps) {
     const { gameSelectors } = useContext(AppContext)!
-
-    const tree = createMemo(() => gameSelectors.gameState().historyTree.tree())
 
     return <Modal
         id="history_modal"
@@ -18,7 +16,7 @@ export function History(props: ModalControlProps) {
         onClose={props.onClose}
     >
         <div class="flex w-full flex-col items-start">
-            <HistoryTreeBoard node={tree()} />
+            <HistoryTreeBoard node={gameSelectors.historyTree().tree()} />
         </div>
     </Modal>
 }
@@ -67,9 +65,7 @@ function TimelineConnector() {
 }
 
 function HistoryBoard(props: { history: History }) {
-    const { runtimeSelectors } = useContext(AppContext)!
-
-    const describe = createMemo(() => BoardWorker.fromHistory(props.history, "Renju").describe())
+    const describe = createMemo(() => describeHistory(props.history))
     const last = createMemo(() => props.history.at(-1))
 
     return <MiniBoard

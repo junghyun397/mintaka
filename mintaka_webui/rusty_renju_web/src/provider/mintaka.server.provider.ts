@@ -3,9 +3,9 @@ import type {
     BestMove, Command, CommandResult, Config,
     CreateSessionRequest, CreateSessionResponse, GameState, HashKey,
     Health, LaunchSessionRequest, Response as MintakaResponse, SearchObjective, Timer,
-} from "../wasm/pkg/rusty_renju_wasm"
+} from "../../wasm/pkg/rusty_renju_wasm"
 import { SERVER_PROTOCOL } from "../config"
-import type { Configs } from "./mintaka"
+import type { Configs } from "../mintaka"
 
 export type MintakaServerConfig = {
     readonly address: string,

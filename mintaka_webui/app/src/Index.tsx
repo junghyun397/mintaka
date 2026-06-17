@@ -3,10 +3,9 @@ import './index.css'
 import { render } from 'solid-js/web'
 import 'solid-devtools'
 import { App } from "./App"
+import { initRustyRenju } from "rusty-renju-web/rusty-renju"
 
-import init from "./wasm/pkg/rusty_renju_wasm"
-
-await init()
+await initRustyRenju()
 
 const root = document.getElementById('root')
 

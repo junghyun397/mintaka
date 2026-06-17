@@ -1,8 +1,10 @@
 ### npm ###
-dist
-node_modules
+/node_modules
+/app/node_modules
+/rusty_renju_web/node_modules
+/app/dist
 
-.vite_dev.log
-.vite_pid
+/app/.vite_dev.log
+/app/.vite_pid
 
-/src/wasm
+/rusty_renju_web/wasm/pkg

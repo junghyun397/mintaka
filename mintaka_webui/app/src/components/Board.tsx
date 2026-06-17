@@ -1,9 +1,8 @@
 import { createMemo, createSelector, For, Index, Match, Switch, useContext } from "solid-js"
 import { AppContext } from "../context"
-import { INDEX_TO_POS, LETTERS, NUMS } from "../domain/rusty-renju"
+import { INDEX_TO_POS, LETTERS, NUMS, type Pos } from "rusty-renju-web/rusty-renju"
 import { range } from "../utils/array"
 import { filter } from "../utils/undefined"
-import type { Pos } from "../wasm/pkg/rusty_renju_wasm"
 
 export function Board() {
     const { gameSelectors, runtimeSelectors } = useContext(AppContext)!

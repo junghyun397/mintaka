@@ -1,7 +1,5 @@
-import type { ForwardMethod, HistoryTree } from "../domain/HistoryTree"
-import type { BestMove, HashKey, Pos } from "../wasm/pkg/rusty_renju_wasm"
-import { BoardWorker } from "../wasm/pkg/rusty_renju_wasm"
-import { emptyAppGameState, type AppGameState } from "../domain/rusty-renju"
+import type { ForwardMethod, HistoryTree } from "rusty-renju-web/HistoryTree"
+import { buildGameStateFromHistorySource, emptyAppGameState, type AppGameState, type BestMove, type HashKey, type Pos } from "rusty-renju-web/rusty-renju"
 
 interface GameController {
     clear: () => void,
@@ -86,8 +84,13 @@ export function createGameController(
             let { boardWorker, historyTree } = gameState()
 
             if (bestMove.position_hash !== boardWorker.hashKey()) {
-                historyTree = historySnapshot
-                boardWorker = BoardWorker.fromHistory(historyTree.toHistory(), "Renju")
+                const snapshot = buildGameStateFromHistorySource({
+                    type: "history-tree",
+                    content: historySnapshot,
+                })
+
+                boardWorker = snapshot.boardWorker
+                historyTree = snapshot.historyTree
             }
 
             boardWorker = boardWorker.set(bestMove.best_move)

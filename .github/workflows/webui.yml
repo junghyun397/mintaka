@@ -58,7 +58,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.rustup
-          key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain.toml', 'mintaka_webui/package.json') }}
+          key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain.toml', 'mintaka_webui/package.json', 'mintaka_webui/rusty_renju_web/package.json') }}
           restore-keys: |
             ${{ runner.os }}-rustup-
 
@@ -67,8 +67,7 @@ jobs:
         working-directory: mintaka_webui
 
       - name: Install requirements
-        run: |
-          pnpm requirements
+        run: pnpm --filter rusty-renju-web run requirements
         working-directory: mintaka_webui
 
       - name: Build
@@ -79,7 +78,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: webui-dist
-          path: mintaka_webui/dist
+          path: mintaka_webui/app/dist
           if-no-files-found: error
 
   deploy:

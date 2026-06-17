@@ -1,4 +1,4 @@
-import { createMemo, createSignal, Match, Show, Switch, useContext } from "solid-js"
+import { createSignal, Match, Show, Switch, useContext } from "solid-js"
 import { AppContext } from "../context"
 import {
     IconArrowUturnRight, IconChevronDoubleLeft, IconChevronDoubleRight, IconChevronLeft, IconChevronRight,
@@ -22,16 +22,12 @@ export function Control() {
 function ControlButtons() {
     const { gameActions, appSettings, gameSelectors, runtimeSelectors } = useContext(AppContext)!
 
-    const inBranchHead = createMemo(() => gameSelectors.gameState().historyTree.inBranchHead)
-    const forwardable = createMemo(() => gameSelectors.gameState().historyTree.forwardable)
-    const backwardable = createMemo(() => gameSelectors.gameState().historyTree.backwardable)
-
     return <>
-        <Show when={gameSelectors.history().length === 0 && forwardable()} fallback={
+        <Show when={gameSelectors.history().length === 0 && gameSelectors.historyTree().forwardable} fallback={
             <button
                 title="Undo all moves"
                 class="btn btn-square"
-                classList={{ "btn-disabled": !backwardable() }}
+                classList={{ "btn-disabled": !gameSelectors.historyTree().backwardable }}
                 onClick={gameActions.bulkBackward}
             >
                 <IconChevronDoubleLeft />
@@ -48,7 +44,7 @@ function ControlButtons() {
         <button
             title="Undo"
             class="btn btn-square"
-            classList={{ "btn-disabled": !backwardable() }}
+            classList={{ "btn-disabled": !gameSelectors.historyTree().backwardable }}
             onClick={gameActions.backward}
         >
             <IconChevronLeft />
@@ -89,11 +85,11 @@ function ControlButtons() {
                 </button>
             </Match>
         </Switch>
-        <Show when={inBranchHead()} fallback={
+        <Show when={gameSelectors.historyTree().inBranchHead} fallback={
             <button
                 title="Redo"
                 class="btn btn-square"
-                classList={{ "btn-disabled": !forwardable() }}
+                classList={{ "btn-disabled": !gameSelectors.historyTree().forwardable }}
                 onClick={[gameActions.forward, "continue"]}
             >
                 <IconChevronRight />
@@ -131,7 +127,7 @@ function ControlButtons() {
         <button
             title="Redo all moves"
             class="btn btn-square"
-            classList={{ "btn-disabled": !forwardable() }}
+            classList={{ "btn-disabled": !gameSelectors.historyTree().forwardable }}
             onClick={[gameActions.bulkForward, "continue"]}
         >
             <IconChevronDoubleRight />

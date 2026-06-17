@@ -1,8 +1,8 @@
-import type { MintakaServerConfig } from "../domain/mintaka.server.provider"
-import type { MintakaProviderType } from "../domain/mintaka.provider"
+import type { MintakaServerConfig } from "rusty-renju-web/provider/mintaka.server.provider"
+import type { MintakaProviderType } from "rusty-renju-web/provider/mintaka.provider"
 import { createStore, type SetStoreFunction } from "solid-js/store"
 import { makePersisted } from "@solid-primitives/storage"
-import { PERSIST_CONFIG_VERSION, WEB_WORKER_READY } from "../config"
+import { PERSIST_CONFIG_VERSION, WEB_WORKER_READY } from "rusty-renju-web/config"
 
 const Themes = ["system", "dark", "light"] as const
 

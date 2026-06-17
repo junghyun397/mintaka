@@ -164,7 +164,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     if pref.webui {
         let webui = Router::new()
-            .fallback_service(ServeDir::new("mintaka_webui/dist"))
+            .fallback_service(ServeDir::new("mintaka_webui/app/dist"))
             .layer(SetResponseHeaderLayer::overriding(
                 HeaderName::from_static("cross-origin-opener-policy"),
                 HeaderValue::from_static("same-origin"),

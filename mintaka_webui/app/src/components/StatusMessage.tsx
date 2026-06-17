@@ -1,6 +1,6 @@
 import { useContext } from "solid-js"
 import { AppContext } from "../context"
-import { formatNodes } from "../domain/mintaka"
+import { formatNodes } from "rusty-renju-web/mintaka"
 import { flatmap } from "../utils/undefined"
 
 export function StatusMessage() {

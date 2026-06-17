@@ -1,7 +1,9 @@
-import type { Color, History, Pos } from "../wasm/pkg/rusty_renju_wasm"
-import { BoardWorker } from "../wasm/pkg/rusty_renju_wasm"
+import init, { BoardWorker, calculateWinRate as calculateWasmWinRate, defaultBoard, rustyRenjuVersion } from "../wasm/pkg/rusty_renju_wasm"
+import type { Board, BoardDescribe, Color, History, Pos, Score } from "../wasm/pkg/rusty_renju_wasm"
 import { EmptyHistoryTree, type HistoryEntry, HistoryTree } from "./HistoryTree"
-import { assertNever } from "../utils/never"
+import { assertNever } from "./utils/never"
+
+export type * from "../wasm/pkg/rusty_renju_wasm"
 
 export type HistorySource =
     | { type: "history", content: History }
@@ -16,8 +18,24 @@ export function emptyAppGameState(): AppGameState {
     return { boardWorker: BoardWorker.empty("Renju"), historyTree: EmptyHistoryTree }
 }
 
-export function flip(color: Color): Color {
-    return color === "Black" ? "White" : "Black"
+export async function initRustyRenju(): Promise<void> {
+    await init()
+}
+
+export function getRustyRenjuVersion(): string {
+    return rustyRenjuVersion()
+}
+
+export function describeHistory(history: History): BoardDescribe {
+    return BoardWorker.fromHistory(history, "Renju").describe()
+}
+
+export function defaultRenjuBoard(): Board {
+    return defaultBoard("Renju")
+}
+
+export function calculateWinRate(score: Score): number {
+    return calculateWasmWinRate(score)
 }
 
 export const NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as const

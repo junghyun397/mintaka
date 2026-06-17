@@ -1,14 +1,16 @@
-import { BestMove, Board, BoardWorker, Color, CommandResult, Config, GameState, HashKey, History, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
-import { defaultBoard, calculateWinRate } from "../wasm/pkg/rusty_renju_wasm"
-import type { HistoryTree } from "../domain/HistoryTree"
-import { DefaultWorkerConfig, MaxWorkerConfig, MintakaWorkerProvider } from "../domain/mintaka.worker.provider"
-import { buildMintakaRuntime, type IdleState, type MintakaRuntimeState } from "../domain/mintaka.runtime"
-import { assertNever } from "../utils/never"
-import { createSession, MintakaServerProvider, type MintakaServerConfig } from "../domain/mintaka.server.provider"
-import type { MintakaProvider } from "../domain/mintaka.provider"
-import type { AppGameState } from "../domain/rusty-renju"
-import { extractStatics, type Configs, type MintakaStatics } from "../domain/mintaka"
-import { MINTAKA_CONFIG_VERSION } from "../config"
+import type { HistoryTree } from "rusty-renju-web/HistoryTree"
+import { DefaultWorkerConfig, MaxWorkerConfig, MintakaWorkerProvider } from "rusty-renju-web/provider/mintaka.worker.provider"
+import { buildMintakaRuntime, type IdleState, type MintakaRuntimeState } from "rusty-renju-web/mintaka.runtime"
+import { assertNever } from "rusty-renju-web/utils/never"
+import { createSession, MintakaServerProvider, type MintakaServerConfig } from "rusty-renju-web/provider/mintaka.server.provider"
+import type { MintakaProvider } from "rusty-renju-web/provider/mintaka.provider"
+import {
+    calculateWinRate, defaultRenjuBoard,
+    type AppGameState, type BestMove, type Board, type Color, type CommandResult,
+    type Config, type GameState, type HashKey, type History, type MaybePos,
+} from "rusty-renju-web/rusty-renju"
+import { extractStatics, type Configs, type MintakaStatics } from "rusty-renju-web/mintaka"
+import { MINTAKA_CONFIG_VERSION } from "rusty-renju-web/config"
 
 interface RuntimeController {
     unloadRuntime: () => void,
@@ -184,7 +186,7 @@ export function createRuntimeController(
     }
 
     const loadServerRuntime = async (serverConfig: MintakaServerConfig) => {
-        const board: Board = defaultBoard("Renju")
+        const board: Board = defaultRenjuBoard()
         const history: History = []
 
         let storedConfig = persistProviderConfigController.load({ type: "server", config: serverConfig })
@@ -272,7 +274,7 @@ export function createRuntimeController(
         loadWorkerRuntime: () => {
             unloadRuntime()
 
-            const board: Board = defaultBoard("Renju")
+            const board: Board = defaultRenjuBoard()
             const history: History = []
 
             let config = persistProviderConfigController.load({ type: "worker" }) ?? DefaultWorkerConfig

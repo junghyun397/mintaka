@@ -1,5 +1,5 @@
 import { Modal, Section, type ModalControlProps } from "./Modal"
-import { rustyRenjuVersion } from "../wasm/pkg/rusty_renju_wasm"
+import { getRustyRenjuVersion } from "rusty-renju-web/rusty-renju"
 import pkg from '../../package.json'
 import { useContext } from "solid-js"
 import { AppContext } from "../context"
@@ -16,7 +16,7 @@ export function About(props: ModalControlProps) {
         <div class="flex flex-col gap-4">
             <Section title="Version">
                 <p><b>webui</b> v{pkg.version}</p>
-                <p><b>rusty-renju</b> v{rustyRenjuVersion()}</p>
+                <p><b>rusty-renju</b> v{getRustyRenjuVersion()}</p>
                 <p><b>mintaka</b> {runtimeSelectors.version()}</p>
             </Section>
             <Section title="Author">

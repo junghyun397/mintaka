@@ -1,6 +1,6 @@
-import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective, Timer } from "../wasm/pkg/rusty_renju_wasm"
+import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective, Timer } from "../../wasm/pkg/rusty_renju_wasm"
 import type { MintakaLaunchResponse, MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand } from "./mintaka.provider"
-import { duration, InfiniteDuration } from "./mintaka"
+import { duration, InfiniteDuration } from "../mintaka"
 import { Mutex } from "../utils/mutex"
 
 export type MintakaWorkerMessage =

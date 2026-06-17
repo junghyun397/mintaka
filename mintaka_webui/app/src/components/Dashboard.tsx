@@ -1,11 +1,11 @@
 import { AppContext } from "../context"
 import { createEffect, createMemo, createResource, createSignal, Match, on, Show, Switch, useContext } from "solid-js"
 import { unwrap } from "solid-js/store"
-import type { Config } from "../wasm/pkg/rusty_renju_wasm"
+import type { Config } from "rusty-renju-web/rusty-renju"
 import { flatmap } from "../utils/undefined"
-import { SERVER_PROTOCOL, SERVER_URL, WEB_WORKER_READY } from "../config"
-import { duration, formatNodes, nps } from "../domain/mintaka"
-import { checkHealth, type MintakaServerConfig } from "../domain/mintaka.server.provider"
+import { SERVER_PROTOCOL, SERVER_URL, WEB_WORKER_READY } from "rusty-renju-web/config"
+import { duration, formatNodes, nps } from "rusty-renju-web/mintaka"
+import { checkHealth, type MintakaServerConfig } from "rusty-renju-web/provider/mintaka.server.provider"
 import { Modal, type ModalControlProps } from "./Modal"
 
 export function Dashboard(props: ModalControlProps) {

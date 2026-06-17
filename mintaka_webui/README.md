@@ -1,6 +1,6 @@
 # mintaka-webui
 
 ```shell
-pnpm run requirements
+pnpm run --filter rusty-renju-web requirements
 pnpm run serve
 ```

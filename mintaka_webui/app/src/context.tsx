@@ -1,21 +1,20 @@
 import { createContext, createEffect, createMemo, type Accessor, type ParentProps } from "solid-js"
 import { createStore, reconcile, unwrap, type SetStoreFunction, type Store } from "solid-js/store"
-import type { ForwardMethod } from "./domain/HistoryTree"
-import type { BoardDescribe, Color, Config, HashKey, History, Pos } from "./wasm/pkg/rusty_renju_wasm"
+import type { ForwardMethod, HistoryTree } from "rusty-renju-web/HistoryTree"
 import { createPersistConfigStore, defaultPersistConfig, type PersistConfig } from "./stores/persist.config"
 import { createAppSettingsStore, type AppSettings } from "./stores/app.settings"
 import { createGameController } from "./controllers/game.controller"
 import { createRuntimeController, type MintakaRuntimeType } from "./controllers/runtime.controller"
 import { createAppState } from "./stores/app.state"
-import type { MintakaRuntimeState } from "./domain/mintaka.runtime"
+import type { MintakaRuntimeState } from "rusty-renju-web/mintaka.runtime"
 import { filter, flatmap } from "./utils/undefined"
 import { parseUrlParams, setupUrlSync } from "./url"
-import { buildGameStateFromHistorySource, emptyAppGameState, type AppGameState } from "./domain/rusty-renju"
+import { buildGameStateFromHistorySource, emptyAppGameState, type BoardDescribe, type Color, type Config, type HashKey, type History, type Pos } from "rusty-renju-web/rusty-renju"
 import { setupThemeSync } from "./theme"
 import { assertOk } from "./utils/response"
-import { assertNever } from "./utils/never"
-import type { Configs, MintakaStatics } from "./domain/mintaka"
-import { WEB_WORKER_READY } from "./config"
+import { assertNever } from "rusty-renju-web/utils/never"
+import type { Configs, MintakaStatics } from "rusty-renju-web/mintaka"
+import { WEB_WORKER_READY } from "rusty-renju-web/config"
 
 interface AppActions {
     readonly loadWorkerRuntime: () => void,
@@ -53,7 +52,7 @@ interface GameActions {
 }
 
 interface GameSelectors {
-    readonly gameState: Accessor<AppGameState>,
+    readonly historyTree: Accessor<HistoryTree>,
     readonly history: Accessor<History>,
     readonly sequenceMap: Accessor<Map<Pos, number>>,
     readonly boardDescribe: BoardDescribe,
@@ -105,7 +104,9 @@ export function AppContextProvider(props: ParentProps) {
 
     const [appSettings, setAppSettings] = createAppSettingsStore(initialUrlParam)
 
-    const history = createMemo(() => appState.gameState().historyTree.toHistory())
+    const historyTree = createMemo(() => appState.gameState().historyTree)
+
+    const history = createMemo(() => historyTree().toHistory())
 
     const sequenceMap = createMemo(() => new Map(
         history()
@@ -247,7 +248,7 @@ export function AppContextProvider(props: ParentProps) {
     }
 
     const gameSelectors: GameSelectors = {
-        gameState: appState.gameState,
+        historyTree,
         history,
         sequenceMap,
         boardDescribe,

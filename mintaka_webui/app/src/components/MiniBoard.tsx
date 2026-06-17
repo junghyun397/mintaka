@@ -1,7 +1,6 @@
 import { Index, Match, Show, Switch } from "solid-js"
-import type { BoardDescribe, MaybePos } from "../wasm/pkg/rusty_renju_wasm"
 import { range } from "../utils/array"
-import { INDEX_TO_POS } from "../domain/rusty-renju"
+import { INDEX_TO_POS, type BoardDescribe, type MaybePos } from "rusty-renju-web/rusty-renju"
 import { filter } from "../utils/undefined"
 
 export function MiniBoard(props: {

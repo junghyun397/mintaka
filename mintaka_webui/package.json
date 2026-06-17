@@ -1,37 +1,21 @@
 {
-  "name": "mintaka-webui",
-  "version": "0.0.1",
-  "description": "",
+  "name": "mintaka-webui-workspace",
+  "private": true,
   "type": "module",
   "scripts": {
-    "format": "eslint src --fix",
-    "requirements": "rustup component add rust-src && rustup target add wasm32-unknown-unknown && cargo install wasm-pack typeshare-cli",
-    "typeshare:build": "typeshare ../ --lang=typescript --output-file=../rusty_renju_wasm/types_ts",
-    "rusty_renju:build": "CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS='-C target-feature=+bulk-memory,+simd128' wasm-pack build ../rusty_renju_wasm --release --target web --out-name rusty_renju_wasm --out-dir ../mintaka_webui/src/wasm/pkg/rusty_renju_wasm -- -Z build-std=std,panic_abort",
-    "mintaka:build": "CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals,+simd128 -C link-arg=--import-memory -C link-arg=--shared-memory -C link-arg=--export=__wasm_init_tls -C link-arg=--export=__tls_base -C link-arg=--export=__tls_size -C link-arg=--export=__tls_align -C link-arg=--initial-memory=16777216 -C link-arg=--max-memory=4294967296' wasm-pack build ../mintaka_wasm --release --target web --out-name mintaka_wasm --out-dir ../mintaka_webui/src/wasm/pkg/mintaka_wasm -- -Z build-std=std,panic_abort --features panic_hook",
-    "wasm:package": "pnpm run typeshare:build && pnpm run rusty_renju:build && pnpm run mintaka:build",
-    "typecheck": "tsc --noEmit --strict",
-    "dev:wasm": "pnpm run wasm:package && pnpm run typecheck && vite --host",
-    "dev": "vite --host",
-    "build": "pnpm run wasm:package && pnpm run typecheck && vite build",
-    "serve": "pnpm run build && vite preview --host"
+    "format": "eslint app/src app/vite.config.ts rusty_renju_web/src --fix",
+    "typecheck": "tsc --noEmit --strict -p rusty_renju_web/tsconfig.json && tsc --noEmit --strict -p app/tsconfig.json",
+    "dev:wasm": "pnpm --filter rusty-renju-web run wasm:build && pnpm --filter mintaka-webui run dev",
+    "dev": "pnpm --filter mintaka-webui run dev",
+    "build": "pnpm --filter rusty-renju-web run wasm:build && pnpm run typecheck && pnpm --filter mintaka-webui run build",
+    "serve": "pnpm run build && pnpm --filter mintaka-webui run preview"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "^5.10.0",
-    "@tailwindcss/vite": "^4.3.0",
-    "@types/node": "^25.9.2",
     "@typescript-eslint/parser": "^8.60.1",
-    "daisyui": "^5.5.23",
     "eslint": "^9.39.4",
     "eslint-plugin-better-tailwindcss": "^3.8.0",
-    "solid-devtools": "^0.34.5",
     "tailwindcss": "^4.3.0",
-    "typescript": "^5.9.3",
-    "vite": "^7.3.5",
-    "vite-plugin-solid": "^2.11.12"
-  },
-  "dependencies": {
-    "@solid-primitives/storage": "^4.3.4",
-    "solid-js": "^1.9.13"
+    "typescript": "^5.9.3"
   }
 }
