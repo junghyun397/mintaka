@@ -435,6 +435,19 @@ impl Sessions {
         }
     }
 
+    pub fn compact_eviction_entries(&self) {
+        let mut queue = self.eviction_queue.lock().unwrap();
+
+        queue.retain(|Reverse(entry)| {
+            self.map.get(&entry.key).is_some_and(|session| {
+                session.last_active == entry.last_active
+                    && session.last_active_seq == entry.last_active_seq
+            })
+        });
+
+        queue.shrink_to_fit();
+    }
+
     pub fn with<R>(&self, key: &SessionKey, f: impl FnOnce(&Session) -> R) -> Option<R> {
         self.map.get(key)
             .map(|session| f(&session))
@@ -513,23 +526,6 @@ impl Sessions {
         }
 
         removed_sessions
-    }
-
-    pub fn idle_keys_by_expiration(&self, now: Instant) -> (Vec<SessionKey>, Vec<SessionKey>) {
-        let mut hibernation_keys = vec![];
-        let mut expired_keys = vec![];
-
-        for session in self.map.iter()
-            .filter(|session| session.status() == SessionStatus::Idle)
-        {
-            if session.is_expired(now) {
-                expired_keys.push(*session.key());
-            } else if session.should_hibernate(now) {
-                hibernation_keys.push(*session.key());
-            }
-        }
-
-        (hibernation_keys, expired_keys)
     }
 
     pub fn remove_idle(&self, key: &SessionKey, last_active_seq: Option<u32>) -> Result<Session, AppError> {

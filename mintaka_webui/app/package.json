@@ -10,17 +10,17 @@
     "serve": "pnpm run build && pnpm run preview"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.0",
-    "@types/node": "^25.9.2",
+    "@tailwindcss/vite": "^4.3.1",
+    "@types/node": "^25.9.3",
     "daisyui": "^5.5.23",
     "solid-devtools": "^0.34.5",
-    "tailwindcss": "^4.3.0",
+    "tailwindcss": "^4.3.1",
     "vite": "^7.3.5",
     "vite-plugin-solid": "^2.11.12"
   },
   "dependencies": {
-    "rusty-renju-web": "workspace:*",
     "@solid-primitives/storage": "^4.3.4",
+    "rusty-renju-web": "workspace:*",
     "solid-js": "^1.9.13"
   }
 }

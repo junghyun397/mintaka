@@ -9,7 +9,7 @@ use rusty_renju::utils::byte_size::ByteSize;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
@@ -461,6 +461,83 @@ impl AppState {
         }
 
         Ok(removed)
+    }
+
+    pub async fn clean_idle_sessions(&self) {
+        enum CleanupAction {
+            Hibernate,
+            Destroy,
+        }
+
+        let now = Instant::now();
+
+        for session_key in self.sessions.keys() {
+            let action = self.sessions.with(&session_key, |session| {
+                if session.status() != SessionStatus::Idle {
+                    None
+                } else if session.is_expired(now) {
+                    Some(CleanupAction::Destroy)
+                } else if session.should_hibernate(now) {
+                    Some(CleanupAction::Hibernate)
+                } else {
+                    None
+                }
+            }).flatten();
+
+            match action {
+                Some(CleanupAction::Hibernate) => {
+                    if let Err(err) = self.hibernate_active_session(session_key).await {
+                        tracing::warn!("failed to hibernate idle session: sid={session_key}, err={err}; skipping");
+                    }
+                }
+                Some(CleanupAction::Destroy) => {
+                    if let Err(err) = self.destroy_active_session(session_key) {
+                        tracing::warn!("failed to destroy expired session: sid={session_key}, err={err}; skipping");
+                    }
+                }
+                None => {}
+            }
+        }
+
+        self.sessions.compact_eviction_entries();
+    }
+
+    pub async fn clean_expired_hibernated_sessions(&self) -> Result<(), AppError> {
+        let mut entries = tokio::fs::read_dir(&self.preference.sessions_directory)
+            .await
+            .map_err(AppError::from_general_error)?;
+
+        let now_epoch_secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH).unwrap()
+            .as_secs();
+
+        while let Some(entry) = entries.next_entry().await.map_err(AppError::from_general_error)? {
+            let file_name = entry.file_name();
+
+            let Some(file_name) = file_name.to_str() else {
+                continue;
+            };
+
+            let Some((session_key, expiry_epoch_secs)) = file_name.split_once('_') else {
+                continue;
+            };
+
+            let Ok(session_key) = session_key.parse() else {
+                continue;
+            };
+
+            let Ok(expiry_epoch_secs) = expiry_epoch_secs.parse::<u64>() else {
+                continue;
+            };
+
+            if expiry_epoch_secs >= now_epoch_secs {
+                continue;
+            }
+
+            self.remove_hibernated_session_file(session_key).await?;
+        }
+
+        Ok(())
     }
 
     pub fn command_session(

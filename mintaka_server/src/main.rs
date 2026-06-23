@@ -13,7 +13,7 @@ use std::error::Error;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::signal::unix::SignalKind;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
@@ -153,6 +153,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     spawn_session_cleaner(&state);
+    spawn_hibernated_session_cleaner(&state);
     spawn_sigterm_watcher(&state);
 
     let url = if pref.tls_config.is_some() {
@@ -275,16 +276,22 @@ fn spawn_session_cleaner(state: &Arc<AppState>) {
         loop {
             interval.tick().await;
 
-            let now = Instant::now();
+            state.clean_idle_sessions().await;
+        }
+    });
+}
 
-            let (hibernation_keys, expired_keys) = state.sessions.idle_keys_by_expiration(now);
+fn spawn_hibernated_session_cleaner(state: &Arc<AppState>) {
+    let state = state.clone();
 
-            for session_key in hibernation_keys {
-                let _ = state.hibernate_active_session(session_key).await;
-            }
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
 
-            for session_key in expired_keys {
-                let _ = state.destroy_session(session_key).await;
+        loop {
+            interval.tick().await;
+
+            if let Err(err) = state.clean_expired_hibernated_sessions().await {
+                tracing::warn!("failed to clean expired hibernated sessions: {err}");
             }
         }
     });
