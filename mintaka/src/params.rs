@@ -1,5 +1,4 @@
 use crate::value::Depth;
-use rusty_renju::notation::score::Score;
 
 macro_rules! parse_int {
     ($name:literal,$t:ty,$default:expr) => {
@@ -25,8 +24,8 @@ macro_rules! parse_or_default {
     }};
 }
 
-pub const ASPIRATION_DELTA_BASE: Score = parse_int!("aspiration_delta_base", Score, 8);
-pub const ASPIRATION_DELTA_DIV: Score = parse_int!("aspiration_delta_div", Score, 8192);
+pub const ASPIRATION_DELTA_BASE: i32 = parse_int!("aspiration_delta_base", i32, 8);
+pub const ASPIRATION_DELTA_DIV: i32 = parse_int!("aspiration_delta_div", i32, 8192);
 
 pub const LMR_BASE: f64 = parse_float!("lmr_base", f64, 0.8);
 pub const LMR_DIV: f64 = parse_float!("lmr_div", f64, 2.4);

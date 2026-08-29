@@ -17,7 +17,7 @@ use rusty_renju::const_for;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::score::{Score, Scores};
+use rusty_renju::notation::score::Score;
 
 trait NodeType {
     const IS_ROOT: bool;
@@ -50,7 +50,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
 ) -> (Score, MaybePos) {
     let position_hash = state.board.hash_key;
 
-    let mut score: Score = 0;
+    let mut score: Score = Score::ABORT;
     let mut best_move = MaybePos::NONE;
     let mut root_pv = PrincipalVariation::EMPTY;
     let mut selective_depth = 0;
@@ -61,7 +61,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     let starting_depth = (td.tid % 10 + 1) as Depth;
     'iterative_deepening: for depth in starting_depth ..= td.config.max_depth() {
         let iter_score = if depth < 5 {
-            pvs::<R, TH, RootNode>(td, &mut state, depth, -Score::INF, Score::INF, false)
+            pvs::<R, TH, RootNode>(td, &mut state, depth, Score::NEG_INF, Score::INF, false)
         } else {
             aspiration::<R, TH>(td, &mut state, depth, score)
         };
@@ -91,7 +91,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
             })
         }
 
-        if Score::is_mate(iter_score) {
+        if iter_score.is_mate() {
             mate_count += 1;
 
             if depth - starting_depth > 10
@@ -146,9 +146,9 @@ fn aspiration<const R: RuleKind, TH: ThreadType>(
 ) -> Score {
     let mut depth = max_depth;
 
-    let mut delta = params::ASPIRATION_DELTA_BASE + prev_score.pow(2) / params::ASPIRATION_DELTA_DIV;
-    let mut alpha = (prev_score - delta).max(-Score::INF);
-    let mut beta = (prev_score + delta).min(Score::INF);
+    let mut delta = params::ASPIRATION_DELTA_BASE + prev_score.unwrap().pow(2) / params::ASPIRATION_DELTA_DIV;
+    let mut alpha = prev_score - delta;
+    let mut beta = prev_score + delta;
 
     loop {
         let score = pvs::<R, TH, RootNode>(td, state, depth, alpha, beta, false);
@@ -159,14 +159,14 @@ fn aspiration<const R: RuleKind, TH: ThreadType>(
 
         if score <= alpha { // fail-low
             beta = (alpha + beta) / 2;
-            alpha = (score - delta).max(-Score::INF);
+            alpha = score - delta;
             depth = max_depth;
 
             if TH::IS_MAIN {
                 td.thread_type.time_manager_mut().update_fail_low();
             }
         } else if score >= beta { // fail-high
-            beta = (score + delta).min(Score::INF);
+            beta = score + delta;
             depth = max_depth;
         } else { // exact
             return score;
@@ -226,7 +226,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             let parent_eval = if td.ply > 0 {
                 -td.ss[td.ply - 1].static_eval
             } else {
-                0
+                Score::DRAW
             };
 
             td.ss[td.ply] = SearchFrame {
@@ -293,7 +293,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         threat_kind = None;
     };
 
-    let static_eval: Score;
+    let mut static_eval = Score::NAN;
     let tt_move: MaybePos;
     let tt_pv: bool;
     let tt_endgame_depth: u8;
@@ -311,12 +311,12 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             td.pvs[td.ply].load(entry.best_move, PrincipalVariation::EMPTY);
         }
 
-        return transposition_table::decode_mate_distance(entry.score as Score, td.ply);
+        return transposition_table::decode_mate_distance(Score::from_i32_unchecked(entry.score as i32), td.ply);
     }
 
     match tt_entry {
         Some(entry) if entry.tt_flag.maybe_score_kind().is_some() => { // full-tt
-            let tt_score = transposition_table::decode_mate_distance(entry.score as Score, td.ply);
+            let tt_score = transposition_table::decode_mate_distance(Score::from_i32_unchecked(entry.score as i32), td.ply);
 
             tt_move = entry.best_move;
             tt_pv = entry.tt_flag.is_pv();
@@ -347,14 +347,14 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 return tt_score;
             }
 
-            static_eval = entry.eval as Score;
+            static_eval = Score::from_i32_unchecked(entry.eval as i32);
         }
         Some(entry) => { // endgame-tt
             tt_move = MaybePos::NONE;
             tt_pv = false;
             tt_endgame_depth = entry.tt_flag.endgame_depth();
 
-            static_eval = entry.eval as Score;
+            static_eval = Score::from_i32_unchecked(entry.eval as i32);
 
             td.tt.store(
                 state.board.hash_key,
@@ -363,7 +363,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 tt_endgame_depth,
                 0,
                 static_eval,
-                0,
+                Score::DRAW,
                 false,
             );
         }
@@ -372,15 +372,6 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             tt_pv = false;
             tt_endgame_depth = 0;
 
-            let evaluator_eval = td.evaluator.eval_value(state);
-            td.ss[td.ply].evaluator_eval = evaluator_eval;
-
-            if td.evaluator.require_stabilize() && td.ply > 0 {
-                static_eval = (-td.ss[td.ply - 1].evaluator_eval + evaluator_eval) / 2;
-            } else {
-                static_eval = evaluator_eval;
-            }
-
             td.tt.store(
                 state.board.hash_key,
                 MaybePos::NONE,
@@ -388,25 +379,36 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 0,
                 0,
                 static_eval,
-                0,
+                Score::DRAW,
                 false,
             );
+        }
+    }
+
+    if static_eval.is_nan() {
+        let evaluator_eval = td.evaluator.eval_value(state);
+        td.ss[td.ply].evaluator_eval = evaluator_eval;
+
+        if td.evaluator.require_stabilize() && td.ply > 0 {
+            static_eval = (-td.ss[td.ply - 1].evaluator_eval.fallback(evaluator_eval) + evaluator_eval) / 2;
+        } else {
+            static_eval = evaluator_eval;
         }
     }
 
     td.ss[td.ply].static_eval = static_eval;
 
     let static_eval_improvement = if td.ply > 1 {
-        static_eval - td.ss[td.ply - 2].static_eval
+        (static_eval - td.ss[td.ply - 2].static_eval.fallback(static_eval)).unwrap_unchecked()
     } else {
-        0
+        Score::DRAW.unwrap_unchecked()
     };
 
     if depth_left <= 0 || td.ply >= value::MAX_PLY {
         let vcf_depth = td.config.max_vcf_depth.unwrap_or(30);
 
         if static_eval >= beta
-            || Score::is_winning(alpha)
+            || alpha.is_win()
             || tt_endgame_depth >= vcf_depth.min(TTFlag::MAX_TT_ENDGAME_DEPTH as Depth) as u8
         {
             return static_eval;
@@ -422,7 +424,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     td.clear_killer();
 
     let original_alpha = alpha;
-    let mut best_score = -Score::INF;
+    let mut best_score = Score::NEG_INF;
     let mut best_move = MaybePos::NONE;
 
     let mut move_picker = MovePicker::init_new(tt_move, td.killers[td.ply], threat_kind);
@@ -463,7 +465,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
             // futility pruning
             let fp_margin = params::FP_BASE + params::FP_MUL * depth_left * depth_left;
-            if !Score::is_winning(alpha)
+            if !alpha.is_win()
                  && static_eval + fp_margin <= alpha
             {
                 move_picker.skip_lp_quiets();

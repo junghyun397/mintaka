@@ -18,7 +18,7 @@ mod bench_vcf {
     use rusty_renju::history::History;
     use rusty_renju::notation::pos::pos_unchecked;
     use rusty_renju::notation::rule::RuleKind;
-    use rusty_renju::notation::score::{Score, Scores};
+    use rusty_renju::notation::score::Score;
     use rusty_renju::utils::byte_size::ByteSize;
     use rusty_renju::utils::empty::Empty;
     use std::sync::atomic::{AtomicBool, AtomicU32};
@@ -55,7 +55,7 @@ mod bench_vcf {
 
                 tt.clear();
 
-                assert_eq!(Score::is_mate(result), $expect_vcf)
+                assert_eq!(result.is_mate(), $expect_vcf)
             })
         }};
     }

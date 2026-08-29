@@ -12,7 +12,7 @@ use crate::{params, value};
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::score::{Score, Scores};
+use rusty_renju::notation::score::Score;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 pub const KILLER_MOVE_SLOTS: usize = 2;

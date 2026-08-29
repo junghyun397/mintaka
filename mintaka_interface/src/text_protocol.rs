@@ -282,7 +282,7 @@ fn match_command<const R: RuleKind>(
                 }
             }
             "nodes" => {
-                let nodes = args.get(1).ok_or("nodes not provided.")?
+                let nodes = args.get(2).ok_or("nodes not provided.")?
                     .parse::<u32>()
                     .map_err(|_| "invalid nodes number.")?;
 

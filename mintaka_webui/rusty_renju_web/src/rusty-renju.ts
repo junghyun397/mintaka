@@ -1,5 +1,5 @@
 import init, { BoardWorker, calculateWinRate as calculateWasmWinRate, defaultBoard, rustyRenjuVersion } from "../wasm/pkg/rusty_renju_wasm"
-import type { Board, BoardDescribe, Color, History, Pos, Score } from "../wasm/pkg/rusty_renju_wasm"
+import type { Board, BoardDescribe, History, Pos, Score } from "../wasm/pkg/rusty_renju_wasm"
 import { EmptyHistoryTree, type HistoryEntry, HistoryTree } from "./HistoryTree"
 import { assertNever } from "./utils/never"
 

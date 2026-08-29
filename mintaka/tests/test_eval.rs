@@ -30,7 +30,7 @@ mod test_eval {
 
             let score = -evaluator.eval_value(&state);
 
-            scores[pos.idx_usize()] = score as f32;
+            scores[pos.idx_usize()] = score.unwrap_unchecked() as f32;
         }
 
         scores

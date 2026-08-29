@@ -18,7 +18,7 @@ pub struct HeuristicEvaluator<const R: RuleKind> {
     neighbor_scores: NeighborScores,
     scores: ColorContainer<[i16; pattern::PATTERN_SIZE]>,
     policy_score: [i16; pattern::PATTERN_SIZE],
-    score_black: Score,
+    score_black: i32,
     hash_key: HashKey,
 }
 
@@ -48,7 +48,7 @@ impl<const R: RuleKind> HeuristicEvaluator<R> {
 
                     self.policy_score[pos.idx_usize()] += pattern_delta;
 
-                    score_delta += pattern_delta as Score;
+                    score_delta += pattern_delta as i32;
                 }
             }
 
@@ -93,8 +93,8 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
         }
 
         self.score_black =
-             self.scores[Color::Black].iter().map(|&score| score as Score).sum::<Score>()
-                - self.scores[Color::White].iter().map(|&score| score as Score).sum::<Score>();
+             self.scores[Color::Black].iter().map(|&score| score as i32).sum::<i32>()
+                - self.scores[Color::White].iter().map(|&score| score as i32).sum::<i32>();
     }
 
     fn play(&mut self, board: &Board<R>, artifact: MoveArtifact, plied: MaybePos) {
@@ -121,16 +121,16 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
 
     fn eval_value(&mut self, state: &GameState<R>) -> Score {
         let mut forbidden_score = 0;
+
         for pos in state.board.patterns.forbidden_field.iter_hot_pos() {
             forbidden_score += match state.board.patterns.forbidden_kind(pos).unwrap() {
                 ForbiddenKind::Overline => HeuristicPatternScores::OVERLINE_FORBID,
                 ForbiddenKind::DoubleFour => HeuristicPatternScores::DOUBLE_FOUR_FORBID,
                 ForbiddenKind::DoubleThree => HeuristicPatternScores::DOUBLE_THREE_FORBID,
-            } as Score
+            } as i32
         }
 
-        (self.score_black - forbidden_score)
-            * BLACK_SIGNUM[state.board.player_color]
+        Score::from_i32_clamp((self.score_black - forbidden_score) * BLACK_SIGNUM[state.board.player_color])
     }
 
     fn hash_key(&self) -> HashKey {
@@ -213,4 +213,4 @@ impl HeuristicPatternScores {
     const DOUBLE_THREE_FORBID: i16  = Self::DOUBLE_THREE_FORK + 50;
 }
 
-const BLACK_SIGNUM: ColorContainer<Score> = ColorContainer::new(1, -1);
+const BLACK_SIGNUM: ColorContainer<i32> = ColorContainer::new(1, -1);

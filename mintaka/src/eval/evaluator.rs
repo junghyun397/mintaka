@@ -32,7 +32,3 @@ pub trait Evaluator<const R: RuleKind> {
 
     fn hash_key(&self) -> HashKey;
 }
-
-pub fn stabilize_eval(current: Score, parent: Score) -> Score {
-    (current + parent) / 2
-}

@@ -14,7 +14,7 @@ use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::score::{Score, Scores};
+use rusty_renju::notation::score::Score;
 use rusty_renju::pattern::Pattern;
 
 pub trait SequenceTracker {
@@ -229,7 +229,7 @@ pub fn endgame_sequence<const R: RuleKind, const VCT: bool>(
         vcf::<R, 5, VecSequenceTracker>(
             td, VcfWin, Depth::MAX,
             *state, endgame_moves,
-            0, Score::MIN, Score::MAX
+            Score::DRAW, Score::NEG_INF, Score::INF
         )
     };
 
@@ -387,7 +387,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
 
             if let Some(entry) = td.tt.probe(tt_key) {
                 // tt cutoff
-                if Score::is_winning(entry.score as Score) {
+                if Score::from_i32_unchecked(entry.score as i32).is_win() {
                     let total_ply = td.ply + vcf_ply;
                     let win_score = Score::win_in(total_ply);
 
@@ -476,7 +476,7 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                 clamped_vcf_depth_left,
                 0,
                 Score::NAN,
-                0,
+                Score::DRAW,
                 false,
             );
         }

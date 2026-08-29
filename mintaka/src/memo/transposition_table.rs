@@ -3,7 +3,7 @@ use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucket, TTFlag};
 use crate::value::{Depth, Depths};
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::score::{Score, Scores};
+use rusty_renju::notation::score::Score;
 use rusty_renju::utils::byte_size::ByteSize;
 #[cfg(feature = "compress-tt")]
 use std::io::{Read, Write};
@@ -181,8 +181,8 @@ impl TTView<'_> {
         is_pv: bool,
     ) {
         let idx = self.calculate_index(key);
-        let eval = eval as i16;
-        let score = score as i16;
+        let eval = eval.unwrap_unchecked() as i16;
+        let score = score.unwrap_unchecked() as i16;
 
         let bucket = &self.table[idx];
 
@@ -240,6 +240,8 @@ impl TTView<'_> {
 
         let bucket = &self.table[idx];
 
+        let score = score.unwrap() as i16;
+
         if let Some(mut entry) = bucket.probe(key) {
             if !entry.tt_flag.is_endgame_proven() {
                 entry.best_move = response_pos.into();
@@ -247,7 +249,7 @@ impl TTView<'_> {
                 entry.tt_flag.set_score_kind(score_kind);
                 entry.age = self.age as u8;
                 entry.depth = Depth::PLY_LIMIT as u8;
-                entry.score = score as i16;
+                entry.score = score;
 
                 bucket.store(key, entry);
             }
@@ -258,7 +260,7 @@ impl TTView<'_> {
                 age: self.age as u8,
                 depth: Depth::PLY_LIMIT as u8,
                 eval: 0,
-                score: score as i16,
+                score,
             };
 
             bucket.store(key, entry);
@@ -290,16 +292,20 @@ fn clamp_depth(depth: Depth) -> u8 {
 }
 
 pub fn encode_mate_distance(score: Score, ply: usize) -> Score {
-    if Score::is_mate(score) {
-        score + (ply as Score) * score.signum()
+    if score.is_mate() {
+        let score = score.unwrap();
+
+        Score::from_i32_clamp(score + ply as i32 * score.signum())
     } else {
         score
     }
 }
 
 pub fn decode_mate_distance(score: Score, ply: usize) -> Score {
-    if Score::is_mate(score) {
-        score - (ply as Score) * score.signum()
+    if score.is_mate() {
+        let score = score.unwrap();
+
+        Score::from_i32_clamp(score - ply as i32 * score.signum())
     } else {
         score
     }

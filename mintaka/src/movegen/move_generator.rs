@@ -3,16 +3,16 @@ use crate::search_endgame::{EndgameMovesUnchecked, ENDGAME_MAX_MOVES};
 use rusty_renju::board::Board;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::score::{Score, Scores};
+use rusty_renju::notation::score::Score;
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::movegen::move_list::MoveList;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 
-pub const TT_MOVE_SCORE: i16 = Score::INF as i16 - 300;
-pub const DIRECT_RESPONSE_SCORE: i16 = Score::INF as i16 - 500;
-pub const KILLER_MOVE_SCORE: i16 = Score::INF as i16 - 1000;
+pub const TT_MOVE_SCORE: i16 = Score::INF.unwrap_unchecked() as i16 - 300;
+pub const DIRECT_RESPONSE_SCORE: i16 = Score::INF.unwrap_unchecked() as i16 - 500;
+pub const KILLER_MOVE_SCORE: i16 = Score::INF.unwrap_unchecked() as i16 - 1000;
 pub const COUNTER_MOVE_BONUS: i16 = 100;
 
 pub fn generate_endgame_moves<const R: RuleKind, const VCT: bool>(board: &Board<R>, distance_window: u8, recent_move: Pos) -> EndgameMovesUnchecked {
