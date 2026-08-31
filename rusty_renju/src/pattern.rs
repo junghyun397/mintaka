@@ -217,7 +217,7 @@ impl<const R: RuleKind> Patterns<R> {
         field
     }
 
-    #[inline(always)]
+    #[inline(never)] // reduce I-cache pressure
     pub fn update_pattern_with_slice<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) -> u16 {
         let slice_pattern = slice.calculate_slice_pattern::<R, C>();
 
@@ -232,7 +232,7 @@ impl<const R: RuleKind> Patterns<R> {
         touched_bitmask
     }
 
-    #[inline(always)]
+    #[inline(never)] // reduce I-cache pressure
     pub fn clear_pattern_with_slice<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) -> u16 {
         let start_idx = slice.start_pos.idx_usize();
 

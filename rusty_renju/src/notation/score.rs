@@ -5,6 +5,7 @@ use crate::notation::pos;
 #[cfg_attr(feature = "typeshare", typeshare::typeshare)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(transparent)]
 pub struct Score(i32);
 
 impl Score {
@@ -17,7 +18,6 @@ impl Score {
     pub const DRAW: Score = Score(0);
 
     pub fn from_i32_clamp(value: i32) -> Score {
-        assert_ne!(value, Self::NAN.0);
         Score(value.clamp(Self::NEG_INF.0, Self::INF.0))
     }
 

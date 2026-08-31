@@ -7,7 +7,7 @@ use crate::slice_pattern::SlicePattern;
 use crate::step_idx;
 use crate::utils::empty::Empty;
 use std::simd::cmp::SimdPartialEq;
-use std::simd::{u8x16, Simd};
+use std::simd::Simd;
 use crate::notation::pos;
 use crate::notation::rule::RuleKind;
 
@@ -160,7 +160,7 @@ impl<const R: RuleKind> PatternIndex<R> {
 
 #[cfg_attr(target_arch = "wasm32", inline(never))]
 #[cfg_attr(not(target_arch = "wasm32"), inline(always))]
-fn pattern_bitmask(patterns: u8x16, mask: u8) -> u16 {
+fn pattern_bitmask(patterns: Simd<u8, 16>, mask: u8) -> u16 {
     (patterns & Simd::splat(mask))
         .simd_ne(Simd::splat(0))
         .to_bitmask() as u16

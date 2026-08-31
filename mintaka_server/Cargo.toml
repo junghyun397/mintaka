@@ -18,7 +18,7 @@ num_cpus = "1.17"
 futures-util = "0.3"
 axum = { version = "0.8", features = ["ws"] }
 axum-server = { version = "0.8", features = ["tls-rustls"] }
-tower-http = { version = "0.6", features = ["trace", "cors", "fs", "set-header"] }
+tower-http = { version = "0.7", features = ["trace", "cors", "fs", "set-header"] }
 tokio = { version = "1.45", features = ["full"] }
 async-stream = "0.3"
 

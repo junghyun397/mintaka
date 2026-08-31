@@ -186,7 +186,7 @@ impl<const R: RuleKind> Board<R> {
         let mut artifact = MoveArtifact::empty();
 
         macro_rules! update_by_slice_each_color {
-            ($color:expr,$direction:expr,$slice:expr,$slice_idx:expr) => {
+            ($color:expr,$direction:expr,$slice:expr) => {
                 let unit_artifact = match (
                     $slice.pattern_bitmap[$color] != 0,
                     $slice.has_potential_pattern::<{ $color }>(),
@@ -202,32 +202,49 @@ impl<const R: RuleKind> Board<R> {
             }
         }
 
-        macro_rules! update_by_slice {
-            ($direction:expr,$slice:expr,$slice_idx:expr) => {{
+        macro_rules! mutate_slice {
+            ($slice:expr,$slice_idx:expr) => {{
                 match M {
                     MoveType::Set => $slice.set_mut(self.player_color, $slice_idx),
                     MoveType::Unset => $slice.unset_mut(self.player_color, $slice_idx)
                 }
-
-                update_by_slice_each_color!(Color::Black, $direction, $slice, $slice_idx);
-                update_by_slice_each_color!(Color::White, $direction, $slice, $slice_idx);
             }};
         }
 
-
         let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
-        update_by_slice!(Direction::Horizontal, horizontal_slice, pos.col());
+        mutate_slice!(horizontal_slice, pos.col());
 
         let vertical_slice = &mut self.slices.vertical_slices[pos.col_usize()];
-        update_by_slice!(Direction::Vertical, vertical_slice, pos.row());
+        mutate_slice!(vertical_slice, pos.row());
 
         if let Some(ascending_slice) = self.slices.ascending_slice_mut(pos) {
-            update_by_slice!(Direction::Ascending, ascending_slice, pos.col() - ascending_slice.start_col);
+            mutate_slice!(ascending_slice, pos.col() - ascending_slice.start_col);
         }
 
         if let Some(descending_slice) = self.slices.descending_slice_mut(pos) {
-            update_by_slice!(Direction::Descending, descending_slice, pos.col() - descending_slice.start_col);
+            mutate_slice!(descending_slice, pos.col() - descending_slice.start_col);
         }
+
+        macro_rules! update_color {
+            ($color:expr) => {{
+                let horizontal_slice = &mut self.slices.horizontal_slices[pos.row_usize()];
+                update_by_slice_each_color!($color, Direction::Horizontal, horizontal_slice);
+
+                let vertical_slice = &mut self.slices.vertical_slices[pos.col_usize()];
+                update_by_slice_each_color!($color, Direction::Vertical, vertical_slice);
+
+                if let Some(ascending_slice) = self.slices.ascending_slice_mut(pos) {
+                    update_by_slice_each_color!($color, Direction::Ascending, ascending_slice);
+                }
+
+                if let Some(descending_slice) = self.slices.descending_slice_mut(pos) {
+                    update_by_slice_each_color!($color, Direction::Descending, descending_slice);
+                }
+            }};
+        }
+
+        update_color!(Color::Black);
+        update_color!(Color::White);
 
         self.validate_five();
 
