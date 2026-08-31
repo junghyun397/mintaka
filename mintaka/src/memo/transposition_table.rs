@@ -1,10 +1,10 @@
-use std::fmt::{Debug, Display};
-use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucket, TTFlag};
-use crate::value::{Depth, Depths};
+use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucket, TTEntryBucketProbe, TTFlag};
+use crate::value::Depth;
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::score::Score;
 use rusty_renju::utils::byte_size::ByteSize;
+use std::fmt::{Debug, Display};
 #[cfg(feature = "compress-tt")]
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -95,7 +95,7 @@ impl TranspositionTable {
             .map(|entry| entry.usage(self.age.load(Ordering::Relaxed) as u8))
             .sum();
 
-        used * 1000 / SAMPLE * TTEntryBucket::BUCKET_SIZE as usize
+        used * 1000 / SAMPLE * TTEntryBucket::BUCKET_SIZE
     }
 
     // compression level: 0-9
@@ -147,6 +147,26 @@ impl TranspositionTable {
     }
 }
 
+pub enum TTStore {
+    Searched {
+        best_move: MaybePos,
+        bound: Option<ScoreKind>,
+        depth: Depth,
+        eval: Score,
+        score: Score,
+        is_pv: bool,
+    },
+    EndgameCold {
+        depth: u8,
+    },
+    EndgameProven {
+        best_move: Pos,
+        bound: ScoreKind,
+        score: Score,
+        is_pv: bool,
+    },
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct TTView<'a> {
     table: &'a [TTEntryBucket],
@@ -158,14 +178,15 @@ impl TTView<'_> {
         ((u64::from(key) as u128 * (self.table.len() as u128)) >> 64) as usize
     }
 
-    pub fn probe(&self, key: HashKey) -> Option<TTEntry> {
+    pub fn probe(&self, key: HashKey) -> Option<TTEntryBucketProbe> {
         let idx = self.calculate_index(key);
         self.table[idx].probe(key)
     }
 
-    pub fn store_entry(&self, key: HashKey, entry: TTEntry) {
+    pub fn update_entry(&self, key: HashKey, slot: usize, entry: TTEntry) {
         let idx = self.calculate_index(key);
-        self.table[idx].store(key, entry);
+
+        self.table[idx].store(slot, key, entry);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -173,9 +194,9 @@ impl TTView<'_> {
         &self,
         key: HashKey,
         best_move: MaybePos,
-        maybe_score_kind: Option<ScoreKind>,
-        endgame_depth: u8,
         depth: Depth,
+        endgame_depth: u8,
+        maybe_score_kind: Option<ScoreKind>,
         eval: Score,
         score: Score,
         is_pv: bool,
@@ -186,18 +207,14 @@ impl TTView<'_> {
 
         let bucket = &self.table[idx];
 
-        if let Some(mut entry) = bucket.probe(key) {
-            if entry.tt_flag.is_endgame_proven() {
-                return;
-            }
-
+        if let Some(TTEntryBucketProbe { slot, mut entry }) = bucket.probe(key) {
             let entry_score_kind = entry.tt_flag.maybe_score_kind();
 
             let score_kind_value = maybe_score_kind.map_or(0, ScoreKind::into);
             let replace_score = depth + score_kind_value + 5;
             let keep_score = entry.depth as i32 + entry_score_kind.map_or(0, ScoreKind::into);
 
-            if self.age > entry.age as u32
+            if self.age != entry.tt_flag.age() as u32
                 || (maybe_score_kind == Some(ScoreKind::Exact)
                     && entry_score_kind != Some(ScoreKind::Exact))
                 || replace_score > keep_score
@@ -206,64 +223,35 @@ impl TTView<'_> {
                     entry.best_move = best_move;
                 }
 
-                entry.tt_flag = TTFlag::new(maybe_score_kind, is_pv, endgame_depth);
-                entry.age = self.age as u8;
-                entry.depth = clamp_depth(depth);
+                entry.tt_flag = TTFlag::new(self.age as u8, maybe_score_kind, is_pv);
+                entry.depth = depth as u8;
+                entry.endgame_depth = endgame_depth;
                 entry.eval = eval;
                 entry.score = score;
 
-                bucket.store(key, entry);
+                bucket.store(slot, key, entry);
             }
         } else {
-            let entry = TTEntry {
-                best_move,
-                tt_flag: TTFlag::new(maybe_score_kind, is_pv, endgame_depth),
-                age: self.age as u8,
-                depth: clamp_depth(depth),
-                eval,
-                score,
-            };
+            let replace_score = depth as u8;
 
-            bucket.store(key, entry);
-        }
-    }
+            for (slot, entry) in bucket.load_entries().map(TTEntry::from).iter().enumerate() {
+                if entry.depth - 6 * (self.age as u8 - entry.tt_flag.age()) > replace_score {
+                    continue;
+                }
 
-    pub fn store_endgame_proven(
-        &self,
-        key: HashKey,
-        response_pos: Pos,
-        score_kind: ScoreKind,
-        score: Score,
-        is_pv: bool,
-    ) {
-        let idx = self.calculate_index(key);
+                let entry = TTEntry {
+                    best_move,
+                    tt_flag: TTFlag::new(self.age as u8, maybe_score_kind, is_pv),
+                    depth: depth as u8,
+                    endgame_depth,
+                    eval,
+                    score,
+                };
 
-        let bucket = &self.table[idx];
+                bucket.store(slot, key, entry);
 
-        let score = score.unwrap() as i16;
-
-        if let Some(mut entry) = bucket.probe(key) {
-            if !entry.tt_flag.is_endgame_proven() {
-                entry.best_move = response_pos.into();
-                entry.tt_flag.set_endgame_proven();
-                entry.tt_flag.set_score_kind(score_kind);
-                entry.age = self.age as u8;
-                entry.depth = Depth::PLY_LIMIT as u8;
-                entry.score = score;
-
-                bucket.store(key, entry);
+                break;
             }
-        } else {
-            let entry = TTEntry {
-                best_move: response_pos.into(),
-                tt_flag: TTFlag::new_endgame_proven(score_kind, is_pv),
-                age: self.age as u8,
-                depth: Depth::PLY_LIMIT as u8,
-                eval: 0,
-                score,
-            };
-
-            bucket.store(key, entry);
         }
     }
 
@@ -285,10 +273,6 @@ impl TTView<'_> {
             );
         }
     }
-}
-
-fn clamp_depth(depth: Depth) -> u8 {
-    depth.clamp(0, u8::MAX as Depth) as u8
 }
 
 pub fn encode_mate_distance(score: Score, ply: usize) -> Score {

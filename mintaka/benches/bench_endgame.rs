@@ -51,7 +51,7 @@ mod bench_vcf {
             let td = ThreadData::new(WorkerThread::<Instant>::new(), 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
-                let result = search_endgame::endgame_search::<{ RuleKind::Renju }, false>(&mut td.clone(), Depth::MAX, &state, -Score::INF, Score::INF, Score::DRAW);
+                let result = search_endgame::endgame_search::<{ RuleKind::Renju }, false>(&mut td.clone(), Depth::MAX, &state, -Score::INF, Score::INF, Score::DRAW, true);
 
                 tt.clear();
 

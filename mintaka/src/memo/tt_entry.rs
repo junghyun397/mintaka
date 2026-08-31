@@ -1,3 +1,5 @@
+use std::simd::cmp::SimdPartialEq;
+use std::simd::Simd;
 use rusty_renju::assert_struct_sizes;
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
@@ -27,25 +29,22 @@ impl From<ScoreKind> for i32 {
     }
 }
 
-// endgame_depth(5) | endgame_win_sentinel(5) , is_pv(1) , score_kind(2)
+// age(5), is_pv(1) , score_kind(2)
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[repr(transparent)]
 pub struct TTFlag(u8);
 
 impl TTFlag {
-    pub const TT_ENDGAME_WIN_DEPTH: u8 = 0b11111;
     pub const MAX_TT_ENDGAME_DEPTH: u8 = 0b11110;
-    const TT_ENDGAME_WIN_MASK: u8 = Self::TT_ENDGAME_WIN_DEPTH << 3;
 
-    pub fn new(maybe_score_kind: Option<ScoreKind>, is_pv: bool, clamped_endgame_depth: u8) -> Self {
-        debug_assert!(clamped_endgame_depth <= Self::MAX_TT_ENDGAME_DEPTH);
-
+    pub fn new(age: u8, maybe_score_kind: Option<ScoreKind>, is_pv: bool) -> Self {
         let score_kind = maybe_score_kind.map_or(0, ScoreKind::into);
 
-        Self(score_kind | ((is_pv as u8) << 2) | clamped_endgame_depth << 3)
+        Self(score_kind | ((is_pv as u8) << 2) | age << 3)
     }
 
-    pub fn new_endgame_proven(score_kind: ScoreKind, is_pv: bool) -> Self {
-        Self(score_kind as u8 | ((is_pv as u8) << 2) | Self::TT_ENDGAME_WIN_MASK)
+    pub fn new_simple(age: u8, score_kind: ScoreKind, is_pv: bool) -> Self {
+        Self(age << 3 | ((is_pv as u8) << 2) | score_kind as u8)
     }
 
     pub fn maybe_score_kind(&self) -> Option<ScoreKind> {
@@ -66,10 +65,6 @@ impl TTFlag {
         (self.0 >> 2) & 0b1 == 0b1
     }
 
-    pub fn endgame_depth(&self) -> u8 {
-        self.0 >> 3
-    }
-
     pub fn set_score_kind(&mut self, score_kind: ScoreKind) {
         self.0 = (self.0 & !0b11) | score_kind as u8;
     }
@@ -78,16 +73,12 @@ impl TTFlag {
         self.0 = (self.0 & !(0b1 << 2)) | ((is_pv as u8) << 2);
     }
 
-    pub fn is_endgame_proven(&self) -> bool {
-        self.0 & Self::TT_ENDGAME_WIN_MASK == Self::TT_ENDGAME_WIN_MASK
+    pub fn age(&self) -> u8 {
+        self.0 >> 3
     }
 
-    pub fn set_endgame_proven(&mut self) {
-        self.0 |= Self::TT_ENDGAME_WIN_MASK;
-    }
-
-    pub fn set_endgame_depth(&mut self, clamped_endgame_depth: u8) {
-        self.0 = (self.0 & !(0b11111 << 3)) | (clamped_endgame_depth << 3);
+    pub fn set_age(&mut self, age: u8) {
+        self.0 = (self.0 & !(0b11111 << 3)) | (age << 3);
     }
 }
 
@@ -96,10 +87,14 @@ impl TTFlag {
 pub struct TTEntry {
     pub best_move: MaybePos, // 8
     pub tt_flag: TTFlag, // 8
-    pub age: u8, // 8
     pub depth: u8, // 8
+    pub endgame_depth: u8, // 8
     pub eval: i16, // 16
     pub score: i16, // 16
+}
+
+impl TTEntry {
+    pub const ENDGAME_PROVEN_DEPTH: u8 = u8::MAX;
 }
 
 assert_struct_sizes!(TTEntry, size=8, align=8);
@@ -119,69 +114,89 @@ impl From<u64> for TTEntry {
 #[derive(Debug)]
 #[repr(align(64))]
 pub struct TTEntryBucket {
-    keys: [AtomicU64; 2],
+    signatures: [AtomicU64; 2],
     entries: [AtomicU64; 6]
+}
+
+pub struct TTEntryBucketProbe {
+    pub entry: TTEntry,
+    pub slot: usize,
 }
 
 assert_struct_sizes!(TTEntryBucket, size=64, align=64);
 
 impl TTEntryBucket {
-    pub const BUCKET_SIZE: u64 = 6;
+    pub const BUCKET_SIZE: usize = 6;
+
+    const SIGNATURE_SHIFTS: [u64; 8] = [0, 21, 42, 0, 21, 42, 0, 0];
+
+    const ENTRY_HASH_MUL: u64 = 11400714819323198549;
 
     fn pack_hash_key(key: HashKey) -> u64 {
         u64::from(key) & KEY_MASK
     }
 
-    fn shuffle_pack_entry(entry: u64) -> u64 {
-        entry.wrapping_mul(11400714819323198549) >> KEY_SHIFT // fibonacci hashing
+    pub fn load_entries(&self) -> [u64; Self::BUCKET_SIZE] {
+        std::array::from_fn(|slot_idx|
+            self.entries[slot_idx].load(Ordering::Relaxed)
+        )
     }
 
-    fn calculate_slot_index(packed_key: u64) -> usize {
-        ((packed_key * Self::BUCKET_SIZE) >> KEY_SIZE) as usize
+    pub fn probe(&self, key: HashKey) -> Option<TTEntryBucketProbe> {
+        let signature_hi = self.signatures[0].load(Ordering::Acquire);
+        let signature_lo = self.signatures[1].load(Ordering::Acquire);
+
+        let entries = self.load_entries();
+
+        let entries = Simd::<u64, 8>::from_array([
+            entries[0], entries[1], entries[2],
+            entries[3], entries[4], entries[5],
+            0, 0,
+        ]);
+
+        let signatures = Simd::<u64, 8>::from_array([
+            signature_hi, signature_hi, signature_hi,
+            signature_lo, signature_lo, signature_lo,
+            0, 0,
+        ]);
+
+        let stored_signatures = (signatures >> Simd::<u64, 8>::from_array(Self::SIGNATURE_SHIFTS))
+            & Simd::<u64, 8>::splat(KEY_MASK);
+
+        let entry_checksums = (entries * Simd::<u64, 8>::splat(Self::ENTRY_HASH_MUL))
+            >> KEY_SHIFT;
+
+        let signature_matches = (
+            (stored_signatures ^ entry_checksums).simd_eq(Simd::<u64, 8>::splat(Self::pack_hash_key(key)))
+                & entries.simd_ne(Simd::<u64, 8>::splat(0))
+        ).to_bitmask() & 0b111111;
+
+        if signature_matches == 0 {
+            None
+        } else {
+            let slot = signature_matches.trailing_zeros() as usize;
+
+            Some(TTEntryBucketProbe { slot, entry: entries[slot].into() })
+        }
     }
 
-    fn calculate_lane_shift(slot_idx: usize) -> usize {
-        KEY_SIZE * (slot_idx % 3)
-    }
+    pub fn store(&self, slot: usize, key: HashKey, entry: TTEntry) {
+        let entry = u64::from(entry);
 
-    pub fn probe(&self, key: HashKey) -> Option<TTEntry> {
-        let packed_key = Self::pack_hash_key(key);
+        let signature = Self::pack_hash_key(key) ^ (entry.wrapping_mul(Self::ENTRY_HASH_MUL) >> KEY_SHIFT);
 
-        let slot_idx = Self::calculate_slot_index(packed_key);
-        let keys_idx = slot_idx / 3;
-        let lane_shift = Self::calculate_lane_shift(slot_idx);
+        self.entries[slot].store(entry, Ordering::Relaxed);
 
-        let stored_key = (self.keys[keys_idx].load(Ordering::Relaxed) >> lane_shift) & KEY_MASK;
-        let stored_entry = self.entries[slot_idx].load(Ordering::Relaxed);
+        let shift = KEY_SIZE * (slot % 3);
 
-        (stored_key ^ Self::shuffle_pack_entry(stored_entry) == packed_key)
-            .then(|| stored_entry.into())
-    }
-
-    fn store_key(&self, slot_idx: usize, shuffle_packed_key: u64) {
-        let keys_idx = slot_idx / 3;
-        let lane_shift = Self::calculate_lane_shift(slot_idx);
-
-        self.keys[keys_idx]
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |keys|
-                Some((keys & !(KEY_MASK << lane_shift)) | (shuffle_packed_key << lane_shift))
-            )
-            .ok();
-    }
-
-    pub fn store(&self, key: HashKey, entry: TTEntry) {
-        let entry: u64 = entry.into();
-        let packed_key = Self::pack_hash_key(key);
-
-        let slot_idx = Self::calculate_slot_index(packed_key);
-
-        self.store_key(slot_idx, packed_key ^ Self::shuffle_pack_entry(entry));
-        self.entries[slot_idx].store(entry, Ordering::Relaxed);
+        self.signatures[slot / 3].try_update(Ordering::Release, Ordering::Relaxed, |old|
+            Some((old & !(KEY_MASK << shift)) | (signature << shift))
+        ).unwrap();
     }
 
     pub fn clear(&self) {
-        for keys in &self.keys {
-            keys.store(0, Ordering::Relaxed);
+        for signature in &self.signatures {
+            signature.store(0, Ordering::Relaxed);
         }
 
         for entry in &self.entries {
@@ -195,7 +210,7 @@ impl TTEntryBucket {
             .map(|entry| {
                 let entry = entry.load(Ordering::Relaxed);
 
-                (entry != 0 && TTEntry::from(entry).age == age) as usize
+                (entry != 0 && TTEntry::from(entry).tt_flag.age() == age) as usize
             })
             .sum()
     }

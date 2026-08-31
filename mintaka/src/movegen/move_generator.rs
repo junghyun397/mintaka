@@ -93,7 +93,7 @@ pub fn generate_all_moves<const R: RuleKind>(
     let policy_buffer = td.evaluator.eval_policy(state);
 
     let field = state.board.legal_field(state.board.player_color) & state.movegen_window.movegen_field;
-    let player_pattern = state.board.patterns.field[state.board.player_color];
+    let player_pattern = &state.board.patterns.field[state.board.player_color];
 
     let counter_move = counter_move_from(td, state);
 

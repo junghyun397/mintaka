@@ -2,7 +2,7 @@ use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::memo::history_table::{QuietPlied, TacticalPlied};
 use crate::memo::transposition_table;
-use crate::memo::tt_entry::{ScoreKind, TTFlag};
+use crate::memo::tt_entry::{ScoreKind, TTEntryBucketProbe, TTFlag};
 use crate::movegen::move_generator;
 use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker::{MovePicker, ThreatKind};
@@ -301,7 +301,8 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     let tt_entry = td.tt.probe(state.board.hash_key);
 
     // endgame-hit
-    if let Some(entry) = tt_entry && entry.tt_flag.is_endgame_proven() {
+    if let Some(TTEntryBucketProbe { entry, ..} ) = &tt_entry
+        && entry.endgame_depth == u8::MAX {
         if NT::IS_ROOT {
             td.best_move = entry.best_move;
             td.singular_root = true;
@@ -315,12 +316,13 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     }
 
     match tt_entry {
-        Some(entry) if entry.tt_flag.maybe_score_kind().is_some() => { // full-tt
+        Some(TTEntryBucketProbe { entry, .. })
+        if entry.tt_flag.maybe_score_kind().is_some() => { // full-tt
             let tt_score = transposition_table::decode_mate_distance(Score::from_i32_unchecked(entry.score as i32), td.ply);
 
             tt_move = entry.best_move;
             tt_pv = entry.tt_flag.is_pv();
-            tt_endgame_depth = entry.tt_flag.endgame_depth();
+            tt_endgame_depth = entry.endgame_depth;
 
             // tt-cutoff
             if !NT::IS_PV
@@ -349,19 +351,19 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
             static_eval = Score::from_i32_unchecked(entry.eval as i32);
         }
-        Some(entry) => { // endgame-tt
+        Some(TTEntryBucketProbe { entry, .. }) => { // endgame-tt
             tt_move = MaybePos::NONE;
             tt_pv = false;
-            tt_endgame_depth = entry.tt_flag.endgame_depth();
+            tt_endgame_depth = entry.endgame_depth;
 
             static_eval = Score::from_i32_unchecked(entry.eval as i32);
 
             td.tt.store(
                 state.board.hash_key,
                 MaybePos::NONE,
-                None,
-                tt_endgame_depth,
                 0,
+                tt_endgame_depth,
+                None,
                 static_eval,
                 Score::DRAW,
                 false,
@@ -375,9 +377,9 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             td.tt.store(
                 state.board.hash_key,
                 MaybePos::NONE,
+                0,
+                0,
                 None,
-                0,
-                0,
                 static_eval,
                 Score::DRAW,
                 false,
@@ -409,13 +411,13 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         if static_eval >= beta
             || alpha.is_win()
-            || tt_endgame_depth >= vcf_depth.min(TTFlag::MAX_TT_ENDGAME_DEPTH as Depth) as u8
+            || tt_endgame_depth >= vcf_depth as u8
         {
             return static_eval;
         }
 
         return endgame_search::<R, false>(
-            td, vcf_depth, state, alpha, beta, static_eval
+            td, vcf_depth, state, alpha, beta, static_eval, !cut_node,
         );
     }
 
@@ -626,9 +628,9 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     td.tt.store(
         state.board.hash_key,
         best_move,
-        Some(score_kind),
-        tt_endgame_depth,
         depth_left,
+        tt_endgame_depth,
+        Some(score_kind),
         static_eval,
         transposition_table::encode_mate_distance(best_score, td.ply),
         tt_pv | NT::IS_PV,
