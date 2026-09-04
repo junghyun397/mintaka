@@ -6,14 +6,14 @@ use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucketProbe};
 use crate::movegen::move_generator::generate_endgame_moves;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
-use crate::value::Depth;
+use crate::utils::depth::Depth;
 use rusty_renju::board::Board;
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
-use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::score::Score;
+use rusty_renju::notation::score::{MaybeScore, Score};
+use rusty_renju::notation::pos;
 use rusty_renju::pattern::Pattern;
 use std::cmp::Reverse;
 
@@ -135,7 +135,7 @@ pub struct EndgameFrame {
 impl EndgameFrame {
     pub const EMPTY: Self = Self {
         moves: EndgameMovesUnchecked::EMPTY,
-        alpha: Score::NAN,
+        alpha: Score::NEG_INF,
         four_pos: MaybePos::INVALID_POS,
         response_pos: MaybePos::INVALID_POS,
     };
@@ -173,7 +173,7 @@ impl VcfDestination for VcfCounter {
 
 pub fn endgame_search<const R: RuleKind, const VCT: bool>(
     td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
-    max_ply: Depth,
+    max_ply: u8,
     state: &GameState<R>,
     alpha: Score, beta: Score,
     static_eval: Score,
@@ -228,7 +228,7 @@ pub fn endgame_sequence<const R: RuleKind, const VCT: bool>(
         todo!()
     } else {
         vcf::<R, 5, VecSequenceTracker>(
-            td, VcfWin,  Depth::MAX,
+            td, VcfWin, pos::U8_BOARD_SIZE,
             *state, endgame_moves,
             Score::DRAW, Score::NEG_INF, Score::INF,
             true,
@@ -244,7 +244,7 @@ pub fn endgame_sequence<const R: RuleKind, const VCT: bool>(
 fn vcf<const R: RuleKind, const DW: u8, Sq: SequenceTracker>(
     td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
     dest: impl VcfDestination,
-    max_depth: Depth,
+    max_depth: u8,
     state: GameState<R>,
     vcf_moves: EndgameMovesUnchecked,
     static_eval: Score,
@@ -252,8 +252,8 @@ fn vcf<const R: RuleKind, const DW: u8, Sq: SequenceTracker>(
     is_pv: bool,
 ) -> Sq::Output {
     match state.board.player_color {
-        Color::Black => try_vcf::<R, { Color::Black }, DW, _, Sq>(td, dest, max_depth as u8, state, vcf_moves, static_eval, alpha, beta, is_pv),
-        Color::White => try_vcf::<R, { Color::White }, DW, _, Sq>(td, dest, max_depth as u8, state, vcf_moves, static_eval, alpha, beta, is_pv),
+        Color::Black => try_vcf::<R, { Color::Black }, DW, _, Sq>(td, dest, max_depth, state, vcf_moves, static_eval, alpha, beta, is_pv),
+        Color::White => try_vcf::<R, { Color::White }, DW, _, Sq>(td, dest, max_depth, state, vcf_moves, static_eval, alpha, beta, is_pv),
     }
 }
 
@@ -279,19 +279,17 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
         four_pos: Pos,
         is_pv: bool,
     ) -> Sq {
-        let total_ply = td.ply + vcf_ply;
-
-        let win_score = Score::win_in(total_ply);
-        let lose_score = Score::lose_in(total_ply);
+        let win_score = Score::win_in(vcf_ply);
+        let lose_score = Score::lose_in(vcf_ply);
 
         let mut result = Sq::unit(four_pos);
 
         while let Some(frame) = td.pop_endgame_frame() {
             hash_key = hash_key.set(player_color, frame.response_pos);
-            tt_store_vcf_lose(&td.tt, hash_key, frame.response_pos, lose_score, total_ply, is_pv);
+            tt_store_vcf_lose(&td.tt, hash_key, frame.response_pos, lose_score, vcf_ply, is_pv);
 
             hash_key = hash_key.set(!player_color, frame.four_pos);
-            tt_store_vcf_win(&td.tt, hash_key, frame.four_pos, win_score, total_ply, is_pv);
+            tt_store_vcf_win(&td.tt, hash_key, frame.four_pos, win_score, vcf_ply, is_pv);
 
             result.push(frame.response_pos, frame.four_pos);
         }
@@ -322,10 +320,9 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
             }
 
             if player_pattern.has_open_four() {
-                let total_ply = td.ply + vcf_ply;
-                let win_score = Score::win_in(total_ply);
+                let win_score = Score::win_in(vcf_ply);
 
-                tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, win_score, total_ply, is_pv);
+                tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, win_score, vcf_ply, is_pv);
 
                 let trace_result = backtrace_frames(td, state.board.hash_key, !state.board.player_color, vcf_ply, four_pos, is_pv);
 
@@ -366,10 +363,9 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
                 response_four_count == 0
                     && (player_pattern.has_open_three() || dest.additional_reached(four_pos))
             ) {
-                let total_ply = td.ply + vcf_ply;
-                let win_score = Score::win_in(total_ply);
+                let win_score = Score::win_in(vcf_ply);
 
-                tt_store_vcf_win(&td.tt, parent_hash_key, four_pos, win_score, total_ply, is_pv);
+                tt_store_vcf_win(&td.tt, parent_hash_key, four_pos, win_score, vcf_ply, is_pv);
 
                 let trace_result = backtrace_frames(td, parent_hash_key, parent_player_color, vcf_ply, four_pos, is_pv);
 
@@ -391,12 +387,13 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
             }
 
             if let Some(TTEntryBucketProbe { entry, .. }) = td.tt.probe(tt_key) {
-                // tt cutoff
-                if Score::from_i32_unchecked(entry.score as i32).is_win() {
-                    let total_ply = td.ply + vcf_ply;
-                    let win_score = Score::win_in(total_ply);
+                let tt_score = MaybeScore::from(entry.score as i32);
 
-                    tt_store_vcf_win(&td.tt, parent_hash_key, four_pos, win_score, total_ply, is_pv);
+                // tt cutoff
+                if tt_score.is_some() && tt_score.unwrap().is_win() {
+                    let win_score = Score::win_in(vcf_ply);
+
+                    tt_store_vcf_win(&td.tt, parent_hash_key, four_pos, win_score, vcf_ply, is_pv);
 
                     let trace_result = backtrace_frames(td, parent_hash_key, parent_player_color, vcf_ply, four_pos, is_pv);
 
@@ -473,11 +470,11 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Sq: 
             td.tt.store(
                 state.board.hash_key,
                 MaybePos::NONE,
-                0,
+                Depth::ZERO,
                 vcf_depth_left,
                 None,
-                Score::NAN,
-                Score::DRAW,
+                MaybeScore::NONE,
+                MaybeScore::NONE,
                 false,
             );
         }
@@ -511,11 +508,11 @@ fn tt_store_vcf_win(
     tt.store(
         hash_key,
         four_pos.into(),
-        0,
+        Depth::ZERO,
         TTEntry::ENDGAME_PROVEN_DEPTH,
         Some(ScoreKind::LowerBound),
-        Score::NAN,
-        transposition_table::encode_mate_distance(score, ply),
+        score.into(),
+        transposition_table::encode_mate_distance(score, ply).into(),
         is_pv,
     );
 }
@@ -532,11 +529,11 @@ fn tt_store_vcf_lose(
     tt.store(
         hash_key,
         response_pos.into(),
-        0,
+        Depth::ZERO,
         TTEntry::ENDGAME_PROVEN_DEPTH,
         Some(ScoreKind::UpperBound),
-        Score::NAN,
-        transposition_table::encode_mate_distance(score, ply),
+        score.into(),
+        transposition_table::encode_mate_distance(score, ply).into(),
         is_pv,
     );
 }

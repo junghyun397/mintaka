@@ -2,22 +2,24 @@ use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::memo::history_table::{QuietPlied, TacticalPlied};
 use crate::memo::transposition_table;
-use crate::memo::tt_entry::{ScoreKind, TTEntryBucketProbe, TTFlag};
+use crate::memo::tt_entry::{ScoreKind, TTEntryBucketProbe};
 use crate::movegen::move_generator;
 use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker::{MovePicker, ThreatKind};
+use crate::params;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
 use crate::search_endgame::endgame_search;
 use crate::thread_data::{SearchFrame, ThreadData};
 use crate::thread_type::ThreadType;
-use crate::value::Depth;
-use crate::{params, value};
+use crate::utils::depth;
+use crate::utils::depth::Depth;
 use rusty_renju::const_for;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::score::Score;
+use rusty_renju::notation::score::{MaybeScore, Score};
+use rusty_renju::notation::pos;
 
 trait NodeType {
     const IS_ROOT: bool;
@@ -50,17 +52,19 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
 ) -> (Score, MaybePos) {
     let position_hash = state.board.hash_key;
 
-    let mut score: Score = Score::ABORT;
+    let mut score: Score = Score::DRAW;
     let mut best_move = MaybePos::NONE;
     let mut root_pv = PrincipalVariation::EMPTY;
-    let mut selective_depth = 0;
+    let mut selective_depth = Depth::ZERO;
 
     let mut mate_count = 0;
     let mut best_move_changes = 0;
 
-    let starting_depth = (td.tid % 10 + 1) as Depth;
-    'iterative_deepening: for depth in starting_depth ..= td.config.max_depth() {
-        let iter_score = if depth < 5 {
+    let starting_depth = Depth::from_i32(td.tid as i32 % 10 + 1);
+    'iterative_deepening: for depth in starting_depth.value() ..= td.config.max_depth().value() {
+        let depth = Depth::from_i32(depth);
+
+        let iter_score = if depth < Depth::from_i32(5) {
             pvs::<R, TH, RootNode>(td, &mut state, depth, Score::NEG_INF, Score::INF, false)
         } else {
             aspiration::<R, TH>(td, &mut state, depth, score)
@@ -87,14 +91,14 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
                 pv: td.pvs[0],
                 total_nodes_in_1k: td.batch_counter.count_global_in_1k(),
                 time_elapsed: td.thread_type.time_manager().elapsed(),
-                selective_depth: selective_depth as Depth,
+                selective_depth,
             })
         }
 
         if iter_score.is_mate() {
             mate_count += 1;
 
-            if depth - starting_depth > 10
+            if depth - starting_depth > Depth::from_i32(10)
                 && mate_count > 4
             {
                 break 'iterative_deepening;
@@ -146,7 +150,7 @@ fn aspiration<const R: RuleKind, TH: ThreadType>(
 ) -> Score {
     let mut depth = max_depth;
 
-    let mut delta = params::ASPIRATION_DELTA_BASE + prev_score.unwrap().pow(2) / params::ASPIRATION_DELTA_DIV;
+    let mut delta = params::ASPIRATION_DELTA_BASE + prev_score.value().pow(2) / params::ASPIRATION_DELTA_DIV;
     let mut alpha = prev_score - delta;
     let mut beta = prev_score + delta;
 
@@ -189,11 +193,11 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         && td.search_limit_exceeded()
     {
         td.set_aborted();
-        return Score::ABORT;
+        return Score::DRAW;
     }
 
     if td.is_aborted() {
-        return Score::ABORT;
+        return Score::DRAW;
     }
 
     if td.config.draw_condition.is_some_and(|draw_in| state.len() as u32 >= draw_in) {
@@ -204,18 +208,18 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
     td.pvs[td.ply].clear();
 
-    td.selective_depth = td.selective_depth.max(td.ply);
+    td.selective_depth = td.selective_depth.max((td.ply as i32).into());
 
     {
         let (score, pos) = find_immediate_win(state, td.ply);
 
-        if score != Score::NAN { // immediate win or lose
+        if score.is_some() { // immediate win or lose
             if NT::IS_ROOT {
                 td.singular_root = true;
                 td.best_move = pos;
             }
 
-            return score;
+            return score.unwrap();
         }
 
         if let Some(pos) = pos.ok() { // defend immediate win
@@ -232,7 +236,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             td.ss[td.ply] = SearchFrame {
                 pos: pos.into(),
                 static_eval: parent_eval,
-                evaluator_eval: Score::NAN,
+                evaluator_eval: MaybeScore::NONE,
                 on_pv: NT::IS_PV,
                 recovery_state: state.recovery_state(),
                 searching: MaybePos::NONE,
@@ -293,7 +297,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         threat_kind = None;
     };
 
-    let mut static_eval = Score::NAN;
+    let mut static_eval = MaybeScore::NONE;
     let tt_move: MaybePos;
     let tt_pv: bool;
     let tt_endgame_depth: u8;
@@ -312,13 +316,13 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             td.pvs[td.ply].load(entry.best_move, PrincipalVariation::EMPTY);
         }
 
-        return transposition_table::decode_mate_distance(Score::from_i32_unchecked(entry.score as i32), td.ply);
+        return transposition_table::decode_mate_distance(Score::from_i32(entry.score as i32), td.ply);
     }
 
     match tt_entry {
         Some(TTEntryBucketProbe { entry, .. })
         if entry.tt_flag.maybe_score_kind().is_some() => { // full-tt
-            let tt_score = transposition_table::decode_mate_distance(Score::from_i32_unchecked(entry.score as i32), td.ply);
+            let tt_score = transposition_table::decode_mate_distance(Score::from_i32(entry.score as i32), td.ply);
 
             tt_move = entry.best_move;
             tt_pv = entry.tt_flag.is_pv();
@@ -326,7 +330,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
             // tt-cutoff
             if !NT::IS_PV
-                && depth_left <= entry.depth as Depth
+                && depth_left <= Depth::from_i32(entry.depth as i32)
                 && match entry.tt_flag.score_kind() {
                     ScoreKind::LowerBound => tt_score >= beta,
                     ScoreKind::UpperBound => tt_score <= alpha,
@@ -349,23 +353,23 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 return tt_score;
             }
 
-            static_eval = Score::from_i32_unchecked(entry.eval as i32);
+            static_eval = Score::from_i32(entry.eval as i32).into();
         }
         Some(TTEntryBucketProbe { entry, .. }) => { // endgame-tt
             tt_move = MaybePos::NONE;
             tt_pv = false;
             tt_endgame_depth = entry.endgame_depth;
 
-            static_eval = Score::from_i32_unchecked(entry.eval as i32);
+            static_eval = MaybeScore::NONE;
 
             td.tt.store(
                 state.board.hash_key,
                 MaybePos::NONE,
-                0,
+                Depth::ZERO,
                 tt_endgame_depth,
                 None,
                 static_eval,
-                Score::DRAW,
+                Score::DRAW.into(),
                 false,
             );
         }
@@ -377,47 +381,50 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             td.tt.store(
                 state.board.hash_key,
                 MaybePos::NONE,
-                0,
+                Depth::ZERO,
                 0,
                 None,
                 static_eval,
-                Score::DRAW,
+                Score::DRAW.into(),
                 false,
             );
         }
     }
 
-    if static_eval.is_nan() {
+    if static_eval.is_none() {
         let evaluator_eval = td.evaluator.eval_value(state);
-        td.ss[td.ply].evaluator_eval = evaluator_eval;
 
-        if td.evaluator.require_stabilize() && td.ply > 0 {
-            static_eval = (-td.ss[td.ply - 1].evaluator_eval.fallback(evaluator_eval) + evaluator_eval) / 2;
+        td.ss[td.ply].evaluator_eval = evaluator_eval.into();
+
+        static_eval = if td.evaluator.require_stabilize() && td.ply > 0 {
+            (-td.ss[td.ply - 1].evaluator_eval.unwrap_or(evaluator_eval) + evaluator_eval) / 2
         } else {
-            static_eval = evaluator_eval;
-        }
+            evaluator_eval
+        }.into()
     }
+
+    let static_eval = static_eval.unwrap();
 
     td.ss[td.ply].static_eval = static_eval;
 
     let static_eval_improvement = if td.ply > 1 {
-        (static_eval - td.ss[td.ply - 2].static_eval.fallback(static_eval)).unwrap_unchecked()
+        static_eval - td.ss[td.ply - 2].static_eval
     } else {
-        Score::DRAW.unwrap_unchecked()
-    };
+        Score::DRAW
+    }.value();
 
-    if depth_left <= 0 || td.ply >= value::MAX_PLY {
-        let vcf_depth = td.config.max_vcf_depth.unwrap_or(30);
+    if depth_left <= Depth::ZERO || td.ply >= depth::MAX_PLY {
+        let vcf_depth = td.config.max_vcf_depth.unwrap_or(pos::BOARD_SIZE as u8);
 
         if static_eval >= beta
             || alpha.is_win()
-            || tt_endgame_depth >= vcf_depth as u8
+            || tt_endgame_depth >= vcf_depth
         {
             return static_eval;
         }
 
         return endgame_search::<R, false>(
-            td, vcf_depth, state, alpha, beta, static_eval, !cut_node,
+            td, vcf_depth, state, alpha, beta, static_eval, NT::IS_PV,
         );
     }
 
@@ -466,7 +473,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             }
 
             // futility pruning
-            let fp_margin = params::FP_BASE + params::FP_MUL * depth_left * depth_left;
+            let fp_margin = params::FP_BASE + params::FP_MUL * depth_left.value() * depth_left.value();
             if !alpha.is_win()
                  && static_eval + fp_margin <= alpha
             {
@@ -492,10 +499,10 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         }
 
         let new_full_depth = depth_left - 1;
-        let mut reduction = 0;
+        let mut reduction = Depth::ZERO;
 
         // late move reduction
-        if depth_left > 2
+        if depth_left > Depth::from_i32(2)
             && moves_made > 1 + NT::IS_ROOT as usize
             && move_score < move_generator::KILLER_MOVE_SCORE
             && threat_kind.is_none()
@@ -503,31 +510,31 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             reduction = td.lookup_lmr_table(depth_left, moves_made);
 
             // cut-node reduction
-            reduction += Depth::from(cut_node);
+            reduction += Depth::from_i32(cut_node as i32);
 
             // reduction pv less
-            reduction -= Depth::from(NT::IS_PV);
+            reduction += Depth::from_i32(NT::IS_PV as i32);
 
             // reduction tactical less
             if is_tactical
                 && td.ply < 4
             {
-                reduction -= 1;
+                reduction -= Depth::from_i32(1);
             }
 
             // reduction history score
             if let Some(history_score) = history_score {
                 if history_score > 0 {
-                    reduction -= 1;
+                    reduction -= Depth::from_i32(1);
                 } else if history_score < -4096 {
-                    reduction += 1;
+                    reduction += Depth::from_i32(1);
                 }
             }
 
-            reduction = reduction.clamp(0, new_full_depth);
+            reduction = reduction.clamp_value(new_full_depth);
         }
 
-        let new_depth = (new_full_depth - reduction).clamp(0, new_full_depth);
+        let new_depth = (new_full_depth - reduction).clamp_value(new_full_depth);
 
         let nodes_before = td.batch_counter.count_local_in_1k();
 
@@ -631,48 +638,48 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         depth_left,
         tt_endgame_depth,
         Some(score_kind),
-        static_eval,
-        transposition_table::encode_mate_distance(best_score, td.ply),
+        static_eval.into(),
+        transposition_table::encode_mate_distance(best_score, td.ply).into(),
         tt_pv | NT::IS_PV,
     );
 
     best_score
 }
 
-fn find_immediate_win<const R: RuleKind>(state: &GameState<R>, ply: usize) -> (Score, MaybePos) {
+fn find_immediate_win<const R: RuleKind>(state: &GameState<R>, ply: usize) -> (MaybeScore, MaybePos) {
     if let Some(pos) = state.board.patterns.five_pos[state.board.player_color].ok()
     { // five
-        return (Score::win_in(ply + 1), pos.into())
+        return (Score::win_in(ply + 1).into(), pos.into())
     }
 
     if let Some(pos) = state.board.patterns.five_pos[!state.board.player_color].ok() {
         if state.board.player_color == Color::Black
             && state.board.patterns.is_forbidden(pos)
         { // trap
-            return (Score::lose_in(ply + 2), MaybePos::NONE)
+            return (Score::lose_in(ply + 2).into(), MaybePos::NONE)
         }
 
         if 1 < state.board.patterns.field[!state.board.player_color].iter()
             .filter(|pattern| pattern.has_five())
             .count()
         { // opponent-five
-            return (Score::lose_in(ply + 2), pos.into())
+            return (Score::lose_in(ply + 2).into(), pos.into())
         }
 
-        return (Score::NAN, pos.into())
+        return (MaybeScore::NONE, pos.into())
     }
 
     if let Some(pos) = state.board.patterns.effective_fork_four_field(state.board.player_color)
         .first_pos()
     { // open-four
-        return (Score::win_in(ply + 3), pos.into());
+        return (Score::win_in(ply + 3).into(), pos.into());
     }
 
-    (Score::NAN, MaybePos::NONE)
+    (MaybeScore::NONE, MaybePos::NONE)
 }
 
 fn lookup_lmp_mc_table(depth: Depth, is_improving: bool) -> usize {
-    let clamped_depth = (depth - 1).min(11) as usize;
+    let clamped_depth = (depth.value() - 1).min(11) as usize;
 
     LMP_MC_TABLE[is_improving as usize][clamped_depth]
 }

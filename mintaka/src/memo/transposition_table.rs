@@ -1,25 +1,25 @@
 use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucket, TTEntryBucketProbe, TTFlag};
-use crate::value::Depth;
 use rusty_renju::hash_key::HashKey;
-use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::score::Score;
+use rusty_renju::notation::pos::MaybePos;
+use rusty_renju::notation::score::{MaybeScore, Score};
 use rusty_renju::utils::byte_size::ByteSize;
 use std::fmt::{Debug, Display};
 #[cfg(feature = "compress-tt")]
 use std::io::{Read, Write};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::time::Duration;
+use crate::utils::depth::Depth;
 
 pub struct TranspositionTable {
     table: Vec<TTEntryBucket>,
-    age: AtomicU32,
+    age: AtomicU8,
 }
 
 impl TranspositionTable {
     pub fn new_with_size(size: ByteSize) -> Self {
         let mut new = Self {
             table: Vec::new(),
-            age: AtomicU32::new(0),
+            age: AtomicU8::new(0),
         };
 
         new.resize(size);
@@ -35,12 +35,14 @@ impl TranspositionTable {
         size.bytes() as usize / size_of::<TTEntryBucket>()
     }
 
-    pub fn fetch_age(&self) -> u32 {
+    pub fn fetch_age(&self) -> u8 {
         self.age.load(Ordering::Relaxed)
     }
 
     pub fn increase_age(&self) {
-        self.age.fetch_add(1, Ordering::Relaxed);
+        self.age.try_update(Ordering::Acquire, Ordering::Relaxed, |age|
+            Some(age.wrapping_add(1) & TTFlag::MAX_AGE)
+        ).unwrap();
     }
 
     pub fn clear_age(&self) {
@@ -81,32 +83,32 @@ impl TranspositionTable {
 
     pub fn optimal_size(nps: usize, expected_runtime: Duration) -> ByteSize {
         const FILL_FACTOR: f64 = 0.75;
-        const ENTRY_SIZE: f64 = size_of::<TTEntryBucket>() as f64 / TTEntryBucket::BUCKET_SIZE as f64;
+        const ENTRY_SIZE: f64 = size_of::<TTEntryBucket>() as f64 * TTEntryBucket::BUCKET_SIZE as f64;
 
-        let total_nodes = nps as f64 * expected_runtime.as_secs() as f64;
+        let total_nodes = nps as f64 * expected_runtime.as_millis() as f64 / 1000.0;
         ByteSize::from_bytes((total_nodes / ENTRY_SIZE * FILL_FACTOR) as u64)
     }
 
-    pub fn hash_full_permille(&self) -> usize {
+    pub fn hash_full_permille(&self, reference_age: u8) -> usize {
         const SAMPLE: usize = 1000;
 
         let used: usize = self.table.iter()
             .take(SAMPLE)
-            .map(|entry| entry.usage(self.age.load(Ordering::Relaxed) as u8))
+            .map(|entry| entry.usage(reference_age))
             .sum();
 
-        used * 1000 / SAMPLE * TTEntryBucket::BUCKET_SIZE
+        used * 1000 / (SAMPLE * TTEntryBucket::BUCKET_SIZE)
     }
 
     // compression level: 0-9
     pub fn export(&self, compression_level: u32) -> Vec<u8> {
-        let age = self.fetch_age().to_be_bytes();
+        let age = (self.fetch_age() as u64).to_be_bytes();
         let byte_len = self.table.len() * size_of::<TTEntryBucket>();
         let byte_cap = self.table.capacity() * size_of::<TTEntryBucket>();
 
         let table_ptr = self.table.as_ptr() as *mut u8;
 
-        let mut bytes = Vec::with_capacity(byte_cap + 1);
+        let mut bytes = Vec::with_capacity(byte_cap + 8);
         bytes.extend(age);
         bytes.extend_from_slice(unsafe { std::slice::from_raw_parts(table_ptr, byte_len) });
         tt_compress(&bytes, compression_level)
@@ -116,12 +118,13 @@ impl TranspositionTable {
     pub fn import(source: Vec<u8>) -> Result<Self, TTImportError> {
         let decompressed = tt_decompress(source)?;
 
-        let age: u32 = (&decompressed[0..4])
+        let age = (&decompressed[0..8])
             .try_into()
-            .map(u32::from_be_bytes)
-            .unwrap_or_default();
+            .map(u64::from_be_bytes)
+            .unwrap_or_default()
+            as u8;
 
-        let payload = &decompressed[4..];
+        let payload = &decompressed[8..];
 
         if !payload.len().is_multiple_of(size_of::<TTEntryBucket>()) {
             return Err(TTImportError::BrokenPayload);
@@ -142,38 +145,22 @@ impl TranspositionTable {
 
         Ok(Self {
             table,
-            age: AtomicU32::new(age),
+            age: AtomicU8::new(age),
         })
     }
-}
-
-pub enum TTStore {
-    Searched {
-        best_move: MaybePos,
-        bound: Option<ScoreKind>,
-        depth: Depth,
-        eval: Score,
-        score: Score,
-        is_pv: bool,
-    },
-    EndgameCold {
-        depth: u8,
-    },
-    EndgameProven {
-        best_move: Pos,
-        bound: ScoreKind,
-        score: Score,
-        is_pv: bool,
-    },
 }
 
 #[derive(Debug, Copy, Clone)]
 pub struct TTView<'a> {
     table: &'a [TTEntryBucket],
-    pub age: u32,
+    pub age: u8,
 }
 
 impl TTView<'_> {
+    fn relative_age(&self, age: u8) -> u8 {
+        (age.wrapping_sub(self.age)) & TTFlag::MAX_AGE
+    }
+
     fn calculate_index(&self, key: HashKey) -> usize {
         ((u64::from(key) as u128 * (self.table.len() as u128)) >> 64) as usize
     }
@@ -197,61 +184,62 @@ impl TTView<'_> {
         depth: Depth,
         endgame_depth: u8,
         maybe_score_kind: Option<ScoreKind>,
-        eval: Score,
-        score: Score,
+        eval: MaybeScore,
+        score: MaybeScore,
         is_pv: bool,
     ) {
         let idx = self.calculate_index(key);
-        let eval = eval.unwrap_unchecked() as i16;
-        let score = score.unwrap_unchecked() as i16;
 
         let bucket = &self.table[idx];
 
-        if let Some(TTEntryBucketProbe { slot, mut entry }) = bucket.probe(key) {
-            let entry_score_kind = entry.tt_flag.maybe_score_kind();
-
-            let score_kind_value = maybe_score_kind.map_or(0, ScoreKind::into);
-            let replace_score = depth + score_kind_value + 5;
-            let keep_score = entry.depth as i32 + entry_score_kind.map_or(0, ScoreKind::into);
-
-            if self.age != entry.tt_flag.age() as u32
-                || (maybe_score_kind == Some(ScoreKind::Exact)
-                    && entry_score_kind != Some(ScoreKind::Exact))
-                || replace_score > keep_score
+        if let Some(TTEntryBucketProbe { slot, entry: exist_entry }) = bucket.probe(key) {
+            if self.age != exist_entry.tt_flag.age()
+                || maybe_score_kind == Some(ScoreKind::Exact)
+                || depth.value() as u8 + 3 + 4 * is_pv as u8 > exist_entry.depth
             {
-                if best_move.is_some() {
-                    entry.best_move = best_move;
-                }
-
-                entry.tt_flag = TTFlag::new(self.age as u8, maybe_score_kind, is_pv);
-                entry.depth = depth as u8;
-                entry.endgame_depth = endgame_depth;
-                entry.eval = eval;
-                entry.score = score;
+                let entry = TTEntry {
+                    best_move: best_move.or(exist_entry.best_move),
+                    tt_flag: TTFlag::new(self.age, maybe_score_kind, is_pv),
+                    depth: depth.value() as u8,
+                    endgame_depth,
+                    eval: eval.or(MaybeScore::from(exist_entry.eval as i32)).unwrap_unchecked() as i16,
+                    score: score.or(MaybeScore::from(exist_entry.score as i32)).unwrap_unchecked() as i16,
+                };
 
                 bucket.store(slot, key, entry);
             }
         } else {
-            let replace_score = depth as u8;
+            let entries = bucket.load_entries();
 
-            for (slot, entry) in bucket.load_entries().map(TTEntry::from).iter().enumerate() {
-                if entry.depth - 6 * (self.age as u8 - entry.tt_flag.age()) > replace_score {
-                    continue;
-                }
+            let victim_slot =
+                if let Some(slot) = entries.iter().position(|&entry| entry == 0) {
+                    slot
+                } else {
+                    entries
+                        .map(|entry| {
+                            let entry = TTEntry::from(entry);
 
-                let entry = TTEntry {
-                    best_move,
-                    tt_flag: TTFlag::new(self.age as u8, maybe_score_kind, is_pv),
-                    depth: depth as u8,
-                    endgame_depth,
-                    eval,
-                    score,
+                            (entry.depth
+                                + entry.endgame_depth / 20
+                                - 6 * (self.relative_age(entry.tt_flag.age()))
+                            ) as usize
+                        })
+                        .into_iter()
+                        .enumerate()
+                        .min_by_key(|(_, score)| *score)
+                        .unwrap().0
                 };
 
-                bucket.store(slot, key, entry);
+            let entry = TTEntry {
+                best_move,
+                tt_flag: TTFlag::new(self.age, maybe_score_kind, is_pv),
+                depth: depth.value() as u8,
+                endgame_depth,
+                eval: eval.unwrap_unchecked() as i16,
+                score: score.unwrap_unchecked() as i16,
+            };
 
-                break;
-            }
+            bucket.store(victim_slot, key, entry);
         }
     }
 
@@ -277,9 +265,9 @@ impl TTView<'_> {
 
 pub fn encode_mate_distance(score: Score, ply: usize) -> Score {
     if score.is_mate() {
-        let score = score.unwrap();
+        let score = score.value();
 
-        Score::from_i32_clamp(score + ply as i32 * score.signum())
+        Score::from_i32(score + ply as i32 * score.signum())
     } else {
         score
     }
@@ -287,9 +275,9 @@ pub fn encode_mate_distance(score: Score, ply: usize) -> Score {
 
 pub fn decode_mate_distance(score: Score, ply: usize) -> Score {
     if score.is_mate() {
-        let score = score.unwrap();
+        let score = score.value();
 
-        Score::from_i32_clamp(score - ply as i32 * score.signum())
+        Score::from_i32(score - ply as i32 * score.signum())
     } else {
         score
     }
@@ -347,4 +335,3 @@ fn tt_decompress(source: Vec<u8>) -> Result<Vec<u8>, TTImportError> {
 fn tt_decompress(source: Vec<u8>) -> Result<Vec<u8>, TTImportError> {
     Ok(source)
 }
-

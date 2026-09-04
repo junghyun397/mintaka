@@ -13,9 +13,9 @@ mod bench_vcf {
     use mintaka::search_endgame;
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
-    use mintaka::value::Depth;
     use rusty_renju::board;
     use rusty_renju::history::History;
+    use rusty_renju::notation::pos;
     use rusty_renju::notation::pos::pos_unchecked;
     use rusty_renju::notation::rule::RuleKind;
     use rusty_renju::notation::score::Score;
@@ -51,7 +51,7 @@ mod bench_vcf {
             let td = ThreadData::new(WorkerThread::<Instant>::new(), 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
-                let result = search_endgame::endgame_search::<{ RuleKind::Renju }, false>(&mut td.clone(), Depth::MAX, &state, -Score::INF, Score::INF, Score::DRAW, true);
+                let result = search_endgame::endgame_search::<{ RuleKind::Renju }, false>(&mut td.clone(), pos::U8_BOARD_SIZE, &state, -Score::INF, Score::INF, Score::DRAW, true);
 
                 tt.clear();
 

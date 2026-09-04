@@ -1,5 +1,3 @@
-use crate::value::Depth;
-
 macro_rules! parse_int {
     ($name:literal,$t:ty,$default:expr) => {
         parse_or_default!($name,$t,1.0,$default)
@@ -34,8 +32,8 @@ pub const LMP_BASE: usize = parse_int!("lmp_base", usize, 2);
 pub const LMP_DIV_IMPROVING: f64 = parse_float!("lmp_div_improving", f64, 1.0);
 pub const LMP_DIV_NON_IMPROVING: f64 = parse_float!("lmp_div_non_improving", f64, 2.0);
 
-pub const FP_BASE: Depth = parse_int!("fp_base", Depth, 100);
-pub const FP_MUL: Depth = parse_int!("fp_mul", Depth, 32);
+pub const FP_BASE: i32 = parse_int!("fp_base", i32, 100);
+pub const FP_MUL: i32 = parse_int!("fp_mul", i32, 32);
 
 pub const HT_QUIET_BONUS_MUL: i32 = parse_int!("ht_quiet_bonus_mul", i32, 4);
 pub const HT_TACTICAL_BONUS_MUL: i32 = parse_int!("ht_tactical_bonus_mul", i32, 4);

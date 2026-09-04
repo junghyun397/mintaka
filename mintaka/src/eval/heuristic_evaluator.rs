@@ -130,7 +130,7 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
             } as i32
         }
 
-        Score::from_i32_clamp((self.score_black - forbidden_score) * BLACK_SIGNUM[state.board.player_color])
+        Score::from_i32((self.score_black - forbidden_score) * BLACK_SIGNUM[state.board.player_color]).clamp_non_mate()
     }
 
     fn hash_key(&self) -> HashKey {

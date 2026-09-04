@@ -1,11 +1,11 @@
 use crate::params;
-use crate::value::Depth;
 use core::f64;
 use rusty_renju::history::History;
 use rusty_renju::notation::color::{Color, ColorContainer};
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos, PosList};
 use rusty_renju::utils::empty::Empty;
+use crate::utils::depth::Depth;
 
 pub type QuietPlied = PosList<{ 256 - 8 }>;
 pub type TacticalPlied = PosList<{ 64 - 8 }>;
@@ -38,7 +38,7 @@ impl Empty for HistoryTable {
 
 impl HistoryTable {
     pub fn update_quiet(&mut self, history: &History, quiet_plied: QuietPlied, color: Color, best_move: Pos, depth: Depth) {
-        let bonus = depth * depth * params::HT_QUIET_BONUS_MUL;
+        let bonus = depth.value() * depth.value() * params::HT_QUIET_BONUS_MUL;
 
         for &pos in quiet_plied.iter() {
             let bonus = bonus * Self::is_equal_sign(pos, best_move);
@@ -54,7 +54,7 @@ impl HistoryTable {
     }
 
     pub fn update_tactical(&mut self, three_plied: TacticalPlied, four_plied: TacticalPlied, color: Color, best_move: Pos, depth: Depth) {
-        let bonus = depth * depth * params::HT_TACTICAL_BONUS_MUL;
+        let bonus = depth.value() * depth.value() * params::HT_TACTICAL_BONUS_MUL;
 
         for &pos in three_plied.iter() {
             let bonus = bonus * Self::is_equal_sign(pos, best_move);

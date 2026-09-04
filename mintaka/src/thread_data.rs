@@ -7,20 +7,21 @@ use crate::memo::transposition_table::TTView;
 use crate::principal_variation::PrincipalVariation;
 use crate::search_endgame::EndgameFrame;
 use crate::thread_type::ThreadType;
-use crate::value::Depth;
-use crate::{params, value};
-use rusty_renju::notation::pos;
+use crate::params;
+use rusty_renju::notation::{pos, score};
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::score::Score;
+use rusty_renju::notation::score::{MaybeScore, Score};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use crate::utils::depth;
+use crate::utils::depth::Depth;
 
 pub const KILLER_MOVE_SLOTS: usize = 2;
 
 #[derive(Debug, Copy, Clone)]
 pub struct SearchFrame {
     pub pos: MaybePos,
-    pub evaluator_eval: Score,
+    pub evaluator_eval: MaybeScore,
     pub static_eval: Score,
     pub on_pv: bool,
     pub recovery_state: RecoveryState,
@@ -30,7 +31,7 @@ pub struct SearchFrame {
 impl SearchFrame {
     pub const EMPTY: Self = Self {
         pos: MaybePos::NONE,
-        evaluator_eval: Score::DRAW,
+        evaluator_eval: MaybeScore::NONE,
         static_eval: Score::DRAW,
         on_pv: false,
         recovery_state: RecoveryState::EMPTY,
@@ -66,25 +67,25 @@ pub struct ThreadData<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> {
 
     pub tt: TTView<'a>,
     pub ht: Box<HistoryTable>,
-    pub ss: Box<[SearchFrame; value::MAX_PLY_SLOTS]>,
-    pub pvs: Box<[PrincipalVariation; value::MAX_PLY_SLOTS]>,
-    pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; value::MAX_PLY_SLOTS]>,
-    pub debug_statics: Box<[DebugStatics; value::MAX_PLY_SLOTS]>,
+    pub ss: Box<[SearchFrame; depth::MAX_PLY_SLOTS]>,
+    pub pvs: Box<[PrincipalVariation; depth::MAX_PLY_SLOTS]>,
+    pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; depth::MAX_PLY_SLOTS]>,
+    pub debug_statics: Box<[DebugStatics; depth::MAX_PLY_SLOTS]>,
 
-    pub lmr_table: Box<[[Depth; value::MAX_PLY_SLOTS]; 64]>,
+    pub lmr_table: Box<[[Depth; depth::MAX_PLY_SLOTS]; 64]>,
 
     pub root_pv: PrincipalVariation,
     pub root_moves_in_1k: [u32; pos::BOARD_SIZE],
     pub singular_root: bool,
 
-    pub endgame_stack: Box<[EndgameFrame; value::MAX_PLY_SLOTS]>,
+    pub endgame_stack: Box<[EndgameFrame; depth::MAX_PLY_SLOTS]>,
     pub endgame_stack_top: usize,
 
     pub batch_counter: BatchCounter<'a>,
     aborted: &'a AtomicBool,
 
     pub best_move: MaybePos,
-    pub selective_depth: usize,
+    pub selective_depth: Depth,
 
     pub ply: usize,
 }
@@ -108,20 +109,20 @@ impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, T
             tt,
             evaluator,
             ht: Box::new(ht),
-            ss: Box::new([SearchFrame::EMPTY; value::MAX_PLY_SLOTS]),
-            pvs: Box::new([PrincipalVariation::EMPTY; value::MAX_PLY_SLOTS]),
-            killers: Box::new([[MaybePos::NONE; 2]; value::MAX_PLY_SLOTS]),
+            ss: Box::new([SearchFrame::EMPTY; depth::MAX_PLY_SLOTS]),
+            pvs: Box::new([PrincipalVariation::EMPTY; depth::MAX_PLY_SLOTS]),
+            killers: Box::new([[MaybePos::NONE; 2]; depth::MAX_PLY_SLOTS]),
             lmr_table: Box::new(build_lmr_table(config)),
-            debug_statics: Box::new([DebugStatics::EMPTY; value::MAX_PLY_SLOTS]),
+            debug_statics: Box::new([DebugStatics::EMPTY; depth::MAX_PLY_SLOTS]),
             root_pv: PrincipalVariation::EMPTY,
             root_moves_in_1k: [0; pos::BOARD_SIZE],
             singular_root: false,
-            endgame_stack: Box::new([EndgameFrame::EMPTY; value::MAX_PLY_SLOTS]),
+            endgame_stack: Box::new([EndgameFrame::EMPTY; depth::MAX_PLY_SLOTS]),
             endgame_stack_top: 0,
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
             best_move: MaybePos::NONE,
-            selective_depth: 0,
+            selective_depth: Depth::ZERO,
             ply: 0,
         }
     }
@@ -146,10 +147,10 @@ impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, T
     }
 
     pub fn lookup_lmr_table(&self, depth_left: Depth, moves_made: usize) -> Depth {
-        let depth_clamped = depth_left.clamp(0, 63) as usize;
-        let moves_made_clamped = moves_made.clamp(0, value::MAX_PLY);
+        let depth_clamped = depth_left.clamp_value(Depth::from_i32(63)).value();
+        let moves_made_clamped = moves_made.clamp(0, depth::MAX_PLY);
 
-        self.lmr_table[depth_clamped][moves_made_clamped]
+        self.lmr_table[depth_clamped as usize][moves_made_clamped]
     }
 
     pub fn push_ply(&mut self, pos: Pos) {
@@ -171,7 +172,7 @@ impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, T
     }
 
     pub fn clear_killer(&mut self) {
-        if self.ply + 2 < value::MAX_PLY {
+        if self.ply + 2 < depth::MAX_PLY {
             self.killers[self.ply + 2] = [MaybePos::NONE; 2];
         }
     }
@@ -195,18 +196,17 @@ impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, T
     }
 }
 
-fn build_lmr_table(config: Config) -> [[Depth; value::MAX_PLY_SLOTS]; 64] {
-    let mut lmr_table = [[0; value::MAX_PLY_SLOTS]; 64];
+fn build_lmr_table(config: Config) -> [[Depth; depth::MAX_PLY_SLOTS]; 64] {
+    let mut lmr_table = [[Depth::ZERO; depth::MAX_PLY_SLOTS]; 64];
 
     let worker_factor = 1.0 + (config.workers.min(16) as f64) / 100.0;
     let lmr_div = params::LMR_DIV * worker_factor;
 
     for depth in 1 .. 64 {
-        for played in 1 .. value::MAX_PLY_SLOTS {
-            lmr_table[depth][played] = (
-                params::LMR_BASE +
-                    (depth as f64).ln() * (played as f64).ln() / lmr_div
-            ) as Depth;
+        for played in 1 .. depth::MAX_PLY_SLOTS {
+            lmr_table[depth][played] = Depth::from_i32(
+                (params::LMR_BASE + (depth as f64).ln() * (played as f64).ln() / lmr_div) as i32
+            );
         }
     }
 

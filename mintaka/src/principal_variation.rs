@@ -1,4 +1,4 @@
-use crate::value::MAX_PLY;
+use crate::utils::depth;
 use rusty_renju::impl_debug_from_display;
 use rusty_renju::notation::pos::MaybePos;
 use std::fmt::{Display, Formatter};
@@ -10,12 +10,12 @@ use typeshare::typeshare;
 #[cfg_attr(feature = "serde", serde(try_from = "Vec<MaybePos>"))]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct PrincipalVariation {
-    pub line: [MaybePos; MAX_PLY],
+    pub line: [MaybePos; depth::MAX_PLY],
     pub top: usize,
 }
 
 impl PrincipalVariation {
-    pub const EMPTY: Self = Self { line: [MaybePos::NONE; MAX_PLY], top: 0 };
+    pub const EMPTY: Self = Self { line: [MaybePos::NONE; depth::MAX_PLY], top: 0 };
 
     pub fn moves(&self) -> &[MaybePos] {
         &self.line[0 .. self.top]
@@ -51,11 +51,11 @@ impl TryFrom<Vec<MaybePos>> for PrincipalVariation {
     fn try_from(vec: Vec<MaybePos>) -> Result<Self, Self::Error> {
         let top = vec.len();
         
-        if top > MAX_PLY {
+        if top > depth::MAX_PLY {
             return Err("moves longer than max ply");
         }
 
-        let mut line = [MaybePos::NONE; MAX_PLY];
+        let mut line = [MaybePos::NONE; depth::MAX_PLY];
         line[..top].copy_from_slice(&vec);
 
         Ok(Self { line, top })

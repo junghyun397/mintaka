@@ -1,9 +1,9 @@
 use crate::protocol::timer::Timer;
-use crate::value::{Depth, Depths};
 use rusty_renju::utils::byte_size::ByteSize;
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::time::Duration;
+use crate::utils::depth::Depth;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
@@ -22,7 +22,7 @@ pub struct Config {
 
     pub max_nodes_in_1k: Option<u32>,
     pub max_depth: Option<Depth>,
-    pub max_vcf_depth: Option<Depth>,
+    pub max_vcf_depth: Option<u8>,
 
     pub tt_size: ByteSize,
     pub workers: u32,
@@ -118,7 +118,7 @@ impl Config {
     pub fn validate(self) -> Result<Self, ConfigValidationError> {
         if self.max_depth > Some(Depth::PLY_LIMIT) {
             Err(ConfigValidationError::DepthDeeperThanMaxPly)
-        } else if self.max_vcf_depth > Some(Depth::PLY_LIMIT) {
+        } else if self.max_vcf_depth > Some(Depth::PLY_LIMIT.value() as u8) {
             Err(ConfigValidationError::VCFDepthDeeperThanMaxPly)
         } else {
             Ok(self)

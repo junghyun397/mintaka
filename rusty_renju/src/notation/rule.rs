@@ -1,6 +1,7 @@
 use std::fmt::Display;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
+use crate::board_io;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(std::marker::ConstParamTy, Default, PartialEq, Eq, Copy, Clone, Debug)]
@@ -33,9 +34,9 @@ pub enum ForbiddenKind {
 impl From<ForbiddenKind> for char {
     fn from(value: ForbiddenKind) -> Self {
         match value {
-            ForbiddenKind::DoubleThree => crate::board_io::SYMBOL_FORBID_DOUBLE_THREE,
-            ForbiddenKind::DoubleFour => crate::board_io::SYMBOL_FORBID_DOUBLE_FOUR,
-            ForbiddenKind::Overline => crate::board_io::SYMBOL_FORBID_OVERLINE
+            ForbiddenKind::DoubleThree => board_io::SYMBOL_FORBID_DOUBLE_THREE,
+            ForbiddenKind::DoubleFour => board_io::SYMBOL_FORBID_DOUBLE_FOUR,
+            ForbiddenKind::Overline => board_io::SYMBOL_FORBID_OVERLINE
         }
     }
 }

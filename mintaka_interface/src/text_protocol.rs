@@ -16,7 +16,7 @@ use std::io::{BufRead, Write};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
-use mintaka::value::Depth;
+use mintaka::utils::depth::Depth;
 
 pub fn entry<const R: RuleKind>() -> Result<(), GameError> {
     let pref = Preference::<R>::parse();
@@ -178,7 +178,7 @@ fn text_protocol<const R: RuleKind>(
                 stdio_out(Ok(TextProtocolResponse::Ack));
             }
             Message::Config(ConfigCommand::MaxDepth(max_depth)) => {
-                config.max_depth = Some(max_depth as Depth);
+                config.max_depth = Some(Depth::from_i32(max_depth as i32));
 
                 stdio_out(Ok(TextProtocolResponse::Ack));
             }

@@ -7,7 +7,7 @@ pub fn calculate_win_rate(score: Score) -> f32 {
         return -1.0;
     }
 
-    let score = score.unwrap();
+    let score = score.value();
 
     score.signum() as f32 * ((score.abs() as f32) .ln_1p() / 10000.0_f32.ln_1p())
 }

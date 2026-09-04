@@ -244,6 +244,10 @@ impl MaybePos {
         self.0.0 != Self::INVALID_POS.0
     }
 
+    pub const fn or(self, other: Self) -> Self {
+        if self.is_some() { self } else { other } 
+    }
+
     pub const fn unwrap(self) -> Pos {
         debug_assert!(self.is_some());
 

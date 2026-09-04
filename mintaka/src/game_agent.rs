@@ -1,6 +1,5 @@
 use crate::config::{Config, SearchObjective};
 use crate::eval::evaluator::{ActiveEvaluator, Evaluator};
-use crate::eval::heuristic_evaluator::HeuristicEvaluator;
 use crate::game_state::{GameState, GameStateData};
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::{TTImportError, TranspositionTable};
@@ -218,7 +217,7 @@ impl<const R: RuleKind> GameAgent<R> {
                     player
                 );
 
-                self.evaluator = HeuristicEvaluator::from_state(&self.state);
+                self.evaluator = ActiveEvaluator::from_state(&self.state);
             },
             Command::Clear => {
                 self.reinit_from_state(GameState::empty());
@@ -340,7 +339,7 @@ impl<const R: RuleKind> GameAgent<R> {
             position_hash: self.state.board.hash_key,
             best_move,
             score,
-            selective_depth: main_td.selective_depth as u32,
+            selective_depth: main_td.selective_depth,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed: started_time.elapsed(),
             pv: main_td.root_pv

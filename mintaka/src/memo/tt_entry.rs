@@ -35,7 +35,7 @@ impl From<ScoreKind> for i32 {
 pub struct TTFlag(u8);
 
 impl TTFlag {
-    pub const MAX_TT_ENDGAME_DEPTH: u8 = 0b11110;
+    pub const MAX_AGE: u8 = 0b11111;
 
     pub fn new(age: u8, maybe_score_kind: Option<ScoreKind>, is_pv: bool) -> Self {
         let score_kind = maybe_score_kind.map_or(0, ScoreKind::into);
@@ -204,13 +204,13 @@ impl TTEntryBucket {
         }
     }
 
-    pub fn usage(&self, age: u8) -> usize {
+    pub fn usage(&self, reference_age: u8) -> usize {
         self.entries
             .iter()
             .map(|entry| {
                 let entry = entry.load(Ordering::Relaxed);
 
-                (entry != 0 && TTEntry::from(entry).tt_flag.age() == age) as usize
+                (entry != 0 && TTEntry::from(entry).tt_flag.age() == reference_age) as usize
             })
             .sum()
     }

@@ -1,9 +1,9 @@
 use crate::principal_variation::PrincipalVariation;
-use crate::value::Depth;
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::score::Score;
 use std::time::Duration;
+use crate::utils::depth::Depth;
 
 #[cfg_attr(feature = "typeshare", typeshare::typeshare)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
