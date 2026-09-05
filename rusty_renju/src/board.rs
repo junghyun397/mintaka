@@ -52,7 +52,7 @@ impl<const R: RuleKind> Empty for Board<R> {
     }
 }
 
-#[derive(std::marker::ConstParamTy, Eq, PartialEq,)]
+#[derive(std::marker::ConstParamTy, Eq, PartialEq)]
 pub enum MoveType {
     Set, Unset
 }

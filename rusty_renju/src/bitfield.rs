@@ -1,5 +1,6 @@
 use crate::notation::pos;
 use crate::notation::pos::Pos;
+use crate::utils::empty::Empty;
 use crate::{assert_struct_sizes, impl_debug_from_display};
 #[cfg(feature = "serde")]
 use base64::engine::{general_purpose, Engine as _};
@@ -8,7 +9,6 @@ use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, N
 use std::simd::Simd;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
-use crate::utils::empty::Empty;
 
 // serialization format: base64url-safe no padding
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]

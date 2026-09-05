@@ -236,6 +236,7 @@ impl<const R: RuleKind> Patterns<R> {
     pub fn clear_pattern_with_slice<const C: Color, const D: Direction>(&mut self, slice: &mut Slice) -> u16 {
         let start_idx = slice.start_pos.idx_usize();
 
+        slice.pattern_bitmap[C] = 0;
         let old_bitmap = self.indexes[C]
             .replace_slice_bitmap::<D>(slice.idx, SlicePattern::EMPTY);
         let changed_bitmask = old_bitmap.changed_pattern_bitmap(SlicePattern::EMPTY);
