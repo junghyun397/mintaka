@@ -158,7 +158,7 @@ pub struct TTView<'a> {
 
 impl TTView<'_> {
     fn relative_age(&self, age: u8) -> u8 {
-        (age.wrapping_sub(self.age)) & TTFlag::MAX_AGE
+        self.age.wrapping_sub(age) & TTFlag::MAX_AGE
     }
 
     fn calculate_index(&self, key: HashKey) -> usize {
@@ -219,10 +219,9 @@ impl TTView<'_> {
                         .map(|entry| {
                             let entry = TTEntry::from(entry);
 
-                            (entry.depth
-                                + entry.endgame_depth / 20
-                                - 6 * (self.relative_age(entry.tt_flag.age()))
-                            ) as usize
+                            entry.depth as i32
+                                + entry.endgame_depth as i32 / 20
+                                - 6 * self.relative_age(entry.tt_flag.age()) as i32
                         })
                         .into_iter()
                         .enumerate()

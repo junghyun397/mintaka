@@ -4,17 +4,16 @@ use crate::eval::evaluator::Evaluator;
 use crate::game_state::RecoveryState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
-use crate::principal_variation::PrincipalVariation;
-use crate::search_endgame::EndgameFrame;
-use crate::thread_type::ThreadType;
 use crate::params;
-use rusty_renju::notation::{pos, score};
+use crate::principal_variation::PrincipalVariation;
+use crate::thread_type::ThreadType;
+use crate::utils::depth;
+use crate::utils::depth::Depth;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{MaybeScore, Score};
+use rusty_renju::notation::pos;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use crate::utils::depth;
-use crate::utils::depth::Depth;
 
 pub const KILLER_MOVE_SLOTS: usize = 2;
 
@@ -78,9 +77,6 @@ pub struct ThreadData<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> {
     pub root_moves_in_1k: [u32; pos::BOARD_SIZE],
     pub singular_root: bool,
 
-    pub endgame_stack: Box<[EndgameFrame; depth::MAX_PLY_SLOTS]>,
-    pub endgame_stack_top: usize,
-
     pub batch_counter: BatchCounter<'a>,
     aborted: &'a AtomicBool,
 
@@ -117,8 +113,6 @@ impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, T
             root_pv: PrincipalVariation::EMPTY,
             root_moves_in_1k: [0; pos::BOARD_SIZE],
             singular_root: false,
-            endgame_stack: Box::new([EndgameFrame::EMPTY; depth::MAX_PLY_SLOTS]),
-            endgame_stack_top: 0,
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
             best_move: MaybePos::NONE,
@@ -177,23 +171,6 @@ impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, T
         }
     }
 
-    pub fn clear_endgame_stack(&mut self) {
-        self.endgame_stack_top = 0;
-    }
-
-    pub fn push_endgame_frame(&mut self, frame: EndgameFrame) {
-        self.endgame_stack[self.endgame_stack_top] = frame;
-        self.endgame_stack_top += 1;
-    }
-
-    pub fn pop_endgame_frame(&mut self) -> Option<EndgameFrame> {
-        if self.endgame_stack_top == 0 {
-            return None;
-        }
-
-        self.endgame_stack_top -= 1;
-        Some(self.endgame_stack[self.endgame_stack_top])
-    }
 }
 
 fn build_lmr_table(config: Config) -> [[Depth; depth::MAX_PLY_SLOTS]; 64] {

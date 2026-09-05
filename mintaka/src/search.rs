@@ -513,7 +513,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             reduction += Depth::from_i32(cut_node as i32);
 
             // reduction pv less
-            reduction += Depth::from_i32(NT::IS_PV as i32);
+            reduction -= Depth::from_i32(NT::IS_PV as i32);
 
             // reduction tactical less
             if is_tactical
