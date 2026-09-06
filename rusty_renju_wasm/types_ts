@@ -42,7 +42,7 @@ export interface BestMove {
 	position_hash: HashKey;
 	best_move: MaybePos;
 	score: Score;
-	selective_depth: number;
+	selective_depth: Depth;
 	total_nodes_in_1k: number;
 	pv: PrincipalVariation;
 	time_elapsed: Duration;
@@ -91,7 +91,7 @@ export interface Config {
 	draw_condition?: number;
 	max_nodes_in_1k?: number;
 	max_depth?: Depth;
-	max_vcf_depth?: Depth;
+	max_vcf_depth?: number;
 	tt_size: ByteSize;
 	workers: number;
 	pondering: boolean;

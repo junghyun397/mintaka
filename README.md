@@ -28,7 +28,8 @@ and plans to integrate an AlphaZero-based value and policy network.
 
 ```shell
 cd mintaka_webui
-pnpm requirements
+pnpm install
+pnpm -C rusty_renju_web requirements
 pnpm build
 ```
 
