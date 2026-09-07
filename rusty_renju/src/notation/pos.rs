@@ -178,15 +178,25 @@ impl FromStr for Pos {
     type Err = PosError;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        source[1..].parse::<u8>()
-            .map_err(|_| PosError::InvalidRowCharter)
-            .and_then(|row| {
-                let col = source.chars().next().unwrap() as u8 - b'a';
+        let mut chars = source.chars();
 
-                (col < BOARD_WIDTH && row <= BOARD_WIDTH)
-                    .then(|| Pos::from_cartesian(row - 1 , col))
+        let col = chars.next()
+            .ok_or(PosError::InvalidRowCharter)
+            .and_then(|raw_col| {
+                let raw_col = raw_col as u8 - b'a';
+
+                (raw_col < BOARD_WIDTH)
+                    .then(|| raw_col)
                     .ok_or(PosError::OutOfRange)
-            })
+            })?;
+
+        let row: u8 = chars.as_str()
+            .parse()
+            .map_err(|_| PosError::InvalidRowCharter)?;
+
+        (0 < row && row <= BOARD_WIDTH)
+            .then(|| Pos::from_cartesian(row - 1, col))
+            .ok_or(PosError::OutOfRange)
     }
 }
 
@@ -262,7 +272,6 @@ impl MaybePos {
         }
     }
 
-    // same codegen as a manual branch
     pub fn ok(self) -> Option<Pos> {
         self.is_some().then_some(self.0)
     }
@@ -325,7 +334,6 @@ impl From<Option<Pos>> for MaybePos {
         }
     }
 }
-
 impl From<Option<MaybePos>> for MaybePos {
     fn from(value: Option<MaybePos>) -> Self {
         value.unwrap_or(Self::NONE)

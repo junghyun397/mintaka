@@ -66,13 +66,13 @@ fn lookup_patterns<const R: RuleKind, const C: Color>(
     acc: &mut SlicePattern,
     shift: usize,
     key: usize,
-    raw: usize,
+    stones: usize,
 ) {
     #[cold]
-    fn extended_match_for_black(direction: ExtendedMatch, b_raw: usize, shift: usize) -> bool {
+    fn extended_match_for_color(direction: ExtendedMatch, stones: usize, shift: usize) -> bool {
         match direction {
-            Left => b_raw & (0b1 << shift.saturating_sub(1)) == 0,
-            Right => b_raw & (0b1 << (shift + 8)) == 0
+            Left => stones & (0b1 << shift.saturating_sub(1)) == 0,
+            Right => stones & (0b1 << (shift + 8)) == 0
         }
     }
 
@@ -102,11 +102,9 @@ fn lookup_patterns<const R: RuleKind, const C: Color>(
             );
         }
 
-        if ((R == RuleKind::Renju && C == Color::Black) || R == RuleKind::Gomoku)
-            && slice_patch_data.extended_match.is_some_and(|extended_match|
-                extended_match_for_black(extended_match, raw, shift)
-            )
-        {
+        if slice_patch_data.extended_match.is_some_and(|extended_match|
+            extended_match_for_color(extended_match, stones, shift)
+        ) {
             acc.patterns |= shift_and_fit_u128(slice_patch_data.extended_mask, lane_shift);
         }
     }
@@ -222,7 +220,7 @@ impl SlicePatchData {
         extended_match: None,
     };
 
-    const fn has_same_data(self, other: Self) -> bool {
+    const fn equals(self, other: Self) -> bool {
         self.patch_mask == other.patch_mask
             && self.closed_four_mask == other.closed_four_mask
             && self.extended_mask == other.extended_mask
@@ -260,7 +258,7 @@ impl SlicePatchData {
 }
 
 const BLACK_LUT_SIZE: usize = 87;
-const WHITE_LUT_SIZE: usize = 69;
+const WHITE_LUT_SIZE: usize = 71;
 
 #[repr(align(32))]
 struct PatchLut {
@@ -314,9 +312,9 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
             embed_pattern!(black, $mirror, $pattern, $($patch),+);
             embed_pattern!(white, $mirror, $pattern, $($patch),+);
         };
-        (black,asymmetry,long-pattern,$direction:expr,$pattern:literal,$($patch:literal),+) => {
-            flash_pattern!(black, rev=false, Some($direction), $pattern, fill_array!($($patch),+));
-            flash_pattern!(black, rev=true, Some($direction.reverse()), $pattern, fill_array!($($patch),+));
+        ($color:ident,asymmetry,long-pattern,$direction:expr,$pattern:literal,$($patch:literal),+) => {
+            flash_pattern!($color, rev=false, Some($direction), $pattern, fill_array!($($patch),+));
+            flash_pattern!($color, rev=true, Some($direction.reverse()), $pattern, fill_array!($($patch),+));
         };
         ($color:ident,symmetry,$pattern:literal,$($patch:literal),+) => {
             flash_pattern!($color, rev=false, Option::None, $pattern, fill_array!($($patch),+));
@@ -408,10 +406,13 @@ const fn build_slice_pattern_lut() -> SlicePatternLut {
 
     // white-open-three
 
-    embed_pattern!(white, asymmetry, ".OO...", ".OO.3.");
+    embed_pattern!(white, asymmetry, ".OO...!", ".OO.3.!");
+    embed_pattern!(white, asymmetry, ".OO...O!", ".OO.3.O!");
+    embed_pattern!(white, asymmetry, long-pattern, Right, ".OO...OO", ".OO.3.OO"); // .OO...OO[!]
+
     embed_pattern!(white, asymmetry, "!.OO...", "!.OO3..");
     embed_pattern!(white, asymmetry, "X..OO..", "X.3OO..");
-    embed_pattern!(white, asymmetry, ".O.O..!!", ".O.O3.!!");
+    embed_pattern!(white, asymmetry, ".O.O..!", ".O.O3.!");
     embed_pattern!(white, asymmetry, ".O.O..O!", ".O.O3.O!");
     embed_pattern!(white, asymmetry, "!.O.O..", "!.O3O..");
     embed_pattern!(white, asymmetry, "!.O..O.", "!.O3.O.");
@@ -547,7 +548,7 @@ const fn find_or_insert_patch<const N: usize>(
     candidate: SlicePatchData
 ) -> usize {
     const_for!(idx in 0, *patch_top + 1; {
-        if patches[idx].has_same_data(candidate) {
+        if patches[idx].equals(candidate) {
             return idx;
         }
     });

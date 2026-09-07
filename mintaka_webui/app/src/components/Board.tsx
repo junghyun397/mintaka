@@ -10,7 +10,7 @@ export function Board() {
     const lastSequence = createMemo(() => gameSelectors.history().length)
     const prevSequence = createMemo(() => lastSequence() - 1)
     const winningSequence = createMemo(() =>
-        gameSelectors.boardDescribe.winner?.moves,
+        gameSelectors.boardDescribe.winner?.components,
     )
 
     const isLastSequence = createSelector(lastSequence)

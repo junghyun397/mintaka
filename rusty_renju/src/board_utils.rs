@@ -11,7 +11,7 @@ use crate::slice::Slice;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BoardWinner {
     pub color: Color,
-    pub moves: [Pos; 5],
+    pub components: [Pos; 5],
 }
 
 impl<const R: RuleKind> Board<R> {
@@ -45,7 +45,7 @@ impl<const R: RuleKind> Board<R> {
                     .or(slice.winner_idx::<{ Color::White }>().map(|idx| (Color::White, idx)))
                     .map(|(color, idx)| BoardWinner {
                         color,
-                        moves: std::array::from_fn(|sequence|
+                        components: std::array::from_fn(|sequence|
                             slice.start_pos.directional_offset_unchecked(direction, idx as isize)
                                 .directional_offset_unchecked(direction, sequence as isize)
                         )

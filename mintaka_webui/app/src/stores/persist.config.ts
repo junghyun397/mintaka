@@ -39,7 +39,9 @@ export function defaultPersistConfig(): PersistConfig {
 }
 
 export function createPersistConfigStore(): [PersistConfig, SetStoreFunction<PersistConfig>] {
-    const [persistConfig, setPersistConfig] = makePersisted(createStore(defaultPersistConfig()),
+    const [persistConfig, setPersistConfig] = makePersisted<
+        PersistConfig, [PersistConfig, SetStoreFunction<PersistConfig>]
+    >(createStore(defaultPersistConfig()),
         { name: "persist-config-" + PERSIST_CONFIG_VERSION },
     )
 

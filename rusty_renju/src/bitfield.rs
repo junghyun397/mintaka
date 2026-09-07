@@ -1,7 +1,7 @@
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::utils::empty::Empty;
-use crate::{assert_struct_sizes, impl_debug_from_display};
+use crate::{assert_struct_sizes, const_for, impl_debug_from_display};
 #[cfg(feature = "serde")]
 use base64::engine::{general_purpose, Engine as _};
 use std::fmt::{Display, Formatter};
@@ -25,9 +25,19 @@ impl Empty for Bitfield {
 }
 
 impl Bitfield {
-    pub const ZERO_FILLED: Bitfield = Bitfield([0; 32]);
+    pub const ZERO_FILLED: Self = Self([0; 32]);
 
-    pub const ONE_FILLED: Bitfield = Bitfield([0xFF; 32]);
+    pub const ONE_FILLED: Self = Self([0xFF; 32]);
+
+    pub const LEGAL_MASK: Self = {
+        let mut legal_mask = Self::ONE_FILLED;
+
+        const_for!(idx in pos::BOARD_SIZE, 256; {
+            legal_mask.unset_idx(idx);
+        });
+
+        legal_mask
+    };
 
     pub const fn is_hot_idx(&self, idx: usize) -> bool {
         self.0[idx / 8] & (0b1 << (idx % 8)) != 0
@@ -141,7 +151,7 @@ impl Not for Bitfield {
     type Output = Self;
 
     fn not(self) -> Self::Output {
-        Self((!self.to_simd()).into())
+        Self((!self.to_simd() & Self::LEGAL_MASK.to_simd()).into())
     }
 }
 
@@ -291,17 +301,16 @@ impl serde::Serialize for Bitfield {
 #[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for Bitfield {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
-        let vec = if deserializer.is_human_readable() {
+        if deserializer.is_human_readable() {
             general_purpose::URL_SAFE_NO_PAD.decode(&String::deserialize(deserializer)?)
                 .map_err(serde::de::Error::custom)?
         } else {
             Vec::<u8>::deserialize(deserializer)
                 .map_err(serde::de::Error::custom)?
-        };
-
-        vec
+        }
             .try_into()
             .map_err(|_| serde::de::Error::custom("invalid bitfield binary"))
             .map(Self)
+
     }
 }

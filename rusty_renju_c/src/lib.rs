@@ -100,7 +100,7 @@ impl From<Option<rusty_renju::board_utils::BoardWinner>> for BoardWinner {
                 winner.color as u8
             ),
             sequence: value.as_ref().map_or([MAYBE_POS_NONE; 5], |winner|
-                winner.moves.map(|pos| pos.idx() as u32)
+                winner.components.map(|pos| pos.idx() as u32)
             ),
         }
     }

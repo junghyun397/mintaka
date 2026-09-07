@@ -96,17 +96,16 @@ fn parse_board_elements(source: &str) -> Result<Vec<BoardElement>, &'static str>
         .ok_or("Invalid elements size.")
 }
 
-fn extract_stones_by_color(color: Color, source: &[BoardElement]) -> Box<[Pos]> {
-    source.iter()
-        .enumerate()
-        .filter_map(|(idx, symbol)|
-            match symbol {
-                &BoardElement::Stone(sym_color) if sym_color == color =>
-                    Some(Pos::from_index(idx as u8)),
-                _ => None
-            }
-        )
-        .collect()
+fn extract_stones_by_color(color: Color, source: &[BoardElement]) -> Bitfield {
+    let mut bitfield = Bitfield::empty();
+
+    for (idx, symbol) in source.iter().enumerate() {
+        if let &BoardElement::Stone(sym_color) = symbol && sym_color == color {
+            bitfield.set(Pos::from_index(idx as u8));
+        }
+    }
+
+    bitfield
 }
 
 impl<const R: RuleKind> Board<R> {
@@ -301,13 +300,15 @@ impl<const R: RuleKind> FromStr for Board<R> {
     fn from_str(source: &str) -> Result<Self, Self::Err> {
         let elements = parse_board_elements(source)?;
 
-        let blacks = extract_stones_by_color(Color::Black, &elements);
-        let whites = extract_stones_by_color(Color::White, &elements);
+        let stones = ColorContainer::new(
+            extract_stones_by_color(Color::Black, &elements),
+            extract_stones_by_color(Color::White, &elements),
+        );
 
         let mut board = Board::empty();
-        let player_color = Color::player_color_from_each_moves(blacks.len(), whites.len());
+        let player_color = Color::player_color_from_each_moves(stones[Color::Black].count_hots(), stones[Color::White].count_hots());
 
-        board.batch_set_each_color_mut(blacks, whites, player_color);
+        board.batch_set_each_color_mut(stones, player_color);
 
         Ok(board)
     }
@@ -421,11 +422,9 @@ impl<const R: RuleKind> TryFrom<BoardData> for Board<R> {
             return Err(BoardDeserializeError::RuleKindMismatch);
         }
 
-        let black_moves = data.bitfield[Color::Black].iter_hot_pos().collect::<Box<_>>();
-        let white_moves = data.bitfield[Color::White].iter_hot_pos().collect::<Box<_>>();
-
         let mut board = Board::<R>::empty();
-        board.batch_set_each_color_mut(black_moves, white_moves, data.player_color);
+
+        board.batch_set_each_color_mut(data.bitfield, data.player_color);
 
         if board.hash_key != data.hash_key {
             return Err(BoardDeserializeError::HashMismatch);

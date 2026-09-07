@@ -55,7 +55,7 @@ export type BoardExportItem =
 
 export interface BoardWinner {
 	color: Color;
-	moves: [Pos, Pos, Pos, Pos, Pos];
+	components: [Pos, Pos, Pos, Pos, Pos];
 }
 
 export interface BoardDescribe {

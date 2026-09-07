@@ -28,10 +28,9 @@ pub struct Board<const R: RuleKind> {
 impl<const R: RuleKind> PartialEq for Board<R> {
     fn eq(&self, other: &Self) -> bool {
         self.slices.bitfield() == other.slices.bitfield()
+            && self.hash_key == other.hash_key
     }
 }
-
-impl<const R: RuleKind> Eq for Board<R> {}
 
 impl<const R: RuleKind> Hash for Board<R> {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -132,43 +131,37 @@ impl<const R: RuleKind> Board<R> {
     }
 
     pub fn batch_set_mut(&mut self, moves: &[MaybePos]) {
-        let odd_moves = moves.iter()
-            .enumerate()
-            .filter_map(|(idx, &pos)|
-                (!idx.is_multiple_of(2)).then_some(pos).and_then(MaybePos::into)
-            )
-            .collect::<Vec<_>>();
+        let mut player = self.player_color;
 
-        let even_moves = moves.iter()
-            .enumerate()
-            .filter_map(|(idx, &pos)|
-                idx.is_multiple_of(2).then_some(pos).and_then(MaybePos::into)
-            )
-            .collect::<Vec<_>>();
+        for &pos in moves {
+            if let Some(pos) = pos.ok() {
+                self.slices.set(player, pos);
+                self.hot_field.set(pos);
+                self.hash_key = self.hash_key.set(player, pos);
+                self.stones += 1;
+            } else {
+                self.hash_key = self.hash_key.switch();
+            }
 
-        let (black_moves, white_moves) = match self.player_color {
-            Color::Black => (even_moves, odd_moves),
-            Color::White => (odd_moves, even_moves)
-        };
-
-        let player = Color::player_color_from_each_moves(black_moves.len(), white_moves.len());
-
-        self.batch_set_each_color_mut(black_moves.into_boxed_slice(), white_moves.into_boxed_slice(), player)
+            player = !player;
+        }
     }
 
-    pub fn batch_set_each_color_mut(&mut self, blacks: Box<[Pos]>, whites: Box<[Pos]>, player: Color) {
-        self.stones += blacks.len() as u8 + whites.len() as u8;
+    pub fn batch_set_each_color_mut(&mut self, stones: ColorContainer<Bitfield>, player: Color) {
+        let mut hash_player = self.player_color;
 
-        for pos in blacks {
-            self.slices.set(Color::Black, pos);
-            self.hot_field.set(pos);
-            self.hash_key = self.hash_key.set(Color::Black, pos);
+        for (color, bitfield) in stones.iter() {
+            for pos in bitfield.iter_hot_pos() {
+                self.slices.set(color, pos);
+                self.hot_field.set(pos);
+                self.hash_key = self.hash_key.set(color, pos);
+                self.stones += 1;
+                hash_player = !hash_player;
+            }
         }
 
-        for pos in whites {
-            self.slices.set(Color::White, pos);
-            self.hot_field.set(pos);
-            self.hash_key = self.hash_key.set(Color::White, pos);
+        if hash_player != player {
+            self.hash_key = self.hash_key.switch();
         }
 
         self.player_color = player;
