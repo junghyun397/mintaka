@@ -32,10 +32,6 @@ pub enum Command {
     Undo {
         hash: HashKey,
     },
-    BatchSet {
-        player_moves: Vec<Pos>,
-        opponent_moves: Vec<Pos>,
-    },
     RebuildTT(ByteSize),
 }
 
@@ -62,10 +58,6 @@ pub enum Command {
     },
     Undo {
         hash: HashKey,
-    },
-    BatchSet {
-        player_moves: Vec<Pos>,
-        opponent_moves: Vec<Pos>,
     },
     RebuildTT(ByteSize),
 }

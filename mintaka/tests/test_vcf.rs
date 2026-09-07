@@ -38,7 +38,7 @@ mod test_vcf {
 
             let time = std::time::Instant::now();
 
-            let vcf_result: Vec<MaybePos> = search_endgame::endgame_sequence::<{ RuleKind::Renju }, false>(&mut td, &state)
+            let vcf_result: Vec<MaybePos> = search_endgame::endgame_proof::<{ RuleKind::Renju }, false>(&mut td, &state)
                 .unwrap().into_iter()
                 .map(Pos::into)
                 .collect();

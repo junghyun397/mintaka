@@ -19,7 +19,8 @@ pub fn generate_endgame_moves<const R: RuleKind, const VCT: bool>(board: &Board<
     let mut vcf_moves = [MaybePos::NONE; ENDGAME_MAX_MOVES];
     let mut vcf_moves_top = 0;
 
-    let mut field = board.patterns.indexes[board.player_color].closed_fours;
+    let indexes = &board.patterns.indexes[board.player_color];
+    let mut field = indexes.closed_fours | indexes.fork_fours;
 
     if VCT {
         field |= board.patterns.indexes[board.player_color].open_threes;

@@ -2,7 +2,7 @@
 
 extern crate test;
 
-mod bench_vcf {
+mod bench_endgame {
     use indoc::indoc;
     use mintaka::config::{Config, SearchObjective};
     use mintaka::eval::evaluator::ActiveEvaluator;
@@ -38,7 +38,7 @@ mod bench_vcf {
                 history
             };
 
-            let state = GameStateData { board_data: (&$board).into(), history }.into();
+            let mut state = GameStateData { board_data: (&$board).into(), history }.into();
 
             let evaluator = ActiveEvaluator::from_state(&state);
 
@@ -51,7 +51,7 @@ mod bench_vcf {
             let td = ThreadData::new(WorkerThread::<Instant>::new(), 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
-                let result = search_endgame::endgame_search::<{ RuleKind::Renju }, false>(&mut td.clone(), pos::U8_BOARD_SIZE, &state, -Score::INF, Score::INF, Score::DRAW, true);
+                let result = search_endgame::quiescence_search::<{ RuleKind::Renju }, false>(&mut td.clone(), pos::U8_BOARD_SIZE, &mut state, -Score::INF, Score::INF, Score::DRAW, true);
 
                 tt.clear();
 

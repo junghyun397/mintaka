@@ -195,30 +195,6 @@ impl<const R: RuleKind> GameAgent<R> {
                     None => return Err(GameError::StoneDoesNotExist),
                 }
             },
-            Command::BatchSet { player_moves, opponent_moves } => {
-                let (black_stones, white_stones) =
-                    match self.state.board.player_color {
-                        Color::Black => (player_moves, opponent_moves),
-                        Color::White => (opponent_moves, player_moves),
-                    };
-
-                let batch_color =
-                    Color::player_color_from_each_moves(black_stones.len(), white_stones.len());
-
-                let player = if batch_color == Color::Black {
-                    self.state.board.player_color
-                } else {
-                    !self.state.board.player_color
-                };
-
-                self.state.board.batch_set_each_color_mut(
-                    black_stones.into_boxed_slice(),
-                    white_stones.into_boxed_slice(),
-                    player
-                );
-
-                self.evaluator = ActiveEvaluator::from_state(&self.state);
-            },
             Command::Clear => {
                 self.reinit_from_state(GameState::empty());
             },

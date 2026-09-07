@@ -14,7 +14,6 @@ use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{MaybeScore, Score};
 use rusty_renju::notation::pos;
-use rusty_renju::pattern::Pattern;
 use std::cmp::Reverse;
 
 pub const ENDGAME_MAX_MOVES: usize = 30;
@@ -75,55 +74,96 @@ impl EndgameMovesUnchecked {
     }
 }
 
-pub trait VcfDestination {
-    fn conditional_abort(&self, response_pattern: Pattern) -> bool;
-
-    fn additional_reached(&self, four_pos: Pos) -> bool;
+struct EndgameContext {
+    beta: Score,
+    is_pv: bool,
 }
 
-pub struct VcfWin; impl VcfDestination for VcfWin {
-    fn conditional_abort(&self, _: Pattern) -> bool {
-        false
+trait EndgameProof {
+    const SEQUENCE: bool;
+
+    fn entry(four_pos: Pos, ply: usize) -> Self;
+
+    fn stand_pat(eval: Score) -> Self;
+
+    fn abort() -> Self;
+
+    fn score(&self) -> Score;
+
+    fn push_pair(&mut self, response: Pos, attack: Pos);
+}
+
+impl EndgameProof for Score {
+    const SEQUENCE: bool = false;
+
+    fn entry(_four_pos: Pos, ply: usize) -> Self {
+        Score::win_in(ply)
     }
 
-    fn additional_reached(&self, _: Pos) -> bool {
-        false
+    fn stand_pat(eval: Score) -> Self {
+        eval
+    }
+
+    fn abort() -> Self {
+        Score::DRAW
+    }
+
+    fn score(&self) -> Score {
+        *self
+    }
+
+    fn push_pair(&mut self, _response: Pos, _attack: Pos) { }
+}
+
+struct SequenceProof {
+    score: Score,
+    sequence: Vec<Pos>,
+}
+
+impl EndgameProof for SequenceProof {
+    const SEQUENCE: bool = true;
+
+    fn entry(four_pos: Pos, ply: usize) -> Self {
+        Self { score: Score::win_in(ply), sequence: vec![four_pos] }
+    }
+
+    fn stand_pat(eval: Score) -> Self {
+        Self { score: eval, sequence: vec![] }
+    }
+
+    fn abort() -> Self {
+        Self::stand_pat(Score::DRAW)
+    }
+
+    fn score(&self) -> Score {
+        self.score
+    }
+
+    fn push_pair(&mut self, response: Pos, attack: Pos) {
+        self.sequence.push(response);
+        self.sequence.push(attack);
     }
 }
 
-pub struct VcfCounter {
-    target_pos: Pos
-}
-
-impl VcfDestination for VcfCounter {
-    fn conditional_abort(&self, response_pattern: Pattern) -> bool {
-        response_pattern.has_open_three()
-    }
-
-    fn additional_reached(&self, four_pos: Pos) -> bool {
-        self.target_pos == four_pos
-    }
-}
-
-pub fn endgame_search<const R: RuleKind, const VCT: bool>(
+pub fn quiescence_search<const R: RuleKind, const VCT: bool>(
     td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
     max_ply: u8,
-    state: &GameState<R>,
+    state: &mut GameState<R>,
     alpha: Score, beta: Score,
     static_eval: Score,
     is_pv: bool,
 ) -> Score {
     let indexes = state.board.patterns.indexes[state.board.player_color];
 
-    let empty_closed_fours = indexes.closed_fours.is_empty();
+    let empty_fours = !indexes.has_any_four();
 
-    if (!VCT && empty_closed_fours)
-        || (VCT && empty_closed_fours && indexes.open_threes.is_empty())
+    if (!VCT && empty_fours)
+        || (VCT && empty_fours && indexes.open_threes.is_empty())
     {
         return static_eval;
     }
 
-    let recent_player_action = state.history.previous_action().unwrap_or(pos::CENTER);
+    let recent_player_action = state.history.last_action_pair()[0].unwrap_or(pos::CENTER);
 
     let mut endgame_moves = generate_endgame_moves::<R, VCT>(&state.board, 8, recent_player_action);
 
@@ -137,16 +177,24 @@ pub fn endgame_search<const R: RuleKind, const VCT: bool>(
     if VCT {
         todo!()
     } else {
-        vcf::<R, 5, ScoreProof>(
-            td, VcfWin, max_ply,
-            *state, endgame_moves,
-            alpha, beta,
-            is_pv,
-        ).map_or(static_eval, |proof| proof.score())
+        let context = EndgameContext { beta, is_pv };
+        let history = state.history;
+
+        let score = match state.board.player_color {
+            Color::Black => try_vcf::<R, { Color::Black }, 5, _, Score>(
+                td, &context, max_ply, state, endgame_moves, alpha, static_eval, 0,
+            ),
+            Color::White => try_vcf::<R, { Color::White }, 5, _, Score>(
+                td, &context, max_ply, state, endgame_moves, alpha, static_eval, 0,
+            ),
+        };
+
+        state.history = history;
+        score
     }
 }
 
-pub fn endgame_sequence<const R: RuleKind, const VCT: bool>(
+pub fn endgame_proof<const R: RuleKind, const VCT: bool>(
     td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
     state: &GameState<R>
 ) -> Option<Vec<Pos>> {
@@ -161,103 +209,54 @@ pub fn endgame_sequence<const R: RuleKind, const VCT: bool>(
     if VCT {
         todo!()
     } else {
-        vcf::<R, 5, SequenceProof>(
-            td, VcfWin, pos::U8_BOARD_SIZE,
-            *state, endgame_moves,
-            Score::NEG_INF, Score::INF,
-            true,
-        ).map(SequenceProof::into_sequence)
-    }
-}
+        let context = EndgameContext { beta: Score::INF, is_pv: true };
 
-struct EndgameContext<D> {
-    dest: D,
-    beta: Score,
-    is_pv: bool,
-}
+        let mut state = *state;
+        let static_eval = td.evaluator.eval_value(&state);
 
-trait EndgameProof {
-    fn new(four_pos: Pos, ply: usize) -> Self;
+        let mut proof = match state.board.player_color {
+            Color::Black => try_vcf::<R, { Color::Black }, 8, _, SequenceProof>(
+                td, &context, pos::U8_BOARD_SIZE, &mut state, endgame_moves, Score::NEG_INF, static_eval, 0,
+            ),
+            Color::White => try_vcf::<R, { Color::White }, 8, _, SequenceProof>(
+                td, &context, pos::U8_BOARD_SIZE, &mut state, endgame_moves, Score::NEG_INF, static_eval, 0,
+            ),
+        };
 
-    fn push_pair(&mut self, response: Pos, attack: Pos);
-
-    fn ply(&self) -> usize;
-
-    fn score(&self) -> Score {
-        Score::win_in(self.ply())
-    }
-}
-
-#[derive(Copy, Clone)]
-struct ScoreProof {
-    ply: usize,
-}
-
-impl EndgameProof for ScoreProof {
-    fn new(_four_pos: Pos, ply: usize) -> Self {
-        Self { ply }
-    }
-
-    fn push_pair(&mut self, _response: Pos, _attack: Pos) { }
-
-    fn ply(&self) -> usize {
-        self.ply
-    }
-}
-
-struct SequenceProof {
-    sequence: Vec<Pos>,
-    ply: usize,
-}
-
-impl EndgameProof for SequenceProof {
-    fn new(four_pos: Pos, ply: usize) -> Self {
-        Self { sequence: vec![four_pos], ply }
-    }
-
-    fn push_pair(&mut self, response: Pos, attack: Pos) {
-        self.sequence.push(response);
-        self.sequence.push(attack);
-    }
-
-    fn ply(&self) -> usize {
-        self.ply
-    }
-}
-
-impl SequenceProof {
-    fn into_sequence(mut self) -> Vec<Pos> {
-        self.sequence.reverse();
-        self.sequence
-    }
-}
-
-fn vcf<const R: RuleKind, const DW: u8, Pr: EndgameProof>(
-    td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
-    dest: impl VcfDestination,
-    max_depth: u8,
-    mut state: GameState<R>,
-    vcf_moves: EndgameMovesUnchecked,
-    alpha: Score, beta: Score,
-    is_pv: bool,
-) -> Option<Pr> {
-    let context = EndgameContext { dest, beta, is_pv };
-
-    match state.board.player_color {
-        Color::Black => try_vcf::<R, { Color::Black }, DW, _, Pr>(td, &context, max_depth, &mut state, vcf_moves, alpha, 0),
-        Color::White => try_vcf::<R, { Color::White }, DW, _, Pr>(td, &context, max_depth, &mut state, vcf_moves, alpha, 0),
+        if !proof.score.is_win() || proof.sequence.is_empty() {
+            None
+        } else {
+            proof.sequence.reverse();
+            Some(proof.sequence)
+        }
     }
 }
 
 fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Pf: EndgameProof>(
     td: &mut ThreadData<R, TH, impl Evaluator<R>>,
-    context: &EndgameContext<impl VcfDestination>,
-    vcf_depth_left: u8,
+    context: &EndgameContext,
+    vcf_pair_depth_left: u8,
     state: &mut GameState<R>,
     mut vcf_moves: EndgameMovesUnchecked,
-    alpha: Score,
+    mut alpha: Score,
+    static_eval: Score,
     vcf_ply: usize,
-) -> Option<Pf> {
+) -> Pf {
+    let ply = td.ply + vcf_ply;
+
+    if td.is_aborted() {
+        return Pf::abort();
+    }
+
+    let mut best_proof = Pf::stand_pat(static_eval);
+    let mut best_score = best_proof.score();
+
+    alpha = alpha.max(best_score).max(Score::lose_in(ply));
+
+    if alpha >= context.beta || alpha >= Score::win_in(ply + 1) {
+        return best_proof;
+    }
+
     while let Some(four_pos) = vcf_moves.next() {
         if TH::IS_MAIN
             && td.should_check_limit()
@@ -267,27 +266,30 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Pf: 
         }
 
         if td.is_aborted() {
-            return None;
+            return Pf::abort();
         }
 
         let player_pattern = state.board.patterns.field[C][four_pos.idx_usize()];
 
-        if C == Color::Black && state.board.patterns.is_forbidden(four_pos) {
+        if R == RuleKind::Renju && C == Color::Black && state.board.patterns.is_forbidden(four_pos) {
             continue;
         }
 
         if player_pattern.has_open_four() {
-            let proof = Pf::new(four_pos, vcf_ply + 3);
-            tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, proof.score(), proof.ply(), context.is_pv);
-            return Some(proof);
+            let proof = Pf::entry(four_pos, ply + 3);
+
+            tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, static_eval, proof.score(), ply, context.is_pv);
+
+            return proof;
         }
 
-        let Some(child_depth) = vcf_depth_left.checked_sub(1) else {
+        let Some(child_depth) = vcf_pair_depth_left.checked_sub(1) else {
             continue;
         };
 
         td.batch_counter.increment();
-        let artifact = state.board.set_mut(four_pos);
+        let recovery_state = state.recovery_state();
+        let artifact = state.play_mut(four_pos);
         td.evaluator.play(&state.board, artifact, four_pos.into());
 
         let proof = 'candidate: {
@@ -304,55 +306,44 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Pf: 
                 (RuleKind::Renju, Color::Black) => response_four_count > 1
                     || response_pattern.has_open_four(),
                 _ => response_pattern.has_open_four() && !response_is_forbidden
-            } || context.dest.conditional_abort(response_pattern) {
-                break 'candidate None;
+            } {
+                break 'candidate Pf::stand_pat(static_eval);
             }
 
-            if (C == Color::White && response_is_forbidden) || (
-                response_four_count == 0
-                    && (player_pattern.has_open_three() || context.dest.additional_reached(four_pos))
-            ) {
-                break 'candidate Some(Pf::new(four_pos, vcf_ply + 1));
-            }
-
-            let ply_after_attack = td.ply + vcf_ply + 1;
-            let child_alpha = alpha.max(Score::lose_in(ply_after_attack));
-
-            if child_alpha >= context.beta
-                || child_alpha >= Score::win_in(ply_after_attack)
-                || state.board.stones + 2 >= pos::U8_BOARD_SIZE
-                || child_depth == 0
+            if (C == Color::White && response_is_forbidden)
+                || (response_four_count == 0 && player_pattern.has_open_three())
             {
-                break 'candidate None;
+                break 'candidate Pf::entry(four_pos, ply + 1);
             }
 
-            if let Some(TTEntryBucketProbe { entry, .. }) = td.tt.probe(tt_key) {
+            if !Pf::SEQUENCE && let Some(TTEntryBucketProbe { entry, .. }) = td.tt.probe(tt_key) {
                 let tt_score = MaybeScore::from(entry.score as i32);
 
                 // tt cutoff
-                if tt_score.is_some() && tt_score.unwrap().is_win() {
-                    break 'candidate Some(Pf::new(four_pos, vcf_ply + 1));
-                }
-
-                // tt vcf cache
-                if child_depth <= entry.endgame_depth {
-                    break 'candidate None;
+                if tt_score.is_some() && tt_score.unwrap().is_win()
+                    && matches!(entry.tt_flag.maybe_score_kind(), Some(ScoreKind::Exact | ScoreKind::LowerBound))
+                {
+                    let score = transposition_table::decode_mate_distance(tt_score.unwrap(), ply + 2);
+                    let mate_ply = (Score::MATE.value() - score.value()) as usize;
+                    break 'candidate Pf::entry(four_pos, mate_ply);
                 }
             }
 
             td.batch_counter.increment();
-            let artifact = state.board.set_mut(response_pos);
+            let response_eval = td.evaluator.eval_value(state);
+            let response_recovery_state = state.recovery_state();
+            let artifact = state.play_mut(response_pos);
             td.evaluator.play(&state.board, artifact, response_pos.into());
 
             let child_moves = if !state.board.patterns.indexes[C].has_any_four() {
-                None // cold branch pruning
+                None // cold branch stand-pat
             } else if response_four_count != 0 {
                 let response_move = state.board.patterns.five_pos[!C].unwrap();
 
                 if !state.board.patterns.field[C][response_move.idx_usize()].has_any_four()
-                    || (C == Color::Black && state.board.patterns.is_forbidden(response_move))
+                    || (R == RuleKind::Renju && C == Color::Black && state.board.patterns.is_forbidden(response_move))
                 {
-                    None
+                    None // unable to continue with four stand-pat
                 } else {
                     Some(EndgameMovesUnchecked::unit(response_move))
                 }
@@ -360,73 +351,70 @@ fn try_vcf<const R: RuleKind, const C: Color, const DW: u8, TH: ThreadType, Pf: 
                 Some(generate_endgame_moves::<R, false>(&state.board, DW, four_pos))
             };
 
+            let child_eval = td.evaluator.eval_value(state);
+
             let mut proof = if let Some(mut moves) = child_moves {
                 moves.init();
-                try_vcf::<R, C, DW, TH, Pf>(td, context, child_depth, state, moves, child_alpha, vcf_ply + 2)
+
+                try_vcf::<R, C, DW, TH, Pf>(
+                    td, context, child_depth, state, moves, alpha, child_eval, vcf_ply + 2,
+                )
             } else {
-                None
+                Pf::stand_pat(child_eval)
             };
 
-            let artifact = state.board.unset_mut(response_pos);
+            let artifact = state.undo_mut(response_recovery_state);
             td.evaluator.undo(&state.board, artifact, response_pos.into());
 
             if td.is_aborted() {
-                break 'candidate None;
+                break 'candidate Pf::abort();
             }
 
-            if let Some(proof) = &mut proof {
-                tt_store_vcf_lose(&td.tt, state.board.hash_key, response_pos, -proof.score(), proof.ply(), context.is_pv);
+            if proof.score().is_win() {
+                tt_store_vcf_lose(&td.tt, state.board.hash_key, response_pos, response_eval, -proof.score(), ply + 1, context.is_pv);
                 proof.push_pair(response_pos, four_pos);
             }
 
             proof
         };
 
-        let artifact = state.board.unset_mut(four_pos);
+        let artifact = state.undo_mut(recovery_state);
         td.evaluator.undo(&state.board, artifact, four_pos.into());
 
         if td.is_aborted() {
-            return None;
+            return Pf::abort();
         }
 
-        if let Some(proof) = proof {
-            tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, proof.score(), proof.ply(), context.is_pv);
-            return Some(proof);
+        let score = proof.score();
+
+        if score.is_win() {
+            tt_store_vcf_win(&td.tt, state.board.hash_key, four_pos, static_eval, score, ply, context.is_pv);
+            return proof;
+        }
+
+        if score > best_score {
+            best_score = score;
+            best_proof = proof;
+            alpha = alpha.max(score);
+        }
+
+        if alpha >= context.beta {
+            return best_proof;
         }
     }
 
     if td.is_aborted() {
-        return None;
+        return Pf::abort();
     }
 
-    if let Some(TTEntryBucketProbe { slot, mut entry }) = td.tt.probe(state.board.hash_key) {
-        if entry.endgame_depth != u8::MAX
-            && entry.endgame_depth <= vcf_depth_left
-        {
-            entry.endgame_depth = vcf_depth_left;
-
-            td.tt.update_entry(state.board.hash_key, slot, entry);
-        }
-    } else {
-        td.tt.store(
-            state.board.hash_key,
-            MaybePos::NONE,
-            Depth::ZERO,
-            vcf_depth_left,
-            None,
-            MaybeScore::NONE,
-            MaybeScore::NONE,
-            false,
-        );
-    }
-
-    None
+    best_proof
 }
 
 fn tt_store_vcf_win(
     tt: &TTView,
     hash_key: HashKey,
     four_pos: Pos,
+    eval: Score,
     score: Score,
     ply: usize,
     is_pv: bool,
@@ -437,7 +425,7 @@ fn tt_store_vcf_win(
         Depth::ZERO,
         TTEntry::ENDGAME_PROVEN_DEPTH,
         Some(ScoreKind::LowerBound),
-        score.into(),
+        eval.into(),
         transposition_table::encode_mate_distance(score, ply).into(),
         is_pv,
     );
@@ -448,6 +436,7 @@ fn tt_store_vcf_lose(
     tt: &TTView,
     hash_key: HashKey,
     response_pos: Pos,
+    eval: Score,
     score: Score,
     ply: usize,
     is_pv: bool,
@@ -458,7 +447,7 @@ fn tt_store_vcf_lose(
         Depth::ZERO,
         TTEntry::ENDGAME_PROVEN_DEPTH,
         Some(ScoreKind::UpperBound),
-        score.into(),
+        eval.into(),
         transposition_table::encode_mate_distance(score, ply).into(),
         is_pv,
     );

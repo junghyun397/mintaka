@@ -9,7 +9,7 @@ use crate::movegen::move_picker::{MovePicker, ThreatKind};
 use crate::params;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
-use crate::search_endgame::endgame_search;
+use crate::search_endgame::quiescence_search;
 use crate::thread_data::{SearchFrame, ThreadData};
 use crate::thread_type::ThreadType;
 use crate::utils::depth;
@@ -418,12 +418,11 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         if static_eval >= beta
             || alpha.is_win()
-            || tt_endgame_depth >= vcf_depth
         {
             return static_eval;
         }
 
-        return endgame_search::<R, false>(
+        return quiescence_search::<R, false>(
             td, vcf_depth, state, alpha, beta, static_eval, NT::IS_PV,
         );
     }
