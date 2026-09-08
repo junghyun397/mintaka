@@ -1,14 +1,12 @@
 use crate::params;
+use crate::utils::depth::Depth;
 use core::f64;
+use rusty_renju::bitfield::Bitfield;
 use rusty_renju::history::History;
 use rusty_renju::notation::color::{Color, ColorContainer};
 use rusty_renju::notation::pos;
-use rusty_renju::notation::pos::{MaybePos, Pos, PosList};
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::utils::empty::Empty;
-use crate::utils::depth::Depth;
-
-pub type QuietPlied = PosList<{ 256 - 8 }>;
-pub type TacticalPlied = PosList<{ 64 - 8 }>;
 
 pub const MAX_HISTORY_SCORE: i32 = (i16::MAX / 2) as i32;
 
@@ -37,10 +35,10 @@ impl Empty for HistoryTable {
 }
 
 impl HistoryTable {
-    pub fn update_quiet(&mut self, history: &History, quiet_plied: QuietPlied, color: Color, best_move: Pos, depth: Depth) {
+    pub fn update_quiet(&mut self, history: &History, quiet_plied: Bitfield, color: Color, best_move: Pos, depth: Depth) {
         let bonus = depth.value() * depth.value() * params::HT_QUIET_BONUS_MUL;
 
-        for &pos in quiet_plied.iter() {
+        for pos in quiet_plied.iter_hot_pos() {
             let bonus = bonus * Self::is_equal_sign(pos, best_move);
 
             Self::update_gravity_score(&mut self.quiet[color][pos.idx_usize()], bonus);
@@ -53,16 +51,16 @@ impl HistoryTable {
         }
     }
 
-    pub fn update_tactical(&mut self, three_plied: TacticalPlied, four_plied: TacticalPlied, color: Color, best_move: Pos, depth: Depth) {
+    pub fn update_tactical(&mut self, three_plied: Bitfield, four_plied: Bitfield, color: Color, best_move: Pos, depth: Depth) {
         let bonus = depth.value() * depth.value() * params::HT_TACTICAL_BONUS_MUL;
 
-        for &pos in three_plied.iter() {
+        for pos in three_plied.iter_hot_pos() {
             let bonus = bonus * Self::is_equal_sign(pos, best_move);
 
             Self::update_gravity_score(&mut self.three[color][pos.idx_usize()], bonus);
         }
 
-        for &pos in four_plied.iter() {
+        for pos in four_plied.iter_hot_pos() {
             let bonus = bonus * Self::is_equal_sign(pos, best_move);
 
             Self::update_gravity_score(&mut self.four[color][pos.idx_usize()], bonus);

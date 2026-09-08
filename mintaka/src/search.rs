@@ -1,25 +1,25 @@
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
-use crate::memo::history_table::{QuietPlied, TacticalPlied};
 use crate::memo::transposition_table;
 use crate::memo::tt_entry::{ScoreKind, TTEntryBucketProbe};
 use crate::movegen::move_generator;
 use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker::{MovePicker, ThreatKind};
-use crate::params;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
-use crate::search_endgame::quiescence_search;
+use crate::search_endgame::{ThreatSearchKind, quiescence_search};
 use crate::thread_data::{SearchFrame, ThreadData};
 use crate::thread_type::ThreadType;
 use crate::utils::depth;
 use crate::utils::depth::Depth;
+use crate::params;
+use rusty_renju::bitfield::Bitfield;
 use rusty_renju::const_for;
 use rusty_renju::notation::color::Color;
+use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{MaybeScore, Score};
-use rusty_renju::notation::pos;
 
 trait NodeType {
     const IS_ROOT: bool;
@@ -278,132 +278,82 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         }
     }
 
-    let threat_kind;
-    'threat_kind: {
+    let threat_kind = 'threat_kind: {
         let fork_four_field = state.board.patterns.effective_fork_four_field(!state.board.player_color);
 
         if !fork_four_field.is_empty() {
-            threat_kind = Some(ThreatKind::ForkFour(fork_four_field));
-            break 'threat_kind;
+            break 'threat_kind Some(ThreatKind::ForkFour(fork_four_field));
         }
 
         let fork_three_four_field = state.board.patterns.effective_fork_three_four_field(!state.board.player_color);
 
         if !fork_three_four_field.is_empty() {
-            threat_kind = Some(ThreatKind::ForkThreeFour(fork_three_four_field | state.board.patterns.indexes[!state.board.player_color].open_threes));
-            break 'threat_kind;
+            break 'threat_kind Some(ThreatKind::ForkThreeFour(
+                fork_three_four_field
+                    | state.board.patterns.indexes[!state.board.player_color].open_threes
+            ));
         }
 
-        threat_kind = None;
+        None
     };
 
-    let mut static_eval = MaybeScore::NONE;
+    let evaluator_eval: MaybeScore;
     let tt_move: MaybePos;
     let tt_pv: bool;
-    let tt_endgame_depth: u8;
+    let tt_quiescence_depth: u8;
 
     let tt_entry = td.tt.probe(state.board.hash_key);
 
-    // endgame-hit
-    if let Some(TTEntryBucketProbe { entry, ..} ) = &tt_entry
-        && entry.endgame_depth == u8::MAX {
-        if NT::IS_ROOT {
-            td.best_move = entry.best_move;
-            td.singular_root = true;
-        }
+    if let Some(TTEntryBucketProbe { entry, .. }) = tt_entry {
+        let entry_tt_score = Score::from_i32(entry.score as i32);
+        evaluator_eval = MaybeScore::from_i32(entry.eval as i32);
+        tt_move = entry.best_move;
+        tt_pv = entry.tt_flag.is_pv();
+        tt_quiescence_depth = entry.quiescence_depth;
 
-        if NT::IS_PV {
-            td.pvs[td.ply].load(entry.best_move, PrincipalVariation::EMPTY);
-        }
-
-        return transposition_table::decode_mate_distance(Score::from_i32(entry.score as i32), td.ply);
-    }
-
-    match tt_entry {
-        Some(TTEntryBucketProbe { entry, .. })
-        if entry.tt_flag.maybe_score_kind().is_some() => { // full-tt
-            let tt_score = transposition_table::decode_mate_distance(Score::from_i32(entry.score as i32), td.ply);
-
-            tt_move = entry.best_move;
-            tt_pv = entry.tt_flag.is_pv();
-            tt_endgame_depth = entry.endgame_depth;
-
-            // tt-cutoff
-            if !NT::IS_PV
-                && depth_left <= Depth::from_i32(entry.depth as i32)
-                && match entry.tt_flag.score_kind() {
-                    ScoreKind::LowerBound => tt_score >= beta,
-                    ScoreKind::UpperBound => tt_score <= alpha,
-                    ScoreKind::Exact => true,
-                }
+        // tt-cutoff
+        if !NT::IS_PV
+            && depth_left <= Depth::from_i32(entry.depth as i32)
+            && match entry.tt_flag.score_kind() {
+            ScoreKind::LowerBound => entry_tt_score >= beta,
+            ScoreKind::UpperBound => entry_tt_score <= alpha,
+            ScoreKind::Exact => true,
+        } {
+            if entry_tt_score >= beta
+                && let Some(pos) = tt_move.ok()
+                && threat_kind.is_none()
+                && state.board.is_legal_move(pos)
+                && !state.board.patterns.field[state.board.player_color][pos.idx_usize()].is_tactical()
             {
-                if tt_score >= beta
-                    && let Some(pos) = tt_move.ok()
-                    && threat_kind.is_none()
-                    && state.board.is_legal_move(pos)
-                    && !state.board.patterns.field[state.board.player_color][pos.idx_usize()].is_tactical()
-                {
-                    td.push_killer(pos);
+                td.push_killer(pos);
 
-                    let mut quiet_plied = QuietPlied::EMPTY;
-                    quiet_plied.push(pos);
-                    td.ht.update_quiet(&state.history, quiet_plied, state.board.player_color, pos, depth_left);
-                }
-
-                return tt_score;
+                let mut quiet_plied = Bitfield::ZERO_FILLED;
+                quiet_plied.set(pos);
+                td.ht.update_quiet(&state.history, quiet_plied, state.board.player_color, pos, depth_left);
             }
 
-            static_eval = Score::from_i32(entry.eval as i32).into();
+            return entry_tt_score;
         }
-        Some(TTEntryBucketProbe { entry, .. }) => { // endgame-tt
-            tt_move = MaybePos::NONE;
-            tt_pv = false;
-            tt_endgame_depth = entry.endgame_depth;
-
-            static_eval = MaybeScore::NONE;
-
-            td.tt.store(
-                state.board.hash_key,
-                MaybePos::NONE,
-                Depth::ZERO,
-                tt_endgame_depth,
-                None,
-                static_eval,
-                Score::DRAW.into(),
-                false,
-            );
-        }
-        None => {
-            tt_move = MaybePos::NONE;
-            tt_pv = false;
-            tt_endgame_depth = 0;
-
-            td.tt.store(
-                state.board.hash_key,
-                MaybePos::NONE,
-                Depth::ZERO,
-                0,
-                None,
-                static_eval,
-                Score::DRAW.into(),
-                false,
-            );
-        }
+    } else {
+        evaluator_eval = MaybeScore::NONE;
+        tt_move = MaybePos::NONE;
+        tt_pv = NT::IS_PV;
+        tt_quiescence_depth = 0;
     }
 
-    if static_eval.is_none() {
-        let evaluator_eval = td.evaluator.eval_value(state);
+    let evaluator_eval = if evaluator_eval.is_none() {
+        td.evaluator.eval_value(state)
+    } else {
+        evaluator_eval.unwrap()
+    };
 
-        td.ss[td.ply].evaluator_eval = evaluator_eval.into();
+    td.ss[td.ply].evaluator_eval = evaluator_eval.into();
 
-        static_eval = if td.evaluator.require_stabilize() && td.ply > 0 {
-            (-td.ss[td.ply - 1].evaluator_eval.unwrap_or(evaluator_eval) + evaluator_eval) / 2
-        } else {
-            evaluator_eval
-        }.into()
-    }
-
-    let static_eval = static_eval.unwrap();
+    let static_eval = if td.evaluator.require_stabilize() && td.ply > 0 {
+        (-td.ss[td.ply - 1].evaluator_eval.unwrap_or(-evaluator_eval) + evaluator_eval) / 2
+    } else {
+        evaluator_eval
+    };
 
     td.ss[td.ply].static_eval = static_eval;
 
@@ -422,7 +372,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             return static_eval;
         }
 
-        return quiescence_search::<R, false>(
+        return quiescence_search::<R, { ThreatSearchKind::VCF }>(
             td, vcf_depth, state, alpha, beta, static_eval, NT::IS_PV,
         );
     }
@@ -435,14 +385,14 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     let mut best_score = Score::NEG_INF;
     let mut best_move = MaybePos::NONE;
 
-    let mut move_picker = MovePicker::init_new(tt_move, td.killers[td.ply], threat_kind);
     let mut moves_made = 0;
     let mut searched_moves = 0;
 
-    let mut quiet_plied = QuietPlied::EMPTY;
-    let mut three_plied = TacticalPlied::EMPTY;
-    let mut four_plied = TacticalPlied::EMPTY;
+    let mut quiet_plied = Bitfield::ZERO_FILLED;
+    let mut three_plied = Bitfield::ZERO_FILLED;
+    let mut four_plied = Bitfield::ZERO_FILLED;
 
+    let mut move_picker = MovePicker::init_new(tt_move, td.killers[td.ply], threat_kind);
     'position_search: while let Some(MoveEntry { pos, move_score, history_score, .. }) = move_picker.next(td, state) {
         if !state.board.is_legal_move(pos) {
             continue;
@@ -489,11 +439,11 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         if threat_kind.is_none() {
             if on_three {
-                three_plied.push(pos);
+                three_plied.set(pos);
             } else if on_four {
-                four_plied.push(pos);
+                four_plied.set(pos);
             } else {
-                quiet_plied.push(pos);
+                quiet_plied.set(pos);
             }
         }
 
@@ -635,7 +585,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         state.board.hash_key,
         best_move,
         depth_left,
-        tt_endgame_depth,
+        tt_quiescence_depth,
         Some(score_kind),
         static_eval.into(),
         transposition_table::encode_mate_distance(best_score, td.ply).into(),
@@ -646,8 +596,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 }
 
 fn find_immediate_win<const R: RuleKind>(state: &GameState<R>, ply: usize) -> (MaybeScore, MaybePos) {
-    if let Some(pos) = state.board.patterns.five_pos[state.board.player_color].ok()
-    { // five
+    if let Some(pos) = state.board.patterns.five_pos[state.board.player_color].ok() { // five
         return (Score::win_in(ply + 1).into(), pos.into())
     }
 

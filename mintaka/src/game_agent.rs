@@ -12,13 +12,12 @@ use crate::thread_data::ThreadData;
 use crate::thread_type::{MainThread, WorkerThread};
 use crate::time_manager::TimeManager;
 use crate::utils::monotonic_clock::MonotonicClock;
-use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::empty::Empty;
 use std::fmt::{Display, Formatter};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 #[cfg(not(feature = "rayon"))]
 macro_rules! search_scope {

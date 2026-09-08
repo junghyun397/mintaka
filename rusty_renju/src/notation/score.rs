@@ -135,6 +135,14 @@ impl MaybeScore {
 
     pub const NONE: Self = Self(Self::INVALID_SCORE);
 
+    pub const fn from_i32(value: i32) -> Self {
+        if value == Self::INVALID_SCORE.0 {
+            Self::NONE
+        } else {
+            Self(Score::from_i32(value))
+        }
+    }
+
     pub fn is_none(&self) -> bool {
         self.0 == Self::INVALID_SCORE
     }
@@ -168,11 +176,7 @@ impl From<Score> for MaybeScore {
 }
 
 impl From<i32> for MaybeScore {
-    fn from(score: i32) -> Self {
-        if score == Self::INVALID_SCORE.0 {
-            Self::NONE
-        } else {
-            Self(Score::from_i32(score))
-        }
+    fn from(value: i32) -> Self {
+        Self::from_i32(value)
     }
 }

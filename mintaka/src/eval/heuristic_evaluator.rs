@@ -1,9 +1,9 @@
 use crate::eval::evaluator::{Evaluator, PolicyDistribution};
 use crate::game_state::GameState;
-use crate::movegen::neighbor_scores::NeighborScores;
 use rusty_renju::board::{Board, MoveArtifact};
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::color::{Color, ColorContainer};
+use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::{ForbiddenKind, RuleKind};
 use rusty_renju::notation::score::Score;
@@ -11,11 +11,9 @@ use rusty_renju::pattern::Pattern;
 use rusty_renju::slice::Slices;
 use rusty_renju::utils::empty::Empty;
 use rusty_renju::{const_for, pattern};
-use rusty_renju::notation::pos;
 
 #[derive(Clone)]
 pub struct HeuristicEvaluator<const R: RuleKind> {
-    neighbor_scores: NeighborScores,
     scores: ColorContainer<[i16; pattern::PATTERN_SIZE]>,
     policy_score: [i16; pattern::PATTERN_SIZE],
     score_black: i32,
@@ -66,7 +64,6 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
 
     fn from_state(state: &GameState<R>) -> Self {
         let mut evaluator = Self {
-            neighbor_scores: NeighborScores::empty(),
             scores: ColorContainer::new([0; pattern::PATTERN_SIZE], [0; pattern::PATTERN_SIZE]),
             policy_score: [0; pattern::PATTERN_SIZE],
             score_black: 0,
@@ -79,7 +76,6 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
     }
 
     fn init(&mut self, board: &Board<R>) {
-        self.neighbor_scores = (&board.hot_field).into();
         self.hash_key = board.hash_key;
 
         for color in [Color::Black, Color::White] {
@@ -99,7 +95,6 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
 
     fn play(&mut self, board: &Board<R>, artifact: MoveArtifact, plied: MaybePos) {
         if let Some(plied) = plied.ok() {
-            self.neighbor_scores.add_neighbor_score(plied);
             self.update(&board, artifact, plied);
         }
 
@@ -108,7 +103,6 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
 
     fn undo(&mut self, board: &Board<R>, artifact: MoveArtifact, removed: MaybePos) {
         if let Some(removed) = removed.ok() {
-            self.neighbor_scores.remove_neighbor_score(removed);
             self.update(&board, artifact, removed);
         }
 

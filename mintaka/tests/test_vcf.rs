@@ -1,60 +1,44 @@
 #[cfg(test)]
 mod test_vcf {
     use indoc::indoc;
-    use mintaka::config::{Config, SearchObjective};
-    use mintaka::eval::evaluator::ActiveEvaluator;
-    use mintaka::eval::evaluator::Evaluator;
-    use mintaka::memo::history_table::HistoryTable;
-    use mintaka::memo::transposition_table::TranspositionTable;
-    use mintaka::search_endgame;
-    use mintaka::thread_data::ThreadData;
-    use mintaka::thread_type::WorkerThread;
+    use mintaka::endgame_solver;
+    use mintaka::search_endgame::ThreatSearchKind;
     use rusty_renju::board;
-    use rusty_renju::notation::pos::{pos_unchecked, MaybePos, Pos};
-    use rusty_renju::utils::empty::Empty;
-    use rusty_renju::notation::rule::RuleKind;
-    use rusty_renju::utils::byte_size::ByteSize;
+    use rusty_renju::notation::pos;
+    use rusty_renju::notation::pos::{MaybePos, pos_unchecked};
+    use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, AtomicU32};
-    use std::time::Instant;
 
     macro_rules! vcf {
         ($board:expr) => {{
             let mut state = $board.into();
 
-            let config = Config::default();
-
-            let evaluator = ActiveEvaluator::from_state(&state);
-
-            let tt = TranspositionTable::new_with_size(ByteSize::from_kib(32));
-            let ht = HistoryTable::empty();
-
-            let global_counter_in_1k = AtomicU32::new(0);
-            let aborted = AtomicBool::new(false);
-
-            let mut td = ThreadData::new(
-                WorkerThread::<Instant>::new(), 0, SearchObjective::Best, config, evaluator,
-                tt.view(), ht, &aborted, &global_counter_in_1k
-            );
-
             let time = std::time::Instant::now();
 
-            let vcf_result: Vec<MaybePos> = search_endgame::endgame_proof::<{ RuleKind::Renju }, false>(&mut td, &state)
-                .unwrap().into_iter()
-                .map(Pos::into)
-                .collect();
+            let solution = endgame_solver::solve_endgame(
+                state,
+                ThreatSearchKind::VCF,
+                pos::BOARD_SIZE as u32,
+                Arc::new(AtomicU32::new(0)),
+                Arc::new(AtomicBool::new(false)),
+            );
 
             let time = time.elapsed();
 
-            state.board.batch_set_mut(&vcf_result.clone().into_boxed_slice());
-            let last_move = vcf_result.last().copied().unwrap();
+            let sequence: Vec<MaybePos> = solution.sequence.unwrap().into_iter()
+                .map(MaybePos::from)
+                .collect();
 
-            println!("{}", state.board.to_string_with_highlighted_move(last_move.unwrap()));
-            println!("length: {}", vcf_result.len());
-            println!("sequence: {vcf_result:?}");
+            state.board.batch_set_mut(&sequence);
+            let last_move = sequence.last().unwrap().unwrap();
+
+            println!("{}", state.board.to_string_with_highlighted_move(last_move));
+            println!("length: {}", sequence.len());
+            println!("sequence: {sequence:?}");
             println!("time: {time:?}");
-            println!("nodes: {}", td.batch_counter.count_local_in_1k());
+            println!("nodes: {}", solution.nodes);
 
-            last_move.unwrap()
+            last_move
         }};
     }
 

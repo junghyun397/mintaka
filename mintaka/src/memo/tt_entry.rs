@@ -88,13 +88,13 @@ pub struct TTEntry {
     pub best_move: MaybePos, // 8
     pub tt_flag: TTFlag, // 8
     pub depth: u8, // 8
-    pub endgame_depth: u8, // 8
+    pub quiescence_depth: u8, // 8
     pub eval: i16, // 16
     pub score: i16, // 16
 }
 
 impl TTEntry {
-    pub const ENDGAME_PROVEN_DEPTH: u8 = u8::MAX;
+    pub const QUIESCENCE_PROVEN_DEPTH: u8 = u8::MAX;
 }
 
 assert_struct_sizes!(TTEntry, size=8, align=8);

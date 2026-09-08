@@ -1,5 +1,6 @@
+use std::io::ErrorKind::Other;
 use rusty_renju::bitfield::Bitfield;
-use crate::search_endgame::{EndgameMovesUnchecked, ENDGAME_MAX_MOVES};
+use crate::search_endgame::{EndgameMovesUnchecked, ENDGAME_MAX_MOVES, ThreatSearchKind};
 use rusty_renju::board::Board;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
@@ -15,14 +16,14 @@ pub const DIRECT_RESPONSE_SCORE: i16 = Score::INF.value() as i16 - 500;
 pub const KILLER_MOVE_SCORE: i16 = Score::INF.value() as i16 - 1000;
 pub const COUNTER_MOVE_BONUS: i16 = 100;
 
-pub fn generate_endgame_moves<const R: RuleKind, const VCT: bool>(board: &Board<R>, distance_window: u8, recent_move: Pos) -> EndgameMovesUnchecked {
+pub fn generate_endgame_moves<const R: RuleKind, const T: ThreatSearchKind>(board: &Board<R>, distance_window: u8, recent_move: Pos) -> EndgameMovesUnchecked {
     let mut vcf_moves = [MaybePos::NONE; ENDGAME_MAX_MOVES];
     let mut vcf_moves_top = 0;
 
     let indexes = &board.patterns.indexes[board.player_color];
     let mut field = indexes.closed_fours | indexes.fork_fours;
 
-    if VCT {
+    if T == ThreatSearchKind::VCT {
         field |= board.patterns.indexes[board.player_color].open_threes;
     }
 

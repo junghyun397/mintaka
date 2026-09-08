@@ -24,6 +24,7 @@ mod bench_endgame {
     use std::sync::atomic::{AtomicBool, AtomicU32};
     use std::time::Instant;
     use test::Bencher;
+    use mintaka::search_endgame::ThreatSearchKind;
 
     macro_rules! bench_vcf {
         ($bencher:expr,$board:expr,$player_move:expr,$opponent_move:expr,$expect_vcf:expr) => {{
@@ -51,7 +52,7 @@ mod bench_endgame {
             let td = ThreadData::new(WorkerThread::<Instant>::new(), 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
-                let result = search_endgame::quiescence_search::<{ RuleKind::Renju }, false>(&mut td.clone(), pos::U8_BOARD_SIZE, &mut state, -Score::INF, Score::INF, Score::DRAW, true);
+                let result = search_endgame::quiescence_search::<{ RuleKind::Renju }, { ThreatSearchKind::VCF }>(&mut td.clone(), pos::U8_BOARD_SIZE, &mut state, -Score::INF, Score::INF, Score::DRAW, true);
 
                 tt.clear();
 

@@ -1,6 +1,3 @@
-#[cfg(feature = "typeshare")]
-use typeshare::typeshare;
-
 #[macro_export] macro_rules! const_for {
     ($idx:ident in $start:expr, $end:expr; $body:block) => {
         {

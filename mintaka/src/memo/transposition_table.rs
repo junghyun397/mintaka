@@ -201,7 +201,7 @@ impl TTView<'_> {
                     best_move: best_move.or(exist_entry.best_move),
                     tt_flag: TTFlag::new(self.age, maybe_score_kind, is_pv),
                     depth: depth.value() as u8,
-                    endgame_depth,
+                    quiescence_depth: endgame_depth,
                     eval: eval.or(MaybeScore::from(exist_entry.eval as i32)).unwrap_unchecked() as i16,
                     score: score.or(MaybeScore::from(exist_entry.score as i32)).unwrap_unchecked() as i16,
                 };
@@ -220,7 +220,7 @@ impl TTView<'_> {
                             let entry = TTEntry::from(entry);
 
                             entry.depth as i32
-                                + entry.endgame_depth as i32 / 20
+                                + entry.quiescence_depth as i32 / 20
                                 - 6 * self.relative_age(entry.tt_flag.age()) as i32
                         })
                         .into_iter()
@@ -233,7 +233,7 @@ impl TTView<'_> {
                 best_move,
                 tt_flag: TTFlag::new(self.age, maybe_score_kind, is_pv),
                 depth: depth.value() as u8,
-                endgame_depth,
+                quiescence_depth: endgame_depth,
                 eval: eval.unwrap_unchecked() as i16,
                 score: score.unwrap_unchecked() as i16,
             };
