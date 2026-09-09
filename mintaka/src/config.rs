@@ -22,7 +22,7 @@ pub struct Config {
 
     pub max_nodes_in_1k: Option<u32>,
     pub max_depth: Option<Depth>,
-    pub max_vcf_depth: Option<u8>,
+    pub max_quiescence_depth: Option<Depth>,
 
     pub tt_size: ByteSize,
     pub workers: u32,
@@ -39,7 +39,7 @@ impl Default for Config {
             draw_condition: None,
             max_nodes_in_1k: None,
             max_depth: None,
-            max_vcf_depth: None,
+            max_quiescence_depth: None,
             tt_size: ByteSize::from_mib(128),
             workers: 1,
             pondering: false,
@@ -60,7 +60,7 @@ impl Ord for Config {
         (
             self.max_nodes_in_1k,
             self.max_depth,
-            self.max_vcf_depth,
+            self.max_quiescence_depth,
             self.tt_size,
             self.workers,
             self.pondering,
@@ -69,7 +69,7 @@ impl Ord for Config {
             .cmp(&(
                 other.max_nodes_in_1k,
                 other.max_depth,
-                other.max_vcf_depth,
+                other.max_quiescence_depth,
                 other.tt_size,
                 other.workers,
                 other.pondering,
@@ -83,7 +83,7 @@ impl Config {
         draw_condition: None,
         max_nodes_in_1k: None,
         max_depth: None,
-        max_vcf_depth: None,
+        max_quiescence_depth: None,
         tt_size: ByteSize::from_mib(1024 * 1024 * 1024),
         workers: 2048,
         pondering: true,
@@ -118,7 +118,7 @@ impl Config {
     pub fn validate(self) -> Result<Self, ConfigValidationError> {
         if self.max_depth > Some(Depth::PLY_LIMIT) {
             Err(ConfigValidationError::DepthDeeperThanMaxPly)
-        } else if self.max_vcf_depth > Some(Depth::PLY_LIMIT.value() as u8) {
+        } else if self.max_quiescence_depth > Some(Depth::PLY_LIMIT) {
             Err(ConfigValidationError::VCFDepthDeeperThanMaxPly)
         } else {
             Ok(self)

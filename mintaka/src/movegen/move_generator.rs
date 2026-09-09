@@ -1,4 +1,3 @@
-use std::io::ErrorKind::Other;
 use rusty_renju::bitfield::Bitfield;
 use crate::search_endgame::{EndgameMovesUnchecked, ENDGAME_MAX_MOVES, ThreatSearchKind};
 use rusty_renju::board::Board;

@@ -41,7 +41,7 @@ export class MintakaWorkerControl {
 export const DefaultWorkerConfig: Config = {
     max_nodes_in_1k: undefined,
     max_depth: undefined,
-    max_vcf_depth: undefined,
+    max_quiescence_depth: undefined,
     tt_size: 1024 * 1024 * 128,
     workers: Math.max(1, navigator.hardwareConcurrency - 1),
     pondering: false,
@@ -55,7 +55,7 @@ export const DefaultWorkerConfig: Config = {
 
 export const MaxWorkerConfig: Config = {
     ...DefaultWorkerConfig,
-    max_vcf_depth: 225,
+    max_quiescence_depth: 225,
     workers: 256,
     tt_size: 1024 * 1024 * 2048, // 2 GiB
     pondering: true,

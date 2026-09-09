@@ -4,7 +4,6 @@ mod test_vcf {
     use mintaka::endgame_solver;
     use mintaka::search_endgame::ThreatSearchKind;
     use rusty_renju::board;
-    use rusty_renju::notation::pos;
     use rusty_renju::notation::pos::{MaybePos, pos_unchecked};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, AtomicU32};
@@ -18,7 +17,7 @@ mod test_vcf {
             let solution = endgame_solver::solve_endgame(
                 state,
                 ThreatSearchKind::VCF,
-                pos::BOARD_SIZE as u32,
+                None,
                 Arc::new(AtomicU32::new(0)),
                 Arc::new(AtomicBool::new(false)),
             );

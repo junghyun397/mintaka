@@ -84,12 +84,13 @@ impl EndgameMovesUnchecked {
 }
 
 struct EndgameContext {
+    max_depth: Depth,
     beta: Score,
     is_pv: bool,
 }
 
 trait EndgameProof {
-    const SEQUENCE: bool;
+    const COMPLETE_PROOF: bool;
 
     fn entry(four_pos: Pos, ply: usize) -> Self;
 
@@ -103,7 +104,7 @@ trait EndgameProof {
 }
 
 impl EndgameProof for Score {
-    const SEQUENCE: bool = false;
+    const COMPLETE_PROOF: bool = false;
 
     fn entry(_four_pos: Pos, ply: usize) -> Self {
         Score::win_in(ply)
@@ -130,7 +131,7 @@ struct SequenceProof {
 }
 
 impl EndgameProof for SequenceProof {
-    const SEQUENCE: bool = true;
+    const COMPLETE_PROOF: bool = true;
 
     fn entry(four_pos: Pos, ply: usize) -> Self {
         Self { score: Score::win_in(ply), sequence: vec![four_pos] }
@@ -156,7 +157,7 @@ impl EndgameProof for SequenceProof {
 
 pub fn quiescence_search<const R: RuleKind, const T: ThreatSearchKind>(
     td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
-    max_ply: u8,
+    max_quiescence_depth: Option<Depth>,
     state: &mut GameState<R>,
     alpha: Score, beta: Score,
     static_eval: Score,
@@ -174,25 +175,25 @@ pub fn quiescence_search<const R: RuleKind, const T: ThreatSearchKind>(
 
     let recent_player_action = state.history.last_action_pair()[0].unwrap_or(pos::CENTER);
 
-    let mut endgame_moves = generate_endgame_moves::<R, T>(&state.board, 8, recent_player_action);
+    let mut moves = generate_endgame_moves::<R, T>(&state.board, 8, recent_player_action);
 
-    if endgame_moves.is_empty() {
+    if moves.is_empty() {
         return static_eval;
     }
 
-    endgame_moves.sort_moves(&state.board, recent_player_action);
-    endgame_moves.init();
+    moves.sort_moves(&state.board, recent_player_action);
+    moves.init();
 
-    let context = EndgameContext { beta, is_pv };
+    let context = EndgameContext { max_depth: max_quiescence_depth.unwrap_or(Depth::BOARD_LIMIT), beta, is_pv };
 
     match T {
         ThreatSearchKind::VCF => {
             match state.board.player_color {
                 Color::Black => try_vcf::<R, { Color::Black }, _, Score>(
-                    td, &context, 8, max_ply, state, endgame_moves, alpha, static_eval, 0,
+                    td, &context, 8, state, moves, context.max_depth, alpha, static_eval,
                 ),
                 Color::White => try_vcf::<R, { Color::White }, _, Score>(
-                    td, &context, 8, max_ply, state, endgame_moves, alpha, static_eval, 0,
+                    td, &context, 8, state, moves, context.max_depth, alpha, static_eval,
                 ),
             }
         },
@@ -204,28 +205,28 @@ pub fn quiescence_search<const R: RuleKind, const T: ThreatSearchKind>(
 pub fn endgame_proof<const R: RuleKind, const T: ThreatSearchKind>(
     td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
     state: &mut GameState<R>,
-    max_ply: u8,
 ) -> Option<Vec<Pos>> {
-    let mut endgame_moves = generate_endgame_moves::<R, T>(&state.board, pos::BOARD_WIDTH / 2, pos::CENTER);
+    let mut moves = generate_endgame_moves::<R, T>(&state.board, pos::BOARD_WIDTH / 2, pos::CENTER);
 
-    if endgame_moves.is_empty() {
+    if moves.is_empty() {
         return None;
     }
 
-    endgame_moves.init();
+    moves.init();
 
-    let context = EndgameContext { beta: Score::INF, is_pv: true };
-
-    let mut state = *state;
+    let context = EndgameContext {
+        max_depth: td.config.max_quiescence_depth.unwrap_or(Depth::BOARD_LIMIT),
+        beta: Score::INF, is_pv: true,
+    };
 
     let proof = match T {
         ThreatSearchKind::VCF => {
             match state.board.player_color {
                 Color::Black => try_vcf::<R, { Color::Black }, _, SequenceProof>(
-                    td, &context, 8, max_ply, &mut state, endgame_moves, Score::NEG_INF, Score::NEG_INF, 0,
+                    td, &context, 8, state, moves, context.max_depth, Score::NEG_INF, Score::NEG_INF,
                 ),
                 Color::White => try_vcf::<R, { Color::White }, _, SequenceProof>(
-                    td, &context, 8, max_ply, &mut state, endgame_moves, Score::NEG_INF, Score::NEG_INF, 0,
+                    td, &context, 8, state, moves, context.max_depth, Score::NEG_INF, Score::NEG_INF,
                 ),
             }
         },
@@ -246,14 +247,13 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
     td: &mut ThreadData<R, TH, impl Evaluator<R>>,
     context: &EndgameContext,
     distance_window: u8,
-    vcf_pair_depth_left: u8,
     state: &mut GameState<R>,
-    mut vcf_moves: EndgameMovesUnchecked,
+    mut moves: EndgameMovesUnchecked,
+    depth_left: Depth,
     mut alpha: Score,
     static_eval: Score,
-    vcf_ply: usize,
 ) -> Pf {
-    let ply = td.ply + vcf_ply;
+    let ply = td.ply;
 
     if td.is_aborted() {
         return Pf::abort();
@@ -268,7 +268,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
         return best_proof;
     }
 
-    while let Some(four_pos) = vcf_moves.next() {
+    while let Some(four_pos) = moves.next() {
         if TH::IS_MAIN
             && td.should_check_limit()
             && td.search_limit_exceeded()
@@ -294,9 +294,9 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
             return proof;
         }
 
-        let Some(child_depth) = vcf_pair_depth_left.checked_sub(1) else {
+        if Depth::ZERO >= depth_left {
             continue;
-        };
+        }
 
         td.batch_counter.increment();
         let recovery_state = state.recovery_state();
@@ -372,7 +372,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
                 moves.init();
 
                 try_vcf::<R, C, TH, Pf>(
-                    td, context, distance_window, child_depth, state, moves, alpha, child_eval, vcf_ply + 2,
+                    td, context, distance_window, state, moves, depth_left - 2, alpha, child_eval,
                 )
             } else {
                 Pf::stand_pat(child_eval)
@@ -413,7 +413,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
             alpha = alpha.max(score);
         }
 
-        if alpha >= context.beta {
+        if !Pf::COMPLETE_PROOF && alpha >= context.beta {
             return best_proof;
         }
     }

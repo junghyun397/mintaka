@@ -38,6 +38,8 @@ export type PrincipalVariation = MaybePos[];
 
 export type Score = number;
 
+export type ThreatSearchKind = string;
+
 export interface BestMove {
 	position_hash: HashKey;
 	best_move: MaybePos;
@@ -91,7 +93,7 @@ export interface Config {
 	draw_condition?: number;
 	max_nodes_in_1k?: number;
 	max_depth?: Depth;
-	max_vcf_depth?: number;
+	max_quiescence_depth?: Depth;
 	tt_size: ByteSize;
 	workers: number;
 	pondering: boolean;
@@ -146,10 +148,6 @@ export type Command =
 }}
 	| { type: "Undo", content: {
 	hash: HashKey;
-}}
-	| { type: "BatchSet", content: {
-	player_moves: Pos[];
-	opponent_moves: Pos[];
 }}
 	| { type: "RebuildTT", content: ByteSize };
 

@@ -5,6 +5,7 @@ use crate::memo::tt_entry::{ScoreKind, TTEntryBucketProbe};
 use crate::movegen::move_generator;
 use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker::{MovePicker, ThreatKind};
+use crate::params;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
 use crate::search_endgame::{ThreatSearchKind, quiescence_search};
@@ -12,11 +13,9 @@ use crate::thread_data::{SearchFrame, ThreadData};
 use crate::thread_type::ThreadType;
 use crate::utils::depth;
 use crate::utils::depth::Depth;
-use crate::params;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::const_for;
 use rusty_renju::notation::color::Color;
-use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{MaybeScore, Score};
@@ -364,8 +363,6 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     }.value();
 
     if depth_left <= Depth::ZERO || td.ply >= depth::MAX_PLY {
-        let vcf_depth = td.config.max_vcf_depth.unwrap_or(pos::BOARD_SIZE as u8);
-
         if static_eval >= beta
             || alpha.is_win()
         {
@@ -373,7 +370,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         }
 
         return quiescence_search::<R, { ThreatSearchKind::VCF }>(
-            td, vcf_depth, state, alpha, beta, static_eval, NT::IS_PV,
+            td, td.config.max_quiescence_depth, state, alpha, beta, static_eval, NT::IS_PV,
         );
     }
 

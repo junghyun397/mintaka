@@ -14,6 +14,7 @@ use rusty_renju::utils::empty::Empty;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::time::Instant;
+use crate::utils::depth::Depth;
 
 pub struct EndgameSolution {
     pub sequence: Option<Vec<Pos>>,
@@ -23,11 +24,14 @@ pub struct EndgameSolution {
 pub fn solve_endgame<const R: RuleKind>(
     mut state: GameState<R>,
     threat_kind: ThreatSearchKind,
-    depth_limit: u32,
+    depth_limit: Option<Depth>,
     global_counter_1k: Arc<AtomicU32>,
     aborted: Arc<AtomicBool>,
 ) -> EndgameSolution {
-    let config = Config::default();
+    let mut config = Config::default();
+    
+    config.max_quiescence_depth = depth_limit;
+    
     let tt = TranspositionTable::new_with_size(ByteSize::from_kib(32));
     let ht = HistoryTable::empty();
 
@@ -43,12 +47,10 @@ pub fn solve_endgame<const R: RuleKind>(
         &global_counter_1k,
     );
     
-    let max_ply = depth_limit as u8;
-
     let sequence = match threat_kind {
-        ThreatSearchKind::VCF => search_endgame::endgame_proof::<R, { ThreatSearchKind::VCF }>(&mut td, &mut state, max_ply),
-        ThreatSearchKind::VCT => search_endgame::endgame_proof::<R, { ThreatSearchKind::VCT }>(&mut td, &mut state, max_ply),
-        ThreatSearchKind::Forced => search_endgame::endgame_proof::<R, { ThreatSearchKind::Forced }>(&mut td, &mut state, max_ply),
+        ThreatSearchKind::VCF => search_endgame::endgame_proof::<R, { ThreatSearchKind::VCF }>(&mut td, &mut state),
+        ThreatSearchKind::VCT => search_endgame::endgame_proof::<R, { ThreatSearchKind::VCT }>(&mut td, &mut state),
+        ThreatSearchKind::Forced => search_endgame::endgame_proof::<R, { ThreatSearchKind::Forced }>(&mut td, &mut state),
     };
 
     EndgameSolution { sequence, nodes: td.batch_counter.count_local_in_1k() }

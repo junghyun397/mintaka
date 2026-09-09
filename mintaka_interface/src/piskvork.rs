@@ -425,7 +425,7 @@ impl Presets {
         draw_condition: None,
         max_nodes_in_1k: None,
         max_depth: None,
-        max_vcf_depth: None,
+        max_quiescence_depth: None,
 
         tt_size: ByteSize::from_mib(64),
         workers: 1,
@@ -442,7 +442,7 @@ impl Presets {
         draw_condition: None,
         max_nodes_in_1k: None,
         max_depth: None,
-        max_vcf_depth: None,
+        max_quiescence_depth: None,
 
         tt_size: ByteSize::from_mib(128),
         workers: 1,
@@ -459,7 +459,7 @@ impl Presets {
         draw_condition: None,
         max_nodes_in_1k: None,
         max_depth: None,
-        max_vcf_depth: None,
+        max_quiescence_depth: None,
 
         tt_size: ByteSize::from_mib(768),
         workers: 1,
