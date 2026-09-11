@@ -2,7 +2,7 @@
 mintaka applies strict Renju rules while maintaining a low computational cost.
 Below are some examples of strict Renju rules that mintaka can handle.
 
-## Single-line forbidden moves
+## Single-line forbidden moves 
 ```text
    A B C D E F G H I J K L M N O
 15 . . . . . . . . . . . . . . . 15
@@ -61,6 +61,26 @@ Below are some examples of strict Renju rules that mintaka can handle.
  2 . . . . . . . . . . . . . . . 2
  1 . . . . . . . . . . . . . . . 1
    A B C D E F G H I J K L M N O
+```
+## Propagative-nested forbidden moves
+```text
+   A B C D E F G H I J K L M N O
+15 . . . . . . . . . . . . . . . 15
+14 . . . . . . . . . . . . . . . 14
+13 . . . . . . . O . . . . . . . 13
+12 . . . . . . . O . . . . . . . 12
+11 . . . . 3 . X X . 3 . . . . . 11
+10 . . . . . . 3 . . . . . . . . 10
+ 9 . . . . X . 3 X O . . . . . . 9
+ 8 . . . O X O X X X O . . . . . 8
+ 7 . . . . . . . O X . O . . . . 7
+ 6 . . . . 3 . . O . . . . . . . 6
+ 5 . . . . . . . . . . . . . . . 5
+ 4 . . . . . . . . . . . . . . . 4
+ 3 . . . . . . . . . . . . . . . 3
+ 2 . . . . . . . . . . . . . . . 2
+ 1 . . . . . . . . . . . . . . . 1
+   A B C D E F G H I J K L M N O"
 ```
 ## Multiple-nested forbidden moves
 ```text

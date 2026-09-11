@@ -1,8 +1,8 @@
+use rusty_renju::dispatch_any_board;
+use rusty_renju::utils::empty::Empty;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
-use rusty_renju::dispatch_any_board;
-use rusty_renju::utils::empty::Empty;
 
 const COLOR_NONE: u8 = u8::MAX;
 
@@ -198,7 +198,7 @@ pub extern "C" fn rusty_renju_board_from_history(
 ) -> *mut rusty_renju::board_io::AnyBoard {
     if let Some(rule_kind) = rule_kind_from_u8(rule_kind)
         && let Some(actions)
-            = rusty_renju::notation::ffi::try_from_raw_slice::<rusty_renju::notation::pos::MaybePos>(actions, len)
+            = rusty_renju::utils::ffi::try_from_raw_slice::<rusty_renju::notation::pos::MaybePos>(actions, len)
     {
         into_raw_board(any_board_from_history(rule_kind, actions))
     } else {

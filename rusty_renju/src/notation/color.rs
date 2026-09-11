@@ -180,6 +180,7 @@ macro_rules! impl_color_container {
 
 #[cfg_attr(feature = "typeshare", typeshare)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[repr(transparent)]
 pub struct ColorContainer<T>(pub [T; 2]);
 impl_color_container!(ColorContainer);
 

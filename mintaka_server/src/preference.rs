@@ -47,7 +47,7 @@ pub struct Preference {
     pub sessions_directory: String,
     #[arg(long, env = "API_PASSWORD", default_value = None)]
     pub api_password: Option<String>,
-    #[clap(skip)]
+    #[clap(skip = ByteSize::from_kib(32))]
     pub memory_limit: ByteSize,
     #[clap(skip)]
     pub tls_config: Option<TlsConfig>,

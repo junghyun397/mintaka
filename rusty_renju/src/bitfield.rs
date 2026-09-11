@@ -1,7 +1,7 @@
 use crate::notation::pos;
 use crate::notation::pos::Pos;
 use crate::utils::empty::Empty;
-use crate::{assert_struct_sizes, const_for, impl_debug_from_display};
+use crate::{assert_struct_sizes, cartesian_to_index, const_for, const_max, const_min, impl_debug_from_display};
 #[cfg(feature = "serde")]
 use base64::engine::{general_purpose, Engine as _};
 use std::fmt::{Display, Formatter};
@@ -145,6 +145,31 @@ impl Bitfield {
             u64::from_le_bytes(self.0[24..32].try_into().unwrap()),
         ]
     }
+}
+
+pub const fn build_imprint_mask_lut<const N: usize>(pattern: [u16; N]) -> [Bitfield; pos::BOARD_SIZE] {
+    let margin = N as isize / 2;
+    let mut lut = [Bitfield::ZERO_FILLED; pos::BOARD_SIZE];
+
+    const_for!(row in 0, pos::I_BOARD_WIDTH; {
+        const_for!(col in 0, pos::I_BOARD_WIDTH; {
+            let row_begin = const_max!(row - margin, 0);
+            let row_end = const_min!(row + margin, pos::I_BOARD_WIDTH - 1);
+            let col_begin = const_max!(col - margin, 0);
+            let col_end = const_min!(col + margin, pos::I_BOARD_WIDTH - 1);
+
+            const_for!(row_offset in row_begin - row, row_end - row + 1; {
+                const_for!(col_offset in col_begin - col, col_end - col + 1; {
+                    if (pattern[(row_offset + margin) as usize] >> (col_offset + margin)) & 0b1 == 0b1 {
+                        let pos_idx = (row + row_offset) as usize * pos::U_BOARD_WIDTH + (col + col_offset) as usize;
+                        lut[cartesian_to_index!(row, col) as usize].0[pos_idx / 8] |= 0b1 << (pos_idx % 8);
+                    }
+                });
+            });
+        })
+    });
+
+    lut
 }
 
 impl Not for Bitfield {

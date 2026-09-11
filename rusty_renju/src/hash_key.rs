@@ -11,6 +11,7 @@ use typeshare::typeshare;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
 #[derive(Eq, PartialEq, Copy, Clone)]
+#[repr(transparent)]
 pub struct HashKey(u64);
 
 impl HashKey {

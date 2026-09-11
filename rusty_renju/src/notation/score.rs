@@ -126,8 +126,8 @@ impl From<i32> for Score {
     }
 }
 
-#[repr(transparent)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(transparent)]
 pub struct MaybeScore(pub Score);
 
 impl MaybeScore {

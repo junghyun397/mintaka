@@ -257,6 +257,49 @@ mod test_nested_forbid {
     }
 
     #[test]
+    fn chaotic_nested_pseudo_double_three() {
+        let case = board!(indoc! {"
+           A B C D E F G H I J K L M N O
+        15 . . . . . . . . . . . . . . . 15
+        14 . . . . . . . . . . . . . . . 14
+        13 . . . . . . . O . . . . . . . 13
+        12 . . . . . . . O . . . . . . . 12
+        11 . . . . . . X X . . . . . . . 11
+        10 . . . . . . . . . . . . . . . 10
+         9 . . . . X . . X O . . . . . . 9
+         8 . . . O X O X X X O . . . . . 8
+         7 . . . . . . . O X . O . . . . 7
+         6 . . . . . . . O . . . . . . . 6
+         5 . . . . . . . . . . . . . . . 5
+         4 . . . . . . . . . . . . . . . 4
+         3 . . . . . . . . . . . . . . . 3
+         2 . . . . . . . . . . . . . . . 2
+         1 . . . . . . . . . . . . . . . 1
+           A B C D E F G H I J K L M N O"});
+
+        let expected = indoc! {"
+           A B C D E F G H I J K L M N O
+        15 . . . . . . . . . . . . . . . 15
+        14 . . . . . . . . . . . . . . . 14
+        13 . . . . . . . O . . . . . . . 13
+        12 . . . . . . . O . . . . . . . 12
+        11 . . . . 3 . X X . 3 . . . . . 11
+        10 . . . . . . 3 . . . . . . . . 10
+         9 . . . . X . 3 X O . . . . . . 9
+         8 . . . O X O X X X O . . . . . 8
+         7 . . . . . . . O X . O . . . . 7
+         6 . . . . 3 . . O . . . . . . . 6
+         5 . . . . . . . . . . . . . . . 5
+         4 . . . . . . . . . . . . . . . 4
+         3 . . . . . . . . . . . . . . . 3
+         2 . . . . . . . . . . . . . . . 2
+         1 . . . . . . . . . . . . . . . 1
+           A B C D E F G H I J K L M N O"};
+
+        assert_eq!(case.to_string(), expected);
+    }
+
+    #[test]
     fn recursive_double_three() {
         let case = board!(indoc! {"
            A B C D E F G H I J K L M N O

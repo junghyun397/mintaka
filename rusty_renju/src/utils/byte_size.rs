@@ -6,7 +6,7 @@ use typeshare::typeshare;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "LongInt"))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
 pub struct ByteSize(u64);
 
 impl ByteSize {

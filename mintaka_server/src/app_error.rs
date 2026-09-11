@@ -1,7 +1,6 @@
 use mintaka::game_agent::GameError;
-use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum AppError {
     #[error("UNAUTHORIZED")]
     Unauthorized,

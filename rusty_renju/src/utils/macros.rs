@@ -49,10 +49,11 @@
     }
 }
 
-pub const fn repeat_4x(source: u8) -> u32 {
-    u32::from_le_bytes([source, source, source, source])
-}
-
-pub const fn repeat_16x(source: u8) -> u128 {
-    u128::from_le_bytes([source, source, source, source, source, source, source, source, source, source, source, source, source, source, source, source])
+#[macro_export] macro_rules! repeat {
+    ($source:expr,x4 u32) => {
+        u32::from_ne_bytes([$source; 4])
+    };
+    ($source:expr,x16 u128) => {
+        u128::from_ne_bytes([$source; 16])
+    };
 }

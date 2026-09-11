@@ -57,6 +57,7 @@ pub const fn pos_unchecked(source: &str) -> Pos {
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
+#[repr(transparent)]
 pub struct Pos(u8);
 
 impl From<usize> for Pos {
@@ -235,6 +236,7 @@ impl<'de> serde::Deserialize<'de> for Pos {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(try_from = "Option<Pos>", into = "Option<Pos>"))]
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
+#[repr(transparent)]
 pub struct MaybePos(Pos);
 
 impl MaybePos {

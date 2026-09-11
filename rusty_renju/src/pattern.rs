@@ -7,8 +7,7 @@ use crate::pattern_index::PatternIndex;
 use crate::slice::Slice;
 use crate::slice_pattern::SlicePattern;
 use crate::utils::empty::Empty;
-use crate::utils::lang::{repeat_16x, repeat_4x};
-use crate::{assert_struct_sizes, slice_pattern, step_idx};
+use crate::{assert_struct_sizes, repeat, slice_pattern, step_idx};
 
 pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
 pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
@@ -22,27 +21,28 @@ pub const POTENTIAL_FOUR :u8            = 0b0000_0010;
 
 pub const FIVE: u8                      = 0b0000_0001;
 
-pub const UNIT_CLOSED_FOUR_SINGLE_MASK: u32 = repeat_4x(CLOSED_FOUR_SINGLE);
-pub const UNIT_CLOSED_FOUR_MASK: u32        = repeat_4x(CLOSED_FOUR_DOUBLE);
-pub const UNIT_OPEN_FOUR_MASK: u32          = repeat_4x(OPEN_FOUR);
-pub const UNIT_ANY_FOUR_MASK: u32           = repeat_4x(ANY_FOUR);
+pub const UNIT_CLOSED_FOUR_SINGLE_MASK: u32 = repeat!(CLOSED_FOUR_SINGLE,x4 u32);
+pub const UNIT_CLOSED_FOUR_MASK: u32        = repeat!(CLOSED_FOUR_DOUBLE,x4 u32);
+pub const UNIT_OPEN_FOUR_MASK: u32          = repeat!(OPEN_FOUR,x4 u32);
+pub const UNIT_ANY_FOUR_MASK: u32           = repeat!(ANY_FOUR,x4 u32);
 
-pub const UNIT_OPEN_THREE_MASK: u32         = repeat_4x(OPEN_THREE);
-pub const UNIT_CLOSE_THREE_MASK: u32        = repeat_4x(CLOSE_THREE);
+pub const UNIT_OPEN_THREE_MASK: u32         = repeat!(OPEN_THREE,x4 u32);
+pub const UNIT_CLOSE_THREE_MASK: u32        = repeat!(CLOSE_THREE,x4 u32);
 
-pub const UNIT_POTENTIAL_THREE_MASK: u32    = repeat_4x(POTENTIAL_THREE);
-pub const UNIT_POTENTIAL_FOUR_MASK: u32     = repeat_4x(POTENTIAL_FOUR);
-pub const UNIT_ANY_POTENTIAL_MASK: u32      = repeat_4x(POTENTIAL_FOUR | POTENTIAL_THREE);
+pub const UNIT_POTENTIAL_THREE_MASK: u32    = repeat!(POTENTIAL_THREE,x4 u32);
+pub const UNIT_POTENTIAL_FOUR_MASK: u32     = repeat!(POTENTIAL_FOUR,x4 u32);
+pub const UNIT_ANY_POTENTIAL_MASK: u32      = repeat!(POTENTIAL_FOUR | POTENTIAL_THREE,x4 u32);
 
-pub const UNIT_FIVE_MASK: u32               = repeat_4x(FIVE);
+pub const UNIT_FIVE_MASK: u32               = repeat!(FIVE,x4 u32);
 
-pub const UNIT_TACTICAL_MASK: u32           = repeat_4x(OPEN_THREE | ANY_FOUR);
+pub const UNIT_TACTICAL_MASK: u32           = repeat!(OPEN_THREE | ANY_FOUR,x4 u32);
 
-pub const SLICE_PATTERN_FIVE_MASK: u128     = repeat_16x(FIVE);
+pub const SLICE_PATTERN_FIVE_MASK: u128     = repeat!(FIVE,x16 u128);
 
 pub const PATTERN_SIZE: usize = 256;
 
 #[derive(Debug, Copy, Clone, Default)]
+#[repr(transparent)]
 pub struct Pattern(DirectionContainer<u8>);
 
 assert_struct_sizes!(Pattern, size=4, align=1);
@@ -66,6 +66,10 @@ impl Pattern {
 
     pub fn is_tactical(&self) -> bool {
         self.apply_mask(UNIT_TACTICAL_MASK) != 0
+    }
+
+    pub fn has_open_three_at(&self, direction: Direction) -> bool {
+        self.apply_mask((OPEN_THREE as u32) << (direction as usize * 8)) != 0
     }
 
     pub fn has_open_three(&self) -> bool {
@@ -145,6 +149,10 @@ impl Pattern {
 
     pub fn iter_three_directions(&self) -> impl Iterator<Item=Direction> + '_ {
         DirectionIterator { packed_unit: self.apply_mask(UNIT_OPEN_THREE_MASK) }
+    }
+
+    pub fn iter_potential_four_directions(&self) -> impl Iterator<Item=Direction> + '_ {
+        DirectionIterator { packed_unit: self.apply_mask(UNIT_POTENTIAL_FOUR_MASK) }
     }
 
     fn is_forbidden_unchecked(&self) -> bool {
