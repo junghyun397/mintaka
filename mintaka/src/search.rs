@@ -3,7 +3,6 @@ use crate::game_state::GameState;
 use crate::memo::transposition_table;
 use crate::memo::tt_entry::{ScoreKind, TTEntryBucketProbe};
 use crate::movegen::move_generator;
-use crate::movegen::move_list::MoveEntry;
 use crate::movegen::move_picker::{MovePicker, ThreatKind};
 use crate::params;
 use crate::principal_variation::PrincipalVariation;
@@ -19,6 +18,7 @@ use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{MaybeScore, Score};
+use crate::movegen::move_list::MainMoveEntry;
 
 trait NodeType {
     const IS_ROOT: bool;
@@ -390,7 +390,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     let mut four_plied = Bitfield::ZERO_FILLED;
 
     let mut move_picker = MovePicker::init_new(tt_move, td.killers[td.ply], threat_kind);
-    'position_search: while let Some(MoveEntry { pos, move_score, history_score, .. }) = move_picker.next(td, state) {
+    'position_search: while let Some(MainMoveEntry { pos, score: move_score, history_score, .. }) = move_picker.next(td, state) {
         if !state.board.is_legal_move(pos) {
             continue;
         }

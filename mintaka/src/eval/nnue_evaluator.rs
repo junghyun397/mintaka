@@ -4,7 +4,7 @@ use crate::game_state::GameState;
 use rusty_renju::board::{Board, MoveArtifact};
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos;
-use rusty_renju::notation::pos::MaybePos;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::Score;
 
@@ -47,11 +47,15 @@ impl<const R: RuleKind> Evaluator<R> for NnueEvaluator<R> {
         todo!()
     }
 
-    fn eval_policy(&mut self, state: &GameState<R>) -> PolicyDistribution {
+    fn eval_policy(&mut self, state: &GameState<R>) {
         todo!()
     }
 
     fn eval_value(&mut self, state: &GameState<R>) -> Score {
+        todo!()
+    }
+
+    fn ordering_score(&self, board: &Board<R>, pos: Pos) -> i16 {
         todo!()
     }
 

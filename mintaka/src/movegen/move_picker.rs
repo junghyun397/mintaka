@@ -1,7 +1,7 @@
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::movegen::move_generator;
-use crate::movegen::move_list::{MoveEntry, MoveList};
+use crate::movegen::move_list::{MainMoveEntry, MainMoveList, MoveList};
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::bitfield::Bitfield;
@@ -44,7 +44,7 @@ enum MoveKind {
 pub struct MovePicker<const R: RuleKind> {
     threat_kind: Option<ThreatKind>,
     stage: MoveStage,
-    moves_buffer: MoveList,
+    moves_buffer: MainMoveList,
     tt_move: MaybePos,
     killer_moves: [MaybePos; thread_data::KILLER_MOVE_SLOTS],
     occupied_moves: Bitfield,
@@ -76,7 +76,7 @@ impl<const R: RuleKind> MovePicker<R> {
         &mut self,
         td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
         state: &GameState<R>,
-    ) -> Option<MoveEntry> {
+    ) -> Option<MainMoveEntry> {
         loop {
             match self.stage {
                 MoveStage::TT => {
@@ -87,9 +87,9 @@ impl<const R: RuleKind> MovePicker<R> {
                     {
                         self.occupied_moves.set(tt_move);
 
-                        return Some(MoveEntry {
+                        return Some(MainMoveEntry {
                             pos: tt_move,
-                            move_score: move_generator::TT_MOVE_SCORE,
+                            score: move_generator::TT_MOVE_SCORE,
                             lp_quiet: false,
                             history_score: None,
                         });
@@ -118,9 +118,9 @@ impl<const R: RuleKind> MovePicker<R> {
                         {
                             self.occupied_moves.set(killer_move);
 
-                            return Some(MoveEntry {
+                            return Some(MainMoveEntry {
                                 pos: killer_move,
-                                move_score: move_generator::KILLER_MOVE_SCORE,
+                                score: move_generator::KILLER_MOVE_SCORE,
                                 lp_quiet: false,
                                 history_score: None,
                             });

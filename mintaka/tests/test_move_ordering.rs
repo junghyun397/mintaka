@@ -4,7 +4,6 @@ mod test_movegen {
     use mintaka::eval::evaluator::{ActiveEvaluator, Evaluator};
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
-    use mintaka::movegen::move_list::MoveEntry;
     use mintaka::movegen::move_picker::MovePicker;
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
@@ -14,6 +13,7 @@ mod test_movegen {
     use rusty_renju::utils::empty::Empty;
     use std::sync::atomic::{AtomicBool, AtomicU32};
     use std::time::Instant;
+    use mintaka::movegen::move_list::MainMoveEntry;
     use rusty_renju::notation::rule::RuleKind;
 
     macro_rules! test_move_ordering {
@@ -45,10 +45,10 @@ mod test_movegen {
             let mut move_picker = MovePicker::init_new(MaybePos::NONE, [MaybePos::NONE; 2], None);
 
             let mut heatmap = [f32::NAN; pos::BOARD_SIZE];
-            while let Some(MoveEntry { pos, move_score, .. }) = move_picker.next(&mut td, &state) {
-                heatmap[pos.idx_usize()] = move_score as f32;
+            while let Some(MainMoveEntry { pos, score, .. }) = move_picker.next(&mut td, &state) {
+                heatmap[pos.idx_usize()] = score as f32;
 
-                print!("{:?}, ", (pos, move_score));
+                print!("{:?}, ", (pos, score));
             }
 
             println!("\n{}", state.board.to_string_with_heatmap(heatmap, true));

@@ -1,7 +1,6 @@
-use rusty_renju::bitfield::Bitfield;
+use rusty_renju::bitfield::{Bitfield, build_imprint_mask_lut};
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
-use rusty_renju::{cartesian_to_index, const_for, const_max, const_min};
 
 #[derive(Debug, Copy, Clone)]
 pub struct MovegenWindow {
@@ -20,7 +19,15 @@ impl Default for MovegenWindow {
 
 const MOVEGEN_WINDOW_MARGIN: u8 = 3;
 
-const MOVEGEN_IMPRINT_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_movegen_imprint_mask_lut();
+const MOVEGEN_IMPRINT_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_imprint_mask_lut([
+    0b1001001,
+    0b0111110,
+    0b0111110,
+    0b1110111,
+    0b0111110,
+    0b0111110,
+    0b1001001,
+]);
 
 impl MovegenWindow {
 
@@ -113,38 +120,4 @@ impl From<&Bitfield> for MovegenWindow {
 
         acc
     }
-}
-
-const fn build_movegen_imprint_mask_lut() -> [Bitfield; pos::BOARD_SIZE] {
-    let imprint_mask_pattern: [u16; 7] = [
-        0b1001001,
-        0b0111110,
-        0b0111110,
-        0b1110111,
-        0b0111110,
-        0b0111110,
-        0b1001001,
-    ];
-
-    let mut lut = [Bitfield::ZERO_FILLED; pos::BOARD_SIZE];
-
-    const_for!(row in 0, pos::I_BOARD_WIDTH; {
-        const_for!(col in 0, pos::I_BOARD_WIDTH; {
-            let row_begin = const_max!(row - 3, 0);
-            let row_end = const_min!(row + 3, pos::I_BOARD_WIDTH - 1);
-            let col_begin = const_max!(col - 3, 0);
-            let col_end = const_min!(col + 3, pos::I_BOARD_WIDTH - 1);
-
-            const_for!(row_offset in row_begin - row, row_end - row + 1; {
-                const_for!(col_offset in col_begin - col, col_end - col + 1; {
-                    if (imprint_mask_pattern[(row_offset + 3) as usize] >> (col_offset + 3)) & 0b1 == 0b1 {
-                        let pos_idx = (row + row_offset) as usize * pos::U_BOARD_WIDTH + (col + col_offset) as usize;
-                        lut[cartesian_to_index!(row, col) as usize].0[pos_idx / 8] |= 0b1 << (pos_idx % 8);
-                    }
-                });
-            });
-        })
-    });
-
-    lut
 }

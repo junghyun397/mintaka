@@ -1,45 +1,80 @@
-use rusty_renju::bitfield::Bitfield;
-use crate::search_endgame::{EndgameMovesUnchecked, ENDGAME_MAX_MOVES, ThreatSearchKind};
-use rusty_renju::board::Board;
-use rusty_renju::notation::pos::{MaybePos, Pos};
-use rusty_renju::notation::rule::RuleKind;
-use rusty_renju::notation::score::Score;
 use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
-use crate::movegen::move_list::MoveList;
+use crate::movegen::move_list::{EndgameMoveEntry, EndgameMoveList, MainMoveEntry, MainMoveList};
+use crate::search_endgame::ThreatSearchKind;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
+use rusty_renju::bitfield::{Bitfield, build_imprint_mask_lut};
+use rusty_renju::notation::pos;
+use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::rule::RuleKind;
+use rusty_renju::notation::score::Score;
+use rusty_renju::utils::empty::Empty;
 
 pub const TT_MOVE_SCORE: i16 = Score::MATE.value() as i16 - 300;
 pub const DIRECT_RESPONSE_SCORE: i16 = Score::INF.value() as i16 - 500;
 pub const KILLER_MOVE_SCORE: i16 = Score::INF.value() as i16 - 1000;
 pub const COUNTER_MOVE_BONUS: i16 = 100;
 
-pub fn generate_endgame_moves<const R: RuleKind, const T: ThreatSearchKind>(board: &Board<R>, distance_window: u8, recent_move: Pos) -> EndgameMovesUnchecked {
-    let mut vcf_moves = [MaybePos::NONE; ENDGAME_MAX_MOVES];
-    let mut vcf_moves_top = 0;
+const ENDGAME_MOVEGEN_IMPRINT_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_imprint_mask_lut([
+    0b100010001,
+    0b010010010,
+    0b001111100,
+    0b001111100,
+    0b111101111,
+    0b001111100,
+    0b001111100,
+    0b010010010,
+    0b100010001,
+]);
 
-    let indexes = &board.patterns.indexes[board.player_color];
+pub fn generate_full_endgame_moves<const R: RuleKind, const T: ThreatSearchKind>(
+    state: &GameState<R>,
+) -> EndgameMoveList {
+    let mut moves = EndgameMoveList::empty();
+
+    let indexes = &state.board.patterns.indexes[state.board.player_color];
     let mut field = indexes.closed_fours | indexes.fork_fours;
 
     if T == ThreatSearchKind::VCT {
-        field |= board.patterns.indexes[board.player_color].open_threes;
+        field |= indexes.open_threes;
     }
 
     for pos in field.iter_hot_pos() {
-        if pos.distance(recent_move) > distance_window {
-            continue;
-        }
-
-        vcf_moves[vcf_moves_top] = pos.into();
-        vcf_moves_top += 1;
+        moves.push(EndgameMoveEntry { pos, score: 0 });
     }
 
-    EndgameMovesUnchecked { moves: vcf_moves, top: vcf_moves_top as u8 }
+    moves
+}
+
+pub fn generate_endgame_moves<const R: RuleKind, const T: ThreatSearchKind>(
+    td: &ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+    state: &GameState<R>,
+    recent_four: Pos,
+) -> EndgameMoveList {
+    let mut moves = EndgameMoveList::empty();
+
+    let indexes = &state.board.patterns.indexes[state.board.player_color];
+    let mut field = indexes.closed_fours | indexes.fork_fours;
+
+    if T == ThreatSearchKind::VCT {
+        field |= indexes.open_threes;
+    }
+
+    field &= ENDGAME_MOVEGEN_IMPRINT_MASK_LUT[recent_four.idx_usize()];
+
+    for pos in field.iter_hot_pos() {
+        moves.push(EndgameMoveEntry {
+            pos,
+            score: td.evaluator.ordering_score(&state.board, pos),
+        });
+    }
+
+    moves
 }
 
 pub fn generate_threat_direct_response<const R: RuleKind>(
-    buffer: &mut MoveList,
+    buffer: &mut MainMoveList,
     td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
     state: &GameState<R>,
     field: &Bitfield,
@@ -52,12 +87,12 @@ pub fn generate_threat_direct_response<const R: RuleKind>(
             score += 100;
         }
 
-        buffer.push(pos, score, false, None);
+        buffer.push(MainMoveEntry { pos, score, lp_quiet: false, history_score: None });
     }
 }
 
 pub fn generate_extend_four_response<const R: RuleKind>(
-    buffer: &mut MoveList,
+    buffer: &mut MainMoveList,
     td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
     state: &GameState<R>,
 ) {
@@ -82,16 +117,16 @@ pub fn generate_extend_four_response<const R: RuleKind>(
         // history score
         score += td.ht.four[state.board.player_color][pos.idx_usize()] / 128;
 
-        buffer.push(pos, score, false, None);
+        buffer.push(MainMoveEntry { pos, score, lp_quiet: false, history_score: None });
     }
 }
 
 pub fn generate_all_moves<const R: RuleKind>(
-    buffer: &mut MoveList,
+    buffer: &mut MainMoveList,
     td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
     state: &GameState<R>,
 ) {
-    let policy_buffer = td.evaluator.eval_policy(state);
+    td.evaluator.eval_policy(state);
 
     let field = state.board.legal_field(state.board.player_color) & state.movegen_window.movegen_field;
     let player_pattern = &state.board.patterns.field[state.board.player_color];
@@ -103,7 +138,7 @@ pub fn generate_all_moves<const R: RuleKind>(
         let player_pattern = player_pattern[idx];
 
         // policy score
-        let mut score = policy_buffer[idx];
+        let mut score = td.evaluator.ordering_score(&state.board, pos);
 
         // counter-move score
         if let Some(counter_move) = counter_move && pos == counter_move {
@@ -126,7 +161,7 @@ pub fn generate_all_moves<const R: RuleKind>(
             score += history_score / 512;
         };
 
-        buffer.push(Pos::from_index(idx as u8), score, false, Some(history_score));
+        buffer.push(MainMoveEntry { pos, score, lp_quiet: false, history_score: Some(history_score) });
     }
 }
 

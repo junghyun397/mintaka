@@ -182,7 +182,7 @@ impl TTView<'_> {
         key: HashKey,
         best_move: MaybePos,
         depth: Depth,
-        endgame_depth: u8,
+        quiescence_depth: u8,
         maybe_score_kind: Option<ScoreKind>,
         eval: MaybeScore,
         score: MaybeScore,
@@ -201,7 +201,7 @@ impl TTView<'_> {
                     best_move: best_move.or(exist_entry.best_move),
                     tt_flag: TTFlag::new(self.age, maybe_score_kind, is_pv),
                     depth: depth.value() as u8,
-                    quiescence_depth: endgame_depth,
+                    quiescence_depth,
                     eval: eval.or(MaybeScore::from(exist_entry.eval as i32)).unwrap_unchecked() as i16,
                     score: score.or(MaybeScore::from(exist_entry.score as i32)).unwrap_unchecked() as i16,
                 };
@@ -233,7 +233,7 @@ impl TTView<'_> {
                 best_move,
                 tt_flag: TTFlag::new(self.age, maybe_score_kind, is_pv),
                 depth: depth.value() as u8,
-                quiescence_depth: endgame_depth,
+                quiescence_depth,
                 eval: eval.unwrap_unchecked() as i16,
                 score: score.unwrap_unchecked() as i16,
             };

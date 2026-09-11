@@ -45,7 +45,7 @@ where F: FnOnce() + Send + 'scope {
     scope.spawn(move |_| worker());
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum GameError {
     HashMismatch,
     StoneAlreadyExist,

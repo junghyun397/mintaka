@@ -1,34 +1,69 @@
-use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
 use rusty_renju::utils::empty::Empty;
 
 #[derive(Debug, Copy, Clone)]
-pub struct MoveEntry {
+pub struct MainMoveEntry {
     pub pos: Pos,
-    pub move_score: i16,
+    pub score: i16,
     pub history_score: Option<i16>,
     pub lp_quiet: bool,
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct EndgameMoveEntry {
+    pub pos: Pos,
+    pub score: i16,
+}
+
+pub trait MoveEntry: Copy {
+    fn ordering_score(&self) -> i16;
+}
+
+impl MoveEntry for MainMoveEntry {
+    fn ordering_score(&self) -> i16 {
+        self.score
+    }
+}
+
+impl MoveEntry for EndgameMoveEntry {
+    fn ordering_score(&self) -> i16 {
+        self.score
+    }
+}
+
+pub type MainMoveList = MoveList<MainMoveEntry, 192>;
+
+pub type EndgameMoveList = MoveList<EndgameMoveEntry, 32>;
+
 #[derive(Debug)]
-pub struct MoveList {
-    moves: [MoveEntry; pos::BOARD_SIZE],
+pub struct MoveList<E: MoveEntry, const N: usize> {
+    moves: [E; N],
     top: usize,
 }
 
-impl Empty for MoveList {
+impl<E: MoveEntry, const N: usize> Empty for MoveList<E, N> {
     fn empty() -> Self {
         unsafe { std::mem::zeroed() }
     }
 }
 
-impl MoveList {
-    pub fn push(&mut self, pos: Pos, move_score: i16, lp_quiet: bool, history_score: Option<i16>) {
-        self.moves[self.top] = MoveEntry { pos, move_score, lp_quiet, history_score };
+impl<E: MoveEntry, const N: usize> MoveList<E, N> {
+    pub fn is_empty(&self) -> bool {
+        self.top == 0
+    }
+
+    pub fn unit(entry: E) -> Self {
+        let mut moves = Self::empty();
+        moves.push(entry);
+        moves
+    }
+
+    pub fn push(&mut self, entry: E) {
+        self.moves[self.top] = entry;
         self.top += 1;
     }
 
-    pub fn consume_best(&mut self) -> Option<MoveEntry> {
+    pub fn consume_best(&mut self) -> Option<E> {
         if self.top == 0 {
             return None;
         }
@@ -36,9 +71,9 @@ impl MoveList {
         let mut best_idx = 0;
         let mut best_score = i16::MIN;
 
-        for (idx, &MoveEntry { move_score: score, .. }) in self.moves[0 .. self.top].iter().enumerate() {
-            if score > best_score {
-                best_score = score;
+        for (idx, entry) in self.moves[0 .. self.top].iter().enumerate() {
+            if entry.ordering_score() > best_score {
+                best_score = entry.ordering_score();
                 best_idx = idx;
             }
         }

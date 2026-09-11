@@ -3,84 +3,25 @@ use crate::game_state::GameState;
 use crate::memo::transposition_table;
 use crate::memo::transposition_table::TTView;
 use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucketProbe};
-use crate::movegen::move_generator::generate_endgame_moves;
+use crate::movegen::move_generator::{generate_endgame_moves, generate_full_endgame_moves};
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use crate::utils::depth::Depth;
-use rusty_renju::board::Board;
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
-use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::notation::pos;
+use rusty_renju::notation::pos::Pos;
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{MaybeScore, Score};
-use rusty_renju::notation::pos;
-use std::cmp::Reverse;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
+use crate::movegen::move_list::{EndgameMoveEntry, EndgameMoveList};
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(std::marker::ConstParamTy, PartialEq, Eq)]
 pub enum ThreatSearchKind {
     VCF, VCT, Forced,
-}
-
-pub const ENDGAME_MAX_MOVES: usize = 30;
-
-#[derive(Debug, Copy, Clone)]
-pub struct EndgameMovesUnchecked {
-    pub moves: [MaybePos; ENDGAME_MAX_MOVES],
-    pub top: u8,
-}
-
-impl EndgameMovesUnchecked {
-    pub const EMPTY: Self = Self {
-        moves: [MaybePos::NONE; ENDGAME_MAX_MOVES],
-        top: 0,
-    };
-
-    pub fn unit(pos: Pos) -> Self {
-        Self {
-            moves: {
-                const EMPTY_MOVES: [MaybePos; ENDGAME_MAX_MOVES] = [MaybePos::NONE; ENDGAME_MAX_MOVES];
-
-                let mut new_moves = EMPTY_MOVES;
-                new_moves[0] = pos.into();
-                new_moves
-            },
-            top: 1,
-        }
-    }
-
-    pub fn init(&mut self) {
-        self.top = 0;
-    }
-
-    pub fn next(&mut self) -> Option<Pos> {
-        if self.top == ENDGAME_MAX_MOVES as u8 {
-            return None;
-        }
-
-        let next_move = self.moves[self.top as usize].into();
-        self.top += 1;
-        next_move
-    }
-
-    pub fn sort_moves<const R: RuleKind>(&mut self, board: &Board<R>, ref_pos: Pos) {
-        self.moves[..self.top as usize].sort_by_key(|pos| {
-            let pos = pos.unwrap();
-
-            let potential_score = board.patterns.field[board.player_color][pos.idx_usize()]
-                .count_potential_four()
-                .min(2);
-
-            Reverse(potential_score * 10 + (pos::BOARD_WIDTH as u32 - pos.distance(ref_pos) as u32) * 3)
-        });
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.top == 0
-    }
 }
 
 struct EndgameContext {
@@ -175,25 +116,25 @@ pub fn quiescence_search<const R: RuleKind, const T: ThreatSearchKind>(
 
     let recent_player_action = state.history.last_action_pair()[0].unwrap_or(pos::CENTER);
 
-    let mut moves = generate_endgame_moves::<R, T>(&state.board, 8, recent_player_action);
+    let moves = generate_endgame_moves::<R, T>(td, state, recent_player_action);
 
     if moves.is_empty() {
         return static_eval;
     }
 
-    moves.sort_moves(&state.board, recent_player_action);
-    moves.init();
-
-    let context = EndgameContext { max_depth: max_quiescence_depth.unwrap_or(Depth::BOARD_LIMIT), beta, is_pv };
+    let context = EndgameContext {
+        max_depth: max_quiescence_depth.unwrap_or(Depth::BOARD_LIMIT),
+        beta, is_pv,
+    };
 
     match T {
         ThreatSearchKind::VCF => {
             match state.board.player_color {
                 Color::Black => try_vcf::<R, { Color::Black }, _, Score>(
-                    td, &context, 8, state, moves, context.max_depth, alpha, static_eval,
+                    td, &context, state, moves, context.max_depth, alpha, static_eval,
                 ),
                 Color::White => try_vcf::<R, { Color::White }, _, Score>(
-                    td, &context, 8, state, moves, context.max_depth, alpha, static_eval,
+                    td, &context, state, moves, context.max_depth, alpha, static_eval,
                 ),
             }
         },
@@ -206,13 +147,11 @@ pub fn endgame_proof<const R: RuleKind, const T: ThreatSearchKind>(
     td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
     state: &mut GameState<R>,
 ) -> Option<Vec<Pos>> {
-    let mut moves = generate_endgame_moves::<R, T>(&state.board, pos::BOARD_WIDTH / 2, pos::CENTER);
+    let mut moves = generate_full_endgame_moves::<R, T>(state);
 
     if moves.is_empty() {
         return None;
     }
-
-    moves.init();
 
     let context = EndgameContext {
         max_depth: td.config.max_quiescence_depth.unwrap_or(Depth::BOARD_LIMIT),
@@ -223,10 +162,10 @@ pub fn endgame_proof<const R: RuleKind, const T: ThreatSearchKind>(
         ThreatSearchKind::VCF => {
             match state.board.player_color {
                 Color::Black => try_vcf::<R, { Color::Black }, _, SequenceProof>(
-                    td, &context, 8, state, moves, context.max_depth, Score::NEG_INF, Score::NEG_INF,
+                    td, &context, state, moves, context.max_depth, Score::NEG_INF, Score::NEG_INF,
                 ),
                 Color::White => try_vcf::<R, { Color::White }, _, SequenceProof>(
-                    td, &context, 8, state, moves, context.max_depth, Score::NEG_INF, Score::NEG_INF,
+                    td, &context, state, moves, context.max_depth, Score::NEG_INF, Score::NEG_INF,
                 ),
             }
         },
@@ -246,9 +185,8 @@ pub fn endgame_proof<const R: RuleKind, const T: ThreatSearchKind>(
 fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
     td: &mut ThreadData<R, TH, impl Evaluator<R>>,
     context: &EndgameContext,
-    distance_window: u8,
     state: &mut GameState<R>,
-    mut moves: EndgameMovesUnchecked,
+    mut moves: EndgameMoveList,
     depth_left: Depth,
     mut alpha: Score,
     static_eval: Score,
@@ -268,7 +206,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
         return best_proof;
     }
 
-    while let Some(four_pos) = moves.next() {
+    while let Some(EndgameMoveEntry { pos: four_pos, .. }) = moves.consume_best() {
         if TH::IS_MAIN
             && td.should_check_limit()
             && td.search_limit_exceeded()
@@ -352,7 +290,11 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
                 }
 
                 if response_four_count == 0 {
-                    break 'movegen Some(generate_endgame_moves::<R, { ThreatSearchKind::VCF }>(&state.board, distance_window, four_pos));
+                    break 'movegen Some(if Pf::COMPLETE_PROOF {
+                        generate_full_endgame_moves::<R, { ThreatSearchKind::VCF }>(state)
+                    } else {
+                        generate_endgame_moves::<R, { ThreatSearchKind::VCF }>(td, state, four_pos)
+                    })
                 }
 
                 let response_move = state.board.patterns.five_pos[!C].unwrap();
@@ -360,7 +302,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
                 if state.board.patterns.field[C][response_move.idx_usize()].has_any_four()
                     && (R != RuleKind::Renju || C != Color::Black || !state.board.patterns.is_forbidden(response_move))
                 {
-                    break 'movegen Some(EndgameMovesUnchecked::unit(response_move))
+                    break 'movegen Some(EndgameMoveList::unit(EndgameMoveEntry { pos: response_move, score: 0 }))
                 }
 
                 None
@@ -368,11 +310,9 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
 
             let child_eval = td.evaluator.eval_value(state);
 
-            let mut proof = if let Some(mut moves) = child_moves {
-                moves.init();
-
+            let mut proof = if let Some(moves) = child_moves {
                 try_vcf::<R, C, TH, Pf>(
-                    td, context, distance_window, state, moves, depth_left - 2, alpha, child_eval,
+                    td, context, state, moves, depth_left - 2, alpha, child_eval,
                 )
             } else {
                 Pf::stand_pat(child_eval)

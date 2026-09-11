@@ -1,4 +1,4 @@
-use crate::eval::evaluator::{Evaluator, PolicyDistribution};
+use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use rusty_renju::board::{Board, MoveArtifact};
 use rusty_renju::hash_key::HashKey;
@@ -12,11 +12,13 @@ use rusty_renju::slice::Slices;
 use rusty_renju::utils::empty::Empty;
 use rusty_renju::{const_for, pattern};
 
+const BLACK_SIGNUM: ColorContainer<i32> = ColorContainer::new(1, -1);
+
 #[derive(Clone)]
 pub struct HeuristicEvaluator<const R: RuleKind> {
     scores: ColorContainer<[i16; pattern::PATTERN_SIZE]>,
-    policy_score: [i16; pattern::PATTERN_SIZE],
-    score_black: i32,
+    ordering_scores: [ColorContainer<i16>; pattern::PATTERN_SIZE],
+    score_black: Score,
     hash_key: HashKey,
 }
 
@@ -38,19 +40,20 @@ impl<const R: RuleKind> HeuristicEvaluator<R> {
                     changed_bitmap &= changed_bitmap - 1;
 
                     let pos = start_pos.directional_offset_unchecked(direction, slice_idx as isize);
-                    let key = encode_value_key(board.patterns.field[color][pos.idx_usize()]);
+                    let key = encode_key(board.patterns.field[color][pos.idx_usize()]);
 
-                    let score = PATTERN_SCORE_LUT[key];
+                    let score = VALUE_SCORE_LUT[key];
                     let old_score = std::mem::replace(&mut self.scores[color][pos.idx_usize()], score);
                     let pattern_delta = score - old_score;
 
-                    self.policy_score[pos.idx_usize()] += pattern_delta;
+                    let ordering_score = ORDERING_SCORE_LUT[key];
+                    self.ordering_scores[pos.idx_usize()][color] = ordering_score;
 
                     score_delta += pattern_delta as i32;
                 }
             }
 
-            self.score_black += score_delta * BLACK_SIGNUM[color];
+            self.score_black += Score::from_i32(score_delta * BLACK_SIGNUM[color]);
         }
     }
 }
@@ -65,8 +68,8 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
     fn from_state(state: &GameState<R>) -> Self {
         let mut evaluator = Self {
             scores: ColorContainer::new([0; pattern::PATTERN_SIZE], [0; pattern::PATTERN_SIZE]),
-            policy_score: [0; pattern::PATTERN_SIZE],
-            score_black: 0,
+            ordering_scores: [ColorContainer::new(0, 0); pattern::PATTERN_SIZE],
+            score_black: Score::DRAW,
             hash_key: HashKey::empty(),
         };
 
@@ -80,17 +83,17 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
 
         for color in [Color::Black, Color::White] {
             for idx in 0 .. pos::BOARD_SIZE {
-                let key = encode_value_key(board.patterns.field[color][idx]);
-                let pattern_score = PATTERN_SCORE_LUT[key];
+                let key = encode_key(board.patterns.field[color][idx]);
+                let pattern_score = VALUE_SCORE_LUT[key];
 
                 self.scores[color][idx] = pattern_score;
-                self.policy_score[idx] += pattern_score;
             }
         }
 
-        self.score_black =
+        self.score_black = Score::from_i32(
              self.scores[Color::Black].iter().map(|&score| score as i32).sum::<i32>()
-                - self.scores[Color::White].iter().map(|&score| score as i32).sum::<i32>();
+                - self.scores[Color::White].iter().map(|&score| score as i32).sum::<i32>()
+        );
     }
 
     fn play(&mut self, board: &Board<R>, artifact: MoveArtifact, plied: MaybePos) {
@@ -109,22 +112,26 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
         self.hash_key = board.hash_key;
     }
 
-    fn eval_policy(&mut self, _state: &GameState<R>) -> PolicyDistribution {
-        self.policy_score
-    }
+    fn eval_policy(&mut self, _: &GameState<R>) {}
 
     fn eval_value(&mut self, state: &GameState<R>) -> Score {
         let mut forbidden_score = 0;
 
         for pos in state.board.patterns.forbidden_field.iter_hot_pos() {
             forbidden_score += match state.board.patterns.forbidden_kind(pos).unwrap() {
-                ForbiddenKind::Overline => HeuristicPatternScores::OVERLINE_FORBID,
-                ForbiddenKind::DoubleFour => HeuristicPatternScores::DOUBLE_FOUR_FORBID,
-                ForbiddenKind::DoubleThree => HeuristicPatternScores::DOUBLE_THREE_FORBID,
+                ForbiddenKind::Overline => EvaluationScores::OVERLINE_PENALTY,
+                ForbiddenKind::DoubleFour => EvaluationScores::DOUBLE_FOUR_PENALTY,
+                ForbiddenKind::DoubleThree => EvaluationScores::DOUBLE_THREE_PENALTY,
             } as i32
         }
 
-        Score::from_i32((self.score_black - forbidden_score) * BLACK_SIGNUM[state.board.player_color]).clamp_non_mate()
+        ((self.score_black - forbidden_score) * BLACK_SIGNUM[state.board.player_color]).clamp_non_mate()
+    }
+
+    fn ordering_score(&self, board: &Board<R>, pos: Pos) -> i16 {
+        let score = self.ordering_scores[pos.idx_usize()];
+
+        (score[board.player_color] * 5 + score[!board.player_color] * 3) / 3
     }
 
     fn hash_key(&self) -> HashKey {
@@ -132,79 +139,143 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
     }
 }
 
-// open-fours(1), fours(2), open-threes(2), potential(3) 8 bits
-fn encode_value_key(player_pattern: Pattern) -> usize {
-    let has_open_four = player_pattern.has_open_four() as u32;
-    let total_fours = (player_pattern.count_closed_fours() & 0b11) << 1;
-    let open_threes = (player_pattern.count_open_threes() & 0b11) << 3;
-    let potentials = (player_pattern.count_any_potential() & 0b111) << 5;
+// closed_fours(2), open-threes(2), potential_four(2), potential_three(2)
+fn encode_key(pattern: Pattern) -> usize {
+    let mut acc = 0;
 
-    (has_open_four | total_fours | open_threes | potentials) as usize
-}
-
-const VALUE_SCORE_LUT_SIZE: usize = (0b1 << 8) + 1;
-
-type ValueScoreLut = [i16; VALUE_SCORE_LUT_SIZE];
-
-const PATTERN_SCORE_LUT: ValueScoreLut = build_pattern_score_lut();
-
-const fn build_pattern_score_lut() -> ValueScoreLut {
-    let mut acc = [0; VALUE_SCORE_LUT_SIZE];
-
-    const fn flash_score_variants(lut: &mut ValueScoreLut) {
-        const_for!(pattern_key in 0, VALUE_SCORE_LUT_SIZE; {
-            let has_open_four = (pattern_key & 0b1) == 0b1;
-            let closed_fours = (pattern_key >> 1) & 0b11;
-            let open_threes = (pattern_key >> 3) & 0b11;
-            let potentials = (pattern_key >> 5) & 0b111;
-
-            let mut acc = 0;
-
-            if has_open_four {
-                acc = HeuristicPatternScores::OPEN_FOUR;
-            } else if closed_fours > 1 { // double-four fork
-                acc = HeuristicPatternScores::DOUBLE_FOUR_FORK;
-            } else if closed_fours == 1 && open_threes > 0 { // three-four fork
-                acc = HeuristicPatternScores::THREE_FOUR_FORK;
-            } else if open_threes > 1 { // double-three fork
-                acc = HeuristicPatternScores::DOUBLE_THREE_FORK;
-            } else if open_threes != 0 {
-                acc += HeuristicPatternScores::OPEN_THREE;
-                acc += HeuristicPatternScores::POTENTIAL_FORK_BONUS[potentials];
-            } else if closed_fours != 0 {
-                acc += HeuristicPatternScores::CLOSED_FOUR;
-                acc += HeuristicPatternScores::POTENTIAL_FORK_BONUS[potentials];
-            } else {
-                acc += HeuristicPatternScores::POTENTIAL[potentials];
-            }
-
-            lut[pattern_key] = acc;
-        });
-    }
-
-    flash_score_variants(&mut acc);
+    acc |= (pattern.count_closed_fours().max(2) as usize) << 6;
+    acc |= (pattern.count_closed_fours().max(2) as usize) << 4;
+    acc |= (pattern.count_potential_four().max(2) as usize) << 2;
+    acc |= pattern.count_potential_three().max(2) as usize;
 
     acc
 }
 
-struct HeuristicPatternScores;
+const SCORE_LUT_SIZE: usize = u8::MAX as usize + 1;
 
-impl HeuristicPatternScores {
-    const POTENTIAL: [i16; 8]       = [0, 4, 12, 24, 40, 60, 84, 112];
+type ScoreLut = [i16; SCORE_LUT_SIZE];
 
-    const POTENTIAL_FORK_BONUS: [i16; 8] = [0, 28, 30, 36, 40, 60, 84, 112];
+const VALUE_SCORE_LUT: ScoreLut = build_value_lut::<EvaluationScores>();
+const ORDERING_SCORE_LUT: ScoreLut = build_value_lut::<OrderingScores>();
 
-    const CLOSED_FOUR: i16          = 300;
-    const OPEN_THREE: i16           = 160;
-    const OPEN_FOUR: i16            = 1000;
+const fn build_value_lut<W: WeightSet>() -> ScoreLut {
+    let mut lut = [0; SCORE_LUT_SIZE];
 
-    const THREE_FOUR_FORK: i16      = 800 - Self::DOUBLE_THREE_FORK - Self::OPEN_FOUR;
-    const DOUBLE_THREE_FORK: i16    = 300 - Self::OPEN_THREE * 2;
-    const DOUBLE_FOUR_FORK: i16     = 1000 - Self::CLOSED_FOUR * 2;
+    const_for!(pattern_key in 0, SCORE_LUT_SIZE; {
+        let closed_fours = pattern_key >> 6;
+        let open_threes = (pattern_key >> 4) & 0b11;
+        let potential_fours = (pattern_key >> 2) & 0b11;
+        let potential_threes = pattern_key & 0b11;
 
-    const OVERLINE_FORBID: i16      = 400;
-    const DOUBLE_FOUR_FORBID: i16   = Self::DOUBLE_FOUR_FORK + 200;
-    const DOUBLE_THREE_FORBID: i16  = Self::DOUBLE_THREE_FORK + 50;
+        lut[pattern_key] = if closed_fours > 1 { // double-four fork
+            W::DOUBLE_FOUR_FORK
+        } else if closed_fours == 1 && open_threes > 0 { // three-four fork
+            W::THREE_FOUR_FORK
+        } else if open_threes > 1 { // double-three fork
+            W::DOUBLE_THREE_FORK
+        } else {
+            let primary_index = if closed_fours != 0 {
+                2
+            } else if open_threes != 0 {
+                1
+            } else {
+                0
+            };
+
+            W::MAIN_TABLE[primary_index][potential_threes][potential_fours]
+        }
+    });
+
+    lut
 }
 
-const BLACK_SIGNUM: ColorContainer<i32> = ColorContainer::new(1, -1);
+const fn build_ordering_lut() -> ScoreLut {
+    todo!()
+}
+
+trait WeightSet {
+    // MAIN_TABLE[none | three | four][potential-threes][potential-fours]
+    const MAIN_TABLE: [[[i16; 4]; 4]; 3];
+
+    const DOUBLE_FOUR_FORK: i16;
+    const THREE_FOUR_FORK: i16;
+    const DOUBLE_THREE_FORK: i16;
+
+    const OVERLINE_PENALTY: i16;
+    const DOUBLE_FOUR_PENALTY: i16;
+    const DOUBLE_THREE_PENALTY: i16;
+}
+
+struct OrderingScores;
+
+// baseline closed-four = 100
+impl WeightSet for OrderingScores {
+    const MAIN_TABLE: [[[i16; 4]; 4]; 3] = [
+        // none
+        [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+        ],
+        // closed-four
+        [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+        ],
+        // three
+        [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+        ],
+    ];
+
+    const DOUBLE_FOUR_FORK: i16 = 0;
+    const THREE_FOUR_FORK: i16 = 0;
+    const DOUBLE_THREE_FORK: i16 = 0;
+
+    const OVERLINE_PENALTY: i16      = -400;
+    const DOUBLE_FOUR_PENALTY: i16   = -300;
+    const DOUBLE_THREE_PENALTY: i16  = -150;
+}
+
+struct EvaluationScores;
+
+// baseline closed-four = 100
+impl WeightSet for EvaluationScores {
+    const MAIN_TABLE: [[[i16; 4]; 4]; 3] = [
+        // none
+        [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+        ],
+        // closed-four
+        [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+        ],
+        // three
+        [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+        ],
+    ];
+
+    const DOUBLE_FOUR_FORK: i16 = 1000;
+    const THREE_FOUR_FORK: i16 = 1000;
+    const DOUBLE_THREE_FORK: i16 = 100;
+
+    const OVERLINE_PENALTY: i16      = -400;
+    const DOUBLE_FOUR_PENALTY: i16   = -300;
+    const DOUBLE_THREE_PENALTY: i16  = -150;
+}
