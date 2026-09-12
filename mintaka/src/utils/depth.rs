@@ -2,7 +2,7 @@ use rusty_renju::notation::pos;
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 
-pub const MAX_PLY: usize = 128;
+pub const MAX_PLY: usize = 192;
 pub const MAX_PLY_SLOTS: usize = MAX_PLY + 1;
 
 #[cfg_attr(feature = "typeshare", typeshare::typeshare)]
@@ -21,7 +21,7 @@ impl Depth {
     }
 
     pub const fn from_i32(value: i32) -> Self {
-        debug_assert!(Self::PLY_LIMIT.0 > value && value >= 0);
+        debug_assert!(Self::PLY_LIMIT.0 >= value && value >= 0);
         Self(value)
     }
 

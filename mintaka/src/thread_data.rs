@@ -5,7 +5,6 @@ use crate::game_state::RecoveryState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::params;
-use crate::principal_variation::PrincipalVariation;
 use crate::thread_type::ThreadType;
 use crate::utils::depth;
 use crate::utils::depth::Depth;
@@ -67,20 +66,17 @@ pub struct ThreadData<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> {
     pub tt: TTView<'a>,
     pub ht: Box<HistoryTable>,
     pub ss: Box<[SearchFrame; depth::MAX_PLY_SLOTS]>,
-    pub pvs: Box<[PrincipalVariation; depth::MAX_PLY_SLOTS]>,
     pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; depth::MAX_PLY_SLOTS]>,
     pub debug_statics: Box<[DebugStatics; depth::MAX_PLY_SLOTS]>,
 
     pub lmr_table: Box<[[Depth; depth::MAX_PLY_SLOTS]; 64]>,
 
-    pub root_pv: PrincipalVariation,
     pub root_moves_in_1k: [u32; pos::BOARD_SIZE],
     pub singular_root: bool,
 
     pub batch_counter: BatchCounter<'a>,
     aborted: &'a AtomicBool,
 
-    pub best_move: MaybePos,
     pub selective_depth: Depth,
 
     pub ply: usize,
@@ -106,16 +102,13 @@ impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, T
             evaluator,
             ht: Box::new(ht),
             ss: Box::new([SearchFrame::EMPTY; depth::MAX_PLY_SLOTS]),
-            pvs: Box::new([PrincipalVariation::EMPTY; depth::MAX_PLY_SLOTS]),
             killers: Box::new([[MaybePos::NONE; 2]; depth::MAX_PLY_SLOTS]),
             lmr_table: Box::new(build_lmr_table(config)),
             debug_statics: Box::new([DebugStatics::EMPTY; depth::MAX_PLY_SLOTS]),
-            root_pv: PrincipalVariation::EMPTY,
             root_moves_in_1k: [0; pos::BOARD_SIZE],
             singular_root: false,
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
-            best_move: MaybePos::NONE,
             selective_depth: Depth::ZERO,
             ply: 0,
         }

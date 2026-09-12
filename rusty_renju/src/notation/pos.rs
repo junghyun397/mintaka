@@ -274,6 +274,14 @@ impl MaybePos {
         }
     }
 
+    pub fn unwrap_or_else<F>(self, produce: F) -> Pos where F: FnOnce() -> Pos {
+        if self.is_some() {
+            self.0
+        } else {
+            produce()
+        }
+    }
+
     pub fn ok(self) -> Option<Pos> {
         self.is_some().then_some(self.0)
     }

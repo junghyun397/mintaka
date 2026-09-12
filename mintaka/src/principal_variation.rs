@@ -1,6 +1,6 @@
 use crate::utils::depth;
 use rusty_renju::impl_debug_from_display;
-use rusty_renju::notation::pos::MaybePos;
+use rusty_renju::notation::pos::{MaybePos, Pos};
 use std::fmt::{Display, Formatter};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
@@ -10,8 +10,8 @@ use typeshare::typeshare;
 #[cfg_attr(feature = "serde", serde(try_from = "Vec<MaybePos>"))]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct PrincipalVariation {
-    pub line: [MaybePos; depth::MAX_PLY],
-    pub top: usize,
+    line: [MaybePos; depth::MAX_PLY],
+    top: usize,
 }
 
 impl PrincipalVariation {
@@ -25,15 +25,33 @@ impl PrincipalVariation {
         self.top = 0;
     }
 
-    pub fn init(&mut self, head: MaybePos) {
-        self.line[0] = head;
+    pub fn first(&self) -> MaybePos {
+        self.moves().first().copied().unwrap_or(MaybePos::NONE)
+    }
+
+    pub fn set(&mut self, head: Pos) {
+        self.line[0] = head.into();
         self.top = 1;
     }
 
-    pub fn load(&mut self, head: MaybePos, rest: Self) {
-        self.line[0] = head;
-        self.top = rest.top + 1;
-        self.line[1 .. self.top].copy_from_slice(rest.moves());
+    pub fn update(&mut self, head: Pos, rest: &Self) {
+        self.update_line([head], rest);
+    }
+
+    pub fn update_pair(&mut self, attack: Pos, response: Pos, rest: &Self) {
+        self.update_line([attack, response], rest);
+    }
+
+    fn update_line<const N: usize>(&mut self, prefix: [Pos; N], rest: &Self) {
+        let top = N + rest.top;
+        assert!(top <= depth::MAX_PLY, "moves longer than max ply");
+
+        for (slot, pos) in self.line[..N].iter_mut().zip(prefix) {
+            *slot = pos.into();
+        }
+
+        self.line[N .. top].copy_from_slice(rest.moves());
+        self.top = top;
     }
 }
 
@@ -71,6 +89,6 @@ impl From<&PrincipalVariation> for Vec<MaybePos> {
 #[cfg(feature = "serde")]
 impl serde::Serialize for PrincipalVariation {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
-        Vec::from(self).serialize(serializer)
+        self.moves().serialize(serializer)
     }
 }

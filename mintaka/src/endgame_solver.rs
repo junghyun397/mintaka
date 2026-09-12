@@ -37,7 +37,7 @@ pub fn solve_endgame<const R: RuleKind>(
         max_nodes_in_1k: None,
         max_depth: None,
         max_quiescence_depth: depth_limit,
-        tt_size: ByteSize::from_kib(32),
+        tt_size: ByteSize::from_mib(1),
         workers: 1,
         pondering: false,
         initial_timer: Timer::INFINITE,

@@ -33,7 +33,7 @@ pub enum Color {
 ```
 Current workaround:
 ```rust
-#![feature(adt_const_params)]
+#![feature(min_adt_const_params)]
 
 #[derive(std::marker::ConstParamTy, PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]

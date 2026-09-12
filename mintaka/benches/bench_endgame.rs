@@ -10,10 +10,12 @@ mod bench_endgame {
     use mintaka::game_state::GameStateData;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
+    use mintaka::principal_variation::PrincipalVariation;
     use mintaka::search_endgame;
     use mintaka::search_endgame::ThreatSearchKind;
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
+    use mintaka::utils::depth::Depth;
     use rusty_renju::board;
     use rusty_renju::history::History;
     use rusty_renju::notation::pos::pos_unchecked;
@@ -51,7 +53,9 @@ mod bench_endgame {
             let td = ThreadData::new(WorkerThread::<Instant>::new(), 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
-                let result = search_endgame::quiescence_search::<{ RuleKind::Renju }, { ThreatSearchKind::VCF }>(&mut td.clone(), None, &mut state, -Score::INF, Score::INF, Score::DRAW, true);
+                let result = search_endgame::quiescence_search::<{ RuleKind::Renju }, { ThreatSearchKind::VCF }>(
+                    &mut td.clone(), &mut PrincipalVariation::EMPTY, Depth::ZERO, &mut state, -Score::INF, Score::INF, true,
+                );
 
                 tt.clear();
 

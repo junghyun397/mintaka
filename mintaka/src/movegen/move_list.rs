@@ -1,4 +1,4 @@
-use rusty_renju::notation::pos::Pos;
+use rusty_renju::notation::pos::{self, Pos};
 use rusty_renju::utils::empty::Empty;
 
 #[derive(Debug, Copy, Clone)]
@@ -33,7 +33,7 @@ impl MoveEntry for EndgameMoveEntry {
 
 pub type MainMoveList = MoveList<MainMoveEntry, 192>;
 
-pub type EndgameMoveList = MoveList<EndgameMoveEntry, 32>;
+pub type EndgameMoveList = MoveList<EndgameMoveEntry, { pos::BOARD_SIZE }>;
 
 #[derive(Debug)]
 pub struct MoveList<E: MoveEntry, const N: usize> {
@@ -50,6 +50,10 @@ impl<E: MoveEntry, const N: usize> Empty for MoveList<E, N> {
 impl<E: MoveEntry, const N: usize> MoveList<E, N> {
     pub fn is_empty(&self) -> bool {
         self.top == 0
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut E> {
+        self.moves[..self.top].iter_mut()
     }
 
     pub fn unit(entry: E) -> Self {

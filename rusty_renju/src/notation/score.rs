@@ -128,7 +128,7 @@ impl From<i32> for Score {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct MaybeScore(pub Score);
+pub struct MaybeScore(Score);
 
 impl MaybeScore {
     pub const INVALID_SCORE: Score = Score(i16::MIN as i32);
@@ -155,6 +155,10 @@ impl MaybeScore {
         if self.is_some() { self } else { other }
     }
 
+    pub fn ok(self) -> Option<Score> {
+        self.is_some().then_some(self.0)
+    }
+
     pub fn unwrap(self) -> Score {
         assert!(self.is_some());
         self.0
@@ -162,6 +166,14 @@ impl MaybeScore {
 
     pub fn unwrap_or(self, default: Score) -> Score {
         if self.is_some() { self.0 } else { default }
+    }
+
+    pub fn unwrap_or_else<F>(self, produce: F) -> Score where F: FnOnce() -> Score {
+        if self.is_some() {
+            self.0
+        } else {
+            produce()
+        }
     }
 
     pub fn unwrap_unchecked(self) -> i32 {

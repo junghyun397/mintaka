@@ -1,4 +1,4 @@
-#![feature(adt_const_params)]
+#![feature(min_adt_const_params)]
 
 #[cfg(feature = "clap")]
 pub mod preference;

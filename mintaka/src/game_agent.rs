@@ -263,7 +263,7 @@ impl<const R: RuleKind> GameAgent<R> {
 
         let tt_view = self.tt.view();
 
-        let (main_td, score, best_move) = search_scope!(|s| {
+        let (main_td, result) = search_scope!(|s| {
             let state = self.state;
 
             for tid in 1 .. config.workers {
@@ -298,11 +298,11 @@ impl<const R: RuleKind> GameAgent<R> {
                 &aborted, &global_counter_in_1k,
             );
 
-            let (score, best_move) = iterative_deepening::<R, MainThread<_, _>>(
+            let result = iterative_deepening::<R, MainThread<_, _>>(
                 &mut main_td, state
             );
 
-            (main_td, score, best_move)
+            (main_td, result)
         });
 
         self.ht = *main_td.ht;
@@ -312,12 +312,12 @@ impl<const R: RuleKind> GameAgent<R> {
 
         BestMove {
             position_hash: self.state.board.hash_key,
-            best_move,
-            score,
-            selective_depth: main_td.selective_depth,
+            best_move: result.best_move(),
+            score: result.score,
+            selective_depth: result.selective_depth,
             total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
             time_elapsed: started_time.elapsed(),
-            pv: main_td.root_pv
+            pv: result.pv
         }
     }
 }

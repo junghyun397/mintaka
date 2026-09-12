@@ -193,17 +193,33 @@ impl TTView<'_> {
         let bucket = &self.table[idx];
 
         if let Some(TTEntryBucketProbe { slot, entry: exist_entry }) = bucket.probe(key) {
-            if self.age != exist_entry.tt_flag.age()
-                || maybe_score_kind == Some(ScoreKind::Exact)
-                || depth.value() as u8 + 3 + 4 * is_pv as u8 > exist_entry.depth
-            {
+            let should_replace = if quiescence_depth == TTEntry::QUIESCENCE_PROVEN_DEPTH {
+                exist_entry.quiescence_depth != TTEntry::QUIESCENCE_PROVEN_DEPTH
+                    || maybe_score_kind == Some(ScoreKind::Exact)
+                    || match maybe_score_kind {
+                        Some(ScoreKind::LowerBound) => score.unwrap_unchecked() >= exist_entry.score as i32,
+                        Some(ScoreKind::UpperBound) => score.unwrap_unchecked() <= exist_entry.score as i32,
+                        _ => false,
+                    }
+            } else if exist_entry.quiescence_depth == TTEntry::QUIESCENCE_PROVEN_DEPTH {
+                false
+            } else if depth == Depth::ZERO && exist_entry.depth == 0 {
+                self.age != exist_entry.tt_flag.age()
+                    || quiescence_depth >= exist_entry.quiescence_depth
+            } else {
+                self.age != exist_entry.tt_flag.age()
+                    || depth > Depth::ZERO && (maybe_score_kind == Some(ScoreKind::Exact)
+                    || depth.value() + 3 + 4 * is_pv as i32 > exist_entry.depth as i32)
+            };
+
+            if should_replace {
                 let entry = TTEntry {
                     best_move: best_move.or(exist_entry.best_move),
                     tt_flag: TTFlag::new(self.age, maybe_score_kind, is_pv),
                     depth: depth.value() as u8,
                     quiescence_depth,
                     eval: eval.or(MaybeScore::from(exist_entry.eval as i32)).unwrap_unchecked() as i16,
-                    score: score.or(MaybeScore::from(exist_entry.score as i32)).unwrap_unchecked() as i16,
+                    score: score.unwrap_unchecked() as i16,
                 };
 
                 bucket.store(slot, key, entry);

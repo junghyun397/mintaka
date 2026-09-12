@@ -1,4 +1,4 @@
-#![feature(adt_const_params)]
+#![feature(min_adt_const_params)]
 
 #[path = "../piskvork.rs"]
 mod piskvork;

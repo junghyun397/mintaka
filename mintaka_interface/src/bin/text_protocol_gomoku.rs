@@ -1,4 +1,4 @@
-#![feature(adt_const_params)]
+#![feature(min_adt_const_params)]
 
 #[path = "../text_protocol.rs"]
 mod text_protocol;

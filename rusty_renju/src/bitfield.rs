@@ -39,6 +39,12 @@ impl Bitfield {
         legal_mask
     };
 
+    pub const fn unit(pos: Pos) -> Self {
+        let mut bitfield = Self::ZERO_FILLED;
+        bitfield.set(pos);
+        bitfield
+    }
+
     pub const fn is_hot_idx(&self, idx: usize) -> bool {
         self.0[idx / 8] & (0b1 << (idx % 8)) != 0
     }
