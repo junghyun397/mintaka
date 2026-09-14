@@ -11,7 +11,7 @@ use rusty_renju::notation::rule::RuleKind;
 #[clap(
     disable_help_flag = true,
 )]
-pub struct Preference<const R: RuleKind> {
+pub struct Params<const R: RuleKind> {
     #[arg(short, long)]
     pub board: Option<Board<R>>,
     #[arg(short, long)]
@@ -34,7 +34,7 @@ pub struct Preference<const R: RuleKind> {
     pub config: Config,
 }
 
-impl<const R: RuleKind> Preference<R> {
+impl<const R: RuleKind> Params<R> {
     pub fn parse() -> Self {
         let mut pref = Self::parse_from(std::env::args());
 

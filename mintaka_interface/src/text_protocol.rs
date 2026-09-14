@@ -4,7 +4,7 @@ use mintaka::game_state::{GameState, GameStateData};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::response::{CallBackResponseSender, Response};
 use mintaka_interface::message::{ConfigCommand, Message, MessageCommand, MessageSender, StatusCommand};
-use mintaka_interface::preference::Preference;
+use mintaka_interface::params::Params;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
 use rusty_renju::notation::color::UnknownColorError;
@@ -19,9 +19,9 @@ use std::time::{Duration, Instant};
 use mintaka::utils::depth::Depth;
 
 pub fn entry<const R: RuleKind>() -> Result<(), GameError> {
-    let pref = Preference::<R>::parse();
+    let params = Params::<R>::parse();
 
-    let command_sequence: Vec<String> = pref
+    let command_sequence: Vec<String> = params
         .command_sequence
         .map(|sequence| {
             sequence
@@ -33,8 +33,8 @@ pub fn entry<const R: RuleKind>() -> Result<(), GameError> {
         .unwrap_or_default();
 
     text_protocol(
-        pref.config,
-        pref.game_state.unwrap_or_else(|| GameState::empty()),
+        params.config,
+        params.game_state.unwrap_or_else(|| GameState::empty()),
         command_sequence,
     )
 }

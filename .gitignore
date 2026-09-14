@@ -7,4 +7,5 @@
 /.pnpm-store
 __pycache__
 max_config.toml
+openings.csv
 **/playground.rs

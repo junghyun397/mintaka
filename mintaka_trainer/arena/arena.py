@@ -1,13 +1,15 @@
 import argparse
+import copy
 import random
+import re
+import secrets
 import shlex
 import subprocess
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from enum import Enum
-
 import time
+from contextlib import ExitStack
+from dataclasses import dataclass
+from datetime import datetime, timezone, timedelta
+from enum import Enum
 
 
 class Color(Enum):
@@ -22,19 +24,37 @@ class Color(Enum):
 
 
 class Player(Enum):
-    A = 0
-    B = 1
+    BASE = 0
+    TARGET = 1
 
     def flip(self) -> 'Player':
-        return Player.B if self == Player.A else Player.A
+        return Player.TARGET if self == Player.BASE else Player.BASE
 
     def __str__(self) -> str:
-        return self.name
+        return self.name.lower()
+
+
+def time_manager_or_nodes(time, nodes) -> TimeManager | int:
+    if nodes is not None:
+        return nodes
+    else:
+        return TimeManager(
+            total_remaining=time[0], increment=time[1], turn=time[2]
+        )
 
 
 class Config:
     def __init__(self, args):
         self.args = args
+
+        self.path_params_resource = {
+            Player.BASE: (self.args.base_path, self.args.base_params, time_manager_or_nodes(
+                self.args.time, self.args.base_nodes
+            )),
+            Player.TARGET: (self.args.target_path, self.args.target_params, time_manager_or_nodes(
+                self.args.time, self.args.target_nodes
+            )),
+        }
 
 
 @dataclass
@@ -57,34 +77,27 @@ class TimeManager:
 
 
 @dataclass
-class GameResult:
-    color: dict[Player, Color]
-    winner: Color | None
+class GameSnapshot:
+    winner: tuple[Player, Color] | None
+    duration: timedelta
     history: str
-    board_str: str
 
-    def _win(self, color: Color) -> float:
-        if self.winner is None:
-            return 0.5
-        elif self.winner == color:
-            return 1.0
-        else:
-            return 0.0
 
-    def win_zero_to_one(self, player) -> float:
-        return self._win(self.color[player])
+GameResults = dict[Player | Color | None, int]
+
+
+def player_wdl(result: GameResults) -> tuple[int, int, int]:
+    return result[Player.TARGET], result[None], result[Player.BASE]
+
+
+def color_wdl(result: GameResults) -> tuple[int, int, int]:
+    return result[Color.BLACK], result[None], result[Color.WHITE]
 
 
 @dataclass
 class Engine:
     process: subprocess.Popen
-    time_manager: TimeManager
-
-
-def calculate_elo_delta(original_elo, opponent_elo, result_zero_to_one, k_factor) -> float:
-    expected = 1.0 / (1.0 + 10.0 ** ((opponent_elo - original_elo) / 400.0))
-
-    return k_factor * (result_zero_to_one - expected)
+    resource: TimeManager | int
 
 
 def datetime_prefix(config) -> str:
@@ -95,23 +108,32 @@ def datetime_prefix(config) -> str:
 
 
 def game_prefix(config, game_no) -> str:
-    return f"[{game_no + 1}/{config.args.num_games}] "
+    return f"[{game_no + 1}/{config.args.max_openings * 2}] "
 
 
 def turn_prefix(turn_no, player, color) -> str:
     return f"[#{turn_no}:{player}:{color}] "
 
 
-def opening_for(openings: list[Opening], game_no: int) -> Opening | None:
-    return openings[game_no % len(openings)] if len(openings) != 0 else None
+def snapshot_display(opening: Opening, snapshots: list[GameSnapshot]) -> str:
+    return (
+        f"duration={snapshots[0].duration.total_seconds()}s-{snapshots[1].duration.total_seconds()}s, "
+        f"history={snapshots[0].history}-{snapshots[1].history}, "
+        f"opening={opening.sequence}"
+    )
 
 
-def spawn_process(path, params, time_manager: TimeManager, opening: Opening | None) -> subprocess.Popen:
+def spawn_process(path, params, resource: TimeManager | int, opening: Opening) -> subprocess.Popen:
+    if isinstance(resource, TimeManager):
+        resource_param = ["--time", str(resource.total_remaining), str(resource.increment), str(resource.turn)]
+    else:
+        resource_param = ["--nodes-in-1k", str(resource)]
+
     return subprocess.Popen(
         [path]
             + shlex.split(params)
-            + ["--time", str(time_manager.total_remaining), str(time_manager.increment), str(time_manager.turn)]
-            + (["--history", opening.sequence] if opening is not None else []),
+            + resource_param
+            + ["--history", opening.sequence],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -151,26 +173,33 @@ def command_process(config, process, command, filter_prefix: list[str] | None = 
         if response.startswith("="):
             return response[2:]
 
-        if response.startswith("%") and filter_prefix is not None and response[2:].startswith(tuple(filter_prefix)):
+        if (not config.args.concise
+                and response.startswith("%")
+                and filter_prefix is not None
+                and response[2:].startswith(tuple(filter_prefix))
+        ):
             print(f"{datetime_prefix(config)}{println_prefix}{response[2:]}")
 
 
-def play_game(config, game_no: int, opening: Opening | None) -> GameResult:
-    a_time_manager = TimeManager(config.args.a_time[0], config.args.a_time[1], config.args.a_time[2])
-    b_time_manager = TimeManager(config.args.b_time[0], config.args.b_time[1], config.args.b_time[2])
+def play_game(config, game_no: int, opening: Opening) -> GameSnapshot:
+    game_timer = time.perf_counter_ns()
+    initial_color = opening.initial_color
 
-    initial_color = opening.initial_color if opening is not None else Color.BLACK
-
-    with (
-        spawn_process(config.args.a_path, config.args.a_params, a_time_manager, opening) as a_process,
-        spawn_process(config.args.b_path, config.args.b_params, b_time_manager, opening) as b_process,
-    ):
-        engines = {
-            Player.A: Engine(a_process, a_time_manager),
-            Player.B: Engine(b_process, b_time_manager)
+    with ExitStack() as stack:
+        processes = {
+            player: stack.enter_context(spawn_process(path, params, resource, opening))
+            for player, (path, params, resource) in config.path_params_resource.items()
         }
 
-        player = Player.A if game_no % 2 == 0 else Player.B
+        stack.callback(processes[Player.BASE].terminate)
+        stack.callback(processes[Player.TARGET].terminate)
+
+        engines = {
+            player: Engine(process, copy.copy(config.path_params_resource[player][2]))
+            for player, process in processes.items()
+        }
+
+        player = Player.BASE if game_no % 2 == 0 else Player.TARGET
 
         color = {
             player: initial_color,
@@ -193,7 +222,8 @@ def play_game(config, game_no: int, opening: Opening | None) -> GameResult:
 
             time_elapsed = int((time.perf_counter_ns() - timer) / 1_000_000)
 
-            engines[player].time_manager.consume(time_elapsed)
+            if isinstance(engines[player].resource, TimeManager):
+                engines[player].resource.consume(time_elapsed)
 
             if move == "none":
                 winner = color[player.flip()]
@@ -213,135 +243,120 @@ def play_game(config, game_no: int, opening: Opening | None) -> GameResult:
 
                 break
 
-            engines[player].time_manager.apply_increment()
-            command_process(config, engines[player].process,
-                            f"limit time total {int(engines[player].time_manager.total_remaining)}")
+            if isinstance(engines[player].resource, TimeManager):
+                engines[player].resource.apply_increment()
+                command_process(config, engines[player].process,
+                                f"limit time total {int(engines[player].resource.total_remaining)}")
 
             if turn_no >= config.args.draw_in:
                 break
 
             player = player.flip()
 
-        history = command_process(config, engines[Player.A].process, "history")
-        board_str = command_process(config, engines[Player.A].process, "board", println=True)
+        history = command_process(config, engines[Player.BASE].process, "history")
+        board_str = command_process(config, engines[Player.BASE].process, "board")
 
         if board_str is None or history is None:
             raise Exception("board or history response is None")
 
-        for engine in engines.values():
-            engine.process.terminate()
+        prefix = f"{datetime_prefix(config)}{game_prefix(config, game_no)}"
+        if not config.args.concise:
+            print(f"{prefix}Game State:\n{board_str}")
+            print(f"{prefix}Game History: {history}")
+            print(f"{prefix}Game Finished: base={color[Player.BASE]}, target={color[Player.TARGET]}, win={winner}")
 
-        return GameResult(color, winner, history, board_str)
+    duration = timedelta(microseconds=(time.perf_counter_ns() - game_timer) // 1_000)
+
+    if winner is None:
+        return GameSnapshot(winner=None, duration=duration, history=history)
+
+    return GameSnapshot(
+        winner=(Player.BASE if winner == color[Player.BASE] else Player.TARGET, winner),
+        duration=duration, history=history,
+    )
 
 
-def main():
-    default_total_increment_turn = [180_000, 0, 30_000]
+def play_pair(config, opening_no: int, opening: Opening) -> tuple[Opening, list[GameSnapshot], GameResults]:
+    snapshots = []
+    results = {
+        Player.BASE: 0,
+        Player.TARGET: 0,
+        Color.BLACK: 0,
+        Color.WHITE: 0,
+        None: 0,
+    }
 
+    for first_player in Player:
+        game_result = play_game(config, opening_no * 2 + first_player.value, opening)
+
+        if game_result.winner is not None:
+            for player_or_color in game_result.winner:
+                results[player_or_color] += 1
+        else:
+            results[None] += 1
+
+        snapshots.append(game_result)
+
+    return opening, snapshots, results
+
+
+pentanomial_score = {
+    (0, 0, 2): 0,
+    (0, 1, 1): 0.5,
+    (0, 2, 0): 1,
+    (1, 0, 1): 1,
+    (1, 1, 0): 1.5,
+    (2, 0, 0): 2,
+}
+
+
+def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=secrets.randbits(32))
 
-    parser.add_argument("--a-path", type=str, required=True)
-    parser.add_argument("--a-params", type=str, default="")
+    parser.add_argument("--base-path", type=str, required=True)
+    parser.add_argument("--base-params", type=str, default="")
 
-    parser.add_argument("--b-path", type=str, required=True)
-    parser.add_argument("--b-params", type=str, default="")
+    parser.add_argument("--target-path", type=str, required=True)
+    parser.add_argument("--target-params", type=str, default="")
 
-    parser.add_argument("--num-games", type=int, default=100)
-    parser.add_argument("--concurrency", type=int, default=1)
+    parser.add_argument("--max-openings", type=int, default=100)
+    parser.add_argument("--concurrency", type=int, default=2)
 
-    parser.add_argument("--a-time", type=int, nargs=3, default=default_total_increment_turn,
-                        help="total(ms) increment(ms) turn(ms)")
-    parser.add_argument("--b-time", type=int, nargs=3, default=default_total_increment_turn,
-                        help="total(ms) increment(ms) turn(ms)")
+    parser.add_argument("--time", type=int, nargs=3, default=default_time)
+    parser.add_argument("--base-nodes", type=int, default=None)
+    parser.add_argument("--target-nodes", type=int, default=None)
 
-    parser.add_argument("--openings-file", type=str, default=None, help="openings.csv, history on each line")
-
+    parser.add_argument("--openings-file", type=str, required=True)
     parser.add_argument("--draw-in", type=int, default=225)
-
-    parser.add_argument("--a-elo", type=float, default=1000.0)
-    parser.add_argument("--b-elo", type=float, default=1000.0)
-    parser.add_argument("--elo-k-factor", type=float, default=32.0)
 
     parser.add_argument("--concise", action="store_true", default=False)
     parser.add_argument("--no-datetime-prefix", action="store_true", default=False)
     parser.add_argument("--log-prefix-filter", type=str, nargs="*", default=["solution"])
 
-    config = Config(parser.parse_args())
-
-    random.seed(config.args.seed)
-
-    openings = []
-    if config.args.openings_file is not None:
-        with open(config.args.openings_file, "r") as openings_file:
-            openings = [
-                Opening(Color.BLACK if len(opening.split(",")) % 2 == 0 else Color.WHITE, opening)
-                for opening in openings_file.read().strip().splitlines()
-            ]
-
-            random.shuffle(openings)
-            openings = [opening for opening in openings for _ in range(2)]
-
-    elo = {
-        Player.A: config.args.a_elo,
-        Player.B: config.args.b_elo,
-    }
-
-    wins = {
-        Player.A: 0,
-        Player.B: 0,
-        Color.BLACK: 0,
-        Color.WHITE: 0,
-    }
-
-    draws = 0
-
-    completed_games = 0
-
-    with ThreadPoolExecutor(max_workers=max(1, config.args.concurrency)) as executor:
-        futures = {
-            executor.submit(play_game, config, game_no, opening_for(openings, game_no)): game_no
-            for game_no in range(config.args.num_games)
-        }
-
-        for future in as_completed(futures):
-            game_no = futures[future]
-            result = future.result()
-            completed_games += 1
-
-            elo_delta = calculate_elo_delta(
-                elo[Player.A], elo[Player.B],
-                result.win_zero_to_one(Player.A), config.args.elo_k_factor
-            )
-
-            elo[Player.A] += elo_delta
-            elo[Player.B] -= elo_delta
-
-            wins[Player.A] += int(round(result.win_zero_to_one(Player.A)))
-            wins[Player.B] += int(round(result.win_zero_to_one(Player.B)))
-
-            draws = completed_games - wins[Player.A] - wins[Player.B]
-
-            wins[Color.BLACK] += 1 if result.winner == Color.BLACK else 0
-            wins[Color.WHITE] = completed_games - wins[Color.BLACK] - draws
-
-            prefix = f"{datetime_prefix(config)}{game_prefix(config, game_no)}"
-
-            if not config.args.concise:
-                print(f"{prefix}Game State:\n{result.board_str}")
-                print(f"{prefix}Game History: {result.history}")
-
-            print(f"{prefix}Game Finished: a={result.color[Player.A]}, b={result.color[Player.B]}, "
-                  f"win={result.winner}, abd={wins[Player.A]}-{wins[Player.B]}-{draws}, "
-                  f"bwd={wins[Color.BLACK]}-{wins[Color.WHITE]}-{draws}")
-            print(f"{prefix}ELO Updated: a{elo_delta:+}, b{-elo_delta:+}, a={elo[Player.A]}, b={elo[Player.B]}")
-
-    print(
-        f"{datetime_prefix(config)}Arena Finished: a-elo={elo[Player.A]}, b-elo={elo[Player.B]}, "
-        f"abd={wins[Player.A]}-{wins[Player.B]}-{draws}, "
-        f"awr={wins[Player.A] / config.args.num_games * 100.0}%, bwr={wins[Player.B] / config.args.num_games * 100.0}%, "
-        f"bwd={wins[Color.BLACK]}-{wins[Color.WHITE]}-{draws}")
+    return parser
 
 
-if __name__ == "__main__":
-    main()
+def load_openings(config: Config) -> list[Opening]:
+    with open(config.args.openings_file, "r") as openings_file:
+        openings = [
+            Opening(Color.BLACK if len(moves) % 2 == 0 else Color.WHITE, ",".join(moves))
+            for line in openings_file
+            if (moves := re.findall(r"[a-o](?:1[0-5]|[1-9])(?!\d)", line.lower()))
+        ]
+
+    if not openings:
+        raise Exception("openings-file contains no openings")
+
+    rng = random.Random(config.args.seed)
+
+    rng.shuffle(openings)
+
+    if len(openings) < config.args.max_openings:
+        repeats = config.args.max_openings // len(openings)
+        remainder = config.args.max_openings % len(openings)
+        openings = openings * repeats + openings[:remainder]
+        rng.shuffle(openings)
+
+    return openings
