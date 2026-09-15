@@ -1,6 +1,6 @@
 import type { Command, CommandResult, Config, GameState, HashKey, SearchObjective, Timer } from "../../wasm/pkg/rusty_renju_wasm"
 import type { MintakaLaunchResponse, MintakaProvider, MintakaProviderResponse, MintakaProviderRuntimeCommand } from "./mintaka.provider"
-import { duration, InfiniteDuration } from "../mintaka"
+import { timeValue } from "../mintaka"
 import { Mutex } from "../utils/mutex"
 
 export type MintakaWorkerMessage =
@@ -39,16 +39,16 @@ export class MintakaWorkerControl {
 }
 
 export const DefaultWorkerConfig: Config = {
-    max_nodes_in_1k: undefined,
     max_depth: undefined,
     max_quiescence_depth: undefined,
     tt_size: 1024 * 1024 * 128,
     workers: Math.max(1, navigator.hardwareConcurrency - 1),
     pondering: false,
     initial_timer: {
+        time_unit: "Clock",
         total_remaining: undefined,
-        increment: duration(0),
-        turn: duration(5),
+        increment: timeValue(0),
+        turn: timeValue(5),
     },
     spawn_depth_specialist: false,
 }
@@ -60,8 +60,9 @@ export const MaxWorkerConfig: Config = {
     tt_size: 1024 * 1024 * 2048, // 2 GiB
     pondering: true,
     initial_timer: {
+        time_unit: "Clock",
         total_remaining: undefined,
-        increment: InfiniteDuration,
+        increment: timeValue(0),
         turn: undefined,
     },
     spawn_depth_specialist: true,

@@ -232,8 +232,8 @@ impl<const R: RuleKind> GameAgent<R> {
 
         let resource = ComputingResource {
             workers: config.workers,
+            time_unit: timer.time_unit,
             time_limit: time_manager.hard_limit(),
-            nodes_in_1k: config.max_nodes_in_1k,
         };
 
         (resource, time_manager)
@@ -315,7 +315,7 @@ impl<const R: RuleKind> GameAgent<R> {
             best_move: result.best_move(),
             score: result.score,
             selective_depth: result.selective_depth,
-            total_nodes_in_1k: main_td.batch_counter.count_global_in_1k(),
+            total_nodes: main_td.batch_counter.count_global(),
             time_elapsed: started_time.elapsed(),
             pv: result.pv
         }

@@ -187,7 +187,7 @@ impl FromStr for Pos {
                 let raw_col = raw_col as u8 - b'a';
 
                 (raw_col < BOARD_WIDTH)
-                    .then(|| raw_col)
+                    .then_some(raw_col)
                     .ok_or(PosError::OutOfRange)
             })?;
 

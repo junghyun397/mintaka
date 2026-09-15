@@ -1,7 +1,7 @@
 /.idea
 /.venv
 /artifacts
-/arena-artifacts
+/compose-artifacts
 /target
 /sessions
 /temp

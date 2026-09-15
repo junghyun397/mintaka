@@ -3,6 +3,8 @@ use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::score::Score;
 use std::time::Duration;
+use crate::protocol::nodes::Nodes;
+use crate::protocol::time::{TimeUnit, TimeValue};
 use crate::utils::depth::Depth;
 
 #[cfg_attr(feature = "typeshare", typeshare::typeshare)]
@@ -11,8 +13,8 @@ use crate::utils::depth::Depth;
 #[derive(Debug, Copy, Clone)]
 pub struct ComputingResource {
     pub workers: u32,
-    pub time_limit: Option<Duration>,
-    pub nodes_in_1k: Option<u32>,
+    pub time_unit: TimeUnit,
+    pub time_limit: Option<TimeValue>,
 }
 
 #[cfg(feature = "serde")]
@@ -26,7 +28,7 @@ pub enum Response {
         best_move: MaybePos,
         score: Score,
         selective_depth: Depth,
-        total_nodes_in_1k: u32,
+        total_nodes: Nodes,
         pv: PrincipalVariation,
         time_elapsed: Duration,
     },
@@ -41,7 +43,7 @@ pub enum Response {
         best_move: MaybePos,
         score: Score,
         selective_depth: Depth,
-        total_nodes_in_1k: u32,
+        total_nodes: Nodes,
         pv: PrincipalVariation,
         time_elapsed: Duration,
     },

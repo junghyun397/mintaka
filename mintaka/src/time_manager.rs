@@ -1,5 +1,7 @@
 use std::time::Duration;
 use rusty_renju::utils::empty::Empty;
+use crate::batch_counter::BatchCounter;
+use crate::protocol::time::{TimeUnit, TimeValue};
 use crate::protocol::timer::Timer;
 use crate::utils::monotonic_clock::MonotonicClock;
 
@@ -36,19 +38,22 @@ impl TimeFactors {
 enum LimitKind {
     Dynamic {
         factors: TimeFactors,
-        base_soft_limit: Duration,
-        soft_limit: Duration,
-        turn: Duration,
+        base_soft_limit: TimeValue,
+        soft_limit: TimeValue,
+        base_hard_limit: TimeValue,
+        hard_limit: TimeValue,
+        turn: TimeValue,
     },
-    Static,
+    Static {
+        turn: TimeValue,
+    },
     Infinite,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub struct TimeManager<CLK: MonotonicClock> {
     started_time: CLK,
-    base_hard_limit: Duration,
-    hard_limit: Duration,
+    time_unit: TimeUnit,
     limit_kind: LimitKind,
 }
 
@@ -58,32 +63,33 @@ impl<CLK: MonotonicClock> TimeManager<CLK> {
             (None, None, _) => {
                 Self {
                     started_time,
-                    base_hard_limit: Duration::MAX,
-                    hard_limit: Duration::MAX,
+                    time_unit: timer.time_unit,
                     limit_kind: LimitKind::Infinite,
                 }
             },
             (None, Some(turn), _) => {
                 Self {
                     started_time,
-                    base_hard_limit: turn,
-                    hard_limit: turn,
-                    limit_kind: LimitKind::Static,
+                    time_unit: timer.time_unit,
+                    limit_kind: LimitKind::Static {
+                        turn,
+                    },
                 }
             },
             (Some(total_remaining), turn, increment) => {
-                let turn = turn.unwrap_or(Duration::MAX);
+                let turn = turn.unwrap_or(TimeValue::INFINITE);
 
                 let allocation = (total_remaining / 20 + increment / 2).min(turn);
-                let soft_limit = multiply_clamp_duration(&allocation, 0.8, turn);
+                let soft_limit = allocation.multiply_clamp(0.8, turn);
 
                 Self {
                     started_time,
-                    base_hard_limit: allocation,
-                    hard_limit: allocation,
+                    time_unit: timer.time_unit,
                     limit_kind: LimitKind::Dynamic {
                         factors: TimeFactors::empty(),
                         base_soft_limit: soft_limit,
+                        base_hard_limit: allocation,
+                        hard_limit: allocation,
                         soft_limit,
                         turn,
                     },
@@ -93,13 +99,13 @@ impl<CLK: MonotonicClock> TimeManager<CLK> {
     }
 
     pub fn update_fail_low(&mut self) {
-        if let LimitKind::Dynamic { factors, base_soft_limit, soft_limit, turn } = &mut self.limit_kind {
+        if let LimitKind::Dynamic { factors, base_soft_limit, soft_limit, turn, base_hard_limit, hard_limit } = &mut self.limit_kind {
             factors.fail_lows = (factors.fail_lows + 1).min(3);
 
             let multiplier = factors.multiplier();
 
-            *soft_limit = multiply_clamp_duration(base_soft_limit, multiplier, *turn);
-            self.hard_limit = multiply_clamp_duration(&self.base_hard_limit, multiplier, *turn);
+            *soft_limit = base_soft_limit.multiply_clamp(multiplier, *turn);
+            *hard_limit = base_hard_limit.multiply_clamp(multiplier, *turn);
         }
     }
 
@@ -109,15 +115,15 @@ impl<CLK: MonotonicClock> TimeManager<CLK> {
         best_move_changes: u32,
         best_move_search_share: f64,
     ) {
-        if let LimitKind::Dynamic { factors, base_soft_limit, soft_limit, turn } = &mut self.limit_kind {
+        if let LimitKind::Dynamic { factors, base_soft_limit, soft_limit, turn, base_hard_limit, hard_limit } = &mut self.limit_kind {
             factors.forced_move = forced_move;
             factors.best_move_changes = best_move_changes;
             factors.best_move_search_share = best_move_search_share;
 
             let multiplier = factors.multiplier();
 
-            *soft_limit = multiply_clamp_duration(base_soft_limit, multiplier, *turn);
-            self.hard_limit = multiply_clamp_duration(&self.base_hard_limit, multiplier, *turn);
+            *soft_limit = base_soft_limit.multiply_clamp(multiplier, *turn);
+            *hard_limit = base_hard_limit.multiply_clamp(multiplier, *turn);
         }
     }
 
@@ -125,24 +131,36 @@ impl<CLK: MonotonicClock> TimeManager<CLK> {
         self.started_time.elapsed()
     }
 
-    pub fn is_soft_limit_reached(&self) -> bool {
-        if let LimitKind::Dynamic { soft_limit, .. } = self.limit_kind {
-            self.started_time.elapsed() >= soft_limit
-        } else {
-            false
+    fn is_limit_reached(&self, limit: TimeValue, batch_counter: &BatchCounter) -> bool {
+        if self.limit_kind == LimitKind::Infinite {
+            return false;
+        }
+
+        match self.time_unit {
+            TimeUnit::Clock => TimeValue::from_duration(self.started_time.elapsed()) >= limit,
+            TimeUnit::Nodes => TimeValue::from_nodes(batch_counter.count_global()) >= limit,
         }
     }
 
-    pub fn is_hard_limit_reached(&self) -> bool {
-        self.limit_kind != LimitKind::Infinite
-            && self.started_time.elapsed() >= self.hard_limit
+    pub fn is_soft_limit_reached(&self, batch_counter: &BatchCounter) -> bool {
+        let LimitKind::Dynamic { soft_limit, .. } = self.limit_kind else {
+            return false
+        };
+
+        self.is_limit_reached(soft_limit, batch_counter)
     }
 
-    pub fn hard_limit(&self) -> Option<Duration> {
-        (self.limit_kind != LimitKind::Infinite).then(|| self.hard_limit)
+    pub fn is_hard_limit_reached(&self, batch_counter: &BatchCounter) -> bool {
+        self.hard_limit().is_some_and(|limit|
+            self.is_limit_reached(limit, batch_counter)
+        )
     }
-}
 
-fn multiply_clamp_duration(duration: &Duration, factor: f64, max: Duration) -> Duration {
-    Duration::from_millis((duration.as_millis() as f64 * factor) as u64).min(max)
+    pub fn hard_limit(&self) -> Option<TimeValue> {
+        match self.limit_kind {
+            LimitKind::Infinite => None,
+            LimitKind::Static { turn } => Some(turn),
+            LimitKind::Dynamic { hard_limit, .. } => Some(hard_limit),
+        }
+    }
 }

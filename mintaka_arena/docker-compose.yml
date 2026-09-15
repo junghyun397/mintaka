@@ -9,4 +9,4 @@ services:
     ports:
       - ${ADDRESS:-0.0.0.0}:${PORT:-8095}:${PORT:-8095}
     volumes:
-      - ../arena-artifacts:/var/lib/mintaka/artifacts
+      - ../compose-artifacts:/var/lib/mintaka/artifacts

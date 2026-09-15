@@ -5,7 +5,7 @@ import type {
     Health, LaunchSessionRequest, Response as MintakaResponse, SearchObjective, Timer,
 } from "../../wasm/pkg/rusty_renju_wasm"
 import { SERVER_PROTOCOL } from "../config"
-import type { Configs } from "../mintaka"
+import { parseMintakaJson, stringifyMintakaJson, type Configs } from "../mintaka"
 
 export type MintakaServerConfig = {
     readonly address: string,
@@ -50,7 +50,7 @@ export async function createSession(serverConfig: MintakaServerConfig, state: Ga
         headers: {
             "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: stringifyMintakaJson(payload),
     })
 
     await assertResponseOk(response, "Failed to create session")
@@ -84,7 +84,7 @@ export class MintakaServerProvider implements MintakaProvider {
 
         await assertResponseOk(response, "Failed to load session configs")
 
-        return response.json()
+        return parseMintakaJson<Configs>(await response.text())
     }
 
     subscribeResponse(handler: (response: MintakaProviderResponse) => void) {
@@ -235,7 +235,7 @@ export class MintakaServerProvider implements MintakaProvider {
             }
 
             eventSource.addEventListener("Response", (event) => {
-                this.onResponse && this.onResponse(JSON.parse(event.data) as MintakaResponse)
+                this.onResponse && this.onResponse(parseMintakaJson<MintakaResponse>(event.data))
             })
 
             eventSource.addEventListener("BestMove", (event) => {

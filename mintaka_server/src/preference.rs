@@ -1,6 +1,7 @@
-use clap::Parser;
+use argh::FromArgs;
 use mintaka::config::Config;
 use rusty_renju::utils::byte_size::ByteSize;
+use std::str::FromStr;
 
 #[derive(Default, Clone)]
 pub struct TlsConfig {
@@ -9,87 +10,51 @@ pub struct TlsConfig {
     pub observe_sighup: bool,
 }
 
-fn version_str() -> &'static str {
-    Box::leak(
-        format!("rusty-renju={}, mintaka={}, mintaka_server={}",
-            rusty_renju::VERSION,
-            mintaka::VERSION,
-            env!("CARGO_PKG_VERSION")
-        ).into_boxed_str()
-    )
-}
-
-#[derive(Clone, Parser)]
-#[
-    command(version = version_str(), disable_version_flag = true,
-    author = "JeongHyeon Choi",
-    about = "mintaka_server: mintaka web api provider.",
-    long_about = None)
-]
+#[derive(Clone)]
 pub struct Preference {
-    #[arg(long, env = "WEBUI", default_value = "false")]
     pub webui: bool,
-    #[arg(long, default_value = "false")]
     pub open_webui: bool,
-    #[arg(short, env = "ADDRESS", long, default_value = "default")]
     pub address: String,
-    #[arg(short, env = "CORES", default_value_t = num_cpus::get_physical())]
     pub cores: usize,
-    #[arg(short, env = "MEMORY_LIMIT_MIB", long, help = "Total memory limit in MiB")]
-    memory_limit_mib: Option<u64>,
-    #[arg(long, env = "TLS_CERT", requires = "tls_key", help = "TLS certificate file path")]
-    tls_cert: Option<String>,
-    #[arg(long, env = "TLS_KEY", requires = "tls_cert", help = "TLS key file path")]
-    tls_key: Option<String>,
-    #[arg(long, env = "TLS_RENEW", help = "Reload TLS certificate on SIGHUP")]
-    tls_renew: bool,
-    #[arg(short, default_value = "sessions", help = "Session storage directory")]
     pub sessions_directory: String,
-    #[arg(long, env = "API_PASSWORD", default_value = None)]
     pub api_password: Option<String>,
-    #[clap(skip = ByteSize::from_kib(32))]
     pub memory_limit: ByteSize,
-    #[clap(skip)]
     pub tls_config: Option<TlsConfig>,
-    #[clap(skip)]
     pub default_config: Config,
-    #[clap(skip)]
     pub max_config: Option<Config>
 }
 
+#[derive(FromArgs)]
+#[argh(description = "mintaka web API provider", help_triggers("-h", "--help"))]
+struct Args {
+    #[argh(switch, description = "serve the web UI [env: WEBUI]")]
+    webui: Option<bool>,
+    #[argh(switch, description = "open the web UI in a browser")]
+    open_webui: bool,
+    #[argh(option, short = 'a', description = "listen address [env: ADDRESS]")]
+    address: Option<String>,
+    #[argh(option, short = 'c', description = "number of CPU cores [env: CORES]")]
+    cores: Option<usize>,
+    #[argh(option, short = 'm', description = "total memory limit in MiB [env: MEMORY_LIMIT_MIB]")]
+    memory_limit_mib: Option<u64>,
+    #[argh(option, description = "TLS certificate file path [env: TLS_CERT]")]
+    tls_cert: Option<String>,
+    #[argh(option, description = "TLS key file path [env: TLS_KEY]")]
+    tls_key: Option<String>,
+    #[argh(switch, description = "reload TLS certificate on SIGHUP [env: TLS_RENEW]")]
+    tls_renew: Option<bool>,
+    #[argh(option, short = 's', default = "String::from(\"sessions\")", description = "session storage directory")]
+    sessions_directory: String,
+    #[argh(option, description = "password required to create sessions [env: API_PASSWORD]")]
+    api_password: Option<String>,
+}
+
 impl Preference {
-
     pub fn parse() -> Self {
-        let mut pref = Self::parse_from(std::env::args());
-
-        pref.init();
-
-        pref
-    }
-
-    fn init(&mut self) {
-        self.memory_limit = self.memory_limit_mib
-            .map(ByteSize::from_mib)
-            .unwrap_or(ByteSize::from_mib(4096));
-
-        if &self.address == "default" {
-            if self.tls_cert.is_some() {
-                self.address = "127.0.0.1:8445".to_string();
-            } else {
-                self.address = "127.0.0.1:8085".to_string();
-            }
-        }
-
-        if let Some(cert_path) = &self.tls_cert && let Some(key_path) = &self.tls_key {
-            self.tls_config = Some(TlsConfig {
-                cert_path: cert_path.clone(),
-                key_path: key_path.clone(),
-                observe_sighup: self.tls_renew,
-            });
-        }
-
-        self.max_config = Self::parse_config("max_config.toml");
-        self.default_config = Self::parse_config("default_config.toml").unwrap_or(Config::default());
+        argh::from_env::<Args>().try_into().unwrap_or_else(|error| {
+            eprintln!("{error}\nRun --help for more information.");
+            std::process::exit(1);
+        })
     }
 
     fn parse_config(path: &str) -> Option<Config> {
@@ -97,5 +62,52 @@ impl Preference {
             .ok()
             .and_then(|str| toml::from_str(&str).ok())
     }
+}
 
+impl TryFrom<Args> for Preference {
+    type Error = String;
+
+    fn try_from(args: Args) -> Result<Self, Self::Error> {
+        let tls_cert = option_or_env(args.tls_cert, "TLS_CERT");
+        let tls_key = option_or_env(args.tls_key, "TLS_KEY");
+        let tls_renew = option_or_env(args.tls_renew, "TLS_RENEW").unwrap_or(false);
+
+        let tls_config = match (tls_cert, tls_key) {
+            (Some(cert_path), Some(key_path)) => Some(
+                TlsConfig { cert_path, key_path, observe_sighup: tls_renew }
+            ),
+            (None, None) => None,
+            _ => return Err("specific --tls-cert and --tls-key together".to_string()),
+        };
+
+        let address = option_or_env(args.address, "ADDRESS")
+            .filter(|address| address != "default")
+            .unwrap_or_else(|| if tls_config.is_some() {
+                "0.0.0.0:8445".to_string()
+            } else {
+                "0.0.0.0:8085".to_string()
+            });
+
+        Ok(Self {
+            webui: option_or_env(args.webui, "WEBUI").unwrap_or(false),
+            open_webui: args.open_webui,
+            address,
+            cores: option_or_env(args.cores, "CORES").unwrap_or_else(num_cpus::get_physical),
+            sessions_directory: args.sessions_directory,
+            api_password: option_or_env(args.api_password, "API_PASSWORD"),
+            memory_limit: option_or_env(args.memory_limit_mib, "MEMORY_LIMIT_MIB")
+                .map(ByteSize::from_mib)
+                .unwrap_or(ByteSize::from_mib(4096)),
+            tls_config,
+            default_config: Self::parse_config("default_config.toml").unwrap_or_default(),
+            max_config: Self::parse_config("max_config.toml"),
+        })
+    }
+}
+
+fn option_or_env<T: FromStr>(option: Option<T>, name: &str) -> Option<T> {
+    option.or_else(|| {
+        std::env::var(name).ok()?
+            .parse().ok()
+    })
 }

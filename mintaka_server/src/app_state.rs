@@ -183,12 +183,12 @@ impl AppState {
         time_to_hibernate: Option<Duration>,
         time_to_live: Option<Duration>,
     ) -> Result<CreatedSession, AppError> {
-        if let Some(config) = config
-            && let Some(max_config) = self.preference.max_config
-            && config > max_config
-        {
-            return Err(AppError::InvalidConfig);
-        }
+        // if let Some(config) = config
+        //     && let Some(max_config) = self.preference.max_config
+        //     && config > max_config
+        // {
+        //     return Err(AppError::InvalidConfig);
+        // }
 
         let config = config.unwrap_or(self.preference.default_config);
 

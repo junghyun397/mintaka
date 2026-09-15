@@ -4,8 +4,8 @@ version = "0.9.0"
 edition = "2024"
 
 [features]
-clap = ["dep:clap"]
-text-protocol = ["clap"]
+argh = ["dep:argh"]
+text-protocol = ["argh"]
 default = []
 
 [[bin]]
@@ -38,4 +38,4 @@ required-features = ["text-protocol"]
 [dependencies]
 rusty_renju = { path = "../rusty_renju" }
 mintaka = { path = "../mintaka" }
-clap = { version = "4.6", features = ["derive"], optional = true }
+argh = { version = "0.1", default-features = false, features = ["help"], optional = true }

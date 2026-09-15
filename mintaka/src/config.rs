@@ -1,9 +1,8 @@
 use crate::protocol::timer::Timer;
-use rusty_renju::utils::byte_size::ByteSize;
-use std::cmp::Ordering;
-use std::fmt::Display;
-use std::time::Duration;
 use crate::utils::depth::Depth;
+use rusty_renju::utils::byte_size::ByteSize;
+use std::fmt::Display;
+use crate::protocol::time::TimeUnit;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
@@ -20,7 +19,6 @@ pub enum SearchObjective {
 pub struct Config {
     pub draw_condition: Option<u32>,
 
-    pub max_nodes_in_1k: Option<u32>,
     pub max_depth: Option<Depth>,
     pub max_quiescence_depth: Option<Depth>,
 
@@ -37,61 +35,26 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             draw_condition: None,
-            max_nodes_in_1k: None,
             max_depth: None,
             max_quiescence_depth: None,
             tt_size: ByteSize::from_mib(128),
             workers: 1,
             pondering: false,
-            initial_timer: Timer::default(),
+            initial_timer: Timer::infinite(TimeUnit::Clock),
             spawn_depth_specialist: false,
         }
-    }
-}
-
-impl PartialOrd<Self> for Config {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Config {
-    fn cmp(&self, other: &Self) -> Ordering {
-        (
-            self.max_nodes_in_1k,
-            self.max_depth,
-            self.max_quiescence_depth,
-            self.tt_size,
-            self.workers,
-            self.pondering,
-            self.initial_timer,
-        )
-            .cmp(&(
-                other.max_nodes_in_1k,
-                other.max_depth,
-                other.max_quiescence_depth,
-                other.tt_size,
-                other.workers,
-                other.pondering,
-                other.initial_timer,
-            ))
     }
 }
 
 impl Config {
     pub const UNLIMITED_CONFIG: Self = Self {
         draw_condition: None,
-        max_nodes_in_1k: None,
         max_depth: None,
         max_quiescence_depth: None,
         tt_size: ByteSize::from_mib(1024 * 1024 * 1024),
         workers: 2048,
         pondering: true,
-        initial_timer: Timer {
-            total_remaining: None,
-            increment: Duration::from_secs(u32::MAX as u64),
-            turn: None,
-        },
+        initial_timer: Timer::infinite(TimeUnit::Clock),
         spawn_depth_specialist: true,
     };
 

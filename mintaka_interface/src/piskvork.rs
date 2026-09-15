@@ -1,3 +1,4 @@
+use std::convert::Into;
 use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::protocol::command::Command;
@@ -13,6 +14,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 use mintaka::game_state::GameState;
+use mintaka::protocol::time::{TimeUnit, TimeValue};
 use mintaka::protocol::timer::Timer;
 use rusty_renju::notation::color::Color;
 use rusty_renju::utils::empty::Empty;
@@ -21,7 +23,7 @@ pub fn entry<const R: RuleKind>() -> Result<(), impl Error> {
     piskvork_protocol::<R>()
 }
 
-const PROTOCOL_MARGIN: Duration = Duration::from_millis(30);
+const PROTOCOL_MARGIN: TimeValue = TimeValue::from_duration(Duration::from_millis(30));
 
 enum PiskvorkResponse {
     Message(String),
@@ -71,11 +73,11 @@ fn stdio_out(piskvork_response: Result<PiskvorkResponse, String>) {
 
 fn print_response(response: Response) {
     let response = match response {
-        Response::Begins(ComputingResource { workers, time_limit, nodes_in_1k }) =>
+        Response::Begins(ComputingResource { workers, time_unit, time_limit }) =>
             format!(
-                "begins workers={workers}, running-time={time_limit:?}, nodes={nodes_in_1k:?}k"
+                "begins workers={workers}, time-unit={time_unit}, running-budget={time_limit:?}"
             ),
-        Response::Status { best_move, score, pv, total_nodes_in_1k, selective_depth, .. } =>
+        Response::Status { best_move, score, pv, total_nodes: total_nodes_in_1k, selective_depth, .. } =>
             format!(
                 "status score={score}, \
                 best-move={best_move:?}, \
@@ -91,15 +93,11 @@ fn print_response(response: Response) {
 fn piskvork_protocol<const R: RuleKind>() -> Result<(), impl Error> {
     let aborted = Arc::new(AtomicBool::new(false));
 
-    let mut config = Presets::FASTGAME_PRESET;
+    let mut config = Presets::FASTGAME;
 
     let mut game_agent = GameAgent::<R>::new(config);
 
-    let mut timer = Timer {
-        total_remaining: Some(Duration::from_secs(180)),
-        increment: Duration::ZERO,
-        turn: Some(Duration::from_secs(30)),
-    };
+    let mut timer = config.initial_timer;
 
     let (message_sender, message_receiver) = {
         let (tx, rx) = mpsc::channel();
@@ -152,9 +150,6 @@ fn piskvork_protocol<const R: RuleKind>() -> Result<(), impl Error> {
             Message::Config(ConfigCommand::TurnTime(turn)) => {
                 config.initial_timer.turn = Some(turn);
                 timer.turn = Some(turn)
-            }
-            Message::Config(ConfigCommand::MaxNodes { in_1k }) => {
-                config.max_nodes_in_1k = Some(in_1k);
             }
             Message::Config(ConfigCommand::Workers(workers)) => {
                 config.workers = workers;
@@ -410,20 +405,19 @@ fn parse_pos(x: &str, y: &str) -> Result<Pos, &'static str> {
     }
 }
 
-fn parse_time(parameters: &Vec<&str>) -> Result<Duration, &'static str> {
+fn parse_time(parameters: &Vec<&str>) -> Result<TimeValue, &'static str> {
     parameters
         .get(2)
         .ok_or("missing info value.")
         .and_then(|token| token.parse::<u64>().map_err(|_| "time parsing failed."))
-        .map(Duration::from_millis)
+        .map(|value| TimeValue::from_value(value, TimeUnit::Clock))
 }
 
 struct Presets;
 
 impl Presets {
-    const FASTGAME_PRESET: Config = Config {
+    const FASTGAME: Config = Config {
         draw_condition: None,
-        max_nodes_in_1k: None,
         max_depth: None,
         max_quiescence_depth: None,
 
@@ -431,16 +425,16 @@ impl Presets {
         workers: 1,
         pondering: false,
         initial_timer: Timer {
-            total_remaining: Some(Duration::from_secs(120)),
-            increment: Duration::ZERO,
-            turn: Some(Duration::from_secs(5)),
+            time_unit: TimeUnit::Clock,
+            total_remaining: Some(TimeValue::from_duration(Duration::from_secs(120))),
+            increment: TimeValue::ZERO,
+            turn: Some(TimeValue::from_duration(Duration::from_secs(5))),
         },
         spawn_depth_specialist: false,
     };
 
-    const STANDARD_PRESET: Config = Config {
+    const STANDARD: Config = Config {
         draw_condition: None,
-        max_nodes_in_1k: None,
         max_depth: None,
         max_quiescence_depth: None,
 
@@ -448,16 +442,16 @@ impl Presets {
         workers: 1,
         pondering: false,
         initial_timer: Timer {
-            total_remaining: Some(Duration::from_secs(180)),
-            increment: Duration::ZERO,
-            turn: Some(Duration::from_secs(30)),
+            time_unit: TimeUnit::Clock,
+            total_remaining: Some(TimeValue::from_duration(Duration::from_secs(180))),
+            increment: TimeValue::ZERO,
+            turn: Some(TimeValue::from_duration(Duration::from_secs(30))),
         },
         spawn_depth_specialist: false,
     };
 
-    const FINAL_PRESET: Config = Config {
+    const FINAL: Config = Config {
         draw_condition: None,
-        max_nodes_in_1k: None,
         max_depth: None,
         max_quiescence_depth: None,
 
@@ -465,9 +459,10 @@ impl Presets {
         workers: 1,
         pondering: false,
         initial_timer: Timer {
-            total_remaining: Some(Duration::from_secs(1000)),
-            increment: Duration::ZERO,
-            turn: Some(Duration::from_secs(300)),
+            time_unit: TimeUnit::Clock,
+            total_remaining: Some(TimeValue::from_duration(Duration::from_secs(1000))),
+            increment: TimeValue::ZERO,
+            turn: Some(TimeValue::from_duration(Duration::from_secs(300))),
         },
         spawn_depth_specialist: false,
     };

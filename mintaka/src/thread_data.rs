@@ -13,6 +13,7 @@ use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{MaybeScore, Score};
 use rusty_renju::notation::pos;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use crate::protocol::nodes::Nodes;
 
 pub const KILLER_MOVE_SLOTS: usize = 2;
 
@@ -71,7 +72,7 @@ pub struct ThreadData<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> {
 
     pub lmr_table: Box<[[Depth; depth::MAX_PLY_SLOTS]; 64]>,
 
-    pub root_moves_in_1k: [u32; pos::BOARD_SIZE],
+    pub root_nodes: [Nodes; pos::BOARD_SIZE],
     pub singular_root: bool,
 
     pub batch_counter: BatchCounter<'a>,
@@ -105,7 +106,7 @@ impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, T
             killers: Box::new([[MaybePos::NONE; 2]; depth::MAX_PLY_SLOTS]),
             lmr_table: Box::new(build_lmr_table(config)),
             debug_statics: Box::new([DebugStatics::EMPTY; depth::MAX_PLY_SLOTS]),
-            root_moves_in_1k: [0; pos::BOARD_SIZE],
+            root_nodes: [Nodes::ZERO; pos::BOARD_SIZE],
             singular_root: false,
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
@@ -119,10 +120,7 @@ impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, T
     }
 
     pub fn search_limit_exceeded(&self) -> bool {
-        self.thread_type.time_manager().is_hard_limit_reached()
-            || self.config.max_nodes_in_1k.is_some_and(|in_1k|
-                self.batch_counter.count_global_in_1k() >= in_1k
-            )
+        self.thread_type.time_manager().is_hard_limit_reached(&self.batch_counter)
     }
 
     pub fn set_aborted(&self) {

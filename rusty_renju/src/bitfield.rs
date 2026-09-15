@@ -140,22 +140,6 @@ impl Bitfield {
     fn to_simd(self) -> Simd<u64, 4> {
         Simd::<u64, 4>::from_array(self.0)
     }
-
-    pub fn from_bytes(bytes: [u8; 32]) -> Self {
-        let mut chunks = [0; 4];
-        for (chunk, bytes) in chunks.iter_mut().zip(bytes.chunks_exact(8)) {
-            *chunk = u64::from_le_bytes(bytes.try_into().unwrap());
-        }
-        Self(chunks)
-    }
-
-    pub fn to_bytes(self) -> [u8; 32] {
-        let mut bytes = [0; 32];
-        for (bytes, chunk) in bytes.chunks_exact_mut(8).zip(self.0) {
-            bytes.copy_from_slice(&chunk.to_le_bytes());
-        }
-        bytes
-    }
 }
 
 pub const fn build_imprint_mask_lut<const N: usize>(pattern: [u16; N]) -> [Bitfield; pos::BOARD_SIZE] {
@@ -326,10 +310,12 @@ impl_debug_from_display!(Bitfield);
 #[cfg(feature = "serde")]
 impl serde::Serialize for Bitfield {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+        let bytes = self.0.map(u64::to_be_bytes);
+
         if serializer.is_human_readable() {
-            serializer.serialize_str(&general_purpose::URL_SAFE_NO_PAD.encode(self.to_bytes()))
+            serializer.serialize_str(&general_purpose::URL_SAFE_NO_PAD.encode(bytes.as_flattened()))
         } else {
-            serializer.serialize_bytes(&self.to_bytes())
+            serializer.serialize_bytes(bytes.as_flattened())
         }
     }
 }
@@ -337,7 +323,7 @@ impl serde::Serialize for Bitfield {
 #[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for Bitfield {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
-        if deserializer.is_human_readable() {
+        let bytes: [u8; 32] = if deserializer.is_human_readable() {
             general_purpose::URL_SAFE_NO_PAD.decode(&String::deserialize(deserializer)?)
                 .map_err(serde::de::Error::custom)?
         } else {
@@ -345,8 +331,10 @@ impl<'de> serde::Deserialize<'de> for Bitfield {
                 .map_err(serde::de::Error::custom)?
         }
             .try_into()
-            .map_err(|_| serde::de::Error::custom("invalid bitfield binary"))
-            .map(Self::from_bytes)
+            .map_err(|_| serde::de::Error::custom("invalid bitfield binary"))?;
 
+        Ok(Self(std::array::from_fn(|idx| {
+            u64::from_be_bytes(bytes[idx * 8..idx * 8 + 8].try_into().unwrap())
+        })))
     }
 }

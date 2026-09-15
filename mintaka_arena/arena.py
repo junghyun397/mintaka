@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import copy
 import random
@@ -13,8 +15,8 @@ from enum import Enum
 
 
 class Color(Enum):
-    BLACK = 0
-    WHITE = 1
+    BLACK = "Black"
+    WHITE = "White"
 
     def flip(self) -> 'Color':
         return Color.BLACK if self == Color.WHITE else Color.WHITE
@@ -24,8 +26,8 @@ class Color(Enum):
 
 
 class Player(Enum):
-    BASE = 0
-    TARGET = 1
+    BASE = "Base"
+    TARGET = "Target"
 
     def flip(self) -> 'Player':
         return Player.TARGET if self == Player.BASE else Player.BASE
@@ -34,17 +36,13 @@ class Player(Enum):
         return self.name.lower()
 
 
-def time_manager_or_nodes(time, nodes) -> TimeManager | int:
-    if nodes is not None:
-        return nodes
-    else:
-        return TimeManager(
-            total_remaining=time[0], increment=time[1], turn=time[2]
-        )
+class TimeUnit(Enum):
+    CLOCK = "Clock"
+    NODES = "Nodes"
 
 
 GAME_SETTINGS = (
-    "base_params", "target_params", "time", "base_nodes", "target_nodes", "draw_in",
+    "base_params", "target_params", "time_unit", "time", "draw_in",
     "max_openings", "concise", "no_datetime_prefix", "log_prefix_filter",
 )
 
@@ -54,12 +52,16 @@ class Config:
         self.args = args
 
         self.path_params_resource = {
-            Player.BASE: (self.args.base_path, self.args.base_params, time_manager_or_nodes(
-                self.args.time, self.args.base_nodes
-            )),
-            Player.TARGET: (self.args.target_path, self.args.target_params, time_manager_or_nodes(
-                self.args.time, self.args.target_nodes
-            )),
+            player: (path, params, TimeManager(
+                time_unit=TimeUnit(self.args.time_unit),
+                total_remaining=self.args.time[0] or None,
+                increment=self.args.time[1],
+                turn=self.args.time[2] or None,
+            ))
+            for player, path, params in (
+                (Player.BASE, self.args.base_path, self.args.base_params),
+                (Player.TARGET, self.args.target_path, self.args.target_params),
+            )
         }
 
 
@@ -78,15 +80,18 @@ class Opening:
 
 @dataclass
 class TimeManager:
-    total_remaining: int
+    time_unit: TimeUnit
+    total_remaining: int | None
     increment: int
-    turn: int
+    turn: int | None
 
     def apply_increment(self):
-        self.total_remaining += self.increment
+        if self.total_remaining is not None:
+            self.total_remaining += self.increment
 
     def consume(self, running_time):
-        self.total_remaining = max(0, self.total_remaining - running_time)
+        if self.total_remaining is not None:
+            self.total_remaining = max(0, self.total_remaining - running_time)
 
 
 @dataclass
@@ -144,7 +149,7 @@ def color_wdl(result: GameResults) -> tuple[int, int, int]:
 @dataclass
 class Engine:
     process: subprocess.Popen
-    resource: TimeManager | int
+    resource: TimeManager
 
 
 def datetime_prefix(config) -> str:
@@ -170,11 +175,13 @@ def snapshot_display(opening: Opening, snapshots: list[GameSnapshot]) -> str:
     )
 
 
-def spawn_process(path, params, resource: TimeManager | int, opening: Opening) -> subprocess.Popen:
-    if isinstance(resource, TimeManager):
-        resource_param = ["--time", str(resource.total_remaining), str(resource.increment), str(resource.turn)]
-    else:
-        resource_param = ["--nodes-in-1k", str(resource)]
+def spawn_process(path, params, resource: TimeManager, opening: Opening) -> subprocess.Popen:
+    resource_param = [
+        "--unit", resource.time_unit.value,
+        "--time-total", str(resource.total_remaining or 0),
+        "--time-increment", str(resource.increment),
+        "--time-turn", str(resource.turn or 0),
+    ]
 
     return subprocess.Popen(
         [path]
@@ -190,7 +197,10 @@ def spawn_process(path, params, resource: TimeManager | int, opening: Opening) -
     )
 
 
-def command_process(config, process, command, filter_prefix: list[str] | None = None, println_prefix: str = "") -> str | None:
+def command_process(
+        config, process, command,
+        filter_prefix: list[str] | None = None, println_prefix: str = "", logs: list[str] | None = None,
+) -> str | None:
     process.stdin.write(f"{command}\n")
     process.stdin.flush()
 
@@ -220,6 +230,9 @@ def command_process(config, process, command, filter_prefix: list[str] | None = 
 
         if response.startswith("="):
             return response[2:]
+
+        if response.startswith("%") and logs is not None:
+            logs.append(response[2:])
 
         if (not config.args.concise
                 and response.startswith("%")
@@ -253,19 +266,30 @@ def play_game(config, game_no: int, opening: Opening) -> GameSnapshot:
 
         while True:
             turn_no += 1
+            logs = []
             timer = time.perf_counter_ns()
 
             move = command_process(
                 config,
                 engines[player].process, "gen",
                 filter_prefix=config.args.log_prefix_filter,
-                println_prefix=f"{game_prefix(config, game_no)}{turn_prefix(turn_no, player, color[player])}"
+                println_prefix=f"{game_prefix(config, game_no)}{turn_prefix(turn_no, player, color[player])}",
+                logs=logs,
             )
 
-            time_elapsed = int((time.perf_counter_ns() - timer) / 1_000_000)
+            time_elapsed = (time.perf_counter_ns() - timer) // 1_000_000
 
-            if isinstance(engines[player].resource, TimeManager):
-                engines[player].resource.consume(time_elapsed)
+            resource = engines[player].resource
+            if resource.time_unit == TimeUnit.CLOCK:
+                resource.consume(time_elapsed)
+            elif resource.total_remaining is not None:
+                nodes = next((
+                    match for log in reversed(logs)
+                    if (match := re.search(r"^solution:.*\bnodes=(\d+)[Kk](?:,|$)", log))
+                ), None)
+                if nodes is None:
+                    raise RuntimeError("engine did not report searched nodes")
+                resource.consume(int(nodes[1]))
 
             if move == "none":
                 winner = color[player.flip()]
@@ -285,10 +309,9 @@ def play_game(config, game_no: int, opening: Opening) -> GameSnapshot:
 
                 break
 
-            if isinstance(engines[player].resource, TimeManager):
-                engines[player].resource.apply_increment()
-                command_process(config, engines[player].process,
-                                f"limit time total {int(engines[player].resource.total_remaining)}")
+            if resource.total_remaining is not None:
+                resource.apply_increment()
+                command_process(config, engines[player].process, f"limit time total {resource.total_remaining}")
 
             if turn_no >= config.args.draw_in:
                 break
@@ -320,9 +343,10 @@ def play_game(config, game_no: int, opening: Opening) -> GameSnapshot:
 
 def play_pair(config, opening_no: int, opening: Opening) -> PairResult:
     snapshots = [
-        play_game(config, opening_no * 2 + first_player.value, opening)
+        play_game(config, opening_no * 2 + 0 if first_player.value == Player.BASE else 1, opening)
         for first_player in Player
     ]
+
     return PairResult(opening, snapshots, game_results(snapshots))
 
 
@@ -375,9 +399,8 @@ def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
     parser.add_argument("--max-openings", type=int, default=100)
     parser.add_argument("--concurrency", type=int, default=2)
 
-    parser.add_argument("--time", type=int, nargs=3, default=default_time)
-    parser.add_argument("--base-nodes", type=int, default=None)
-    parser.add_argument("--target-nodes", type=int, default=None)
+    parser.add_argument("--time-unit", type=str, choices=[unit.value for unit in TimeUnit], default="Clock")
+    parser.add_argument("--time", type=int, nargs=3, default=default_time, metavar=("TOTAL", "INCREMENT", "TURN"))
 
     parser.add_argument("--openings-file", type=str, required=True)
     parser.add_argument("--draw-in", type=int, default=225)

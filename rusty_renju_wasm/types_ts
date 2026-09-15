@@ -4,6 +4,8 @@
 
 export type Bitfield = string;
 
+export type RuleKind = string;
+
 export type HashKey = string;
 
 export type ColorContainer<T> = [T, T];
@@ -40,12 +42,20 @@ export type Score = number;
 
 export type ThreatSearchKind = string;
 
+export type TimeUnit = string;
+
+export type TimeValue = BigInt;
+
+export interface Nodes {
+	in_1k: number;
+}
+
 export interface BestMove {
 	position_hash: HashKey;
 	best_move: MaybePos;
 	score: Score;
 	selective_depth: Depth;
-	total_nodes_in_1k: number;
+	total_nodes: Nodes;
 	pv: PrincipalVariation;
 	time_elapsed: Duration;
 }
@@ -79,19 +89,19 @@ export interface CommandResult {
 
 export interface ComputingResource {
 	workers: number;
-	time_limit?: Duration;
-	nodes_in_1k?: number;
+	time_unit: TimeUnit;
+	time_limit?: TimeValue;
 }
 
 export interface Timer {
-	total_remaining?: Duration;
-	increment: Duration;
-	turn?: Duration;
+	time_unit: TimeUnit;
+	total_remaining?: TimeValue;
+	increment: TimeValue;
+	turn?: TimeValue;
 }
 
 export interface Config {
 	draw_condition?: number;
-	max_nodes_in_1k?: number;
 	max_depth?: Depth;
 	max_quiescence_depth?: Depth;
 	tt_size: ByteSize;
@@ -158,7 +168,7 @@ export type Response =
 	best_move: MaybePos;
 	score: Score;
 	selective_depth: Depth;
-	total_nodes_in_1k: number;
+	total_nodes: Nodes;
 	pv: PrincipalVariation;
 	time_elapsed: Duration;
 }};

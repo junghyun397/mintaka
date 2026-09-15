@@ -111,7 +111,7 @@ impl<const R: RuleKind> Board<R> {
 
         self.render_with_attributes(
             |pos, &item| board_iter_item_to_symbol(self, pos, item),
-            |iter_pos, _| (iter_pos == pos).then(|| (false, MARKER))
+            |iter_pos, _| (iter_pos == pos).then_some((false, MARKER))
         )
     }
 

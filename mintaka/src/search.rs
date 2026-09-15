@@ -102,7 +102,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
                 best_move: result.best_move(),
                 score: result.score,
                 pv: result.pv,
-                total_nodes_in_1k: td.batch_counter.count_global_in_1k(),
+                total_nodes: td.batch_counter.count_global(),
                 time_elapsed: td.thread_type.time_manager().elapsed(),
                 selective_depth: result.selective_depth,
             })
@@ -123,7 +123,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
         if TH::IS_MAIN {
             let best_move_search_share = result.best_move().ok()
                 .map(|pos|
-                    td.root_moves_in_1k[pos.idx_usize()] as f64 / td.batch_counter.count_local_in_1k().max(1) as f64
+                    td.root_nodes[pos.idx_usize()].in_1k as f64 / td.batch_counter.count_local().in_1k.max(1) as f64
                 )
                 .unwrap_or(0.0);
 
@@ -135,7 +135,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
         }
 
         if TH::IS_MAIN
-            && td.thread_type.time_manager().is_soft_limit_reached()
+            && td.thread_type.time_manager().is_soft_limit_reached(&td.batch_counter)
         {
             break 'iterative_deepening;
         }
@@ -500,7 +500,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         let new_depth = (new_full_depth - reduction).clamp_value(new_full_depth);
 
-        let nodes_before = td.batch_counter.count_local_in_1k();
+        let nodes_before = td.batch_counter.count_local();
 
         searched_moves += 1;
 
@@ -531,7 +531,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         };
 
         if NT::IS_ROOT {
-            td.root_moves_in_1k[pos.idx_usize()] += td.batch_counter.count_local_in_1k() - nodes_before;
+            td.root_nodes[pos.idx_usize()] += td.batch_counter.count_local() - nodes_before;
         }
 
         td.pop_ply();

@@ -4,7 +4,7 @@ import { unwrap } from "solid-js/store"
 import type { Config } from "rusty-renju-web/rusty-renju"
 import { flatmap } from "../utils/undefined"
 import { SERVER_PROTOCOL, SERVER_URL, WEB_WORKER_READY } from "rusty-renju-web/config"
-import { duration, formatNodes, nps } from "rusty-renju-web/mintaka"
+import { formatNodes, nps, timeValue, timeValueSeconds } from "rusty-renju-web/mintaka"
 import { checkHealth, type MintakaServerConfig } from "rusty-renju-web/provider/mintaka.server.provider"
 import { Modal, type ModalControlProps } from "./Modal"
 
@@ -209,14 +209,15 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                         ...config,
                         initial_timer: {
                             ...config.initial_timer,
-                            total_remaining: flatmap(value, valid => duration(valid)),
+                            time_unit: "Clock",
+                            total_remaining: flatmap(value, timeValue),
                         },
                     }
                 }}
-                value={props.config.initial_timer.total_remaining?.secs}
+                value={flatmap(props.config.initial_timer.total_remaining, timeValueSeconds)}
                 optional
                 placeholder="unlimited"
-                max={props.maxConfig.initial_timer.total_remaining?.secs}
+                max={flatmap(props.maxConfig.initial_timer.total_remaining, timeValueSeconds)}
                 scale={1}
                 legend="Total Time" label="seconds"
                 description="Default time limit."
@@ -228,13 +229,14 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                         ...config,
                         initial_timer: {
                             ...config.initial_timer,
-                            increment: duration(value),
+                            time_unit: "Clock",
+                            increment: timeValue(value),
                         },
                     }
                 }}
-                value={props.config.initial_timer.increment.secs}
+                value={timeValueSeconds(props.config.initial_timer.increment)}
                 min={0}
-                max={props.maxConfig.initial_timer.increment.secs}
+                max={timeValueSeconds(props.maxConfig.initial_timer.increment)}
                 scale={1}
                 legend="Increment Time" label="seconds"
                 description="Time added after each move."
@@ -246,14 +248,15 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                         ...config,
                         initial_timer: {
                             ...config.initial_timer,
-                            turn: flatmap(value, valid => duration(valid)),
+                            time_unit: "Clock",
+                            turn: flatmap(value, timeValue),
                         },
                     }
                 }}
-                value={props.config.initial_timer.turn?.secs}
+                value={flatmap(props.config.initial_timer.turn, timeValueSeconds)}
                 optional
                 placeholder="unlimited"
-                max={props.maxConfig.initial_timer.turn?.secs}
+                max={flatmap(props.maxConfig.initial_timer.turn, timeValueSeconds)}
                 scale={1}
                 legend="Max Turn Time" label="seconds"
                 description="Maximum time for each move."
@@ -261,16 +264,6 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
         </div>
         <div>
             <h3 class="text font-bold">Search Limits</h3>
-            <NumericConfigSection
-                produce={value => ({ ...unwrap(props.config), max_nodes_in_1k: value })}
-                value={props.config.max_nodes_in_1k}
-                optional
-                placeholder="unlimited"
-                scale={1000}
-                max={props.maxConfig.max_nodes_in_1k}
-                legend="Node Limit" label="×1000 nodes"
-                description="Maximum reachable nodes. Specify when maintaining a constant level regardless of time or hardware."
-            />
             <NumericConfigSection
                 produce={value => ({ ...unwrap(props.config), max_depth: value })}
                 value={props.config.max_depth}

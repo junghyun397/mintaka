@@ -18,11 +18,13 @@ use rusty_renju::utils::empty::Empty;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::time::{Duration, Instant};
+use crate::protocol::nodes::Nodes;
+use crate::protocol::time::TimeUnit;
 
 pub struct EndgameSolution {
     pub sequence: Option<Vec<Pos>>,
     pub elapsed: Duration,
-    pub nodes: u32,
+    pub nodes: Nodes,
 }
 
 pub fn solve_endgame<const R: RuleKind>(
@@ -34,13 +36,12 @@ pub fn solve_endgame<const R: RuleKind>(
 ) -> EndgameSolution {
     let config = Config {
         draw_condition: None,
-        max_nodes_in_1k: None,
         max_depth: None,
         max_quiescence_depth: depth_limit,
         tt_size: ByteSize::from_mib(1),
         workers: 1,
         pondering: false,
-        initial_timer: Timer::INFINITE,
+        initial_timer: Timer::infinite(TimeUnit::Nodes),
         spawn_depth_specialist: false,
     };
     
@@ -54,7 +55,7 @@ pub fn solve_endgame<const R: RuleKind>(
     let mut td = ThreadData::new(
         MainThread::new(
             NullResponseSender,
-            TimeManager::init(Timer::INFINITE, start_time)
+            TimeManager::init(config.initial_timer, start_time)
         ), 0,
         SearchObjective::Best, config,
         evaluator,
@@ -72,5 +73,5 @@ pub fn solve_endgame<const R: RuleKind>(
     
     let elapsed = start_time.elapsed();
 
-    EndgameSolution { sequence, elapsed, nodes: td.batch_counter.count_local_in_1k() }
+    EndgameSolution { sequence, elapsed, nodes: td.batch_counter.count_local() }
 }

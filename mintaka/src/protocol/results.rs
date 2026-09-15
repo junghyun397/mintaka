@@ -6,6 +6,7 @@ use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::score::Score;
 use std::fmt::Display;
 use std::time::Duration;
+use crate::protocol::nodes::Nodes;
 use crate::utils::depth::Depth;
 
 // typeshare-cli does not read `cfg_attr(..., serde(...))`, so keep serde attrs direct.
@@ -66,7 +67,7 @@ pub struct BestMove {
     pub best_move: MaybePos,
     pub score: Score,
     pub selective_depth: Depth,
-    pub total_nodes_in_1k: u32,
+    pub total_nodes: Nodes,
     pub pv: PrincipalVariation,
     pub time_elapsed: Duration,
 }

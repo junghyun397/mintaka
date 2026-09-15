@@ -1,11 +1,11 @@
 use mintaka::config::{Config, SearchObjective};
 use mintaka::protocol::command::Command;
+use mintaka::protocol::time::{TimeUnit, TimeValue};
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
-use std::sync::mpsc;
-use std::time::Duration;
 use rusty_renju::utils::byte_size::ByteSize;
+use std::sync::mpsc;
 
 pub enum Message {
     Config(ConfigCommand),
@@ -19,10 +19,10 @@ pub enum Message {
 }
 
 pub enum ConfigCommand {
-    TotalTime(Duration),
-    IncrementTime(Duration),
-    TurnTime(Duration),
-    MaxNodes { in_1k: u32 },
+    TimeUnit(TimeUnit),
+    TotalTime(TimeValue),
+    IncrementTime(TimeValue),
+    TurnTime(TimeValue),
     MaxDepth(u32),
     Workers(u32),
     ResizeTT(ByteSize),

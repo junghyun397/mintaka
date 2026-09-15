@@ -3,6 +3,7 @@ use std::fmt::Display;
 use typeshare::typeshare;
 use crate::board_io;
 
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(std::marker::ConstParamTy, Default, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum RuleKind {

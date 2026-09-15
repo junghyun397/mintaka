@@ -1,14 +1,28 @@
-import type { Config, Duration, Response } from "../wasm/pkg/rusty_renju_wasm"
+import type { BestMove, Config, Duration, Response, TimeValue } from "../wasm/pkg/rusty_renju_wasm"
 
 export type StatusResponseBody = Extract<Response, { type: "Status" }>["content"]
 
-export const InfiniteDuration = duration(9271584000)
+export function timeValue(secs: number): TimeValue {
+    const wholeSecs = Math.trunc(secs)
+    return BigInt(wholeSecs) * 1_000_000_000n + BigInt(Math.round((secs - wholeSecs) * 1_000_000_000))
+}
 
-export function duration(secs: number, nanos?: number): Duration {
-    return {
-        secs,
-        nanos: nanos ?? 0,
-    }
+export function timeValueSeconds(value: TimeValue): number {
+    return Number(value) / 1_000_000_000
+}
+
+export function stringifyMintakaJson(value: unknown): string {
+    const json = JSON as JSON & { rawJSON: (text: string) => unknown }
+    return JSON.stringify(value, (_, value) => typeof value === "bigint" ? json.rawJSON(value.toString()) : value)
+}
+
+export function parseMintakaJson<T>(text: string): T {
+    return JSON.parse(text, (key, value, context?: { source: string }) => {
+        if (["total_remaining", "increment", "turn", "time_limit"].includes(key) && typeof value === "number")
+            return BigInt(context!.source)
+
+        return value
+    })
 }
 
 export function durationSeconds(duration: Duration): number {
@@ -33,8 +47,8 @@ export type MintakaStatics = {
     readonly totalNodesIn1k: number,
 }
 
-export function extractStatics(response: { total_nodes_in_1k: number, time_elapsed: Duration }): MintakaStatics {
-    return { totalNodesIn1k: response.total_nodes_in_1k, totalRuntime: response.time_elapsed }
+export function extractStatics(response: BestMove | StatusResponseBody): MintakaStatics {
+    return { totalNodesIn1k: response.total_nodes.in_1k, totalRuntime: response.time_elapsed }
 }
 
 export function nps(statics: MintakaStatics): number {

@@ -30,9 +30,8 @@ python3 mintaka_arena/sprt.py
 --base-params "--workers 1 --memory-in-mib 32"
 --target-path target/release/mintaka_text_protocol_renju_target
 --target-params "--workers 1 --memory-in-mib 32"
+--time-unit Clock
 --time 10000 300 0
-# --target-nodes-in-1k 1000
-# --base-nodes-in-1k 1000
 --openings-file openings.csv
 --max-openings 100
 --concurrency 6

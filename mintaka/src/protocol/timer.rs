@@ -1,55 +1,77 @@
 use std::time::Duration;
+#[cfg(feature = "typeshare")]
+use typeshare::typeshare;
+use crate::protocol::nodes::Nodes;
+use crate::protocol::time::{TimeUnit, TimeValue};
 
 #[cfg_attr(feature = "typeshare", typeshare::typeshare)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde_with::skip_serializing_none)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Timer {
-    pub total_remaining: Option<Duration>,
-    pub increment: Duration,
-    pub turn: Option<Duration>,
-}
-
-impl Default for Timer {
-    fn default() -> Self {
-        Self {
-            total_remaining: Some(Duration::from_secs(60 * 5)),
-            increment: Duration::from_secs(0),
-            turn: Some(Duration::from_secs(30)),
-        }
-    }
+    pub time_unit: TimeUnit,
+    pub total_remaining: Option<TimeValue>,
+    pub increment: TimeValue,
+    pub turn: Option<TimeValue>,
 }
 
 impl Timer {
-    pub const INFINITE: Self = Self::new(None, Duration::ZERO, None);
-
     pub const fn new(
-        total_time: Option<Duration>,
-        increment: Duration,
-        turn: Option<Duration>,
+        time_unit: TimeUnit,
+        total_time: Option<TimeValue>,
+        increment: TimeValue,
+        turn: Option<TimeValue>,
     ) -> Self {
         Self {
+            time_unit,
             total_remaining: total_time,
             increment,
             turn,
         }
     }
 
-    pub fn consume(&mut self, running_time: Duration) {
+    pub const fn infinite(time_unit: TimeUnit) -> Self {
+        Self {
+            time_unit,
+            total_remaining: None,
+            increment: TimeValue::ZERO,
+            turn: None,
+        }
+    }
+
+    pub const fn fixed_time(turn_time: Duration) -> Self {
+        Self {
+            time_unit: TimeUnit::Clock,
+            total_remaining: None,
+            increment: TimeValue::ZERO,
+            turn: Some(TimeValue::from_duration(turn_time)),
+        }
+    }
+
+    pub const fn fixed_nodes(nodes: Nodes) -> Self {
+        Self {
+            time_unit: TimeUnit::Nodes,
+            total_remaining: None,
+            increment: TimeValue::ZERO,
+            turn: Some(TimeValue::from_nodes(nodes)),
+        }
+    }
+
+    pub fn consume(&mut self, running_time: TimeValue) {
         if let Some(total_remaining) = &mut self.total_remaining {
-            *total_remaining = total_remaining.saturating_sub(running_time);
+            *total_remaining = *total_remaining - running_time;
         }
     }
 
     pub fn apply_increment(&mut self) {
         if let Some(total_remaining) = &mut self.total_remaining {
-            *total_remaining += self.increment;
+            *total_remaining = *total_remaining + self.increment;
         }
     }
 
-    pub fn append(&mut self, additional_time: Duration) {
+    pub fn append(&mut self, additional_time: TimeValue) {
         if let Some(total_remaining) = &mut self.total_remaining {
-            *total_remaining += additional_time;
+            *total_remaining = *total_remaining + additional_time;
         }
     }
 }

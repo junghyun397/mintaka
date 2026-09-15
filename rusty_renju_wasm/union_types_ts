@@ -16,3 +16,5 @@ export interface Duration {
 }
 
 export type LongInt = number
+
+export type BigInt = bigint

@@ -3,6 +3,8 @@ use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::game_state::{GameState, GameStateData};
 use mintaka::protocol::command::Command;
 use mintaka::protocol::response::{CallBackResponseSender, Response};
+use mintaka::protocol::time::{TimeUnit, TimeValue};
+use mintaka::utils::depth::Depth;
 use mintaka_interface::message::{ConfigCommand, Message, MessageCommand, MessageSender, StatusCommand};
 use mintaka_interface::params::Params;
 use rusty_renju::board::Board;
@@ -14,9 +16,8 @@ use rusty_renju::utils::byte_size::ByteSize;
 use rusty_renju::utils::empty::Empty;
 use std::io::{BufRead, Write};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{mpsc, Arc};
-use std::time::{Duration, Instant};
-use mintaka::utils::depth::Depth;
+use std::sync::{Arc, mpsc};
+use std::time::Instant;
 
 pub fn entry<const R: RuleKind>() -> Result<(), GameError> {
     let params = Params::<R>::parse();
@@ -70,9 +71,9 @@ fn stdio_out(text_protocol_response: Result<TextProtocolResponse, String>) {
 
 fn print_response(response: Response) {
     let log = match response {
-        Response::Begins(ComputingResource { workers, time_limit, nodes_in_1k }) =>
-            format!("begins: workers={workers}, running-time={time_limit:?}, nodes={nodes_in_1k:?}"),
-        Response::Status { best_move, score, pv, total_nodes_in_1k, selective_depth, .. } =>
+        Response::Begins(ComputingResource { workers, time_unit, time_limit }) =>
+            format!("begins: workers={workers}, time-unti={time_unit}, resource={time_limit:?}"),
+        Response::Status { best_move, score, pv, total_nodes: total_nodes_in_1k, selective_depth, .. } =>
             format!("status: depth={selective_depth}, score={score}, best_move={best_move}, total_nodes_in_1k={total_nodes_in_1k}, pv={pv:?}"),
     };
 
@@ -105,7 +106,7 @@ fn text_protocol<const R: RuleKind>(
         (MessageSender::new(tx), rx)
     };
 
-    spawn_command_listener::<R>(aborted.clone(), message_sender, command_sequence);
+    spawn_command_listener::<R>(aborted.clone(), message_sender, timer.time_unit, command_sequence);
 
     for message in message_receiver {
         match message {
@@ -127,11 +128,11 @@ fn text_protocol<const R: RuleKind>(
                 );
 
                 let log = format!(
-                    "solution: pos={}, score={}, depth={}, nodes={}k, elapsed={:?}",
+                    "solution: pos={}, score={}, depth={}, nodes={}, elapsed={:?}",
                     best_move.best_move,
                     best_move.score,
                     best_move.selective_depth,
-                    best_move.total_nodes_in_1k,
+                    best_move.total_nodes,
                     best_move.time_elapsed,
                 );
 
@@ -155,6 +156,11 @@ fn text_protocol<const R: RuleKind>(
                     print_board(&game_agent.state, true);
                 }
             }
+            Message::Config(ConfigCommand::TimeUnit(unit)) => {
+                timer.time_unit = unit;
+
+                stdio_out(Ok(TextProtocolResponse::Ack));
+            }
             Message::Config(ConfigCommand::TotalTime(total)) => {
                 timer.total_remaining = Some(total);
 
@@ -169,11 +175,6 @@ fn text_protocol<const R: RuleKind>(
             Message::Config(ConfigCommand::TurnTime(turn)) => {
                 config.initial_timer.turn = Some(turn);
                 timer.turn = Some(turn);
-
-                stdio_out(Ok(TextProtocolResponse::Ack));
-            }
-            Message::Config(ConfigCommand::MaxNodes { in_1k }) => {
-                config.max_nodes_in_1k = Some(in_1k);
 
                 stdio_out(Ok(TextProtocolResponse::Ack));
             }
@@ -221,6 +222,7 @@ fn text_protocol<const R: RuleKind>(
 fn match_command<const R: RuleKind>(
     aborted: &Arc<AtomicBool>,
     message_sender: &MessageSender,
+    time_unit: TimeUnit,
     args: Vec<&str>,
     buf: &str,
 ) -> Result<(), String> {
@@ -260,33 +262,25 @@ fn match_command<const R: RuleKind>(
         },
         "limit" => match *args.get(1).ok_or("data type not provided.")? {
             "time" => {
-                fn parse_time_in_milliseconds(args: &Vec<&str>) -> Result<Duration, &'static str> {
-                    let time = args.get(3).ok_or("time not provided.")?
+                let parse_time = || -> Result<TimeValue, &'static str> {
+                    args.get(3).ok_or("time not provided.")?
                         .parse::<u64>()
-                        .map_err(|_| "invalid time.")?;
-
-                    Ok(Duration::from_millis(time))
-                }
+                        .map(|value| TimeValue::from_value(value, time_unit))
+                        .map_err(|_| "invalid time.")
+                };
 
                 match *args.get(2).ok_or("data type not provided.")? {
                     "total" => {
-                        message_sender.config(ConfigCommand::TotalTime(parse_time_in_milliseconds(&args)?));
+                        message_sender.config(ConfigCommand::TotalTime(parse_time()?));
                     }
                     "turn" => {
-                        message_sender.config(ConfigCommand::TurnTime(parse_time_in_milliseconds(&args)?));
+                        message_sender.config(ConfigCommand::TurnTime(parse_time()?));
                     }
                     "increment" => {
-                        message_sender.config(ConfigCommand::IncrementTime(parse_time_in_milliseconds(&args)?));
+                        message_sender.config(ConfigCommand::IncrementTime(parse_time()?));
                     }
                     &_ => return Err("unknown time type.".to_string()),
                 }
-            }
-            "nodes" => {
-                let nodes = args.get(2).ok_or("nodes not provided.")?
-                    .parse::<u32>()
-                    .map_err(|_| "invalid nodes number.")?;
-
-                message_sender.config(ConfigCommand::MaxNodes { in_1k: nodes });
             }
             &_ => return Err("unknown limit type.".to_string()),
         },
@@ -388,6 +382,7 @@ fn execute_command<const R: RuleKind>(game_agent: &mut GameAgent<R>, command: Co
 fn spawn_command_listener<const R: RuleKind>(
     aborted: Arc<AtomicBool>,
     message_sender: MessageSender,
+    time_unit: TimeUnit,
     initial_sequence: Vec<String>,
 ) {
     std::thread::spawn(move || {
@@ -404,7 +399,7 @@ fn spawn_command_listener<const R: RuleKind>(
                 continue;
             }
 
-            let result = match_command::<R>(&aborted, &message_sender, args, &line);
+            let result = match_command::<R>(&aborted, &message_sender, time_unit, args, &line);
 
             if let Err(error) = result {
                 stdio_out(Err(error));

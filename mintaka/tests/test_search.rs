@@ -9,13 +9,15 @@ mod test_search {
     use std::sync::atomic::{AtomicBool, AtomicU32};
     use std::sync::Arc;
     use std::time::Instant;
+    use mintaka::protocol::nodes::Nodes;
+    use mintaka::protocol::timer::Timer;
     use rusty_renju::notation::rule::RuleKind;
 
     macro_rules! test_search {
         ($source:expr) => {{
             let mut config = Config::default();
             config.workers = 8;
-            config.max_nodes_in_1k = Some(100);
+            config.initial_timer = Timer::fixed_nodes(Nodes::from_in_1k(100));
 
             let mut agent = {
                 let state: GameState<{ RuleKind::Renju }> = $source.into();

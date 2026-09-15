@@ -57,9 +57,7 @@ impl<const R: RuleKind> Board<R> {
             let pos = Pos::from_index(idx as u8);
 
             self.stone_kind(pos)
-                .map(|color|
-                    BoardExportItem::Stone(color)
-                )
+                .map(BoardExportItem::Stone)
                 .or_else(||
                     self.patterns.forbidden_kind(pos)
                         .map(BoardExportItem::Forbidden)
