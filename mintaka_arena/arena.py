@@ -43,6 +43,12 @@ def time_manager_or_nodes(time, nodes) -> TimeManager | int:
         )
 
 
+GAME_SETTINGS = (
+    "base_params", "target_params", "time", "base_nodes", "target_nodes", "draw_in",
+    "max_openings", "concise", "no_datetime_prefix", "log_prefix_filter",
+)
+
+
 class Config:
     def __init__(self, args):
         self.args = args
@@ -61,6 +67,13 @@ class Config:
 class Opening:
     initial_color: Color
     sequence: str
+
+    def to_json(self):
+        return {"initial_color": self.initial_color.name, "sequence": self.sequence}
+
+    @classmethod
+    def from_json(cls, data) -> Opening:
+        return cls(Color[data["initial_color"]], data["sequence"])
 
 
 @dataclass
@@ -82,8 +95,42 @@ class GameSnapshot:
     duration: timedelta
     history: str
 
+    def to_json(self):
+        return {
+            "winner": [part.name for part in self.winner] if self.winner else None,
+            "duration_us": self.duration // timedelta(microseconds=1),
+            "history": self.history,
+        }
+
+    @classmethod
+    def from_json(cls, data) -> GameSnapshot:
+        winner = data["winner"]
+        return cls(
+            winner=(Player[winner[0]], Color[winner[1]]) if winner is not None else None,
+            duration=timedelta(microseconds=data["duration_us"]),
+            history=data["history"],
+        )
+
 
 GameResults = dict[Player | Color | None, int]
+
+
+@dataclass
+class PairResult:
+    opening: Opening
+    snapshots: list[GameSnapshot]
+    results: GameResults
+
+    def to_json(self):
+        return {
+            "opening": self.opening.to_json(),
+            "snapshots": [snapshot.to_json() for snapshot in self.snapshots],
+        }
+
+    @classmethod
+    def from_json(cls, data) -> PairResult:
+        snapshots = [GameSnapshot.from_json(item) for item in data["snapshots"]]
+        return cls(Opening.from_json(data["opening"]), snapshots, game_results(snapshots))
 
 
 def player_wdl(result: GameResults) -> tuple[int, int, int]:
@@ -138,7 +185,8 @@ def spawn_process(path, params, resource: TimeManager | int, opening: Opening) -
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        bufsize=1
+        bufsize=1,
+        start_new_session=True,
     )
 
 
@@ -186,18 +234,12 @@ def play_game(config, game_no: int, opening: Opening) -> GameSnapshot:
     initial_color = opening.initial_color
 
     with ExitStack() as stack:
-        processes = {
-            player: stack.enter_context(spawn_process(path, params, resource, opening))
-            for player, (path, params, resource) in config.path_params_resource.items()
-        }
+        engines = {}
+        for player, (path, params, resource) in config.path_params_resource.items():
+            process = stack.enter_context(spawn_process(path, params, resource, opening))
+            stack.callback(process.terminate)
 
-        stack.callback(processes[Player.BASE].terminate)
-        stack.callback(processes[Player.TARGET].terminate)
-
-        engines = {
-            player: Engine(process, copy.copy(config.path_params_resource[player][2]))
-            for player, process in processes.items()
-        }
+            engines[player] = Engine(process, copy.copy(config.path_params_resource[player][2]))
 
         player = Player.BASE if game_no % 2 == 0 else Player.TARGET
 
@@ -276,8 +318,15 @@ def play_game(config, game_no: int, opening: Opening) -> GameSnapshot:
     )
 
 
-def play_pair(config, opening_no: int, opening: Opening) -> tuple[Opening, list[GameSnapshot], GameResults]:
-    snapshots = []
+def play_pair(config, opening_no: int, opening: Opening) -> PairResult:
+    snapshots = [
+        play_game(config, opening_no * 2 + first_player.value, opening)
+        for first_player in Player
+    ]
+    return PairResult(opening, snapshots, game_results(snapshots))
+
+
+def game_results(snapshots: list[GameSnapshot]) -> GameResults:
     results = {
         Player.BASE: 0,
         Player.TARGET: 0,
@@ -286,18 +335,14 @@ def play_pair(config, opening_no: int, opening: Opening) -> tuple[Opening, list[
         None: 0,
     }
 
-    for first_player in Player:
-        game_result = play_game(config, opening_no * 2 + first_player.value, opening)
-
-        if game_result.winner is not None:
-            for player_or_color in game_result.winner:
+    for snapshot in snapshots:
+        if snapshot.winner is not None:
+            for player_or_color in snapshot.winner:
                 results[player_or_color] += 1
         else:
             results[None] += 1
 
-        snapshots.append(game_result)
-
-    return opening, snapshots, results
+    return results
 
 
 pentanomial_score = {
@@ -311,14 +356,20 @@ pentanomial_score = {
 
 
 def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(allow_abbrev=False)
 
     parser.add_argument("--seed", type=int, default=secrets.randbits(32))
 
-    parser.add_argument("--base-path", type=str, required=True)
+    parser.add_argument("--worker-addresses", type=str, nargs="+")
+
+    parser.add_argument("--base-path", type=str)
+    parser.add_argument("--base-ref", type=str, help="Base commit on master")
+    parser.add_argument("--base-patch", type=str, help="Base patch file")
     parser.add_argument("--base-params", type=str, default="")
 
-    parser.add_argument("--target-path", type=str, required=True)
+    parser.add_argument("--target-path", type=str)
+    parser.add_argument("--target-ref", type=str, help="Target patch base commit on master (automatic patch default: origin/master)")
+    parser.add_argument("--target-patch", type=str, help="Target patch file")
     parser.add_argument("--target-params", type=str, default="")
 
     parser.add_argument("--max-openings", type=int, default=100)

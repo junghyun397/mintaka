@@ -1,0 +1,12 @@
+services:
+  mintaka-arena-worker:
+    container_name: mintaka-arena-worker
+    build:
+      context: ..
+      dockerfile: mintaka_arena/Dockerfile
+    image: mintaka-arena-worker:latest
+    command: ["--address", "0.0.0.0", "--port", "${PORT:-8095}", "--max-concurrency", "${CONCURRENCY:-6}"]
+    ports:
+      - ${ADDRESS:-0.0.0.0}:${PORT:-8095}:${PORT:-8095}
+    volumes:
+      - ../arena-artifacts:/var/lib/mintaka/artifacts

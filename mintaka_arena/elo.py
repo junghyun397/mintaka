@@ -1,7 +1,8 @@
 import math
-from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, wait
 
 import arena
+import worker_manager
 
 
 def calculate_elo(score: float) -> float:
@@ -34,13 +35,7 @@ def main():
 
     pentanomial = [0, 0, 0, 0, 0]
 
-    results = {
-        arena.Player.BASE: 0,
-        arena.Player.TARGET: 0,
-        arena.Color.BLACK: 0,
-        arena.Color.WHITE: 0,
-        None: 0,
-    }
+    results = arena.game_results([])
 
     elo = {
         arena.Player.BASE: config.args.base_elo,
@@ -56,9 +51,9 @@ def main():
           f"concurrency={config.args.concurrency}",
           flush=True)
 
-    with ThreadPoolExecutor(max_workers=config.args.concurrency) as executor:
+    with worker_manager.WorkerManager(config) as executor:
         pending = {
-            executor.submit(arena.play_pair, config, opening_no, openings[opening_no])
+            executor.submit(opening_no, openings[opening_no])
             for opening_no in range(min(config.args.concurrency, config.args.max_openings))
         }
         next_opening = len(pending)
@@ -68,14 +63,14 @@ def main():
                 done, _ = wait(pending, return_when=FIRST_COMPLETED)
                 future = done.pop()
                 pending.remove(future)
-                opening, snapshot, pair_result = future.result()
+                pair = future.result()
 
-                pair_score = arena.pentanomial_score[arena.player_wdl(pair_result)]
+                pair_score = arena.pentanomial_score[arena.player_wdl(pair.results)]
                 pentanomial[int(pair_score * 2)] += 1
                 squared_errors += (pair_score / 2.0 - score) ** 2
 
                 for player_or_color in results:
-                    results[player_or_color] += pair_result[player_or_color]
+                    results[player_or_color] += pair.results[player_or_color]
                 completed_openings += 1
 
                 score = sum(idx * count for idx, count in enumerate(pentanomial)) / (completed_openings * 4)
@@ -103,7 +98,7 @@ def main():
 
                 if next_opening < config.args.max_openings:
                     pending.add(executor.submit(
-                        arena.play_pair, config, next_opening, openings[next_opening]
+                        next_opening, openings[next_opening]
                     ))
                     next_opening += 1
         finally:
