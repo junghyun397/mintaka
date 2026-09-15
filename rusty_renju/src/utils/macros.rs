@@ -50,7 +50,7 @@
 }
 
 #[macro_export] macro_rules! repeat {
-    ($source:expr,x4 u32) => {
+    ($source:expr, x4 u32) => {
         u32::from_ne_bytes([$source; 4])
     };
     ($source:expr,x16 u128) => {

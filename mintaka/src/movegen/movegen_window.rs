@@ -78,16 +78,16 @@ impl MovegenWindow {
             let start_idx = row_idx + self.start_col as usize;
             let end_idx = row_idx + self.end_col as usize;
 
-            let start_byte = start_idx / 8;
-            let end_byte = end_idx / 8;
-            let start_bit = start_idx % 8;
-            let end_bit = end_idx % 8;
+            let start_chunk = start_idx / 64;
+            let end_chunk = end_idx / 64;
+            let start_bit = start_idx % 64;
+            let end_bit = end_idx % 64;
 
-            if start_byte == end_byte {
-                self.movegen_field.0[start_byte] |= (u8::MAX >> (7 - end_bit + start_bit)) << start_bit;
+            if start_chunk == end_chunk {
+                self.movegen_field.0[start_chunk] |= (u64::MAX >> (63 - end_bit + start_bit)) << start_bit;
             } else {
-                self.movegen_field.0[start_byte] |= u8::MAX << start_bit;
-                self.movegen_field.0[end_byte]   |= u8::MAX >> (7 - end_bit);
+                self.movegen_field.0[start_chunk] |= u64::MAX << start_bit;
+                self.movegen_field.0[end_chunk]   |= u64::MAX >> (63 - end_bit);
             }
         }
     }

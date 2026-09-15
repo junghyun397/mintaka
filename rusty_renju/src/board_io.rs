@@ -25,9 +25,6 @@ pub const SYMBOL_FORBID_DOUBLE_THREE: char = '3';
 pub const SYMBOL_FORBID_DOUBLE_FOUR: char = '4';
 pub const SYMBOL_FORBID_OVERLINE: char = '6';
 
-pub const HISTORY_LITERAL_SEPARATOR: &str = ",";
-pub const HISTORY_LITERAL_PASS: &str = "pass";
-
 enum BoardElement {
     Stone(Color),
     Empty
@@ -245,10 +242,10 @@ impl<const R: RuleKind> Board<R> {
                 }, |_, _| None)
             }
 
-            let open_three = format!("open_three\n{}", render_pattern(board, color, Pattern::count_open_threes));
-            let closed_four = format!("closed_four\n{}", render_pattern(board, color, Pattern::count_closed_fours));
-            let open_four = format!("open_four\n{}", render_pattern(board, color, Pattern::count_open_fours));
-            let close_three = format!("close_three\n{}", render_pattern(board, color, Pattern::count_close_threes));
+            let open_three = format!("open_three\n{}", render_pattern(board, color, Pattern::count_open_three));
+            let closed_four = format!("closed_four\n{}", render_pattern(board, color, Pattern::count_closed_four));
+            let open_four = format!("open_four\n{}", render_pattern(board, color, Pattern::count_open_four));
+            let close_three = format!("close_three\n{}", render_pattern(board, color, Pattern::count_close_three));
             let potential_three = format!("potential_three\n{}", render_pattern(board, color, Pattern::count_potential_three));
             let potential_four = format!("potential_four\n{}", render_pattern(board, color, Pattern::count_potential_four));
             let five = format!("five\n{}", render_pattern(board, color, Pattern::count_five));

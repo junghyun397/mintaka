@@ -145,6 +145,10 @@ impl<const R: RuleKind> Board<R> {
 
             player = !player;
         }
+
+        self.player_color = player;
+
+        self.full_update();
     }
 
     pub fn batch_set_each_color_mut(&mut self, stones: ColorContainer<Bitfield>, player: Color) {
@@ -362,7 +366,7 @@ impl<const R: RuleKind> Board<R> {
             || self.patterns.candidate_overline_field.is_hot(pos) // overline
         {
             Some(true)
-        } else if pattern.count_open_threes() < 3 { // not nested three
+        } else if pattern.count_open_three() < 3 { // not nested three
             Some(false)
         } else { // nested three
             None
@@ -406,9 +410,9 @@ impl<const R: RuleKind> Board<R> {
         let pattern_unit = self.patterns.field[Color::Black][pos.idx_usize()];
 
         let mut total_threes = if C::IS_ROOT {
-            pattern_unit.count_open_threes()
+            pattern_unit.count_open_three()
         } else {
-            pattern_unit.count_open_threes() - 1
+            pattern_unit.count_open_three() - 1
         };
 
         for direction in pattern_unit.iter_three_directions() {

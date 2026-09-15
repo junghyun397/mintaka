@@ -35,6 +35,9 @@ pub const LMP_DIV_NON_IMPROVING: f64 = parse_float!("lmp_div_non_improving", f64
 pub const FP_BASE: i32 = parse_int!("fp_base", i32, 100);
 pub const FP_MUL: i32 = parse_int!("fp_mul", i32, 32);
 
+pub const RAZORING_MARGIN: i32 = parse_int!("razoring_margin", i32, 200);
+pub const RAZORING_MAX_DEPTH: i32 = parse_int!("razoring_max_depth", i32, 4);
+
 pub const HT_QUIET_BONUS_MUL: i32 = parse_int!("ht_quiet_bonus_mul", i32, 4);
 pub const HT_TACTICAL_BONUS_MUL: i32 = parse_int!("ht_tactical_bonus_mul", i32, 4);
 pub const HT_AGEING_MUL: f64 = parse_float!("ht_ageing_mul", f64, 0.75);

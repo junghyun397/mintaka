@@ -47,7 +47,7 @@ pub fn generate_full_endgame_moves<const R: RuleKind, const T: ThreatSearchKind>
     moves
 }
 
-pub fn generate_endgame_moves<const R: RuleKind, const T: ThreatSearchKind>(
+pub fn generate_endgame_moves<const R: RuleKind, const T: ThreatSearchKind, const FILTER: u8>(
     td: &ThreadData<R, impl ThreadType, impl Evaluator<R>>,
     state: &GameState<R>,
     recent_four: Pos,
@@ -64,6 +64,12 @@ pub fn generate_endgame_moves<const R: RuleKind, const T: ThreatSearchKind>(
     field &= ENDGAME_MOVEGEN_IMPRINT_MASK_LUT[recent_four.idx_usize()];
 
     for pos in field.iter_hot_pos() {
+        if FILTER != 0
+            && !state.board.patterns.field[state.board.player_color][pos.idx_usize()].has::<FILTER>()
+        {
+            continue;
+        }
+
         moves.push(EndgameMoveEntry {
             pos,
             score: td.evaluator.ordering_score(&state.board, pos),
@@ -83,7 +89,7 @@ pub fn generate_threat_direct_response<const R: RuleKind>(
         let mut score = DIRECT_RESPONSE_SCORE;
 
         // threat score
-        if state.board.patterns.field[state.board.player_color][pos.idx_usize()].has_any_threat() {
+        if state.board.patterns.field[state.board.player_color][pos.idx_usize()].is_tactical() {
             score += 100;
         }
 

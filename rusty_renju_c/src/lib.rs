@@ -1,4 +1,4 @@
-use rusty_renju::dispatch_any_board;
+use rusty_renju::{dispatch_any_board, repeat};
 use rusty_renju::utils::empty::Empty;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -52,13 +52,13 @@ pub extern "C" fn rusty_renju_board_export_item_stone() -> u8 { BOARD_EXPORT_ITE
 pub extern "C" fn rusty_renju_board_export_item_forbidden() -> u8 { BOARD_EXPORT_ITEM_FORBIDDEN }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_closed_four_mask() -> u32 { rusty_renju::pattern::UNIT_CLOSED_FOUR_MASK }
+pub extern "C" fn rusty_renju_closed_four_mask() -> u32 { repeat!(rusty_renju::pattern::CLOSED_FOURS, x4 u32) }
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_open_four_mask() -> u32 { rusty_renju::pattern::UNIT_OPEN_FOUR_MASK }
+pub extern "C" fn rusty_renju_open_four_mask() -> u32 { repeat!(rusty_renju::pattern::OPEN_FOUR, x4 u32) }
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_open_three_mask() -> u32 { rusty_renju::pattern::UNIT_OPEN_THREE_MASK }
+pub extern "C" fn rusty_renju_open_three_mask() -> u32 { repeat!(rusty_renju::pattern::OPEN_THREE, x4 u32) }
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_close_three_mask() -> u32 { rusty_renju::pattern::UNIT_CLOSE_THREE_MASK }
+pub extern "C" fn rusty_renju_close_three_mask() -> u32 { repeat!(rusty_renju::pattern::CLOSE_THREE, x4 u32) }
 
 #[repr(C)]
 pub struct BoardExportItem {

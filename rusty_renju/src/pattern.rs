@@ -9,8 +9,9 @@ use crate::slice_pattern::SlicePattern;
 use crate::utils::empty::Empty;
 use crate::{assert_struct_sizes, repeat, slice_pattern, step_idx};
 
+pub const CLOSED_FOURS: u8              = 0b1100_0000;
 pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
-pub const CLOSED_FOUR_DOUBLE: u8        = 0b1100_0000;
+
 pub const OPEN_FOUR: u8                 = 0b0010_0000;
 pub const ANY_FOUR: u8                  = 0b1110_0000;
 pub const OPEN_THREE: u8                = 0b0001_0000;
@@ -20,24 +21,6 @@ pub const POTENTIAL_THREE :u8           = 0b0000_0100;
 pub const POTENTIAL_FOUR :u8            = 0b0000_0010;
 
 pub const FIVE: u8                      = 0b0000_0001;
-
-pub const UNIT_CLOSED_FOUR_SINGLE_MASK: u32 = repeat!(CLOSED_FOUR_SINGLE,x4 u32);
-pub const UNIT_CLOSED_FOUR_MASK: u32        = repeat!(CLOSED_FOUR_DOUBLE,x4 u32);
-pub const UNIT_OPEN_FOUR_MASK: u32          = repeat!(OPEN_FOUR,x4 u32);
-pub const UNIT_ANY_FOUR_MASK: u32           = repeat!(ANY_FOUR,x4 u32);
-
-pub const UNIT_OPEN_THREE_MASK: u32         = repeat!(OPEN_THREE,x4 u32);
-pub const UNIT_CLOSE_THREE_MASK: u32        = repeat!(CLOSE_THREE,x4 u32);
-
-pub const UNIT_POTENTIAL_THREE_MASK: u32    = repeat!(POTENTIAL_THREE,x4 u32);
-pub const UNIT_POTENTIAL_FOUR_MASK: u32     = repeat!(POTENTIAL_FOUR,x4 u32);
-pub const UNIT_ANY_POTENTIAL_MASK: u32      = repeat!(POTENTIAL_FOUR | POTENTIAL_THREE,x4 u32);
-
-pub const UNIT_FIVE_MASK: u32               = repeat!(FIVE,x4 u32);
-
-pub const UNIT_TACTICAL_MASK: u32           = repeat!(OPEN_THREE | ANY_FOUR,x4 u32);
-
-pub const SLICE_PATTERN_FIVE_MASK: u128     = repeat!(FIVE,x16 u128);
 
 pub const PATTERN_SIZE: usize = 256;
 
@@ -64,95 +47,96 @@ impl Pattern {
         u32::from(*self) == 0
     }
 
-    pub fn is_tactical(&self) -> bool {
-        self.apply_mask(UNIT_TACTICAL_MASK) != 0
+    pub fn has<const MASK: u8>(&self) -> bool {
+        self.apply_mask(repeat!(MASK, x4 u32)) != 0
+    }
+
+    pub fn has_at<const MASK: u8>(&self, direction: Direction) -> bool {
+        self.apply_mask((MASK as u32) << (direction as usize * 8)) != 0
+    }
+
+    pub fn count<const MASK: u8>(&self) -> u32 {
+        self.apply_mask(repeat!(MASK, x4 u32)).count_ones()
     }
 
     pub fn has_open_three_at(&self, direction: Direction) -> bool {
-        self.apply_mask((OPEN_THREE as u32) << (direction as usize * 8)) != 0
+        self.has_at::<OPEN_THREE>(direction)
     }
 
-    pub fn has_open_three(&self) -> bool {
-        self.apply_mask(UNIT_OPEN_THREE_MASK) != 0
-    }
-
-    pub fn has_open_threes(&self) -> bool {
-        self.apply_mask(UNIT_OPEN_THREE_MASK).count_ones() > 1
-    }
-
-    pub fn has_any_four(&self) -> bool {
-        self.apply_mask(UNIT_ANY_FOUR_MASK) != 0
-    }
-
-    pub fn has_open_four(&self) -> bool {
-        self.apply_mask(UNIT_OPEN_FOUR_MASK) != 0
-    }
-
-    pub fn has_any_fours(&self) -> bool {
-        self.apply_mask(UNIT_ANY_FOUR_MASK).count_ones() > 1
+    pub fn is_tactical(&self) -> bool {
+        self.has::<{ OPEN_THREE | ANY_FOUR }>()
     }
 
     pub fn has_closed_four(&self) -> bool {
-        self.apply_mask(UNIT_CLOSED_FOUR_MASK) != 0
+        self.has::<CLOSED_FOUR_SINGLE>()
+    }
+
+    pub fn has_open_three(&self) -> bool {
+        self.has::<OPEN_THREE>()
     }
 
     pub fn has_close_three(&self) -> bool {
-        self.apply_mask(UNIT_CLOSE_THREE_MASK) != 0
-    }
-
-    pub fn has_any_threat(&self) -> bool {
-        self.apply_mask(UNIT_OPEN_THREE_MASK | UNIT_ANY_FOUR_MASK) != 0
+        self.has::<CLOSE_THREE>()
     }
 
     pub fn has_five(&self) -> bool {
-        self.apply_mask(UNIT_FIVE_MASK) != 0
+        self.has::<FIVE>()
     }
 
-    pub fn count_open_threes(&self) -> u32 {
-        self.apply_mask(UNIT_OPEN_THREE_MASK).count_ones()
+    pub fn has_any_four(&self) -> bool {
+        self.has::<ANY_FOUR>()
     }
 
-    pub fn count_close_threes(&self) -> u32 {
-        self.apply_mask(UNIT_CLOSE_THREE_MASK).count_ones()
+    pub fn has_open_four(&self) -> bool {
+        self.has::<OPEN_FOUR>()
     }
 
-    pub fn count_closed_fours(&self) -> u32 {
-        self.apply_mask(UNIT_CLOSED_FOUR_MASK).count_ones()
+    pub fn has_open_threes(&self) -> bool {
+        self.count_open_three() > 1
     }
 
-    pub fn count_open_fours(&self) -> u32 {
-        self.apply_mask(UNIT_OPEN_FOUR_MASK).count_ones()
+    pub fn has_any_fours(&self) -> bool {
+        self.count_any_four() > 1
     }
 
-    pub fn count_any_fours(&self) -> u32 {
-        self.apply_mask(UNIT_ANY_FOUR_MASK).count_ones()
+    pub fn count_open_three(&self) -> u32 {
+        self.count::<OPEN_THREE>()
+    }
+
+    pub fn count_close_three(&self) -> u32 {
+        self.count::<CLOSE_THREE>()
+    }
+
+    pub fn count_closed_four(&self) -> u32 {
+        self.count::<CLOSED_FOURS>()
+    }
+
+    pub fn count_open_four(&self) -> u32 {
+        self.count::<OPEN_FOUR>()
+    }
+
+    pub fn count_any_four(&self) -> u32 {
+        self.count::<ANY_FOUR>()
     }
 
     pub fn count_potential_three(&self) -> u32 {
-        self.apply_mask(UNIT_POTENTIAL_THREE_MASK).count_ones()
+        self.count::<POTENTIAL_THREE>()
     }
 
     pub fn count_potential_four(&self) -> u32 {
-        self.apply_mask(UNIT_POTENTIAL_FOUR_MASK).count_ones()
-    }
-    
-    pub fn count_five(&self) -> u32 {
-        self.apply_mask(UNIT_FIVE_MASK).count_ones()
+        self.count::<POTENTIAL_FOUR>()
     }
 
-    pub fn count_any_potential(&self) -> u32 {
-        (
-            self.apply_mask(UNIT_POTENTIAL_THREE_MASK)
-                | (self.apply_mask(UNIT_POTENTIAL_FOUR_MASK) << 1)
-        ).count_ones()
+    pub fn count_five(&self) -> u32 {
+        self.count::<FIVE>()
     }
 
     pub fn iter_three_directions(&self) -> impl Iterator<Item=Direction> + '_ {
-        DirectionIterator { packed_unit: self.apply_mask(UNIT_OPEN_THREE_MASK) }
+        DirectionIterator { packed_unit: self.apply_mask(repeat!(OPEN_THREE, x4 u32)) }
     }
 
     pub fn iter_potential_four_directions(&self) -> impl Iterator<Item=Direction> + '_ {
-        DirectionIterator { packed_unit: self.apply_mask(UNIT_POTENTIAL_FOUR_MASK) }
+        DirectionIterator { packed_unit: self.apply_mask(repeat!(POTENTIAL_FOUR, x4 u32)) }
     }
 
     fn is_forbidden_unchecked(&self) -> bool {
@@ -269,6 +253,8 @@ impl<const R: RuleKind> Patterns<R> {
     fn update_with_slice_pattern<const C: Color, const D: Direction>(
         &mut self, slice: &mut Slice, slice_pattern: SlicePattern
     ) -> u16 {
+        const SLICE_PATTERN_FIVE_MASK: u128 = repeat!(FIVE, x16 u128);
+
         if (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK) != 0 {
             let slice_idx = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8;
             let pos = Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8));

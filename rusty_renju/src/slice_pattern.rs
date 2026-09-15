@@ -244,7 +244,7 @@ impl SlicePatchData {
             if self_fours[idx] == pattern::CLOSED_FOUR_SINGLE
                 && other_fours[idx] == pattern::CLOSED_FOUR_SINGLE
             {
-                double_four_mask[idx] = pattern::CLOSED_FOUR_DOUBLE;
+                double_four_mask[idx] = pattern::CLOSED_FOURS;
             }
         });
 

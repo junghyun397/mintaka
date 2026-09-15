@@ -14,7 +14,7 @@ use typeshare::typeshare;
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
 #[derive(Copy, Clone, PartialEq, Eq)]
 #[repr(align(32))]
-pub struct Bitfield(pub [u8; 32]);
+pub struct Bitfield(pub [u64; 4]);
 
 assert_struct_sizes!(Bitfield, size=32, align=32);
 
@@ -25,9 +25,9 @@ impl Empty for Bitfield {
 }
 
 impl Bitfield {
-    pub const ZERO_FILLED: Self = Self([0; 32]);
+    pub const ZERO_FILLED: Self = Self([0; 4]);
 
-    pub const ONE_FILLED: Self = Self([0xFF; 32]);
+    pub const ONE_FILLED: Self = Self([u64::MAX; 4]);
 
     pub const LEGAL_MASK: Self = {
         let mut legal_mask = Self::ONE_FILLED;
@@ -46,7 +46,7 @@ impl Bitfield {
     }
 
     pub const fn is_hot_idx(&self, idx: usize) -> bool {
-        self.0[idx / 8] & (0b1 << (idx % 8)) != 0
+        self.0[idx / 64] & (0b1 << (idx % 64)) != 0
     }
 
     pub const fn is_hot(&self, pos: Pos) -> bool {
@@ -62,7 +62,7 @@ impl Bitfield {
     }
 
     pub const fn or_bit_idx(&mut self, idx: usize, bit: bool) {
-        self.0[idx / 8] |= (bit as u8) << (idx % 8);
+        self.0[idx / 64] |= (bit as u64) << (idx % 64);
     }
 
     pub const fn set_bit_idx(&mut self, idx: usize, bit: bool) {
@@ -82,7 +82,7 @@ impl Bitfield {
     }
 
     pub const fn unset_idx(&mut self, idx: usize) {
-        self.0[idx / 8] &= !(0b1 << (idx % 8));
+        self.0[idx / 64] &= !(0b1 << (idx % 64));
     }
 
     pub const fn unset(&mut self, pos: Pos) {
@@ -90,28 +90,26 @@ impl Bitfield {
     }
 
     pub fn count_hots(&self) -> u32 {
-        self.to_chunks()
-            .iter()
+        self.0.iter()
             .map(|x| x.count_ones())
             .sum()
     }
 
     pub fn count_colds(&self) -> u32 {
-        self.to_chunks()
-            .iter()
+        self.0.iter()
             .map(|x| x.count_zeros())
             .sum()
     }
 
     pub fn iter(&self) -> impl Iterator<Item=bool> + '_ {
         BitfieldIterator {
-            chunks: self.to_chunks(),
+            chunks: self.0,
             position: 0,
         }
     }
 
     pub fn iter_hot_idx(&self) -> impl Iterator<Item=usize> + '_ {
-        BitfieldHotBitsIterator::from(self.to_chunks())
+        BitfieldHotBitsIterator::from(self.0)
     }
 
     pub fn iter_hot_pos(&self) -> impl Iterator<Item=Pos> + '_ {
@@ -120,7 +118,7 @@ impl Bitfield {
     }
 
     pub fn first_pos(&self) -> Option<Pos> {
-        let chunks = self.to_chunks();
+        let chunks = self.0;
 
         if chunks[0] != 0 {
             Some(Pos::from_index(chunks[0].trailing_zeros() as u8))
@@ -136,20 +134,27 @@ impl Bitfield {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0 == [0; 32]
+        self.0 == Self::ZERO_FILLED.0
     }
 
-    fn to_simd(self) -> Simd<u8, 32> {
-        Simd::<u8, 32>::from_array(self.0)
+    fn to_simd(self) -> Simd<u64, 4> {
+        Simd::<u64, 4>::from_array(self.0)
     }
 
-    fn to_chunks(self) -> [u64; 4] {
-        [
-            u64::from_le_bytes(self.0[0..8].try_into().unwrap()),
-            u64::from_le_bytes(self.0[8..16].try_into().unwrap()),
-            u64::from_le_bytes(self.0[16..24].try_into().unwrap()),
-            u64::from_le_bytes(self.0[24..32].try_into().unwrap()),
-        ]
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        let mut chunks = [0; 4];
+        for (chunk, bytes) in chunks.iter_mut().zip(bytes.chunks_exact(8)) {
+            *chunk = u64::from_le_bytes(bytes.try_into().unwrap());
+        }
+        Self(chunks)
+    }
+
+    pub fn to_bytes(self) -> [u8; 32] {
+        let mut bytes = [0; 32];
+        for (bytes, chunk) in bytes.chunks_exact_mut(8).zip(self.0) {
+            bytes.copy_from_slice(&chunk.to_le_bytes());
+        }
+        bytes
     }
 }
 
@@ -168,7 +173,7 @@ pub const fn build_imprint_mask_lut<const N: usize>(pattern: [u16; N]) -> [Bitfi
                 const_for!(col_offset in col_begin - col, col_end - col + 1; {
                     if (pattern[(row_offset + margin) as usize] >> (col_offset + margin)) & 0b1 == 0b1 {
                         let pos_idx = (row + row_offset) as usize * pos::U_BOARD_WIDTH + (col + col_offset) as usize;
-                        lut[cartesian_to_index!(row, col) as usize].0[pos_idx / 8] |= 0b1 << (pos_idx % 8);
+                        lut[cartesian_to_index!(row, col) as usize].set_idx(pos_idx);
                     }
                 });
             });
@@ -182,7 +187,7 @@ impl Not for Bitfield {
     type Output = Self;
 
     fn not(self) -> Self::Output {
-        Self((!self.to_simd() & Self::LEGAL_MASK.to_simd()).into())
+        Self((!self.to_simd() & Self::LEGAL_MASK.to_simd()).to_array())
     }
 }
 
@@ -190,7 +195,7 @@ impl BitAnd for Bitfield {
     type Output = Self;
 
     fn bitand(self, rhs: Self) -> Self::Output {
-        Self((self.to_simd() & rhs.to_simd()).into())
+        Self((self.to_simd() & rhs.to_simd()).to_array())
     }
 }
 
@@ -198,7 +203,7 @@ impl BitOr for Bitfield {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
-        Self((self.to_simd() | rhs.to_simd()).into())
+        Self((self.to_simd() | rhs.to_simd()).to_array())
     }
 }
 
@@ -206,7 +211,7 @@ impl BitXor for Bitfield {
     type Output = Self;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
-        Self((self.to_simd() ^ rhs.to_simd()).into())
+        Self((self.to_simd() ^ rhs.to_simd()).to_array())
     }
 }
 
@@ -322,9 +327,9 @@ impl_debug_from_display!(Bitfield);
 impl serde::Serialize for Bitfield {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
         if serializer.is_human_readable() {
-            serializer.serialize_str(&general_purpose::URL_SAFE_NO_PAD.encode(&self.0))
+            serializer.serialize_str(&general_purpose::URL_SAFE_NO_PAD.encode(self.to_bytes()))
         } else {
-            serializer.serialize_bytes(&self.0)
+            serializer.serialize_bytes(&self.to_bytes())
         }
     }
 }
@@ -341,7 +346,7 @@ impl<'de> serde::Deserialize<'de> for Bitfield {
         }
             .try_into()
             .map_err(|_| serde::de::Error::custom("invalid bitfield binary"))
-            .map(Self)
+            .map(Self::from_bytes)
 
     }
 }

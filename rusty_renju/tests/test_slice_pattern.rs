@@ -103,9 +103,9 @@ mod test_slice_pattern {
 
             $(test_both_flow!($case, $open_three, $color, OPEN_THREE, OPEN_THREE);)?
 
-            $(test_both_flow!($case, $closed_four_single, $color, CLOSED_FOUR_DOUBLE, CLOSED_FOUR_SINGLE);)?
+            $(test_both_flow!($case, $closed_four_single, $color, CLOSED_FOURS, CLOSED_FOUR_SINGLE);)?
 
-            $(test_both_flow!($case, $closed_four_double, $color, CLOSED_FOUR_DOUBLE, CLOSED_FOUR_DOUBLE);)?
+            $(test_both_flow!($case, $closed_four_double, $color, CLOSED_FOURS, CLOSED_FOURS);)?
 
             $(test_both_flow!($case, $open_four, $color, OPEN_FOUR, OPEN_FOUR);)?
 

@@ -53,8 +53,9 @@ mod bench_endgame {
             let td = ThreadData::new(WorkerThread::<Instant>::new(), 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
+                let mut pv = PrincipalVariation::EMPTY;
                 let result = search_endgame::quiescence_search::<{ RuleKind::Renju }, { ThreatSearchKind::VCF }>(
-                    &mut td.clone(), &mut PrincipalVariation::EMPTY, Depth::ZERO, &mut state, -Score::INF, Score::INF, true,
+                    &mut td.clone(), &mut pv, Depth::ZERO, &mut state, -Score::INF, Score::INF, true,
                 );
 
                 tt.clear();

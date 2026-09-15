@@ -1,5 +1,4 @@
 use crate::board::Board;
-use crate::board_io::{HISTORY_LITERAL_PASS, HISTORY_LITERAL_SEPARATOR};
 use crate::impl_debug_from_display;
 use crate::notation::color::Color;
 use crate::notation::pos;
@@ -174,14 +173,9 @@ impl History {
 impl Display for History {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let history = self.iter()
-            .map(|&action|
-                match action {
-                    MaybePos::NONE => HISTORY_LITERAL_PASS.to_string(),
-                    pos => pos.unwrap().to_string()
-                }
-            )
+            .map(MaybePos::to_string)
             .collect::<Vec<_>>()
-            .join(HISTORY_LITERAL_SEPARATOR);
+            .join("");
 
         write!(f, "{history}")
     }

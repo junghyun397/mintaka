@@ -363,7 +363,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
         } else if Pf::COMPLETE_PROOF {
             generate_full_endgame_moves::<R, { ThreatSearchKind::VCF }>(state)
         } else {
-            generate_endgame_moves::<R, { ThreatSearchKind::VCF }>(
+            generate_endgame_moves::<R, { ThreatSearchKind::VCF }, 0>(
                 td, state,
                 state.history.previous_action().unwrap(),
             )

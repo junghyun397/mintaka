@@ -162,8 +162,8 @@ fn forbidden_penalty<W: WeightSet>(kind: ForbiddenKind) -> i16 {
 fn encode_key(pattern: Pattern) -> usize {
     let mut acc = 0;
 
-    acc |= (pattern.count_closed_fours().min(3) as usize) << 6;
-    acc |= (pattern.count_open_threes().min(3) as usize) << 4;
+    acc |= (pattern.count_closed_four().min(3) as usize) << 6;
+    acc |= (pattern.count_open_three().min(3) as usize) << 4;
     acc |= (pattern.count_potential_four().min(3) as usize) << 2;
     acc |= pattern.count_potential_three().min(3) as usize;
 
