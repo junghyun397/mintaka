@@ -1,12 +1,13 @@
 import json
-import queue
+import logging
 import secrets
 import signal
 import sys
 import threading
 import urllib.error
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Callable, Iterator
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
@@ -40,19 +41,26 @@ class RemoteWorker:
     address: str
     run_id: str
 
-    def play(self, opening_no, opening):
+    def play(self, opening):
         return arena.PairResult.from_json(request_json(self.address, "/play", {
             "run_id": self.run_id,
-            "opening_no": opening_no,
             "opening": opening.to_json(),
         }))
 
-    def stop(self):
+    def stop(self, timeout=None):
         try:
-            request_json(self.address, "/stop", {"run_id": self.run_id})
+            request_json(self.address, "/stop", {"run_id": self.run_id}, timeout=timeout)
         except HTTPError as error:
             if error.status != 409:
                 raise
+
+
+@dataclass
+class Worker:
+    concurrency: int
+    play: Callable[[arena.Opening], arena.PairResult]
+    remote: RemoteWorker | None = None
+    active: int = 0
 
 
 @contextmanager
@@ -80,101 +88,167 @@ class WorkerManager:
     def __init__(self, config: arena.Config):
         self.config = config
         self.run_id = secrets.token_hex(16)
-        self.remotes = []
-        self.available = queue.Queue()
-        self.lock = threading.Lock()
+        self.workers: list[Worker] = []
+        self.lock = threading.Condition()
         self.executor = None
         self.failure = None
+
+    @property
+    def concurrency(self) -> int:
+        with self.lock:
+            return sum(worker.concurrency for worker in self.workers)
 
     def __enter__(self):
         try:
             self.prepare()
-            self.executor = ThreadPoolExecutor(max_workers=self.config.args.concurrency)
+            self.executor = ThreadPoolExecutor(max_workers=self.concurrency)
         except BaseException:
             self.__exit__(*sys.exc_info())
             raise
         return self
 
     def prepare(self):
-        args = self.config.args
-        remaining = args.concurrency
-        sources = binary_manager.prepare_sources(args) if args.worker_addresses else None
-        settings = {name: getattr(args, name) for name in arena.GAME_SETTINGS}
+        remaining = self.config.args.concurrency
+        sources = binary_manager.prepare_sources(self.config.args) if self.config.args.worker_addresses else None
+        settings = {name: getattr(self.config.args, name) for name in arena.GAME_SETTINGS}
+        addresses = list(dict.fromkeys(self.config.args.worker_addresses or ["local"]))
 
-        for address in args.worker_addresses or ["local"]:
-            if remaining == 0:
-                break
-
-            if address == "local":
-                count = remaining
-                config = binary_manager.build_config(sources, settings) if sources else self.config
-                play = partial(arena.play_pair, config)
-            else:
-                try:
-                    capacity = request_json(address, "/status", timeout=5)
-                except (HTTPError, OSError) as error:
-                    print(f"Arena skipping {address}: {error}", flush=True)
-                    continue
-
+        with ThreadPoolExecutor(max_workers=len(addresses)) as executor:
+            capacities = list(executor.map(self.capacity, addresses))
+            starts = []
+            for address, capacity in zip(addresses, capacities):
+                if remaining == 0:
+                    break
                 count = min(remaining, capacity)
-                remote = RemoteWorker(address, self.run_id)
-                self.remotes.append(remote)
-                try:
-                    request_json(address, "/start", {
-                        "run_id": self.run_id,
-                        "workers": count,
-                        "sources": {name: source.to_json() for name, source in sources.items()},
-                        "settings": settings,
-                    })
-                except HTTPError as error:
-                    if error.status != 409:
-                        raise
-                    self.remotes.remove(remote)
-                    print(f"Arena skipping {address}: {error}", flush=True)
+                if count <= 0:
                     continue
-                play = remote.play
+                starts.append(executor.submit(self.start_worker, address, count, sources, settings))
+                remaining -= count
 
-            for _ in range(count):
-                self.available.put(play)
-            remaining -= count
-            if args.worker_addresses:
-                print(f"Arena workers: {address}={count}", flush=True)
+            for future in starts:
+                future.result()
 
+        remaining = self.config.args.concurrency - self.concurrency
         if remaining:
-            raise RuntimeError(f"insufficient arena workers: requested {args.concurrency}, missing {remaining}")
+            raise RuntimeError(f"insufficient arena workers: requested {self.config.args.concurrency}, missing {remaining}")
 
-    def submit(self, opening_no: int, opening: arena.Opening):
-        with self.lock:
-            if self.failure is not None:
-                raise RuntimeError("arena worker failed") from self.failure
-            return self.executor.submit(self.play, opening_no, opening)
-
-    def play(self, opening_no, opening):
-        with self.lock:
-            if self.failure is not None:
-                raise RuntimeError("arena worker failed") from self.failure
-        worker = self.available.get()
+    def capacity(self, address):
+        if address == "local":
+            return self.config.args.concurrency
         try:
-            return worker(opening_no, opening)
+            return request_json(address, "/status", timeout=5)
+        except (HTTPError, OSError) as error:
+            logging.warning(f"Arena skipping {address}: {error}")
+            return 0
+
+    def start_worker(self, address, count, sources, settings):
+        remote = None
+        if address == "local":
+            config = binary_manager.build_config(sources, settings) if sources else self.config
+            play = partial(
+                arena.play_pair, config.path_params_resource, config.args.draw_in,
+                log_prefix_filter=tuple(config.args.log_prefix_filter or ()),
+            )
+        else:
+            remote = RemoteWorker(address, self.run_id)
+            play = remote.play
+
+        worker = Worker(count, play, remote)
+        with self.lock:
+            self.workers.append(worker)
+        if remote is not None:
+            try:
+                request_json(address, "/start", {
+                    "run_id": self.run_id,
+                    "workers": count,
+                    "sources": {name: source.to_json() for name, source in sources.items()},
+                    "settings": settings,
+                })
+            except HTTPError as error:
+                if error.status != 409:
+                    raise
+                with self.lock:
+                    self.workers.remove(worker)
+                logging.warning(f"Arena skipping {address}: {error}")
+                return
+
+        if self.config.args.worker_addresses:
+            logging.info(f"Arena workers: {address}={count}")
+
+    def submit(self, opening: arena.Opening):
+        with self.lock:
+            if self.failure is not None:
+                raise RuntimeError("arena worker failed") from self.failure
+            return self.executor.submit(self.play, opening)
+
+    def results(self, openings: list[arena.Opening]) -> Iterator[arena.PairResult]:
+        pending = set()
+        next_opening = 0
+
+        try:
+            while pending or next_opening < self.config.args.max_openings:
+                while next_opening < self.config.args.max_openings and len(pending) < self.concurrency:
+                    pending.add(self.submit(openings[next_opening]))
+                    next_opening += 1
+
+                done, _ = wait(pending, return_when=FIRST_COMPLETED)
+                future = done.pop()
+                pending.remove(future)
+                pair = future.result()
+                if pair is not None:
+                    yield pair
+        finally:
+            for future in pending:
+                future.cancel()
+
+    def play(self, opening: arena.Opening) -> arena.PairResult | None:
+        with self.lock:
+            while True:
+                if self.failure is not None:
+                    raise RuntimeError("arena worker failed") from self.failure
+                worker = next((worker for worker in self.workers if worker.active < worker.concurrency), None)
+                if worker is not None:
+                    worker.active += 1
+                    break
+                self.lock.wait()
+
+        try:
+            return worker.play(opening)
         except BaseException as error:
             with self.lock:
-                if self.failure is None:
-                    self.failure = error
-            raise
+                if worker.remote is None or not isinstance(error, Exception):
+                    self.failure = self.failure or error
+                    raise
+                if worker.concurrency:
+                    removed = worker.concurrency
+                    worker.concurrency = 0
+                    logging.warning(f"Arena disabled {worker.remote.address}: "
+                                    f"removed concurrency={removed}, adjusted concurrency={self.concurrency}: {error}")
+                if self.concurrency == 0:
+                    self.failure = self.failure or error
+                    raise RuntimeError("no arena workers remaining") from error
+            return None
         finally:
-            self.available.put(worker)
+            with self.lock:
+                worker.active -= 1
+                self.lock.notify_all()
 
     def __exit__(self, exc_type, exc_value, traceback):
         cleanup_error = None
         with finish_on_interrupt():
             if self.executor is not None:
                 self.executor.shutdown(wait=True, cancel_futures=True)
-            for remote in self.remotes:
+            for worker in self.workers:
+                if worker.remote is None:
+                    continue
                 try:
-                    remote.stop()
+                    worker.remote.stop(timeout=5 if worker.concurrency == 0 else None)
                 except Exception as error:
-                    print(f"Arena stop failed for {remote.address}: {error}", file=sys.stderr, flush=True)
-                    cleanup_error = cleanup_error or error
+                    if worker.concurrency == 0:
+                        logging.warning(f"Arena stop failed for {worker.remote.address}: {error}")
+                    else:
+                        logging.error(f"Arena stop failed for {worker.remote.address}: {error}")
+                        cleanup_error = cleanup_error or error
         if exc_type is None:
             if self.failure is not None:
                 raise RuntimeError("arena worker failed") from self.failure

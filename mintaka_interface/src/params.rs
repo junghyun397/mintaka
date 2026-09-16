@@ -22,7 +22,7 @@ struct Args<const R: RuleKind> {
     #[argh(option, short = 'h', description = "initial move history")]
     history: Option<History>,
     #[argh(option, short = 'u', description = "time unit: Clock (milliseconds) or Nodes (kilo)")]
-    unit: Option<TimeUnit>,
+    time_unit: Option<TimeUnit>,
     #[argh(option, description = "total budget; 0 disables the limit")]
     time_total: Option<u32>,
     #[argh(option, description = "increment")]
@@ -58,7 +58,7 @@ impl<const R: RuleKind> From<Args<R>> for Params<R> {
 
         let mut config = Config::default();
 
-        if let Some(unit) = args.unit {
+        if let Some(unit) = args.time_unit {
             config.initial_timer.time_unit = unit;
         }
 

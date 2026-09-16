@@ -2,9 +2,9 @@ FROM rust:alpine
 
 RUN apk add --no-cache build-base git openssh-client python3
 
-WORKDIR /var/lib/mintaka
+WORKDIR /app/mintaka
 
-RUN git config --global --add safe.directory /var/lib/mintaka
+RUN git config --global --add safe.directory /app/mintaka
 
 COPY . .
 

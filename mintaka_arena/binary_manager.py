@@ -1,17 +1,15 @@
 import argparse
 import base64
 import hashlib
+import logging
 import shutil
 import subprocess
 import tempfile
 from contextlib import ExitStack
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    import arena
+import arena
 
 
 def git(*args, cwd=None) -> bytes:
@@ -35,50 +33,30 @@ def fetch_master() -> str:
 class Source:
     commit: str
     patch: bytes | None = None
-    patch_created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def patch_hash(self) -> str | None:
         return hashlib.sha256(self.patch).hexdigest() if self.patch else None
 
     def key(self) -> str:
-        if self.patch:
-            created_at = self.patch_created_at
-        else:
-            commit_time = int(git("show", "-s", "--format=%ct", self.commit))
-            created_at = datetime.fromtimestamp(commit_time, timezone.utc)
-
-        timestamp = created_at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        return f"{timestamp}-{self.commit}-{self.patch_hash()}"
+        patch_hash = self.patch_hash()
+        return f"{self.commit}-{patch_hash}" if patch_hash else self.commit
 
     def to_json(self):
         return {
             "commit": self.commit,
             "patch_hash": self.patch_hash(),
             "patch": base64.b64encode(self.patch).decode("ascii") if self.patch else None,
-            "patch_created_at": self.patch_created_at.isoformat(),
         }
 
     @classmethod
     def from_json(cls, data):
         patch = base64.b64decode(data["patch"]) if data["patch"] else None
 
-        return cls(
-            data["commit"], patch,
-            datetime.fromisoformat(data["patch_created_at"]),
-        )
+        return cls(data["commit"], patch)
 
     @classmethod
     def from_patch(cls, commit: str, path: Path):
-        patch = path.read_bytes()
-        if not patch:
-            return cls(commit)
-
-        created_at = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
-        suffix = f"-{commit}-{hashlib.sha256(patch).hexdigest()}"
-        if path.name.startswith("patch-") and path.name.endswith(suffix):
-            patch_time = path.name[6:-len(suffix)].removesuffix("Z")
-            created_at = datetime.fromisoformat(patch_time).replace(tzinfo=timezone.utc)
-        return cls(commit, patch, created_at)
+        return cls(commit, path.read_bytes() or None)
 
     @classmethod
     def from_worktree(cls, commit: str):
@@ -106,7 +84,7 @@ def save_sources(sources: dict[str, Source]):
 
 def prepare_sources(args) -> dict[str, Source]:
     master = fetch_master()
-    base_commit = resolve_commit(args.base_ref)
+    base_commit = resolve_commit(args.base_ref) if args.base_ref else master
     if args.base_patch:
         base = Source.from_patch(base_commit, Path(args.base_patch))
     else:
@@ -123,18 +101,18 @@ def prepare_sources(args) -> dict[str, Source]:
     return sources
 
 
-def build_binary(source: Source, *, use_worktree: bool = True) -> Path:
+def build_binary(source: Source, rule: arena.Rule = arena.Rule.RENJU, *, use_worktree: bool = True) -> Path:
     key = source.key()
     patch_path = save_patch(key, source.patch) if source.patch else None
 
-    binary_name = "mintaka_text_protocol_renju"
+    binary_name = f"mintaka_text_protocol_{rule}"
     cached = Path("artifacts/engines") / f"{binary_name}-{key}"
     cached.parent.mkdir(parents=True, exist_ok=True)
     if cached.is_file():
-        print(f"Arena cache hit: {cached}", flush=True)
+        logging.info(f"Arena cache hit: {cached}")
         return cached
 
-    print(f"Arena building: {key}", flush=True)
+    logging.info(f"Arena building: {key}")
     with ExitStack() as stack:
         worktree = Path(".")
         target = Path("target")
@@ -155,8 +133,7 @@ def build_binary(source: Source, *, use_worktree: bool = True) -> Path:
     return cached
 
 
-def build_config(sources: dict[str, Source], settings: dict) -> "arena.Config":
-    import arena
-
-    paths = {f"{name}_path": str(build_binary(source)) for name, source in sources.items()}
+def build_config(sources: dict[str, Source], settings: dict) -> arena.Config:
+    rule = arena.Rule(settings["rule"])
+    paths = {f"{name}_path": str(build_binary(source, rule)) for name, source in sources.items()}
     return arena.Config(argparse.Namespace(**settings, **paths))

@@ -20,9 +20,9 @@ pub enum Message {
 
 pub enum ConfigCommand {
     TimeUnit(TimeUnit),
-    TotalTime(TimeValue),
-    IncrementTime(TimeValue),
-    TurnTime(TimeValue),
+    TotalTime(u64),
+    IncrementTime(u64),
+    TurnTime(u64),
     MaxDepth(u32),
     Workers(u32),
     ResizeTT(ByteSize),

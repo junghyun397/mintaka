@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="sprt" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+  <configuration default="false" name="sprt-short" type="PythonConfigurationType" factoryName="Python">
     <module name="mintaka" />
     <option name="ENV_FILES" value="" />
     <option name="INTERPRETER_OPTIONS" value="" />
@@ -14,8 +14,8 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <option name="DEBUG_JUST_MY_CODE" value="false" />
     <option name="RUN_TOOL" value="" />
-    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mintaka_trainer/arena/sprt.py" />
-    <option name="PARAMETERS" value="--base-path target/release/mintaka_text_protocol_renju_base --base-params &quot;--workers 1 --memory-in-mib 32&quot; --target-path target/release/mintaka_text_protocol_renju_target --target-params &quot;--workers 1 --memory-in-mib 32&quot; --time 10000 400 0 --openings-file openings.csv --max-openings 100 --concurrency 12 --elo0 0.0 --elo1 5.0 --concise" />
+    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mintaka_arena/sprt.py" />
+    <option name="PARAMETERS" value="--rule Renju --base-path target/release/mintaka_text_protocol_renju --target-path target/release/mintaka_text_protocol_renju --base-params &quot;--workers 1 --memory-in-mib 32&quot; --target-params &quot;--workers 1 --memory-in-mib 32&quot; --concurrency 8 --openings-file openings.csv --time-unit Clock --time 500 200 0 --max-openings 500 --elo0 -4.0 --elo1 8.0 --alpha 0.3 --beta 0.3" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

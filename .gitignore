@@ -1,12 +1,12 @@
 /.idea
 /.venv
 /artifacts
-/compose-artifacts
+/compose-arena-data
 /target
 /sessions
 /temp
 /.pnpm-store
 __pycache__
 max_config.toml
-openings.csv
-**/playground.rs
+/openings
+/exp

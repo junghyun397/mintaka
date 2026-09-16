@@ -47,8 +47,8 @@ export const DefaultWorkerConfig: Config = {
     initial_timer: {
         time_unit: "Clock",
         total_remaining: undefined,
-        increment: timeValue(0),
-        turn: timeValue(5),
+        increment: timeValue(0, "Clock"),
+        turn: timeValue(5, "Clock"),
     },
     spawn_depth_specialist: false,
 }
@@ -62,7 +62,7 @@ export const MaxWorkerConfig: Config = {
     initial_timer: {
         time_unit: "Clock",
         total_remaining: undefined,
-        increment: timeValue(0),
+        increment: timeValue(0, "Clock"),
         turn: undefined,
     },
     spawn_depth_specialist: true,

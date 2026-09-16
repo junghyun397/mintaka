@@ -1,17 +1,18 @@
 FROM rust:alpine AS builder
 
-RUN apk add --no-cache build-base \
-    && rustup toolchain install nightly-2025-11-15 --profile minimal
+RUN apk add --no-cache build-base
 
 WORKDIR /app
 
 COPY . .
 
+RUN rustup toolchain install --profile minimal
+
 # cached build
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/app/target \
-    cargo +nightly-2025-11-15 build --locked --release -p mintaka_server \
+    cargo build --locked --release -p mintaka_server \
     && cp /app/target/release/mintaka_server /tmp/mintaka_server
 
 FROM alpine AS runtime

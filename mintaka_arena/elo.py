@@ -1,5 +1,5 @@
+import logging
 import math
-from concurrent.futures import FIRST_COMPLETED, wait
 
 import arena
 import worker_manager
@@ -28,6 +28,7 @@ def main():
     parser.add_argument("--target-elo", type=float, default=1000.0)
 
     config = arena.Config(parser.parse_args())
+    arena.configure_logging(config.args.log_level)
     openings = arena.load_openings(config)
 
     score = 0.5
@@ -44,72 +45,44 @@ def main():
 
     completed_openings = 0
     decision = "complete"
+    stats = None
 
-    print(f"{arena.datetime_prefix(config)}ELO Started: "
-          f"base={config.args.base_elo:g}, target={config.args.target_elo:g}, "
-          f"openings=[{config.args.min_openings}, {config.args.max_openings}],",
-          f"concurrency={config.args.concurrency}",
-          flush=True)
+    logging.info(f"ELO Started [{config.args.min_openings}, {config.args.max_openings}]: "
+                 f"concurrency={config.args.concurrency}, "
+                 f"base={config.args.base_elo:g}, target={config.args.target_elo:g}")
 
-    with worker_manager.WorkerManager(config) as executor:
-        pending = {
-            executor.submit(opening_no, openings[opening_no])
-            for opening_no in range(min(config.args.concurrency, config.args.max_openings))
-        }
-        next_opening = len(pending)
+    with worker_manager.WorkerManager(config) as workers:
+        for pair in workers.results(openings):
+            pair_results = arena.game_results(pair.snapshots.values())
+            pair_score = arena.pentanomial_score[arena.player_wdl(pair_results)]
+            pentanomial[int(pair_score * 2)] += 1
+            squared_errors += (pair_score / 2.0 - score) ** 2
 
-        try:
-            while pending:
-                done, _ = wait(pending, return_when=FIRST_COMPLETED)
-                future = done.pop()
-                pending.remove(future)
-                pair = future.result()
+            for player_or_color in results:
+                results[player_or_color] += pair_results[player_or_color]
+            completed_openings += 1
 
-                pair_score = arena.pentanomial_score[arena.player_wdl(pair.results)]
-                pentanomial[int(pair_score * 2)] += 1
-                squared_errors += (pair_score / 2.0 - score) ** 2
+            score = sum(idx * count for idx, count in enumerate(pentanomial)) / (completed_openings * 4)
+            elo_delta = calculate_elo(score)
+            elo[arena.Player.TARGET] = elo[arena.Player.BASE] + elo_delta
 
-                for player_or_color in results:
-                    results[player_or_color] += pair.results[player_or_color]
-                completed_openings += 1
+            lower, upper = calculate_ci95(score, squared_errors, completed_openings)
+            half_width = (upper - lower) / 2.0
 
-                score = sum(idx * count for idx, count in enumerate(pentanomial)) / (completed_openings * 4)
-                elo_delta = calculate_elo(score)
-                elo[arena.Player.BASE] -= elo_delta / 2.0
-                elo[arena.Player.TARGET] += elo_delta / 2.0
+            stats = (f"wdl={results[arena.Player.TARGET]}-{results[None]}-{results[arena.Player.BASE]}, "
+                     f"bdw={results[arena.Color.BLACK]}-{results[None]}-{results[arena.Color.WHITE]}, "
+                     f"pen={pentanomial}, "
 
-                lower, upper = calculate_ci95(score, squared_errors, completed_openings)
-                half_width = (upper - lower) / 2.0
+                     f"delta={elo_delta:+.2f}, elo={elo[arena.Player.BASE]:.2f}-{elo[arena.Player.TARGET]:.2f}, "
+                     f"ci95=[{lower:+.2f}, {upper:+.2f}], ci95-hw={half_width:.2f}")
 
-                stats = (f"wdl={results[arena.Player.TARGET]}-{results[None]}-{results[arena.Player.BASE]}, "
-                         f"bdw={results[arena.Color.BLACK]}-{results[None]}-{results[arena.Color.WHITE]}, "
-                         f"pen={pentanomial}, "
+            logging.info(f"Pair Finished [{completed_openings}/{config.args.max_openings}]: {stats}")
 
-                         f"delta={elo_delta:+.2f}, elo={elo[arena.Player.BASE]:.2f}-{elo[arena.Player.TARGET]:.2f}, "
-                         f"ci95=[{lower:+.2f}, {upper:+.2f}], ci95-hw={half_width:.2f}")
+            if completed_openings >= config.args.min_openings and half_width <= 2.0:
+                decision = "precision"
+                break
 
-                print(f"{arena.datetime_prefix(config)}[{completed_openings}/{config.args.max_openings}] "
-                      f"Pair Finished: {stats}",
-                      flush=True)
-
-                if completed_openings >= config.args.min_openings and half_width <= 2.0:
-                    decision = "precision"
-                    break
-
-                if next_opening < config.args.max_openings:
-                    pending.add(executor.submit(
-                        next_opening, openings[next_opening]
-                    ))
-                    next_opening += 1
-        finally:
-            for future in pending:
-                future.cancel()
-
-    print(f"{arena.datetime_prefix(config)}ELO Finished: {decision},",
-          f"openings={completed_openings}/{config.args.max_openings},",
-
-          f"{stats}",
-          flush=True)
+    logging.info(f"ELO Finished [{completed_openings}/{config.args.max_openings}]: {decision}, {stats}")
 
 
 if __name__ == "__main__":

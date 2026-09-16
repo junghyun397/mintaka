@@ -60,8 +60,16 @@ impl TimeValue {
         Self::new(duration.as_nanos())
     }
 
+    pub const fn to_duration(&self) -> Duration {
+        Duration::from_nanos(self.0 as u64)
+    }
+
     pub const fn from_nodes(nodes: Nodes) -> Self {
         Self::new(nodes.in_1k as u128 * 1_000)
+    }
+    
+    pub const fn to_nodes(&self) -> Nodes {
+        Nodes::from_in_1k((self.0 / 1_000) as u32)
     }
 
     pub fn multiply_clamp(&self, factor: f64, max: Self) -> Self {

@@ -6,7 +6,12 @@ services:
       dockerfile: mintaka_arena/Dockerfile
     image: mintaka-arena-worker:latest
     command: ["--address", "0.0.0.0", "--port", "${PORT:-8095}", "--max-concurrency", "${CONCURRENCY:-6}"]
+    environment:
+      CARGO_INCREMENTAL: "1"
     ports:
       - ${ADDRESS:-0.0.0.0}:${PORT:-8095}:${PORT:-8095}
     volumes:
-      - ../compose-artifacts:/var/lib/mintaka/artifacts
+      - ../compose-arena-data/artifacts:/app/mintaka/artifacts
+      - ../compose-arena-data/target:/app/mintaka/target
+      - ../compose-arena-data/cargo/registry:/usr/local/cargo/registry
+      - ../compose-arena-data/cargo/git:/usr/local/cargo/git

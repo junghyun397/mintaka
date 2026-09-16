@@ -23,7 +23,7 @@ pub fn entry<const R: RuleKind>() -> Result<(), impl Error> {
     piskvork_protocol::<R>()
 }
 
-const PROTOCOL_MARGIN: TimeValue = TimeValue::from_duration(Duration::from_millis(30));
+const PROTOCOL_MARGIN: u64 = 30;
 
 enum PiskvorkResponse {
     Message(String),
@@ -141,13 +141,17 @@ fn piskvork_protocol<const R: RuleKind>() -> Result<(), impl Error> {
                 stdio_out(Ok(PiskvorkResponse::Pos(best_move.best_move.unwrap_or(Pos::from_cartesian(7, 7)))));
             }
             Message::Config(ConfigCommand::TotalTime(total)) => {
-                timer.total_remaining = Some(total);
+                timer.total_remaining = Some(TimeValue::from_value(total, TimeUnit::Clock));
             }
             Message::Config(ConfigCommand::IncrementTime(increment)) => {
+                let increment = TimeValue::from_value(increment, TimeUnit::Clock);
+
                 config.initial_timer.increment = increment;
                 timer.increment = increment;
             }
             Message::Config(ConfigCommand::TurnTime(turn)) => {
+                let turn = TimeValue::from_value(turn, TimeUnit::Clock);
+
                 config.initial_timer.turn = Some(turn);
                 timer.turn = Some(turn)
             }
@@ -405,12 +409,11 @@ fn parse_pos(x: &str, y: &str) -> Result<Pos, &'static str> {
     }
 }
 
-fn parse_time(parameters: &Vec<&str>) -> Result<TimeValue, &'static str> {
+fn parse_time(parameters: &Vec<&str>) -> Result<u64, &'static str> {
     parameters
         .get(2)
         .ok_or("missing info value.")
         .and_then(|token| token.parse::<u64>().map_err(|_| "time parsing failed."))
-        .map(|value| TimeValue::from_value(value, TimeUnit::Clock))
 }
 
 struct Presets;

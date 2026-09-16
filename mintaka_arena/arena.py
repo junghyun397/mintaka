@@ -2,16 +2,28 @@ from __future__ import annotations
 
 import argparse
 import copy
+import logging
 import random
 import re
 import secrets
 import shlex
 import subprocess
+import sys
 import time
+from collections.abc import Iterable
 from contextlib import ExitStack
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from enum import Enum
+
+
+class Rule(Enum):
+    RENJU = "Renju"
+    GOMOKU = "Gomoku"
+    FREESTYLE = "Freestyle"
+
+    def __str__(self) -> str:
+        return self.name.lower()
 
 
 class Color(Enum):
@@ -42,8 +54,7 @@ class TimeUnit(Enum):
 
 
 GAME_SETTINGS = (
-    "base_params", "target_params", "time_unit", "time", "draw_in",
-    "max_openings", "concise", "no_datetime_prefix", "log_prefix_filter",
+    "rule", "base_params", "target_params", "time_unit", "time", "draw_in", "log_prefix_filter",
 )
 
 
@@ -51,7 +62,7 @@ class Config:
     def __init__(self, args):
         self.args = args
 
-        self.path_params_resource = {
+        self.path_params_resource: PathParamsResource = {
             player: (path, params, TimeManager(
                 time_unit=TimeUnit(self.args.time_unit),
                 total_remaining=self.args.time[0] or None,
@@ -85,13 +96,9 @@ class TimeManager:
     increment: int
     turn: int | None
 
-    def apply_increment(self):
+    def consume(self, amount: int):
         if self.total_remaining is not None:
-            self.total_remaining += self.increment
-
-    def consume(self, running_time):
-        if self.total_remaining is not None:
-            self.total_remaining = max(0, self.total_remaining - running_time)
+            self.total_remaining = max(0, self.total_remaining - amount)
 
 
 @dataclass
@@ -117,25 +124,30 @@ class GameSnapshot:
         )
 
 
+Snapshots = dict[Player, GameSnapshot]
+
+
 GameResults = dict[Player | Color | None, int]
+
+
+PathParamsResource = dict[Player, tuple[str, str, TimeManager]]
 
 
 @dataclass
 class PairResult:
     opening: Opening
-    snapshots: list[GameSnapshot]
-    results: GameResults
+    snapshots: Snapshots
 
     def to_json(self):
         return {
             "opening": self.opening.to_json(),
-            "snapshots": [snapshot.to_json() for snapshot in self.snapshots],
+            "snapshots": {player.name: snapshot.to_json() for player, snapshot in self.snapshots.items()},
         }
 
     @classmethod
     def from_json(cls, data) -> PairResult:
-        snapshots = [GameSnapshot.from_json(item) for item in data["snapshots"]]
-        return cls(Opening.from_json(data["opening"]), snapshots, game_results(snapshots))
+        snapshots = {Player[player]: GameSnapshot.from_json(snapshot) for player, snapshot in data["snapshots"].items()}
+        return cls(Opening.from_json(data["opening"]), snapshots)
 
 
 def player_wdl(result: GameResults) -> tuple[int, int, int]:
@@ -150,34 +162,64 @@ def color_wdl(result: GameResults) -> tuple[int, int, int]:
 class Engine:
     process: subprocess.Popen
     resource: TimeManager
+    log_prefix_filter: tuple[str, ...]
+
+    def command(self, command: str) -> str | None:
+        return command_process(self.process, command, self.log_prefix_filter)
+
+    def generate(self) -> str:
+        started = time.perf_counter_ns()
+        response = self.command("gen")
+        elapsed_ms = (time.perf_counter_ns() - started) // 1_000_000
+        if response is None:
+            raise RuntimeError("engine did not report a search result")
+
+        try:
+            result = dict(field.strip().split("=", 1) for field in response.split(","))
+            move = result["pos"]
+            if self.resource.time_unit == TimeUnit.CLOCK:
+                self.resource.consume(elapsed_ms)
+            elif self.resource.total_remaining is not None:
+                self.resource.consume(int(result["nodes"].removesuffix("K")))
+        except (KeyError, ValueError) as error:
+            raise RuntimeError(f"invalid search result: {response}") from error
+
+        return move
+
+    def apply_increment(self):
+        if self.resource.total_remaining is not None:
+            self.resource.total_remaining += self.resource.increment
+            self.command(f"limit time total {self.resource.total_remaining}")
 
 
-def datetime_prefix(config) -> str:
-    if config.args.no_datetime_prefix:
-        return ""
-    else:
-        return datetime.now(timezone.utc).strftime("[%Y-%m-%dT%H:%M:%SZ] ")
+class UTCFormatter(logging.Formatter):
+    converter = time.gmtime
+    default_time_format = "%Y-%m-%dT%H:%M:%S"
+    default_msec_format = "%s.%03dZ"
 
 
-def game_prefix(config, game_no) -> str:
-    return f"[{game_no + 1}/{config.args.max_openings * 2}] "
+def configure_logging(level=logging.INFO):
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(UTCFormatter("%(asctime)s %(levelname)s %(message)s"))
+    logging.basicConfig(
+        level=level,
+        handlers=[handler],
+        force=True,
+    )
 
 
-def turn_prefix(turn_no, player, color) -> str:
-    return f"[#{turn_no}:{player}:{color}] "
-
-
-def snapshot_display(opening: Opening, snapshots: list[GameSnapshot]) -> str:
+def pair_display(opening: Opening, snapshots: Snapshots) -> str:
+    base, target = snapshots[Player.BASE], snapshots[Player.TARGET]
     return (
-        f"duration={snapshots[0].duration.total_seconds()}s-{snapshots[1].duration.total_seconds()}s, "
-        f"history={snapshots[0].history}-{snapshots[1].history}, "
+        f"duration={base.duration.total_seconds()}s-{target.duration.total_seconds()}s, "
+        f"history={base.history}-{target.history}, "
         f"opening={opening.sequence}"
     )
 
 
 def spawn_process(path, params, resource: TimeManager, opening: Opening) -> subprocess.Popen:
     resource_param = [
-        "--unit", resource.time_unit.value,
+        "--time-unit", resource.time_unit.value,
         "--time-total", str(resource.total_remaining or 0),
         "--time-increment", str(resource.increment),
         "--time-turn", str(resource.turn or 0),
@@ -198,159 +240,99 @@ def spawn_process(path, params, resource: TimeManager, opening: Opening) -> subp
 
 
 def command_process(
-        config, process, command,
-        filter_prefix: list[str] | None = None, println_prefix: str = "", logs: list[str] | None = None,
+        process, command: str, filter_prefix: tuple[str, ...],
 ) -> str | None:
     process.stdin.write(f"{command}\n")
     process.stdin.flush()
 
     while True:
-        response = process.stdout.readline()
-
-        if response == "":
-            raise Exception("eof response")
-
-        response = response.strip()
+        response = process.stdout.readline().rstrip("\r\n")
 
         if response == "=":
             return None
 
         if response.startswith("?"):
-            raise Exception(f"command: {command}, error: {response[2:]}")
+            raise RuntimeError(f"command: {command}, error: {response[2:]}")
 
         if response.startswith("=\x02"):
-            while True:
-                stream_response = process.stdout.readline()
-                if stream_response == "":
-                    raise Exception("eof response")
-
-                response += stream_response
-                if "\x03" in stream_response:
-                    return response[2:-(len(stream_response) - stream_response.index("\x03"))]
+            chunks = []
+            line = response[2:]
+            while "\x03" not in line:
+                chunks.append(line)
+                line = process.stdout.readline()
+            chunks.append(line.split("\x03", 1)[0])
+            return "".join(chunks)
 
         if response.startswith("="):
             return response[2:]
 
-        if response.startswith("%") and logs is not None:
-            logs.append(response[2:])
-
-        if (not config.args.concise
-                and response.startswith("%")
-                and filter_prefix is not None
-                and response[2:].startswith(tuple(filter_prefix))
-        ):
-            print(f"{datetime_prefix(config)}{println_prefix}{response[2:]}")
+        if response.startswith("% ") and response[2:].startswith(filter_prefix):
+            logging.debug(response[2:])
 
 
-def play_game(config, game_no: int, opening: Opening) -> GameSnapshot:
+def play_game(
+        path_params_resource: PathParamsResource, draw_in: int, opening: Opening, first_player: Player,
+        log_prefix_filter: tuple[str, ...],
+) -> GameSnapshot:
     game_timer = time.perf_counter_ns()
-    initial_color = opening.initial_color
+    colors = {first_player: opening.initial_color, first_player.flip(): opening.initial_color.flip()}
+    winner = None
 
     with ExitStack() as stack:
         engines = {}
-        for player, (path, params, resource) in config.path_params_resource.items():
+        for player, (path, params, resource) in path_params_resource.items():
             process = stack.enter_context(spawn_process(path, params, resource, opening))
             stack.callback(process.terminate)
+            engines[player] = Engine(process, copy.copy(resource), log_prefix_filter)
 
-            engines[player] = Engine(process, copy.copy(config.path_params_resource[player][2]))
-
-        player = Player.BASE if game_no % 2 == 0 else Player.TARGET
-
-        color = {
-            player: initial_color,
-            player.flip(): initial_color.flip()
-        }
-
-        winner = None
-        turn_no = 0
-
-        while True:
-            turn_no += 1
-            logs = []
-            timer = time.perf_counter_ns()
-
-            move = command_process(
-                config,
-                engines[player].process, "gen",
-                filter_prefix=config.args.log_prefix_filter,
-                println_prefix=f"{game_prefix(config, game_no)}{turn_prefix(turn_no, player, color[player])}",
-                logs=logs,
-            )
-
-            time_elapsed = (time.perf_counter_ns() - timer) // 1_000_000
-
-            resource = engines[player].resource
-            if resource.time_unit == TimeUnit.CLOCK:
-                resource.consume(time_elapsed)
-            elif resource.total_remaining is not None:
-                nodes = next((
-                    match for log in reversed(logs)
-                    if (match := re.search(r"^solution:.*\bnodes=(\d+)[Kk](?:,|$)", log))
-                ), None)
-                if nodes is None:
-                    raise RuntimeError("engine did not report searched nodes")
-                resource.consume(int(nodes[1]))
-
+        player = first_player
+        for _ in range(draw_in):
+            engine = engines[player]
+            move = engine.generate()
             if move == "none":
-                winner = color[player.flip()]
+                winner = (player.flip(), colors[player.flip()])
                 break
 
-            winner_player = command_process(config, engines[player].process, f"play {move}")
-            winner_opponent = command_process(config, engines[player.flip()].process, f"play {move}")
+            result = engine.command(f"play {move}")
+            opponent_result = engines[player.flip()].command(f"play {move}")
 
-            if winner_player != winner_opponent:
-                raise Exception(f"player_winner={winner_player}, opponent_winner={winner_opponent} ")
+            if result != opponent_result:
+                raise RuntimeError(f"player_winner={result}, opponent_winner={opponent_result}")
 
-            if winner_player is not None:
-                if "black" in winner_player.lower():
-                    winner = Color.BLACK
-                elif "white" in winner_player.lower():
-                    winner = Color.WHITE
-
+            if result is not None:
+                if result not in ("draw", "full"):
+                    winner_color = Color(result.split()[0].capitalize())
+                    winner = next((side, color) for side, color in colors.items() if color == winner_color)
                 break
 
-            if resource.total_remaining is not None:
-                resource.apply_increment()
-                command_process(config, engines[player].process, f"limit time total {resource.total_remaining}")
-
-            if turn_no >= config.args.draw_in:
-                break
-
+            engine.apply_increment()
             player = player.flip()
 
-        history = command_process(config, engines[Player.BASE].process, "history")
-        board_str = command_process(config, engines[Player.BASE].process, "board")
+        history = engines[Player.BASE].command("history")
 
-        if board_str is None or history is None:
-            raise Exception("board or history response is None")
-
-        prefix = f"{datetime_prefix(config)}{game_prefix(config, game_no)}"
-        if not config.args.concise:
-            print(f"{prefix}Game State:\n{board_str}")
-            print(f"{prefix}Game History: {history}")
-            print(f"{prefix}Game Finished: base={color[Player.BASE]}, target={color[Player.TARGET]}, win={winner}")
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            board = engines[Player.BASE].command("board")
+            logging.debug(f"Game State:\n{board}")
+            logging.debug(f"Game History: {history}")
+            logging.debug(f"Game Finished: base={colors[Player.BASE]}, target={colors[Player.TARGET]}, win={winner}")
 
     duration = timedelta(microseconds=(time.perf_counter_ns() - game_timer) // 1_000)
-
-    if winner is None:
-        return GameSnapshot(winner=None, duration=duration, history=history)
-
-    return GameSnapshot(
-        winner=(Player.BASE if winner == color[Player.BASE] else Player.TARGET, winner),
-        duration=duration, history=history,
-    )
+    return GameSnapshot(winner=winner, duration=duration, history=history)
 
 
-def play_pair(config, opening_no: int, opening: Opening) -> PairResult:
-    snapshots = [
-        play_game(config, opening_no * 2 + 0 if first_player.value == Player.BASE else 1, opening)
+def play_pair(
+        path_params_resource: PathParamsResource, draw_in: int, opening: Opening,
+        log_prefix_filter: tuple[str, ...],
+) -> PairResult:
+    snapshots = {
+        first_player: play_game(path_params_resource, draw_in, opening, first_player, log_prefix_filter)
         for first_player in Player
-    ]
+    }
 
-    return PairResult(opening, snapshots, game_results(snapshots))
+    return PairResult(opening, snapshots)
 
 
-def game_results(snapshots: list[GameSnapshot]) -> GameResults:
+def game_results(snapshots: Iterable[GameSnapshot]) -> GameResults:
     results = {
         Player.BASE: 0,
         Player.TARGET: 0,
@@ -384,10 +366,12 @@ def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
 
     parser.add_argument("--seed", type=int, default=secrets.randbits(32))
 
+    parser.add_argument("--rule", type=str, choices=[rule.value for rule in Rule], default=Rule.RENJU.value)
+
     parser.add_argument("--worker-addresses", type=str, nargs="+")
 
     parser.add_argument("--base-path", type=str)
-    parser.add_argument("--base-ref", type=str, help="Base commit on master")
+    parser.add_argument("--base-ref", type=str, help="Base commit on master (default: origin/master)")
     parser.add_argument("--base-patch", type=str, help="Base patch file")
     parser.add_argument("--base-params", type=str, default="")
 
@@ -399,15 +383,14 @@ def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
     parser.add_argument("--max-openings", type=int, default=100)
     parser.add_argument("--concurrency", type=int, default=2)
 
-    parser.add_argument("--time-unit", type=str, choices=[unit.value for unit in TimeUnit], default="Clock")
+    parser.add_argument("--time-unit", type=str, choices=[unit.value for unit in TimeUnit], default=TimeUnit.CLOCK.value)
     parser.add_argument("--time", type=int, nargs=3, default=default_time, metavar=("TOTAL", "INCREMENT", "TURN"))
 
     parser.add_argument("--openings-file", type=str, required=True)
     parser.add_argument("--draw-in", type=int, default=225)
 
-    parser.add_argument("--concise", action="store_true", default=False)
-    parser.add_argument("--no-datetime-prefix", action="store_true", default=False)
-    parser.add_argument("--log-prefix-filter", type=str, nargs="*", default=["solution"])
+    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO")
+    parser.add_argument("--log-prefix-filter", type=str, nargs="*")
 
     return parser
 
@@ -415,7 +398,7 @@ def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
 def load_openings(config: Config) -> list[Opening]:
     with open(config.args.openings_file, "r") as openings_file:
         openings = [
-            Opening(Color.BLACK if len(moves) % 2 == 0 else Color.WHITE, ",".join(moves))
+            Opening(Color.BLACK if len(moves) % 2 == 0 else Color.WHITE, "".join(moves))
             for line in openings_file
             if (moves := re.findall(r"[a-o](?:1[0-5]|[1-9])(?!\d)", line.lower()))
         ]

@@ -15,7 +15,7 @@
     <option name="DEBUG_JUST_MY_CODE" value="false" />
     <option name="RUN_TOOL" value="" />
     <option name="SCRIPT_NAME" value="$PROJECT_DIR$/mintaka_trainer/arena/elo.py" />
-    <option name="PARAMETERS" value="--base-path target/release/mintaka_text_protocol_renju_base --base-params &quot;--workers 1 --memory-in-mib 256&quot; --target-path target/release/mintaka_text_protocol_renju_target --target-params &quot;--workers 1 --memory-in-mib 256&quot; --time 120000 0 30000 --openings-file openings.csv --min-openings 100 --max-openings 500 --concurrency 8 --base-elo 1000 --target-elo 100 --concise" />
+    <option name="PARAMETERS" value="--base-path target/release/mintaka_text_protocol_renju_base --base-params &quot;--workers 1 --memory-in-mib 256&quot; --target-path target/release/mintaka_text_protocol_renju_target --target-params &quot;--workers 1 --memory-in-mib 256&quot; --time 120000 0 30000 --openings-file openings.csv --min-openings 100 --max-openings 500 --concurrency 8 --base-elo 1000 --target-elo 100" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

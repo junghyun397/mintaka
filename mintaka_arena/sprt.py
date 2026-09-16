@@ -1,5 +1,5 @@
+import logging
 import math
-from concurrent.futures import FIRST_COMPLETED, wait
 
 import arena
 import worker_manager
@@ -50,6 +50,7 @@ def main():
     parser.add_argument("--beta", type=float, default=0.05)
 
     config = arena.Config(parser.parse_args())
+    arena.configure_logging(config.args.log_level)
     openings = arena.load_openings(config)
 
     lower = math.log(config.args.beta) - math.log1p(-config.args.alpha)
@@ -61,70 +62,44 @@ def main():
 
     completed_openings = 0
     decision = "inconclusive"
+    stats = None
 
-    print(f"{arena.datetime_prefix(config)}SPRT Started:",
-          f"elo=[{config.args.elo0:g}, {config.args.elo1:g}],",
-          f"bounds=[{lower:.3f}, {upper:.3f}],",
-          f"max-openings={config.args.max_openings},",
-          f"concurrency={config.args.concurrency}",
-          flush=True)
+    logging.info(f"SPRT Started [0, {config.args.max_openings}]: "
+                 f"concurrency={config.args.concurrency}, "
+                 f"bounds=[{lower:.3f}, {upper:.3f}], "
+                 f"elo=[{config.args.elo0:g}, {config.args.elo1:g}]")
 
-    with worker_manager.WorkerManager(config) as executor:
-        pending = {
-            executor.submit(opening_no, openings[opening_no])
-            for opening_no in range(min(config.args.concurrency, config.args.max_openings))
-        }
-        next_opening = len(pending)
+    with worker_manager.WorkerManager(config) as workers:
+        for pair in workers.results(openings):
+            pair_results = arena.game_results(pair.snapshots.values())
+            pair_score = arena.pentanomial_score[arena.player_wdl(pair_results)]
 
-        try:
-            while pending:
-                done, _ = wait(pending, return_when=FIRST_COMPLETED)
-                future = done.pop()
-                pending.remove(future)
-                pair = future.result()
+            bucket = int(pair_score * 2)
+            pentanomial = [count + (idx == bucket) for idx, count in enumerate(pentanomial)]
+            llr = calculate_llr(pentanomial, config.args.elo0, config.args.elo1)
 
-                pair_score = arena.pentanomial_score[arena.player_wdl(pair.results)]
+            for player_or_color in results:
+                results[player_or_color] += pair_results[player_or_color]
+            completed_openings += 1
 
-                bucket = int(pair_score * 2)
-                pentanomial = [count + (idx == bucket) for idx, count in enumerate(pentanomial)]
-                llr = calculate_llr(pentanomial, config.args.elo0, config.args.elo1)
+            stats = (f"wdl={results[arena.Player.TARGET]}-{results[None]}-{results[arena.Player.BASE]}, "
+                     f"bdw={results[arena.Color.BLACK]}-{results[None]}-{results[arena.Color.WHITE]}, "
+                     f"pen={pentanomial}, "
 
-                for player_or_color in results:
-                    results[player_or_color] += pair.results[player_or_color]
-                completed_openings += 1
+                     f"llr={llr:.3f}")
 
-                stats = (f"wdl={results[arena.Player.TARGET]}-{results[None]}-{results[arena.Player.BASE]}, "
-                         f"bdw={results[arena.Color.BLACK]}-{results[None]}-{results[arena.Color.WHITE]}, "
-                         f"pen={pentanomial}, "
+            logging.info(f"Pair Finished [{completed_openings}/{config.args.max_openings}]: {stats}")
 
-                         f"llr={llr:.3f}")
+            if llr <= lower:
+                decision = "rejected"
+                break
+            if llr >= upper:
+                decision = "accepted"
+                break
 
-                print(f"{arena.datetime_prefix(config)}[{completed_openings}/{config.args.max_openings}]",
-                      f"Pair Finished: {stats}",
-                      flush=True)
-
-                if llr <= lower:
-                    decision = "rejected"
-                    break
-                if llr >= upper:
-                    decision = "accepted"
-                    break
-
-                if next_opening < config.args.max_openings:
-                    pending.add(executor.submit(
-                        next_opening, openings[next_opening]
-                    ))
-                    next_opening += 1
-        finally:
-            for future in pending:
-                future.cancel()
-
-    print(f"{arena.datetime_prefix(config)}SPRT Finished: {decision},",
-          f"openings={completed_openings}/{config.args.max_openings},",
-
-          f"elo=[{config.args.elo0:g}, {config.args.elo1:g}], bounds=[{lower:.3f}, {upper:.3f}],",
-          f" {stats}",
-          flush=True)
+    logging.info(f"SPRT Finished [{completed_openings}/{config.args.max_openings}]: {decision}, "
+                 f"elo=[{config.args.elo0:g}, {config.args.elo1:g}], bounds=[{lower:.3f}, {upper:.3f}], "
+                 f"{stats}")
 
 
 if __name__ == "__main__":

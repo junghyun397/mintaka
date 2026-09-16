@@ -1,16 +1,14 @@
 # mintaka-arena
 
 * All scripts must be run from **project root**.
-* binary_manager.py creates patches based on origin/master.
-* 
+* binary_manager.py creates a patch based on origin/master.
 
 ## Artifacts
 
-* Patches: `artifacts/patches/patch-YYYY-MM-DDThh:mm:ssZ-<commit>-<patchhash>`
-* Engines: `artifacts/engines/<enginename>-YYYY-MM-DDThh:mm:ssZ-<commit>-<patchhash>`
+* Patches: `artifacts/patches/patch-<commit>-<patch_hash>`
+* Engines: `artifacts/engines/<enginename>-<commit>[-<patch_hash>]` (patch hash only when a patch is present)
 
 ## Snapshot
-
 ```shell
 python3 mintaka_arena/snapshot.py
 ```
@@ -18,45 +16,68 @@ python3 mintaka_arena/snapshot.py
 ## Arena Remote Worker
 
 ```shell
-export ADDRESS=0.0.0.0 && export PORT=8095 && export CONCURRENCY=8
+export ADDRESS=0.0.0.0 PORT=8095 CONCURRENCY=8
 docker compose -f mintaka_arena/docker-compose.yml up --build -d
 ```
 
 ## sprt.py Sequential Probability Ratio Tester
-with local resource
 ```shell
 python3 mintaka_arena/sprt.py
---base-path target/release/mintaka_text_protocol_renju_base
+--rule Renju
+--base-path artifacts/engines/mintaka_text_protocol_renju
+--target-path target/release/mintaka_text_protocol_renju
 --base-params "--workers 1 --memory-in-mib 32"
---target-path target/release/mintaka_text_protocol_renju_target
 --target-params "--workers 1 --memory-in-mib 32"
---time-unit Clock
---time 10000 300 0
+--concurrency 8
 --openings-file openings.csv
---max-openings 100
---concurrency 6
---elo0 0.0
---elo1 5.0
---alpha 0.05
---beta 0.05
---concise
+--time-unit Clock
+--time 500 200 0
+--max-openings 500
+--elo0 -4.0
+--elo1 8.0
+--alpha 0.2
+--beta 0.2
 ````
 
+### SPRT Long
+```shell
+--time-unit Clock
+--time 10000 300 0
+--max-openings 2000
+--elo0 0.0
+--elo1 10.0
+--alpha 0.1
+--beta 0.1
+```
+
 ## elo.py CI95 ELO Tester
-with remote worker, include current uncommited changes
 ```shell
 python3 mintaka_arena/elo.py
---base-ref f0e2e1a43449d314fee27349be732b039d395489
---base-patch artifacts/patches/patch-2026-08-25T10:25:00Z-f0e2e1a43449d314fee27349be732b039d395489-dbb4223897b131e480b1bb111a896d20ef4cce73272f01231570c0e487b4ca99
+--rule Renju
+--base-path artifacts/engines/mintaka_text_protocol_renju
+--target-path target/release/mintaka_text_protocol_renju
 --base-params "--workers 1 --memory-in-mib 256"
 --target-params "--workers 1 --memory-in-mib 256"
---time 120000 0 30000
+--concurrency 8
 --openings-file openings.csv
---min-openings 100
---max-openings 500
---concurrency 6
+--time-unit Clock
+--time 120000 0 30000
+--min-openings 500
+--max-openings 4000
 --base-elo 1000
---target-elo 100
---worker-addresses http://100.64.10.1:8086 local
---concise
+--target-elo 1000
+```
+
+## Fixed-Node Test
+```shell
+--time-unit Nodes
+--time 0 0 100000 # 100M/turn
+```
+
+## Remote Test
+```shell
+--concurrency 172
+--base-ref commit_hash
+--base-patch artifacts/patches/patch-commit_hash-patch_hash
+--worker-addresses http://100.80.10.10:8095 local
 ```

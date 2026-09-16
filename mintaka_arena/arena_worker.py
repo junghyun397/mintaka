@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import threading
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -49,6 +50,8 @@ class ArenaWorker(ThreadingHTTPServer):
             self.run = run
 
         try:
+            logging.info(f"Arena Worker [{run_id}]: preparing {workers} workers")
+
             binary_manager.fetch_master()
             binary_manager.save_sources(sources)
 
@@ -67,6 +70,7 @@ class ArenaWorker(ThreadingHTTPServer):
             if run.stopping:
                 raise worker_manager.HTTPError(409, "run is stopping")
 
+        logging.info(f"Arena Worker [{run_id}]: started {workers} workers")
         return {"workers": workers}
 
     def owned_run(self, run_id):
@@ -75,7 +79,6 @@ class ArenaWorker(ThreadingHTTPServer):
         return self.run
 
     def play(self, data):
-        opening_no = data["opening_no"]
         opening = arena.Opening.from_json(data["opening"])
 
         with self.lock:
@@ -90,7 +93,12 @@ class ArenaWorker(ThreadingHTTPServer):
             run.active += 1
 
         try:
-            pair = arena.play_pair(run.config, opening_no, opening)
+            logging.info(f"Arena Play [{run.run_id}]: opening={opening.sequence}")
+
+            pair = arena.play_pair(
+                run.config.path_params_resource, run.config.args.draw_in, opening,
+                log_prefix_filter=tuple(run.config.args.log_prefix_filter or ()),
+            )
         except BaseException:
             with self.lock:
                 run.stopping = True
@@ -99,6 +107,10 @@ class ArenaWorker(ThreadingHTTPServer):
             with self.lock:
                 run.active -= 1
                 self.lock.notify_all()
+
+        logging.info(f"Arena Plied [{run.run_id}]: opening={opening.sequence}, "
+                     f"base={pair.snapshots[arena.Player.BASE].history}, "
+                     f"target={pair.snapshots[arena.Player.TARGET].history}")
 
         return pair.to_json()
 
@@ -112,10 +124,17 @@ class ArenaWorker(ThreadingHTTPServer):
                 self.run = None
             self.lock.notify_all()
 
+        logging.info(f"Arena Worker [{run.run_id}]: stopped")
         return {"stopped": True}
 
 
 class ArenaWorkerHandler(BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        logging.debug(f"Arena Worker [{self.address_string()}]: {format % args}")
+
+    def log_error(self, format, *args):
+        logging.error(f"Arena Worker [{self.address_string()}]: {format % args}")
+
     def reply(self, status, data):
         body = json.dumps(data).encode()
         try:
@@ -154,9 +173,10 @@ class ArenaWorkerHandler(BaseHTTPRequestHandler):
         try:
             result = handlers[self.path](*args)
         except worker_manager.HTTPError as error:
+            logging.warning(f"Arena worker [{self.address_string()}] {self.path}: {error}")
             self.reply(error.status, {"error": str(error)})
         except Exception as error:
-            self.log_error("%s", error)
+            logging.exception(f"Arena worker [{self.address_string()}] {self.path} failed")
             self.reply(500, {"error": str(error)})
         else:
             self.reply(200, result)
@@ -168,16 +188,19 @@ def main():
     parser.add_argument("--address", type=str, default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8095)
     parser.add_argument("--max-concurrency", type=int, default=6)
+    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO")
 
     args = parser.parse_args()
+    arena.configure_logging(args.log_level)
 
     with ArenaWorker((args.address, args.port), args.max_concurrency) as worker:
-        print(f"Arena worker: address={args.address}, port={args.port}, max-concurrency={args.max_concurrency}", flush=True)
+        logging.info(f"Arena worker: address={args.address}, port={args.port}, max-concurrency={args.max_concurrency}")
         try:
             worker.serve_forever()
         except KeyboardInterrupt:
             pass
         finally:
+            logging.info("Arena worker: shutting down")
             with worker.lock:
                 if worker.run is not None:
                     worker.run.stopping = True

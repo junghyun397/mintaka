@@ -1,14 +1,36 @@
-import type { BestMove, Config, Duration, Response, TimeValue } from "../wasm/pkg/rusty_renju_wasm"
+import type { BestMove, Config, Duration, Response, Timer, TimeUnit, TimeValue } from "../wasm/pkg/rusty_renju_wasm"
 
 export type StatusResponseBody = Extract<Response, { type: "Status" }>["content"]
 
-export function timeValue(secs: number): TimeValue {
-    const wholeSecs = Math.trunc(secs)
-    return BigInt(wholeSecs) * 1_000_000_000n + BigInt(Math.round((secs - wholeSecs) * 1_000_000_000))
+function timeValueScale(unit: TimeUnit): number {
+    return unit === "Clock" ? 1_000_000_000 : 1_000
 }
 
-export function timeValueSeconds(value: TimeValue): number {
-    return Number(value) / 1_000_000_000
+export function timeValue(value: number, unit: TimeUnit): TimeValue {
+    const scale = timeValueScale(unit)
+    const whole = Math.trunc(value)
+    return BigInt(whole) * BigInt(scale) + BigInt(Math.round((value - whole) * scale))
+}
+
+export function timeValueInUnit(value: TimeValue, unit: TimeUnit): number {
+    return Number(value) / timeValueScale(unit)
+}
+
+export function updateTimeUnit(timer: Timer, unit: TimeUnit): Timer {
+    if (timer.time_unit === unit)
+        return timer
+
+    const nanosecondsPerNode = 100n
+    const convert = (value: TimeValue): TimeValue => unit === "Clock"
+        ? value.valueOf() * nanosecondsPerNode
+        : value.valueOf() / nanosecondsPerNode
+
+    return {
+        time_unit: unit,
+        total_remaining: timer.total_remaining === undefined ? undefined : convert(timer.total_remaining),
+        increment: convert(timer.increment),
+        turn: timer.turn === undefined ? undefined : convert(timer.turn),
+    }
 }
 
 export function stringifyMintakaJson(value: unknown): string {

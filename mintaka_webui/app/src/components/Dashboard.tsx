@@ -1,10 +1,10 @@
 import { AppContext } from "../context"
 import { createEffect, createMemo, createResource, createSignal, Match, on, Show, Switch, useContext } from "solid-js"
 import { unwrap } from "solid-js/store"
-import type { Config } from "rusty-renju-web/rusty-renju"
+import type { Config, TimeUnit, TimeValue } from "rusty-renju-web/rusty-renju"
 import { flatmap } from "../utils/undefined"
 import { SERVER_PROTOCOL, SERVER_URL, WEB_WORKER_READY } from "rusty-renju-web/config"
-import { formatNodes, nps, timeValue, timeValueSeconds } from "rusty-renju-web/mintaka"
+import { formatNodes, nps, updateTimeUnit, timeValue, timeValueInUnit } from "rusty-renju-web/mintaka"
 import { checkHealth, type MintakaServerConfig } from "rusty-renju-web/provider/mintaka.server.provider"
 import { Modal, type ModalControlProps } from "./Modal"
 
@@ -178,6 +178,19 @@ function ServerConfigSections() {
 }
 
 function ConfigSections(props: { config: Config, maxConfig: Config }) {
+    const { appActions } = useContext(AppContext)!
+
+    const timeUnit = () => props.config.initial_timer.time_unit
+    const timeLabel = () => timeUnit() === "Clock" ? "seconds" : "K nodes"
+    const maxTimer = () => props.maxConfig.initial_timer.time_unit === timeUnit() ? props.maxConfig.initial_timer : undefined
+    const fromTimeValue = (value: TimeValue) => timeValueInUnit(value, timeUnit())
+    const toTimeValue = (value: number) => timeValue(value, timeUnit())
+
+    const handleTimeUnitChange = (unit: TimeUnit) => {
+        const config = unwrap(props.config)
+        appActions.updateConfig({ ...config, initial_timer: updateTimeUnit(config.initial_timer, unit) })
+    }
+
     return <div class="flex flex-col gap-4">
         <div>
             <h3 class="text font-bold">Resources</h3>
@@ -200,8 +213,28 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                 description="Shared memory size. Should be properly sized relative to other resources."
             />
         </div>
-        <div>
+        <div class="flex flex-col gap-2">
             <h3 class="text font-bold">Time Controls</h3>
+            <div class="btn-group flex gap-4">
+                <div class="flex gap-2">
+                    <input
+                        class="radio"
+                        type="radio" name="time-unit" id="time-unit-clock"
+                        checked={timeUnit() === "Clock"}
+                        onChange={() => handleTimeUnitChange("Clock")}
+                    />
+                    <label for="time-unit-clock" class="text inline-flex items-center">Clock</label>
+                </div>
+                <div class="flex gap-2">
+                    <input
+                        class="radio"
+                        type="radio" name="time-unit" id="time-unit-nodes"
+                        checked={timeUnit() === "Nodes"}
+                        onChange={() => handleTimeUnitChange("Nodes")}
+                    />
+                    <label for="time-unit-nodes" class="text inline-flex items-center">Nodes</label>
+                </div>
+            </div>
             <NumericConfigSection
                 produce={value => {
                     const config = unwrap(props.config)
@@ -209,17 +242,16 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                         ...config,
                         initial_timer: {
                             ...config.initial_timer,
-                            time_unit: "Clock",
-                            total_remaining: flatmap(value, timeValue),
+                            total_remaining: flatmap(value, toTimeValue),
                         },
                     }
                 }}
-                value={flatmap(props.config.initial_timer.total_remaining, timeValueSeconds)}
+                value={flatmap(props.config.initial_timer.total_remaining, fromTimeValue)}
                 optional
                 placeholder="unlimited"
-                max={flatmap(props.maxConfig.initial_timer.total_remaining, timeValueSeconds)}
+                max={flatmap(maxTimer()?.total_remaining, fromTimeValue)}
                 scale={1}
-                legend="Total Time" label="seconds"
+                legend="Total Time" label={timeLabel()}
                 description="Default time limit."
             />
             <NumericConfigSection
@@ -229,16 +261,15 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                         ...config,
                         initial_timer: {
                             ...config.initial_timer,
-                            time_unit: "Clock",
-                            increment: timeValue(value),
+                            increment: toTimeValue(value),
                         },
                     }
                 }}
-                value={timeValueSeconds(props.config.initial_timer.increment)}
+                value={fromTimeValue(props.config.initial_timer.increment)}
                 min={0}
-                max={timeValueSeconds(props.maxConfig.initial_timer.increment)}
+                max={flatmap(maxTimer()?.increment, fromTimeValue)}
                 scale={1}
-                legend="Increment Time" label="seconds"
+                legend="Increment Time" label={timeLabel()}
                 description="Time added after each move."
             />
             <NumericConfigSection
@@ -248,17 +279,16 @@ function ConfigSections(props: { config: Config, maxConfig: Config }) {
                         ...config,
                         initial_timer: {
                             ...config.initial_timer,
-                            time_unit: "Clock",
-                            turn: flatmap(value, timeValue),
+                            turn: flatmap(value, toTimeValue),
                         },
                     }
                 }}
-                value={flatmap(props.config.initial_timer.turn, timeValueSeconds)}
+                value={flatmap(props.config.initial_timer.turn, fromTimeValue)}
                 optional
                 placeholder="unlimited"
-                max={flatmap(props.maxConfig.initial_timer.turn, timeValueSeconds)}
+                max={flatmap(maxTimer()?.turn, fromTimeValue)}
                 scale={1}
-                legend="Max Turn Time" label="seconds"
+                legend="Max Turn Time" label={timeLabel()}
                 description="Maximum time for each move."
             />
         </div>

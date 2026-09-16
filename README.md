@@ -17,7 +17,7 @@ and plans to integrate an AlphaZero-based value and policy network.
   - Web Interface: Solid.js frontend with REST API and Webassembly backend
   - Protocol Support: [Piskvork(Gomocup)](https://plastovicka.github.io/protocl2en.htm), [Yixin-board](https://github.com/accreator/Yixin-Board) and [GTP](https://www.gnu.org/software/gnugo/gnugo_19.html)-like custom protocol
   - FFI Bindings: C abi and WebAssembly (JavaScript/TypeScript)
-  - REST api: axum server with session-persistent reload and TLS
+  - REST api: axum server with session-persistent reload
 
 - **Planned**
   - [NNUE](https://en.wikipedia.org/wiki/Efficiently_updatable_neural_network) and [AlpaZero](https://en.wikipedia.org/wiki/AlphaZero)-based evaluation with separate networks for black/white pieces

@@ -72,22 +72,12 @@ fn stdio_out(text_protocol_response: Result<TextProtocolResponse, String>) {
 fn print_response(response: Response) {
     let log = match response {
         Response::Begins(ComputingResource { workers, time_unit, time_limit }) =>
-            format!("begins: workers={workers}, time-unti={time_unit}, resource={time_limit:?}"),
+            format!("begins: workers={workers}, time-unit={time_unit}, resource={time_limit:?}"),
         Response::Status { best_move, score, pv, total_nodes: total_nodes_in_1k, selective_depth, .. } =>
             format!("status: depth={selective_depth}, score={score}, best_move={best_move}, total_nodes_in_1k={total_nodes_in_1k}, pv={pv:?}"),
     };
 
     stdio_out(Ok(TextProtocolResponse::Log(log)));
-}
-
-fn print_board<const R: RuleKind>(state: &GameState<R>, show_last_moves: bool) {
-    let string = if show_last_moves {
-        state.board.to_string_with_last_moves(state.history.last_action_pair())
-    } else {
-        state.board.to_string()
-    };
-
-    stdio_out(Ok(TextProtocolResponse::Multiline(string)));
 }
 
 fn text_protocol<const R: RuleKind>(
@@ -106,7 +96,7 @@ fn text_protocol<const R: RuleKind>(
         (MessageSender::new(tx), rx)
     };
 
-    spawn_command_listener::<R>(aborted.clone(), message_sender, timer.time_unit, command_sequence);
+    spawn_command_listener::<R>(aborted.clone(), message_sender, command_sequence);
 
     for message in message_receiver {
         match message {
@@ -127,18 +117,16 @@ fn text_protocol<const R: RuleKind>(
                     aborted.clone(),
                 );
 
-                let log = format!(
-                    "solution: pos={}, score={}, depth={}, nodes={}, elapsed={:?}",
-                    best_move.best_move,
-                    best_move.score,
-                    best_move.selective_depth,
-                    best_move.total_nodes,
-                    best_move.time_elapsed,
-                );
-
-                stdio_out(Ok(TextProtocolResponse::Log(log)));
-
-                stdio_out(Ok(TextProtocolResponse::Response(best_move.best_move.to_string())));
+                stdio_out(Ok(TextProtocolResponse::Response(
+                    format!(
+                        "pos={}, score={}, depth={}, nodes={}, elapsed={:?}",
+                        best_move.best_move,
+                        best_move.score,
+                        best_move.selective_depth,
+                        best_move.total_nodes,
+                        best_move.time_elapsed,
+                    )
+                )));
 
                 if apply {
                     let command = Command::Play {
@@ -153,7 +141,7 @@ fn text_protocol<const R: RuleKind>(
                 }
 
                 if interactive {
-                    print_board(&game_agent.state, true);
+                    stdio_out(Ok(TextProtocolResponse::Multiline(format_board(&game_agent.state, true))))
                 }
             }
             Message::Config(ConfigCommand::TimeUnit(unit)) => {
@@ -162,17 +150,21 @@ fn text_protocol<const R: RuleKind>(
                 stdio_out(Ok(TextProtocolResponse::Ack));
             }
             Message::Config(ConfigCommand::TotalTime(total)) => {
-                timer.total_remaining = Some(total);
+                timer.total_remaining = Some(TimeValue::from_value(total, timer.time_unit));
 
                 stdio_out(Ok(TextProtocolResponse::Ack));
             }
             Message::Config(ConfigCommand::IncrementTime(increment)) => {
+                let increment = TimeValue::from_value(increment, timer.time_unit);
+
                 config.initial_timer.increment = increment;
                 timer.increment = increment;
 
                 stdio_out(Ok(TextProtocolResponse::Ack));
             }
             Message::Config(ConfigCommand::TurnTime(turn)) => {
+                let turn = TimeValue::from_value(turn, timer.time_unit);
+
                 config.initial_timer.turn = Some(turn);
                 timer.turn = Some(turn);
 
@@ -198,21 +190,29 @@ fn text_protocol<const R: RuleKind>(
             Message::Status(StatusCommand::Version) => {
                 stdio_out(Ok(TextProtocolResponse::Response(
                     format!(
-                        "rule-{}, rusty-renju-{}, mintaka-{}",
+                        "rule={}, rusty-renju={}, mintaka={}",
                         R, rusty_renju::VERSION, mintaka::VERSION
                     )
                 )));
             }
             Message::Status(StatusCommand::Board { show_last_moves }) => {
-                print_board::<R>(&game_agent.state, show_last_moves);
+                stdio_out(Ok(TextProtocolResponse::Multiline(format_board(&game_agent.state, show_last_moves))));
             }
             Message::Status(StatusCommand::History) => {
                 stdio_out(Ok(TextProtocolResponse::Response(
                     game_agent.state.history.to_string()
                 )));
             }
+            Message::Status(StatusCommand::Time) => {
+                stdio_out(Ok(TextProtocolResponse::Response(
+                    format!("total={}, increment={}, turn={}",
+                        format_time_value(timer.time_unit, timer.total_remaining),
+                        format_time_value(timer.time_unit, Some(timer.increment)),
+                        format_time_value(timer.time_unit, timer.turn),
+                    )
+                )))
+            },
             Message::Status(StatusCommand::Forbid) => unreachable!(),
-            Message::Status(StatusCommand::Time) => unreachable!(),
         }
     }
 
@@ -222,7 +222,6 @@ fn text_protocol<const R: RuleKind>(
 fn match_command<const R: RuleKind>(
     aborted: &Arc<AtomicBool>,
     message_sender: &MessageSender,
-    time_unit: TimeUnit,
     args: Vec<&str>,
     buf: &str,
 ) -> Result<(), String> {
@@ -233,57 +232,60 @@ fn match_command<const R: RuleKind>(
         "quit" => {
             std::process::exit(0);
         }
-        "config" => match *args.get(1).ok_or("data type not provided.".to_string())? {
-            "workers" => match *args.get(2).ok_or("workers not provided.".to_string())? {
-                "auto" => {
-                    let cores =
-                        std::thread::available_parallelism().map_or_else(|_| 1, |n| n.get()) as u32;
+        "workers" => match *args.get(1).ok_or("workers not provided.".to_string())? {
+            "auto" => {
+                let cores =
+                    std::thread::available_parallelism().map_or_else(|_| 1, |n| n.get()) as u32;
 
-                    message_sender.config(ConfigCommand::Workers(cores));
-                }
-                &_ => {
-                    let workers = args.get(2).ok_or("workers not provided.")?
-                        .parse::<u32>()
-                        .ok()
-                        .filter(|&workers| workers > 0)
-                        .ok_or("invalid workers number.")?;
+                message_sender.config(ConfigCommand::Workers(cores));
+            }
+            &_ => {
+                let workers = args.get(1).ok_or("workers not provided.")?
+                    .parse::<u32>()
+                    .ok()
+                    .filter(|&workers| workers > 0)
+                    .ok_or("invalid workers number.")?;
 
-                    message_sender.config(ConfigCommand::Workers(workers));
-                }
-            },
-            "memory" => {
-                let memory_size_in_kib = args.get(2).ok_or("memory not provided.")?
+                message_sender.config(ConfigCommand::Workers(workers));
+            }
+        },
+        "memory" => {
+            let memory_size_in_kib = args.get(1).ok_or("memory not provided.")?
+                .parse::<u64>()
+                .map_err(|_| "invalid memory size.")?;
+
+            message_sender.config(ConfigCommand::ResizeTT(ByteSize::from_kib(memory_size_in_kib)));
+        }
+        "time" => {
+            let parse_time = || -> Result<u64, &'static str> {
+                args.get(2).ok_or("time not provided.")?
                     .parse::<u64>()
-                    .map_err(|_| "invalid memory size.")?;
+                    .map_err(|_| "invalid time.")
+            };
 
-                message_sender.config(ConfigCommand::ResizeTT(ByteSize::from_kib(memory_size_in_kib)));
-            }
-            &_ => return Err("data type not provided.".to_string()),
-        },
-        "limit" => match *args.get(1).ok_or("data type not provided.")? {
-            "time" => {
-                let parse_time = || -> Result<TimeValue, &'static str> {
-                    args.get(3).ok_or("time not provided.")?
-                        .parse::<u64>()
-                        .map(|value| TimeValue::from_value(value, time_unit))
-                        .map_err(|_| "invalid time.")
-                };
+            match *args.get(1).ok_or("data type not provided.")? {
+                "unit" => {
+                    let time_unit = args.get(2).ok_or("time unit not provided.")?
+                        .parse::<TimeUnit>()
+                        .map_err(|_| "invalid time unit.")?;
 
-                match *args.get(2).ok_or("data type not provided.")? {
-                    "total" => {
-                        message_sender.config(ConfigCommand::TotalTime(parse_time()?));
-                    }
-                    "turn" => {
-                        message_sender.config(ConfigCommand::TurnTime(parse_time()?));
-                    }
-                    "increment" => {
-                        message_sender.config(ConfigCommand::IncrementTime(parse_time()?));
-                    }
-                    &_ => return Err("unknown time type.".to_string()),
+                    message_sender.config(ConfigCommand::TimeUnit(time_unit));
                 }
+                "total" => {
+                    message_sender.config(ConfigCommand::TotalTime(parse_time()?));
+                }
+                "turn" => {
+                    message_sender.config(ConfigCommand::TurnTime(parse_time()?));
+                }
+                "increment" => {
+                    message_sender.config(ConfigCommand::IncrementTime(parse_time()?));
+                }
+                "left" => {
+                    message_sender.status(StatusCommand::Time);
+                }
+                &_ => return Err("unknown time type.".to_string()),
             }
-            &_ => return Err("unknown limit type.".to_string()),
-        },
+        }
         "load" => match *args.get(1).ok_or("data type not provided.")? {
             "board" => {
                 let board: Board<R> = buf.parse()?;
@@ -311,9 +313,6 @@ fn match_command<const R: RuleKind>(
         }
         "history" => {
             message_sender.status(StatusCommand::History);
-        }
-        "time" => {
-            message_sender.status(StatusCommand::Time);
         }
         "version" => {
             message_sender.status(StatusCommand::Version);
@@ -382,7 +381,6 @@ fn execute_command<const R: RuleKind>(game_agent: &mut GameAgent<R>, command: Co
 fn spawn_command_listener<const R: RuleKind>(
     aborted: Arc<AtomicBool>,
     message_sender: MessageSender,
-    time_unit: TimeUnit,
     initial_sequence: Vec<String>,
 ) {
     std::thread::spawn(move || {
@@ -399,11 +397,31 @@ fn spawn_command_listener<const R: RuleKind>(
                 continue;
             }
 
-            let result = match_command::<R>(&aborted, &message_sender, time_unit, args, &line);
+            let result = match_command::<R>(&aborted, &message_sender, args, &line);
 
             if let Err(error) = result {
                 stdio_out(Err(error));
             }
         }
     });
+}
+
+fn format_board<const R: RuleKind>(state: &GameState<R>, show_last_moves: bool) -> String {
+    if show_last_moves {
+        state.board.to_string_with_last_moves(state.history.last_action_pair())
+    } else {
+        state.board.to_string()
+    }
+}
+
+fn format_time_value(unit: TimeUnit, value: Option<TimeValue>) -> String {
+    match (unit, value) {
+        (TimeUnit::Clock, Some(value)) => {
+            let duration = value.to_duration();
+
+            format!("{}.{}s", duration.as_secs(), duration.subsec_millis())
+        },
+        (TimeUnit::Nodes, Some(value)) => format!("{}K nodes", value.to_nodes()),
+        _ => "infinite".to_string()
+    }
 }
