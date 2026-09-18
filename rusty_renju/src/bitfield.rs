@@ -3,7 +3,7 @@ use crate::notation::pos::Pos;
 use crate::utils::empty::Empty;
 use crate::{assert_struct_sizes, cartesian_to_index, const_for, const_max, const_min, impl_debug_from_display};
 #[cfg(feature = "serde")]
-use base64::engine::{general_purpose, Engine as _};
+use base64::engine::{Engine as _, general_purpose};
 use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
 use std::simd::Simd;

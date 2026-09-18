@@ -126,7 +126,7 @@ def build_binary(source: Source, rule: arena.Rule = arena.Rule.RENJU, *, use_wor
                 git("apply", "--binary", "--whitespace=nowarn", str(patch_path.absolute()), cwd=worktree)
         subprocess.run(
             ["cargo", "build", "--release", "-p", "mintaka_interface",
-             "--features=text-protocol", "--bin", binary_name, "--target-dir", str(target)],
+             "--bin", binary_name, "--target-dir", str(target)],
             cwd=worktree, check=True,
         )
         shutil.copy2(target / "release" / binary_name, cached)

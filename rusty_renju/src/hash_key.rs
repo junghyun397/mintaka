@@ -48,6 +48,8 @@ impl Display for HashKey {
     }
 }
 
+impl_debug_from_display!(HashKey);
+
 impl From<HashKey> for u64 {
     fn from(key: HashKey) -> Self {
         key.0
@@ -61,8 +63,6 @@ impl FromStr for HashKey {
         u64::from_str_radix(&s[2 ..], 16).map(Self)
     }
 }
-
-impl_debug_from_display!(HashKey);
 
 #[cfg(feature = "serde")]
 impl serde::Serialize for HashKey {

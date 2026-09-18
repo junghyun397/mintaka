@@ -9,7 +9,7 @@ use rusty_renju::pattern;
 #[cfg(not(feature = "neural-eval"))]
 pub type ActiveEvaluator<const R: RuleKind> = crate::eval::heuristic_evaluator::HeuristicEvaluator<R>;
 #[cfg(feature = "neural-eval")]
-pub type ActiveEvaluator<const R: RuleKind> = crate::eval::nnue_evaluator::NnueEvaluator<R>;
+pub type ActiveEvaluator<const R: RuleKind> = crate::eval::heuristic_evaluator::HeuristicEvaluator<R>;
 
 pub type PolicyDistribution = [i16; pattern::PATTERN_SIZE];
 

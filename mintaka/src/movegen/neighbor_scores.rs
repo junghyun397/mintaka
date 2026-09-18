@@ -87,7 +87,7 @@ impl NeighborScores {
 #[repr(align(64))]
 struct NeighborhoodScoreLUT([[u8; 256]; pos::BOARD_SIZE]);
 
-const NEIGHBORHOOD_SCORE_LUT: NeighborhoodScoreLUT = build_neighborhood_score_lut();
+static NEIGHBORHOOD_SCORE_LUT: NeighborhoodScoreLUT = build_neighborhood_score_lut();
 
 const fn build_neighborhood_score_lut() -> NeighborhoodScoreLUT {
     let imprint_score_pattern: [[u8; 7]; 7] = [

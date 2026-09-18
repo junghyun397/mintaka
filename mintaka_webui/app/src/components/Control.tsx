@@ -102,7 +102,7 @@ function ControlButtons() {
                 >
                     <IconGitBranch />
                 </div>
-                <ul tabindex="-1" class="dropdown-content menu z-1 gap-2 rounded-box bg-base-100 max-xs:gap-1 max-xs:p-1">
+                <ul tabindex="-1" class="menu dropdown-content z-1 gap-2 rounded-box bg-base-100 max-xs:gap-1 max-xs:p-1">
                     <li>
                         <button
                             title="Continue as previous move"
@@ -127,7 +127,7 @@ function ControlButtons() {
         <button
             title="Redo all moves"
             class="btn btn-square"
-            classList={{ "btn-disabled": !gameSelectors.historyTree().forwardable }}
+            classList={{ "btn-disabled": !gameSelectors.historyTree().bulkForwardable }}
             onClick={[gameActions.bulkForward, "continue"]}
         >
             <IconChevronDoubleRight />
@@ -179,7 +179,7 @@ function ConfigButton() {
         >
             <IconBars3 />
         </div>
-        <ul tabindex="-1" class="dropdown-content menu z-1 gap-2 rounded-box bg-base-100 p-2 max-xs:gap-1 max-xs:p-1">
+        <ul tabindex="-1" class="menu dropdown-content z-1 gap-2 rounded-box bg-base-100 p-2 max-xs:gap-1 max-xs:p-1">
             <li>
                 <button
                     title="About"

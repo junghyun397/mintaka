@@ -44,7 +44,7 @@ export type ThreatSearchKind = string;
 
 export type TimeUnit = string;
 
-export type TimeValue = BigInt;
+export type TimeValue = string;
 
 export interface Nodes {
 	in_1k: number;

@@ -27,7 +27,7 @@ impl<'a> BatchCounter<'a> {
     }
 
     pub fn count_global(&self) -> Nodes {
-        Nodes::from_in_1k(self.global_counter_in_1k.load(Ordering::Relaxed).into())
+        Nodes::from_in_1k(self.global_counter_in_1k.load(Ordering::Relaxed))
     }
 
     pub fn count_local(&self) -> Nodes {

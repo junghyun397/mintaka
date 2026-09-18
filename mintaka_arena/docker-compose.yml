@@ -14,4 +14,3 @@ services:
       - ../compose-arena-data/artifacts:/app/mintaka/artifacts
       - ../compose-arena-data/target:/app/mintaka/target
       - ../compose-arena-data/cargo/registry:/usr/local/cargo/registry
-      - ../compose-arena-data/cargo/git:/usr/local/cargo/git

@@ -189,7 +189,7 @@ class Engine:
     def apply_increment(self):
         if self.resource.total_remaining is not None:
             self.resource.total_remaining += self.resource.increment
-            self.command(f"limit time total {self.resource.total_remaining}")
+            self.command(f"time total {self.resource.total_remaining}")
 
 
 class UTCFormatter(logging.Formatter):
@@ -370,6 +370,7 @@ def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
 
     parser.add_argument("--worker-addresses", type=str, nargs="+")
 
+    # path || ref || (ref && patch)
     parser.add_argument("--base-path", type=str)
     parser.add_argument("--base-ref", type=str, help="Base commit on master (default: origin/master)")
     parser.add_argument("--base-patch", type=str, help="Base patch file")

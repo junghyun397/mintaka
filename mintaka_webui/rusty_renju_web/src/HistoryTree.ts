@@ -40,6 +40,10 @@ export class HistoryTree {
         return this.top < this.history.length || (this.top === 0 && !!this.root?.forwardable)
     }
 
+    get bulkForwardable(): boolean {
+        return !this.inBranchHead && this.top < this.history.length
+    }
+
     get inBranchHead(): boolean {
         return this.root != undefined && this.top === 0
     }
@@ -86,9 +90,16 @@ export class HistoryTree {
     }
 
     push(entry: HistoryEntry): HistoryTree {
-        if (this.top < this.history.length)
+        if (this.top < this.history.length) {
+            if (this.top === 0 && this.root && this.history[0].pos === entry.pos)
+                return new HistoryTree(
+                    this.root.root,
+                    this.root.history.slice(0, this.root.top).concat(entry, this.history.slice(1)),
+                    this.root.top + 1,
+                )
+
             return new HistoryTree(this, [entry])
-        else
+        } else
             return new HistoryTree(this.root, this.history.concat(entry))
     }
 
@@ -118,10 +129,8 @@ export class HistoryTree {
     }
 
     bulkForward(method: ForwardMethod): [HistoryTree, HistoryEntry[]] | undefined {
-        if (this.top === 0 && method === "return")
-            return this.root?.bulkForward("continue")
-
-        if (this.top >= this.history.length) return undefined
+        if (!this.bulkForwardable || (this.top === 0 && method === "return"))
+            return undefined
 
         return [new HistoryTree(this.root, this.history), this.history.slice(this.top)]
     }

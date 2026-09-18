@@ -27,11 +27,11 @@ export function Modal(props: ParentProps & ModalControlProps & {
         class="modal"
         onClose={props.onClose}
     >
-        <div class="modal-box flex max-h-[calc(100dvh-10rem)] max-w-lg flex-col bg-base-200 p-0">
+        <div class="modal-box flex max-h-[calc(100dvh-10rem)] max-w-md flex-col bg-base-200 p-0">
             <div class="flex items-center justify-between px-4 py-3">
                 <h1 class="text font-bold">{props.title}</h1>
                 <form method="dialog" class="flex items-center">
-                    <button class="btn btn-square p-0.5 btn-xs btn-primary">
+                    <button class="btn btn-square p-0.5 btn-primary btn-xs">
                         <IconXMark />
                     </button>
                 </form>

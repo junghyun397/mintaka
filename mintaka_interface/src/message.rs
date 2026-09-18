@@ -1,6 +1,6 @@
 use mintaka::config::{Config, SearchObjective};
 use mintaka::protocol::command::Command;
-use mintaka::protocol::time::{TimeUnit, TimeValue};
+use mintaka::protocol::time::TimeUnit;
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos::{MaybePos, Pos};
@@ -18,13 +18,19 @@ pub enum Message {
     Status(StatusCommand),
 }
 
+pub struct MessagePacket {
+    pub message: Message,
+    pub ack: bool,
+}
+
 pub enum ConfigCommand {
     TimeUnit(TimeUnit),
-    TotalTime(u64),
+    TotalTime(Option<u64>),
     IncrementTime(u64),
-    TurnTime(u64),
-    MaxDepth(u32),
-    Workers(u32),
+    TurnTime(Option<u64>),
+    MaxDepth(Option<u32>),
+    Workers(Option<u32>),
+    MaxMemory(Option<ByteSize>),
     ResizeTT(ByteSize),
 }
 
@@ -60,35 +66,35 @@ pub enum StatusCommand {
 
 #[derive(Clone)]
 pub struct MessageSender {
-    sender: mpsc::Sender<Message>,
+    sender: mpsc::Sender<MessagePacket>,
 }
 
 impl MessageSender {
-    pub fn new(sender: mpsc::Sender<Message>) -> Self {
+    pub fn new(sender: mpsc::Sender<MessagePacket>) -> Self {
         Self { sender }
     }
 
-    pub fn command(&self, command: MessageCommand) {
+    pub fn command(&self, command: MessageCommand, ack: bool) {
         self.sender
-            .send(Message::Command(command))
+            .send(MessagePacket { message: Message::Command(command), ack })
             .expect(CHANNEL_CLOSED_MESSAGE);
     }
     
-    pub fn config(&self, command: ConfigCommand) {
+    pub fn config(&self, command: ConfigCommand, ack: bool) {
         self.sender
-            .send(Message::Config(command))
+            .send(MessagePacket { message: Message::Config(command), ack })
             .expect(CHANNEL_CLOSED_MESSAGE);
     }
 
     pub fn status(&self, command: StatusCommand) {
         self.sender
-            .send(Message::Status(command))
+            .send(MessagePacket { message: Message::Status(command), ack: true })
             .expect(CHANNEL_CLOSED_MESSAGE);
     }
 
     pub fn launch(&self, objective: SearchObjective, apply: bool, print: bool) {
         self.sender
-            .send(Message::Launch { objective, apply, print })
+            .send(MessagePacket { message: Message::Launch { objective, apply, print }, ack: false })
             .expect(CHANNEL_CLOSED_MESSAGE);
     }
 }

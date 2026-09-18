@@ -1,16 +1,13 @@
-use crate::board::Board;
 use crate::impl_debug_from_display;
 use crate::notation::color::Color;
 use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
+use crate::utils::empty::Empty;
 use std::fmt::{Debug, Display, Formatter};
-use std::iter;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
-use crate::notation::rule::RuleKind;
-use crate::utils::empty::Empty;
 
 pub const MAX_HISTORY_SIZE: usize = 248;
 
@@ -241,64 +238,6 @@ impl Display for HistoryError {
 }
 
 impl std::error::Error for HistoryError {}
-
-impl<const R: RuleKind> TryFrom<&Board<R>> for History {
-    type Error = HistoryError;
-
-    fn try_from(value: &Board<R>) -> Result<Self, Self::Error> {
-        let mut black_history = vec![];
-        let mut white_history = vec![];
-
-        for pos in (1 .. pos::CENTER_ROW_COL).rev()
-            .flat_map(|distance_from_center| {
-                let begin_idx = pos::CENTER_ROW_COL - distance_from_center;
-                let end_idx = pos::CENTER_ROW_COL + distance_from_center;
-
-                (0 .. distance_from_center * 2 + 1) // horizontal-down
-                    .map(move |offset| Pos::from_cartesian(begin_idx, begin_idx + offset))
-                    .chain((0 .. distance_from_center * 2 + 1)
-                        .map(move |offset| Pos::from_cartesian(end_idx, begin_idx + offset))
-                    ) // horizontal-up
-                    .chain((0 .. (distance_from_center * 2 + 1).saturating_sub(2))
-                        .map(move |offset| Pos::from_cartesian(begin_idx + 1 + offset, begin_idx))
-                    ) // vertical-left
-                    .chain((0 .. (distance_from_center * 2 + 1).saturating_sub(2))
-                        .map(move |offset| Pos::from_cartesian(begin_idx + 1 + offset, end_idx))
-                    ) // vertical-right
-            })
-            .chain(iter::once(pos::CENTER))
-        {
-            match value.stone_kind(pos) {
-                Some(Color::Black) => black_history.push(pos),
-                Some(Color::White) => white_history.push(pos),
-                _ => {},
-            }
-        }
-
-        if white_history.len() + black_history.len() > pos::BOARD_SIZE {
-            return Err(HistoryError::HistoryTooLong)
-        }
-
-        if white_history.len() > black_history.len() {
-            return Err(HistoryError::WhiteIsLongerThanBlack);
-        }
-
-        let mut history = History::empty();
-
-        while let Some(white_pos) = white_history.pop()
-            && let Some(black_pos) = black_history.pop()
-        {
-            history.set_mut(black_pos);
-            history.set_mut(white_pos);
-        }
-
-        if let Some(black_pos) = black_history.pop() {
-            history.set_mut(black_pos);
-        }
-
-        Ok(history)
-    }
-}
 
 impl From<&History> for Vec<MaybePos> {
     fn from(value: &History) -> Self {

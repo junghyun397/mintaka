@@ -1,4 +1,6 @@
 use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucket, TTEntryBucketProbe, TTFlag};
+use crate::protocol::nodes::Nodes;
+use crate::utils::depth::Depth;
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::score::{MaybeScore, Score};
@@ -7,8 +9,6 @@ use std::fmt::{Debug, Display};
 #[cfg(feature = "compress-tt")]
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU8, Ordering};
-use std::time::Duration;
-use crate::utils::depth::Depth;
 
 pub struct TranspositionTable {
     table: Vec<TTEntryBucket>,
@@ -81,12 +81,11 @@ impl TranspositionTable {
         }
     }
 
-    pub fn optimal_size(nps: usize, expected_runtime: Duration) -> ByteSize {
+    pub fn optimal_size(nodes_budget: Nodes) -> ByteSize {
         const FILL_FACTOR: f64 = 0.75;
-        const ENTRY_SIZE: f64 = size_of::<TTEntryBucket>() as f64 * TTEntryBucket::BUCKET_SIZE as f64;
+        const ENTRY_SIZE: f64 = size_of::<TTEntryBucket>() as f64 / TTEntryBucket::BUCKET_SIZE as f64;
 
-        let total_nodes = nps as f64 * expected_runtime.as_millis() as f64 / 1000.0;
-        ByteSize::from_bytes((total_nodes / ENTRY_SIZE * FILL_FACTOR) as u64)
+        ByteSize::from_bytes((nodes_budget.in_1k as f64 * 1000.0 * ENTRY_SIZE * FILL_FACTOR) as u64)
     }
 
     pub fn hash_full_permille(&self, reference_age: u8) -> usize {
@@ -268,7 +267,7 @@ impl TTView<'_> {
         }
         #[cfg(target_arch = "aarch64")]
         unsafe {
-            use std::arch::aarch64::{_prefetch, _PREFETCH_LOCALITY3, _PREFETCH_READ};
+            use std::arch::aarch64::{_PREFETCH_LOCALITY3, _PREFETCH_READ, _prefetch};
             let idx = self.calculate_index(key);
             let entry = &self.table[idx];
             _prefetch::<_PREFETCH_READ, _PREFETCH_LOCALITY3>(

@@ -2,9 +2,9 @@
 
 ## text-protocol
 ```shell
-cargo build --release -p mintaka_interface --features="text-protocol" --bin mintaka_text_protocol_renju
-cargo build --release -p mintaka_interface --features="text-protocol" --bin mintaka_text_protocol_gomoku
-cargo build --release -p mintaka_interface --features="text-protocol" --bin mintaka_text_protocol_freestyle
+cargo build --release -p mintaka_interface --bin mintaka_text_protocol_renju
+cargo build --release -p mintaka_interface --bin mintaka_text_protocol_gomoku
+cargo build --release -p mintaka_interface --bin mintaka_text_protocol_freestyle
 ```
 
 ## piskvork

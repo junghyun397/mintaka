@@ -16,7 +16,7 @@ pub const DIRECT_RESPONSE_SCORE: i16 = Score::INF.value() as i16 - 500;
 pub const KILLER_MOVE_SCORE: i16 = Score::INF.value() as i16 - 1000;
 pub const COUNTER_MOVE_BONUS: i16 = 100;
 
-const ENDGAME_MOVEGEN_IMPRINT_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_imprint_mask_lut([
+static ENDGAME_MOVEGEN_IMPRINT_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_imprint_mask_lut([
     0b100010001,
     0b010010010,
     0b001111100,
@@ -81,7 +81,7 @@ pub fn generate_endgame_moves<const R: RuleKind, const T: ThreatSearchKind, cons
 
 pub fn generate_threat_direct_response<const R: RuleKind>(
     buffer: &mut MainMoveList,
-    td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+    _td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
     state: &GameState<R>,
     field: &Bitfield,
 ) {

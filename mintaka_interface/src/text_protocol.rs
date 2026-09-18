@@ -5,7 +5,7 @@ use mintaka::protocol::command::Command;
 use mintaka::protocol::response::{CallBackResponseSender, Response};
 use mintaka::protocol::time::{TimeUnit, TimeValue};
 use mintaka::utils::depth::Depth;
-use mintaka_interface::message::{ConfigCommand, Message, MessageCommand, MessageSender, StatusCommand};
+use mintaka_interface::message::{ConfigCommand, Message, MessageCommand, MessagePacket, MessageSender, StatusCommand};
 use mintaka_interface::params::Params;
 use rusty_renju::board::Board;
 use rusty_renju::history::History;
@@ -98,14 +98,24 @@ fn text_protocol<const R: RuleKind>(
 
     spawn_command_listener::<R>(aborted.clone(), message_sender, command_sequence);
 
-    for message in message_receiver {
+    for MessagePacket { message, ack } in message_receiver {
         match message {
             Message::Command(command) => {
                 let command = command.into_command(&config, game_agent.state.board.hash_key);
 
                 let response = execute_command(&mut game_agent, command);
 
-                stdio_out(response);
+                match response {
+                    Err(err) => {
+                        stdio_out(Err(err.to_string()));
+                        continue;
+                    }
+                    Ok(response) if ack => {
+                        stdio_out(Ok(response));
+                        continue;
+                    }
+                    _ => {}
+                }
             }
             Message::Launch { objective, apply, print: interactive } => {
                 let best_move = game_agent.launch::<Instant>(
@@ -143,76 +153,79 @@ fn text_protocol<const R: RuleKind>(
                 if interactive {
                     stdio_out(Ok(TextProtocolResponse::Multiline(format_board(&game_agent.state, true))))
                 }
+
+                continue;
             }
             Message::Config(ConfigCommand::TimeUnit(unit)) => {
                 timer.time_unit = unit;
-
-                stdio_out(Ok(TextProtocolResponse::Ack));
             }
             Message::Config(ConfigCommand::TotalTime(total)) => {
-                timer.total_remaining = Some(TimeValue::from_value(total, timer.time_unit));
-
-                stdio_out(Ok(TextProtocolResponse::Ack));
+                timer.total_remaining = total.map(|total| TimeValue::from_value(total, timer.time_unit));
             }
             Message::Config(ConfigCommand::IncrementTime(increment)) => {
                 let increment = TimeValue::from_value(increment, timer.time_unit);
 
                 config.initial_timer.increment = increment;
                 timer.increment = increment;
-
-                stdio_out(Ok(TextProtocolResponse::Ack));
             }
             Message::Config(ConfigCommand::TurnTime(turn)) => {
-                let turn = TimeValue::from_value(turn, timer.time_unit);
+                let turn = turn.map(|turn| TimeValue::from_value(turn, TimeUnit::Clock));
 
-                config.initial_timer.turn = Some(turn);
-                timer.turn = Some(turn);
-
-                stdio_out(Ok(TextProtocolResponse::Ack));
+                config.initial_timer.turn = turn;
+                timer.turn = turn;
             }
             Message::Config(ConfigCommand::MaxDepth(max_depth)) => {
-                config.max_depth = Some(Depth::from_i32(max_depth as i32));
-
-                stdio_out(Ok(TextProtocolResponse::Ack));
+                config.max_depth = max_depth.map(|depth| Depth::from_i32(depth as i32));
             }
             Message::Config(ConfigCommand::Workers(workers)) => {
-                config.workers = workers;
-
-                stdio_out(Ok(TextProtocolResponse::Ack));
+                config.workers = workers.unwrap_or_else(||
+                    std::thread::available_parallelism().map_or_else(|_| 1, |n| n.get()) as u32
+                );
             }
             Message::Config(ConfigCommand::ResizeTT(size)) => {
                 config.tt_size = size;
 
                 let _ = game_agent.command(Command::RebuildTT(config.tt_size));
+            }
+            Message::Config(ConfigCommand::MaxMemory(_)) => unreachable!(),
+            Message::Status(status_command) => {
+                match status_command {
+                    StatusCommand::Version => {
+                        stdio_out(Ok(TextProtocolResponse::Response(
+                            format!(
+                                "rule={}, rusty-renju={}, mintaka={}",
+                                R, rusty_renju::VERSION, mintaka::VERSION
+                            )
+                        )));
+                    }
+                    StatusCommand::Board { show_last_moves } => {
+                        stdio_out(Ok(TextProtocolResponse::Multiline(
+                            format_board(&game_agent.state, show_last_moves)))
+                        );
+                    }
+                    StatusCommand::History => {
+                        stdio_out(Ok(TextProtocolResponse::Response(
+                            game_agent.state.history.to_string()
+                        )));
+                    }
+                    StatusCommand::Time => {
+                        stdio_out(Ok(TextProtocolResponse::Response(
+                            format!("total={}, increment={}, turn={}",
+                                    format_time_value(timer.time_unit, timer.total_remaining),
+                                    format_time_value(timer.time_unit, Some(timer.increment)),
+                                    format_time_value(timer.time_unit, timer.turn),
+                            )
+                        )));
+                    }
+                    StatusCommand::Forbid => unreachable!(),
+                }
 
-                stdio_out(Ok(TextProtocolResponse::Ack));
+                continue;
             }
-            Message::Status(StatusCommand::Version) => {
-                stdio_out(Ok(TextProtocolResponse::Response(
-                    format!(
-                        "rule={}, rusty-renju={}, mintaka={}",
-                        R, rusty_renju::VERSION, mintaka::VERSION
-                    )
-                )));
-            }
-            Message::Status(StatusCommand::Board { show_last_moves }) => {
-                stdio_out(Ok(TextProtocolResponse::Multiline(format_board(&game_agent.state, show_last_moves))));
-            }
-            Message::Status(StatusCommand::History) => {
-                stdio_out(Ok(TextProtocolResponse::Response(
-                    game_agent.state.history.to_string()
-                )));
-            }
-            Message::Status(StatusCommand::Time) => {
-                stdio_out(Ok(TextProtocolResponse::Response(
-                    format!("total={}, increment={}, turn={}",
-                        format_time_value(timer.time_unit, timer.total_remaining),
-                        format_time_value(timer.time_unit, Some(timer.increment)),
-                        format_time_value(timer.time_unit, timer.turn),
-                    )
-                )))
-            },
-            Message::Status(StatusCommand::Forbid) => unreachable!(),
+        }
+
+        if ack {
+            stdio_out(Ok(TextProtocolResponse::Ack));
         }
     }
 
@@ -222,63 +235,69 @@ fn text_protocol<const R: RuleKind>(
 fn match_command<const R: RuleKind>(
     aborted: &Arc<AtomicBool>,
     message_sender: &MessageSender,
-    args: Vec<&str>,
-    buf: &str,
+    line: String
 ) -> Result<(), String> {
-    match args[0] {
+    let mut args = line.split(' ').into_iter();
+
+    let Some(command) = args.next() else {
+        return Err("command not provided".to_string())
+    };
+
+    match command {
         "abort" => {
             aborted.store(true, Ordering::Relaxed);
         }
         "quit" => {
             std::process::exit(0);
         }
-        "workers" => match *args.get(1).ok_or("workers not provided.".to_string())? {
+        "workers" => match args.next().ok_or("workers not provided.".to_string())? {
             "auto" => {
-                let cores =
-                    std::thread::available_parallelism().map_or_else(|_| 1, |n| n.get()) as u32;
-
-                message_sender.config(ConfigCommand::Workers(cores));
+                message_sender.config(ConfigCommand::Workers(None), true);
             }
-            &_ => {
-                let workers = args.get(1).ok_or("workers not provided.")?
+            workers => {
+                let workers = workers
                     .parse::<u32>()
                     .ok()
                     .filter(|&workers| workers > 0)
                     .ok_or("invalid workers number.")?;
 
-                message_sender.config(ConfigCommand::Workers(workers));
+                message_sender.config(ConfigCommand::Workers(Some(workers)), true);
             }
         },
         "memory" => {
-            let memory_size_in_kib = args.get(1).ok_or("memory not provided.")?
+            let memory_size_in_kib = args.next().ok_or("memory not provided.")?
                 .parse::<u64>()
                 .map_err(|_| "invalid memory size.")?;
 
-            message_sender.config(ConfigCommand::ResizeTT(ByteSize::from_kib(memory_size_in_kib)));
+            message_sender.config(ConfigCommand::ResizeTT(ByteSize::from_kib(memory_size_in_kib)), true);
         }
         "time" => {
-            let parse_time = || -> Result<u64, &'static str> {
-                args.get(2).ok_or("time not provided.")?
+            fn parse_time(arg: Option<&str>) -> Result<u64, &'static str> {
+                arg.ok_or("time not provided.")?
                     .parse::<u64>()
                     .map_err(|_| "invalid time.")
-            };
+            }
 
-            match *args.get(1).ok_or("data type not provided.")? {
+            match args.next().ok_or("data type not provided.")? {
                 "unit" => {
-                    let time_unit = args.get(2).ok_or("time unit not provided.")?
+                    let time_unit = args.next().ok_or("time unit not provided.")?
                         .parse::<TimeUnit>()
                         .map_err(|_| "invalid time unit.")?;
 
-                    message_sender.config(ConfigCommand::TimeUnit(time_unit));
+                    message_sender.config(ConfigCommand::TimeUnit(time_unit), true);
                 }
                 "total" => {
-                    message_sender.config(ConfigCommand::TotalTime(parse_time()?));
+                    let time = parse_time(args.next())?;
+
+                    message_sender.config(ConfigCommand::TotalTime((time != 0).then_some(time)), true);
                 }
                 "turn" => {
-                    message_sender.config(ConfigCommand::TurnTime(parse_time()?));
+                    let time = parse_time(args.next())?;
+
+                    message_sender.config(ConfigCommand::TurnTime((time != 0).then_some(time)), true);
                 }
                 "increment" => {
-                    message_sender.config(ConfigCommand::IncrementTime(parse_time()?));
+                    message_sender.config(ConfigCommand::IncrementTime(parse_time(args.next())?), true);
                 }
                 "left" => {
                     message_sender.status(StatusCommand::Time);
@@ -286,25 +305,27 @@ fn match_command<const R: RuleKind>(
                 &_ => return Err("unknown time type.".to_string()),
             }
         }
-        "load" => match *args.get(1).ok_or("data type not provided.")? {
+        "load" => match args.next().ok_or("data type not provided.")? {
             "board" => {
-                let board: Board<R> = buf.parse()?;
+                let board: Board<R> = line.parse()?;
 
-                let history = (&board).try_into().unwrap_or_else(|_| History::empty());
-
-                message_sender.command(MessageCommand::Command(Command::Init(Box::new(GameStateData { board_data: (&board).into(), history }))));
+                message_sender.command(MessageCommand::Command(Command::Init(Box::new(
+                    GameStateData { board_data: (&board).into(), history: board.build_history() }
+                ))), true);
             }
             "history" => {
-                let history: History = args.get(2).ok_or("history not provided.")?.parse()?;
+                let history: History = args.next().ok_or("history not provided.")?.parse()?;
 
                 let board: Board<R> = (&history).into();
 
-                message_sender.command(MessageCommand::Command(Command::Init(Box::new(GameStateData { board_data: (&board).into(), history }))));
+                message_sender.command(MessageCommand::Command(Command::Init(Box::new(
+                    GameStateData { board_data: (&board).into(), history }
+                ))), true);
             }
             &_ => return Err("unknown data type.".to_string()),
         },
         "clear" => {
-            message_sender.command(MessageCommand::Command(Command::Clear));
+            message_sender.command(MessageCommand::Command(Command::Clear), true);
         }
         "board" => {
             message_sender.status(StatusCommand::Board {
@@ -318,36 +339,36 @@ fn match_command<const R: RuleKind>(
             message_sender.status(StatusCommand::Version);
         }
         "set" => {
-            let pos = args.get(1).ok_or("position not provided.")?
-                .parse()
-                .map_err(|e: PosError| e.to_string())?;
-
-            let color = args.get(2).ok_or("color not provided.")?
+            let color = args.next().ok_or("color not provided.")?
                 .parse()
                 .map_err(|e: UnknownColorError| e.to_string())?;
 
-            message_sender.command(MessageCommand::Set { pos, color });
+            let pos = args.next().ok_or("position not provided.")?
+                .parse()
+                .map_err(|e: PosError| e.to_string())?;
+
+            message_sender.command(MessageCommand::Set { pos, color }, true);
         }
         "unset" => {
-            let pos = args.get(1).ok_or("position not provided.")?
-                .parse()
-                .map_err(|e: PosError| e.to_string())?;
-
-            let color = args.get(2).ok_or("color not provided.")?
+            let color = args.next().ok_or("color not provided.")?
                 .parse()
                 .map_err(|e: UnknownColorError| e.to_string())?;
 
-            message_sender.command(MessageCommand::Unset { pos, color });
-        }
-        "play" => {
-            let action: MaybePos = args.get(1).ok_or("position not provided.")?
+            let pos = args.next().ok_or("position not provided.")?
                 .parse()
                 .map_err(|e: PosError| e.to_string())?;
 
-            message_sender.command(MessageCommand::Play { pos: action });
+            message_sender.command(MessageCommand::Unset { pos, color }, true);
+        }
+        "play" => {
+            let action: MaybePos = args.next().ok_or("position not provided.")?
+                .parse()
+                .map_err(|e: PosError| e.to_string())?;
+
+            message_sender.command(MessageCommand::Play { pos: action }, true);
         }
         "undo" => {
-            message_sender.command(MessageCommand::Undo);
+            message_sender.command(MessageCommand::Undo, true);
         }
         "gen" => {
             message_sender.launch(SearchObjective::Best, false, false);
@@ -391,13 +412,7 @@ fn spawn_command_listener<const R: RuleKind>(
             .into_iter()
             .chain(stdin_lines.map(Result::unwrap))
         {
-            let args = line.trim().split(' ').collect::<Vec<&str>>();
-
-            if args.is_empty() {
-                continue;
-            }
-
-            let result = match_command::<R>(&aborted, &message_sender, args, &line);
+            let result = match_command::<R>(&aborted, &message_sender, line);
 
             if let Err(error) = result {
                 stdio_out(Err(error));

@@ -44,7 +44,7 @@ impl HistoryTable {
             Self::update_gravity_score(&mut self.quiet[color][pos.idx_usize()], bonus);
         }
 
-        if history.len() > 0
+        if !history.is_empty()
             && let Some(prev_move) = history.last_action_unchecked().ok() 
         {
             self.counter[color][prev_move.idx_usize()] = best_move.into();

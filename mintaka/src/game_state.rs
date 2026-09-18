@@ -114,7 +114,7 @@ impl<const R: RuleKind> GameState<R> {
 
 impl<const R: RuleKind> From<Board<R>> for GameState<R> {
     fn from(board: Board<R>) -> Self {
-        let history: History = (&board).try_into().unwrap_or_else(|_| History::empty());
+        let history: History = board.build_history();
 
         GameState {
             board,

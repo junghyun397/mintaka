@@ -9,7 +9,7 @@ import {
     type AppGameState, type BestMove, type Board, type Color, type CommandResult,
     type Config, type GameState, type HashKey, type History, type MaybePos,
 } from "rusty-renju-web/rusty-renju"
-import { extractStatics, parseMintakaJson, stringifyMintakaJson, type Configs, type MintakaStatics } from "rusty-renju-web/mintaka"
+import { extractStatics, type Configs, type MintakaStatics } from "rusty-renju-web/mintaka"
 import { MINTAKA_CONFIG_VERSION } from "rusty-renju-web/config"
 
 interface RuntimeController {
@@ -334,10 +334,10 @@ function createPersistProviderConfigController(): {
         load: (source): Config | undefined => {
             const configString = localStorage.getItem(buildPersistProviderConfigLabel(source))
 
-            return configString === null ? undefined : parseMintakaJson<Config>(configString)
+            return configString === null ? undefined : JSON.parse(configString) as Config
         },
         set: (source, config) => {
-            localStorage.setItem(buildPersistProviderConfigLabel(source), stringifyMintakaJson(config))
+            localStorage.setItem(buildPersistProviderConfigLabel(source), JSON.stringify(config))
         },
     }
 }

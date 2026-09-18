@@ -75,6 +75,9 @@ python3 mintaka_arena/elo.py
 ```
 
 ## Remote Test
+* Base: unspecified(origin/master ref and worktree patch) || ref || (ref && patch)
+* Target: ref || (ref && patch)
+
 ```shell
 --concurrency 172
 --base-ref commit_hash

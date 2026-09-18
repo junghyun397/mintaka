@@ -2,6 +2,8 @@ use std::fmt::Display;
 use std::ops::{Add, Div, Mul, Sub};
 use std::str::FromStr;
 use std::time::Duration;
+#[cfg(feature = "serde")]
+use serde_with::{As, DisplayFromStr, IfIsHumanReadable};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 use crate::protocol::nodes::Nodes;
@@ -34,11 +36,14 @@ impl FromStr for TimeUnit {
     }
 }
 
-#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "BigInt"))]
+#[cfg_attr(feature = "typeshare", typeshare(serialized_as = "String"))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 #[repr(transparent)]
-pub struct TimeValue(u128);
+pub struct TimeValue(
+    #[cfg_attr(feature = "serde", serde(with = "As::<IfIsHumanReadable<DisplayFromStr>>"))]
+    u128
+);
 
 impl TimeValue {
     pub const ZERO: Self = Self::new(0);

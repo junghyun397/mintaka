@@ -1,4 +1,4 @@
-pub fn try_from_raw_slice<T: TryFrom<u32>>(slice: *const u32, len: usize) -> Option<Vec<T>> {
+pub unsafe fn try_from_raw_slice<T: TryFrom<u32>>(slice: *const u32, len: usize) -> Option<Vec<T>> {
     if len == 0 {
         return Some(vec![]);
     }

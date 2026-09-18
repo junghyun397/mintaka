@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::ops::{Add, AddAssign, Div, Sub};
+use std::ops::{Add, AddAssign, Div, Mul, Sub};
 
 #[cfg_attr(feature = "typeshare", typeshare::typeshare)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -46,6 +46,15 @@ impl Div<u32> for Nodes {
     fn div(self, rhs: u32) -> Self::Output {
         Self {
             in_1k: self.in_1k / rhs,
+        }
+    }
+}
+
+impl Mul<u32> for Nodes {
+    type Output = Self;
+    fn mul(self, rhs: u32) -> Self::Output {
+        Self {
+            in_1k: self.in_1k * rhs,
         }
     }
 }

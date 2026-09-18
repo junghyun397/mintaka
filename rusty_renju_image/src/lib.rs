@@ -107,9 +107,9 @@ pub fn rusty_renju_image_render(
     if let Some(board) = unsafe { board.as_ref() }
         && let Ok(image_format) = ImageFormat::try_from(image_format)
         && let Ok(history_render) = HistoryRender::try_from(option)
-        && let Some(actions) = rusty_renju::utils::ffi::try_from_raw_slice::<MaybePos>(actions, actions_len)
-        && let Some(offers) = rusty_renju::utils::ffi::try_from_raw_slice(offers, offers_len)
-        && let Some(blinds) = rusty_renju::utils::ffi::try_from_raw_slice(blinds, blinds_len)
+        && let Some(actions) = unsafe { rusty_renju::utils::ffi::try_from_raw_slice::<MaybePos>(actions, actions_len) }
+        && let Some(offers) = unsafe { rusty_renju::utils::ffi::try_from_raw_slice(offers, offers_len) }
+        && let Some(blinds) = unsafe { rusty_renju::utils::ffi::try_from_raw_slice(blinds, blinds_len) }
     {
         let history = actions.as_slice().into();
         let payloads = RenderPayloads {

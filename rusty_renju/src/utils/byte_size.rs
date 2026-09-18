@@ -10,7 +10,6 @@ use typeshare::typeshare;
 pub struct ByteSize(u64);
 
 impl ByteSize {
-
     pub const ZERO: Self = Self(0);
 
     pub const fn from_bytes(size_in_bytes: u64) -> Self {
@@ -36,7 +35,6 @@ impl ByteSize {
     pub const fn mib(&self) -> u64 {
         self.0 / (1024 * 1024)
     }
-
 }
 
 impl Add for ByteSize {

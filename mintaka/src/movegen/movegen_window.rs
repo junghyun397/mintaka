@@ -19,7 +19,7 @@ impl Default for MovegenWindow {
 
 const MOVEGEN_WINDOW_MARGIN: u8 = 3;
 
-const MOVEGEN_IMPRINT_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_imprint_mask_lut([
+static MOVEGEN_IMPRINT_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_imprint_mask_lut([
     0b1001001,
     0b0111110,
     0b0111110,

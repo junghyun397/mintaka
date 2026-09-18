@@ -1,10 +1,9 @@
-use std::error::Error;
 use crate::bitfield::Bitfield;
 use crate::board::Board;
 use crate::board_iter::{BoardExportItem, BoardIterItem};
 use crate::board_utils::BoardWinner;
-use crate::history::History;
 use crate::hash_key::HashKey;
+use crate::history::History;
 use crate::notation::color::{Color, ColorContainer};
 use crate::notation::pos;
 use crate::notation::pos::{MaybePos, Pos};
@@ -13,7 +12,9 @@ use crate::pattern::Pattern;
 use crate::slice::Slice;
 use crate::utils::empty::Empty;
 use crate::utils::str_utils::join_str_horizontally;
+use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::iter;
 use std::str::FromStr;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
@@ -270,6 +271,60 @@ impl<const R: RuleKind> Board<R> {
         }
     }
 
+    pub fn build_history(&self) -> History {
+        let mut stones = ColorContainer::new(vec![], vec![]);
+
+        for pos in (1 .. pos::CENTER_ROW_COL).rev()
+            .flat_map(|distance_from_center| {
+                let begin_idx = pos::CENTER_ROW_COL - distance_from_center;
+                let end_idx = pos::CENTER_ROW_COL + distance_from_center;
+
+                (0 .. distance_from_center * 2 + 1) // horizontal-down
+                    .map(move |offset| Pos::from_cartesian(begin_idx, begin_idx + offset))
+                    .chain((0 .. distance_from_center * 2 + 1)
+                        .map(move |offset| Pos::from_cartesian(end_idx, begin_idx + offset))
+                    ) // horizontal-up
+                    .chain((0 .. (distance_from_center * 2 + 1).saturating_sub(2))
+                        .map(move |offset| Pos::from_cartesian(begin_idx + 1 + offset, begin_idx))
+                    ) // vertical-left
+                    .chain((0 .. (distance_from_center * 2 + 1).saturating_sub(2))
+                        .map(move |offset| Pos::from_cartesian(begin_idx + 1 + offset, end_idx))
+                    ) // vertical-right
+            })
+            .chain(iter::once(pos::CENTER))
+        {
+            if let Some(color) = self.stone_kind(pos) {
+                stones[color].push(pos);
+            }
+        }
+
+        let mut history = History::empty();
+
+        while let Some(white_pos) = stones[Color::White].pop()
+            && let Some(black_pos) = stones[Color::Black].pop()
+        {
+            history.set_mut(black_pos);
+            history.set_mut(white_pos);
+        }
+
+        if let Some(black_pos) = stones[Color::Black].pop() {
+            history.set_mut(black_pos);
+        }
+
+        let exceed_color =
+            if stones[Color::Black].len() > stones[Color::White].len() {
+                Color::Black
+            } else {
+                Color::White
+            };
+
+        while let Some(pos) = stones[exceed_color].pop() {
+            history.pass();
+            history.set_mut(pos);
+        }
+
+        history
+    }
 }
 
 impl<const R: RuleKind> From<&History> for Board<R> {

@@ -9,7 +9,7 @@ function timeValueScale(unit: TimeUnit): number {
 export function timeValue(value: number, unit: TimeUnit): TimeValue {
     const scale = timeValueScale(unit)
     const whole = Math.trunc(value)
-    return BigInt(whole) * BigInt(scale) + BigInt(Math.round((value - whole) * scale))
+    return (BigInt(whole) * BigInt(scale) + BigInt(Math.round((value - whole) * scale))).toString()
 }
 
 export function timeValueInUnit(value: TimeValue, unit: TimeUnit): number {
@@ -20,10 +20,10 @@ export function updateTimeUnit(timer: Timer, unit: TimeUnit): Timer {
     if (timer.time_unit === unit)
         return timer
 
-    const nanosecondsPerNode = 100n
-    const convert = (value: TimeValue): TimeValue => unit === "Clock"
-        ? value.valueOf() * nanosecondsPerNode
-        : value.valueOf() / nanosecondsPerNode
+    const nanosecondsPerNode = 10n
+    const convert = (value: TimeValue): TimeValue => (unit === "Clock"
+        ? BigInt(value) * nanosecondsPerNode
+        : BigInt(value) / nanosecondsPerNode).toString()
 
     return {
         time_unit: unit,
@@ -31,20 +31,6 @@ export function updateTimeUnit(timer: Timer, unit: TimeUnit): Timer {
         increment: convert(timer.increment),
         turn: timer.turn === undefined ? undefined : convert(timer.turn),
     }
-}
-
-export function stringifyMintakaJson(value: unknown): string {
-    const json = JSON as JSON & { rawJSON: (text: string) => unknown }
-    return JSON.stringify(value, (_, value) => typeof value === "bigint" ? json.rawJSON(value.toString()) : value)
-}
-
-export function parseMintakaJson<T>(text: string): T {
-    return JSON.parse(text, (key, value, context?: { source: string }) => {
-        if (["total_remaining", "increment", "turn", "time_limit"].includes(key) && typeof value === "number")
-            return BigInt(context!.source)
-
-        return value
-    })
 }
 
 export function durationSeconds(duration: Duration): number {

@@ -17,7 +17,7 @@ export function Dashboard(props: ModalControlProps) {
         open={props.open}
         onClose={props.onClose}
     >
-        <div class="flex flex-col gap-4">
+        <div class="mx-auto flex w-full max-w-md flex-col gap-4">
             <Overview />
             <RuntimeConfig />
             <Show when={runtimeSelectors.configs()}>{configs =>
@@ -35,7 +35,7 @@ function Overview() {
         <div class="flex flex-col gap-4">
             <h3 class="text font-bold">Overview</h3>
                 <div class="flex-col gap-2">
-                    <p class="text"><b>Total</b> {formatNodes(statics().totalNodesIn1k)} <span class="text-sm">nodes</span></p>
+                    <p class="text"><b>Total</b> {formatNodes(statics().totalNodesIn1k)} <span class="text-md">nodes</span></p>
                     <p class="text"><b>Runtime</b> {statics().totalRuntime.secs} <span class="text-sm">seconds</span></p>
                     <p class="text"><b>NPS</b> {formatNodes(nps(statics()))} <span class="text-sm">nodes/s</span></p>
                 </div>
@@ -112,7 +112,7 @@ function ServerConfigSections() {
     return <>
         <fieldset class="fieldset">
             <legend class="fieldset-legend">Server Address</legend>
-            <label class="input" classList={{ "input-error": candidateServerConfig() === undefined }}>
+            <label class="input w-full" classList={{ "input-error": candidateServerConfig() === undefined }}>
                 <span class="label">{SERVER_PROTOCOL}://</span>
                 <input
                     type="text"
@@ -130,7 +130,7 @@ function ServerConfigSections() {
         </fieldset>
         <fieldset class="fieldset">
             <legend class="fieldset-legend">API Password</legend>
-            <label class="input">
+            <label class="input w-full">
                 <input
                     type="password"
                     autocomplete="current-password"
@@ -364,7 +364,7 @@ function NumericConfigSection(props: NumericConfigSectionProps) {
     return <fieldset class="fieldset">
         <legend class="fieldset-legend">{props.legend}</legend>
         <label
-            class="input"
+            class="input w-full"
             classList={{
                 "input-error": !isValid(),
             }}
