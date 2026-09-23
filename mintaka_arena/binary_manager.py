@@ -2,6 +2,7 @@ import argparse
 import base64
 import hashlib
 import logging
+import re
 import shutil
 import subprocess
 import tempfile
@@ -33,17 +34,19 @@ def fetch_master() -> str:
 class Source:
     commit: str
     patch: bytes | None = None
+    name: str | None = None
 
     def patch_hash(self) -> str | None:
         return hashlib.sha256(self.patch).hexdigest() if self.patch else None
 
     def key(self) -> str:
-        patch_hash = self.patch_hash()
-        return f"{self.commit}-{patch_hash}" if patch_hash else self.commit
+        patch_key = self.name or self.patch_hash()
+        return f"{self.commit}-{patch_key}" if self.patch else self.commit
 
     def to_json(self):
         return {
             "commit": self.commit,
+            "name": self.name,
             "patch_hash": self.patch_hash(),
             "patch": base64.b64encode(self.patch).decode("ascii") if self.patch else None,
         }
@@ -52,52 +55,58 @@ class Source:
     def from_json(cls, data):
         patch = base64.b64decode(data["patch"]) if data["patch"] else None
 
-        return cls(data["commit"], patch)
+        return cls(data["commit"], patch, data.get("name"))
 
     @classmethod
-    def from_patch(cls, commit: str, path: Path):
-        return cls(commit, path.read_bytes() or None)
+    def from_patch(cls, path: Path, ref: str | None = None):
+        match = re.fullmatch(r"patch-([0-9a-f]+)-(.+)", path.name)
+        if match is None:
+            raise ValueError(f"Cannot parse commit from patch filename: {path}")
+        return cls(resolve_commit(ref or match[1]), path.read_bytes() or None, match[2])
 
     @classmethod
-    def from_worktree(cls, commit: str):
+    def from_worktree(cls, commit: str, name: str | None = None):
         patch = git(
             "diff", "--binary", "--no-ext-diff", "--no-textconv", "--no-color",
             "--src-prefix=a/", "--dst-prefix=b/", commit, "--",
         )
-        return cls(commit, patch or None)
+        return cls(commit, patch or None, name)
 
 
 def save_patch(key: str, patch: bytes) -> Path:
     path = Path("artifacts/patches") / f"patch-{key}"
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    if not path.is_file():
+    if path.is_file():
+        if path.read_bytes() != patch:
+            raise FileExistsError(f"Patch already exists with different contents: {path}")
+    else:
         path.write_bytes(patch)
     return path
 
 
-def save_sources(sources: dict[str, Source]):
-    for source in sources.values():
-        if source.patch:
-            save_patch(source.key(), source.patch)
+def prepare_sources(args) -> dict[str, Source | str]:
+    if not args.base_path or not args.target_path:
+        fetch_master()
 
+    sources = {}
+    for name in ("base", "target"):
+        path = getattr(args, f"{name}_path")
+        ref = getattr(args, f"{name}_ref")
+        patch = getattr(args, f"{name}_patch")
+        if path:
+            if patch:
+                raise ValueError(f"--{name}-patch cannot be used with --{name}-path")
+            sources[name] = path
+        elif patch:
+            sources[name] = Source.from_patch(Path(patch), ref)
+        else:
+            commit = resolve_commit(ref or "origin/master")
+            if name == "target" and not ref:
+                sources[name] = Source.from_worktree(commit)
+            else:
+                sources[name] = Source(commit)
 
-def prepare_sources(args) -> dict[str, Source]:
-    master = fetch_master()
-    base_commit = resolve_commit(args.base_ref) if args.base_ref else master
-    if args.base_patch:
-        base = Source.from_patch(base_commit, Path(args.base_patch))
-    else:
-        base = Source(base_commit)
-
-    if args.target_patch:
-        target = Source.from_patch(resolve_commit(args.target_ref), Path(args.target_patch))
-    else:
-        target_commit = resolve_commit(args.target_ref) if args.target_ref else master
-        target = Source.from_worktree(target_commit)
-
-    sources = {"base": base, "target": target}
-    save_sources(sources)
     return sources
 
 
@@ -117,7 +126,7 @@ def build_binary(source: Source, rule: arena.Rule = arena.Rule.RENJU, *, use_wor
         worktree = Path(".")
         target = Path("target")
         if use_worktree:
-            target = target.absolute()
+            target = (target / "arena").absolute()
             directory = stack.enter_context(tempfile.TemporaryDirectory(dir=cached.parent))
             worktree = Path(directory) / "source"
             git("worktree", "add", "--detach", str(worktree), source.commit)
@@ -133,7 +142,10 @@ def build_binary(source: Source, rule: arena.Rule = arena.Rule.RENJU, *, use_wor
     return cached
 
 
-def build_config(sources: dict[str, Source], settings: dict) -> arena.Config:
+def build_config(sources: dict[str, Source | str], settings: dict) -> arena.Config:
     rule = arena.Rule(settings["rule"])
-    paths = {f"{name}_path": str(build_binary(source, rule)) for name, source in sources.items()}
+    paths = {
+        f"{name}_path": str(build_binary(source, rule)) if isinstance(source, Source) else source
+        for name, source in sources.items()
+    }
     return arena.Config(argparse.Namespace(**settings, **paths))

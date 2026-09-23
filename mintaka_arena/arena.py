@@ -370,14 +370,16 @@ def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
 
     parser.add_argument("--worker-addresses", type=str, nargs="+")
 
-    # path || ref || (ref && patch)
-    parser.add_argument("--base-path", type=str)
-    parser.add_argument("--base-ref", type=str, help="Base commit on master (default: origin/master)")
+    base_source = parser.add_mutually_exclusive_group()
+    base_source.add_argument("--base-path", type=str)
+    base_source.add_argument("--base-ref", type=str, help="Base commit (default: patch commit or origin/master)")
     parser.add_argument("--base-patch", type=str, help="Base patch file")
     parser.add_argument("--base-params", type=str, default="")
 
-    parser.add_argument("--target-path", type=str)
-    parser.add_argument("--target-ref", type=str, help="Target patch base commit on master (automatic patch default: origin/master)")
+    target_source = parser.add_mutually_exclusive_group()
+    target_source.add_argument("--target-path", type=str)
+    target_source.add_argument("--target-ref", type=str,
+                               help="Target commit (default: patch commit or origin/master with a worktree patch)")
     parser.add_argument("--target-patch", type=str, help="Target patch file")
     parser.add_argument("--target-params", type=str, default="")
 

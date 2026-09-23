@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import threading
+import time
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -18,6 +19,7 @@ class Run:
     preparing: bool = True
     stopping: bool = False
     active: int = 0
+    last_pair_finished: float | None = None
 
 
 class ArenaWorker(ThreadingHTTPServer):
@@ -28,6 +30,13 @@ class ArenaWorker(ThreadingHTTPServer):
         self.max_concurrency = max_concurrency
         self.lock = threading.Condition()
         self.run = None
+
+    def service_actions(self):
+        with self.lock:
+            run = self.run
+            if (run is not None and not run.active and run.last_pair_finished is not None
+                    and time.monotonic() - run.last_pair_finished >= 5):
+                self.stop({"run_id": run.run_id})
 
     def status(self):
         with self.lock:
@@ -41,7 +50,10 @@ class ArenaWorker(ThreadingHTTPServer):
         if workers > self.max_concurrency:
             raise worker_manager.HTTPError(400, "allocation > capacity")
 
-        sources = {name: binary_manager.Source.from_json(data["sources"][name]) for name in ("base", "target")}
+        sources = {
+            name: binary_manager.Source.from_json(source) if isinstance(source, dict) else source
+            for name, source in data["sources"].items()
+        }
 
         with self.lock:
             if self.run is not None:
@@ -52,8 +64,8 @@ class ArenaWorker(ThreadingHTTPServer):
         try:
             logging.info(f"Arena Worker [{run_id}]: preparing {workers} workers")
 
-            binary_manager.fetch_master()
-            binary_manager.save_sources(sources)
+            if any(isinstance(source, binary_manager.Source) for source in sources.values()):
+                binary_manager.fetch_master()
 
             config = binary_manager.build_config(sources, data["settings"])
         except BaseException:
@@ -106,6 +118,7 @@ class ArenaWorker(ThreadingHTTPServer):
         finally:
             with self.lock:
                 run.active -= 1
+                run.last_pair_finished = time.monotonic()
                 self.lock.notify_all()
 
         logging.info(f"Arena Plied [{run.run_id}]: opening={opening.sequence}, "

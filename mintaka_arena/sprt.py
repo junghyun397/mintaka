@@ -1,5 +1,6 @@
 import logging
 import math
+import signal
 
 import arena
 import worker_manager
@@ -42,12 +43,14 @@ def calculate_llr(pentanomial: list[int], elo0: float, elo1: float) -> float:
 
 
 def main():
+    signal.signal(signal.SIGTERM, signal.default_int_handler)
+
     parser = arena.new_parser([30_000, 300, 0])
 
     parser.add_argument("--elo0", type=float, default=0.0)
-    parser.add_argument("--elo1", type=float, default=5.0)
-    parser.add_argument("--alpha", type=float, default=0.05)
-    parser.add_argument("--beta", type=float, default=0.05)
+    parser.add_argument("--elo1", type=float, default=10.0)
+    parser.add_argument("--alpha", type=float, default=0.1)
+    parser.add_argument("--beta", type=float, default=0.1)
 
     config = arena.Config(parser.parse_args())
     arena.configure_logging(config.args.log_level)

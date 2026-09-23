@@ -75,11 +75,16 @@ def finish_on_interrupt():
         nonlocal interrupted
         interrupted = True
 
-    previous = signal.signal(signal.SIGINT, interrupt)
+    previous = {
+        signum: signal.signal(signum, interrupt)
+        for signum in (signal.SIGINT, signal.SIGTERM)
+    }
+
     try:
         yield
     finally:
-        signal.signal(signal.SIGINT, previous)
+        for signum, handler in previous.items():
+            signal.signal(signum, handler)
     if interrupted:
         raise KeyboardInterrupt
 
@@ -108,10 +113,11 @@ class WorkerManager:
         return self
 
     def prepare(self):
-        remaining = self.config.args.concurrency
-        sources = binary_manager.prepare_sources(self.config.args) if self.config.args.worker_addresses else None
-        settings = {name: getattr(self.config.args, name) for name in arena.GAME_SETTINGS}
-        addresses = list(dict.fromkeys(self.config.args.worker_addresses or ["local"]))
+        args = self.config.args
+        remaining = args.concurrency
+        addresses = list(dict.fromkeys(args.worker_addresses or ["local"]))
+        sources = binary_manager.prepare_sources(args)
+        settings = {name: getattr(args, name) for name in arena.GAME_SETTINGS}
 
         with ThreadPoolExecutor(max_workers=len(addresses)) as executor:
             capacities = list(executor.map(self.capacity, addresses))
@@ -144,7 +150,7 @@ class WorkerManager:
     def start_worker(self, address, count, sources, settings):
         remote = None
         if address == "local":
-            config = binary_manager.build_config(sources, settings) if sources else self.config
+            config = binary_manager.build_config(sources, settings)
             play = partial(
                 arena.play_pair, config.path_params_resource, config.args.draw_in,
                 log_prefix_filter=tuple(config.args.log_prefix_filter or ()),
@@ -161,7 +167,10 @@ class WorkerManager:
                 request_json(address, "/start", {
                     "run_id": self.run_id,
                     "workers": count,
-                    "sources": {name: source.to_json() for name, source in sources.items()},
+                    "sources": {
+                        name: source.to_json() if isinstance(source, binary_manager.Source) else source
+                        for name, source in sources.items()
+                    },
                     "settings": settings,
                 })
             except HTTPError as error:

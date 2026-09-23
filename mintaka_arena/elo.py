@@ -1,5 +1,6 @@
 import logging
 import math
+import signal
 
 import arena
 import worker_manager
@@ -21,6 +22,8 @@ def calculate_ci95(score: float, squared_errors: float, count: int) -> tuple[flo
 
 
 def main():
+    signal.signal(signal.SIGTERM, signal.default_int_handler)
+
     parser = arena.new_parser([120000, 0, 5000])
 
     parser.add_argument("--min-openings", type=int, default=100)

@@ -3,15 +3,20 @@
 * All scripts must be run from **project root**.
 * binary_manager.py creates a patch based on origin/master.
 
-## Artifacts
+## binary_manager.py Artifacts
 
-* Patches: `artifacts/patches/patch-<commit>-<patch_hash>`
-* Engines: `artifacts/engines/<enginename>-<commit>[-<patch_hash>]` (patch hash only when a patch is present)
+* Patch Out: `artifacts/patches/patch-<commit>-<patch_name>`
+* Engine Out: `artifacts/engines/<enginename>-<commit>[-<patch_name>]`
 
-## Snapshot
+## snapshot.py Snapshot Builder
+
 ```shell
-python3 mintaka_arena/snapshot.py
+python3 mintaka_arena/snapshot.py --name patch_name
 ```
+
+* Patch Out: `artifacts/patches/patch-commit-patch_name`
+* Engine Out: `artifacts/engines/patch-commit-patch_name`
+
 
 ## Arena Remote Worker
 
@@ -21,6 +26,7 @@ docker compose -f mintaka_arena/docker-compose.yml up --build -d
 ```
 
 ## sprt.py Sequential Probability Ratio Tester
+
 ```shell
 python3 mintaka_arena/sprt.py
 --rule Renju
@@ -30,8 +36,9 @@ python3 mintaka_arena/sprt.py
 --target-params "--workers 1 --memory-in-mib 32"
 --concurrency 8
 --openings-file openings.csv
+
 --time-unit Clock
---time 500 200 0
+--time 500 100 0
 --max-openings 500
 --elo0 -4.0
 --elo1 8.0
@@ -40,6 +47,7 @@ python3 mintaka_arena/sprt.py
 ````
 
 ### SPRT Long
+
 ```shell
 --time-unit Clock
 --time 10000 300 0
@@ -51,6 +59,7 @@ python3 mintaka_arena/sprt.py
 ```
 
 ## elo.py CI95 ELO Tester
+
 ```shell
 python3 mintaka_arena/elo.py
 --rule Renju
@@ -68,19 +77,27 @@ python3 mintaka_arena/elo.py
 --target-elo 1000
 ```
 
-## Fixed-Node Test
-```shell
---time-unit Nodes
---time 0 0 100000 # 100M/turn
-```
+## Examples
+* Base: unspecified(origin/master ref) || ref || (ref && patch)
+* Target: unspecified(generate origin/master ref with a worktree patch) || ref || (ref && patch)
 
-## Remote Test
-* Base: unspecified(origin/master ref and worktree patch) || ref || (ref && patch)
-* Target: ref || (ref && patch)
-
+* origin/master HEAD vs. worktree, remote
 ```shell
 --concurrency 172
+--worker-addresses http://100.80.10.10:8095
+```
+
+* origin/master@commit vs. target patch, remote and local
+```shell
+--concurrency 182
 --base-ref commit_hash
---base-patch artifacts/patches/patch-commit_hash-patch_hash
+--target-patch artifacts/patches/patch-commit_hash-patch_name
 --worker-addresses http://100.80.10.10:8095 local
+```
+
+* base patch vs. target patch, local
+```shell
+--concurrency 8
+--base-ref commit_hash
+--target-patch artifacts/patches/patch-commit_hash-patch_name
 ```
