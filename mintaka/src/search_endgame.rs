@@ -2,7 +2,7 @@ use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::memo::transposition_table;
 use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucketProbe};
-use crate::movegen::move_generator::{generate_endgame_moves, generate_full_endgame_moves};
+use crate::movegen::move_generator::{generate_endgame_moves, generate_full_endgame_moves, TT_MOVE_SCORE};
 use crate::movegen::move_list::{EndgameMoveEntry, EndgameMoveList};
 use crate::principal_variation::PrincipalVariation;
 use crate::thread_data::ThreadData;
@@ -16,6 +16,8 @@ use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{MaybeScore, Score};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
+use rusty_renju::bitfield::Bitfield;
+use rusty_renju::pattern;
 use crate::config::Config;
 
 pub fn find_immediate_win<const R: RuleKind>(config: &Config, state: &GameState<R>, ply: usize) -> (MaybeScore, MaybePos) {
@@ -35,19 +37,18 @@ pub fn find_immediate_win<const R: RuleKind>(config: &Config, state: &GameState<
         (score, pos)
     }
 
-    if let Some(pos) = state.board.patterns.five_pos[state.board.player_color].ok() {
+    if let Some(pos) = state.board.patterns.five_pos[state.board.player_color][0].ok() {
         return mate_in_ply(config, state, 1, Score::win_in(ply + 1), pos.into())
     }
 
-    if let Some(pos) = state.board.patterns.five_pos[!state.board.player_color].ok() {
+    if let five_pos = state.board.patterns.five_pos[!state.board.player_color]
+        && let Some(pos) = five_pos[0].ok()
+    {
         if !state.board.is_legal_move(pos) {
             return mate_in_ply(config, state, 2, Score::lose_in(ply + 2), MaybePos::NONE)
         }
 
-        if 1 < state.board.patterns.field[!state.board.player_color].iter()
-            .filter(|pattern| pattern.has_five())
-            .count()
-        {
+        if five_pos[1].is_some() {
             return mate_in_ply(config, state, 2, Score::lose_in(ply + 2), pos.into())
         }
 
@@ -77,6 +78,7 @@ pub fn min_endgame_stones<const T: ThreatSearchKind>() -> u8 {
 }
 
 struct EndgameContext {
+    start_ply: usize,
     min_depth: Depth,
     beta: Score,
     is_pv: bool,
@@ -157,6 +159,7 @@ pub fn quiescence_search<const R: RuleKind, const T: ThreatSearchKind>(
     is_pv: bool,
 ) -> Score {
     let context = EndgameContext {
+        start_ply: td.ply,
         min_depth: Depth::ZERO - td.config.max_quiescence_depth.unwrap_or(Depth::PLY_LIMIT)
             .min(Depth::PLY_LIMIT - td.ply as i32),
         beta, is_pv,
@@ -166,10 +169,10 @@ pub fn quiescence_search<const R: RuleKind, const T: ThreatSearchKind>(
         ThreatSearchKind::VCF => {
             match state.board.player_color {
                 Color::Black => try_vcf::<R, { Color::Black }, _, Score>(
-                    td, &context, pv, state, depth_left, td.ply, alpha,
+                    td, &context, pv, state, depth_left, 0, alpha,
                 ),
                 Color::White => try_vcf::<R, { Color::White }, _, Score>(
-                    td, &context, pv, state, depth_left, td.ply, alpha,
+                    td, &context, pv, state, depth_left, 0, alpha,
                 ),
             }
         },
@@ -183,6 +186,7 @@ pub fn endgame_proof<const R: RuleKind, const T: ThreatSearchKind>(
     state: &mut GameState<R>,
 ) -> Option<Vec<Pos>> {
     let context = EndgameContext {
+        start_ply: td.ply,
         min_depth: Depth::ZERO - td.config.max_quiescence_depth.unwrap_or(Depth::PLY_LIMIT)
             .min(Depth::PLY_LIMIT - td.ply as i32),
         beta: Score::INF, is_pv: true,
@@ -193,10 +197,10 @@ pub fn endgame_proof<const R: RuleKind, const T: ThreatSearchKind>(
         ThreatSearchKind::VCF => {
             match state.board.player_color {
                 Color::Black => try_vcf::<R, { Color::Black }, _, SequenceProof>(
-                    td, &context, &mut pv, state, Depth::ZERO, td.ply, Score::NEG_INF,
+                    td, &context, &mut pv, state, Depth::ZERO, 0, Score::NEG_INF,
                 ),
                 Color::White => try_vcf::<R, { Color::White }, _, SequenceProof>(
-                    td, &context, &mut pv, state, Depth::ZERO, td.ply, Score::NEG_INF,
+                    td, &context, &mut pv, state, Depth::ZERO, 0, Score::NEG_INF,
                 ),
             }
         },
@@ -219,10 +223,12 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
     pv: &mut PrincipalVariation,
     state: &mut GameState<R>,
     depth_left: Depth,
-    ply: usize,
+    vcf_ply: usize,
     mut alpha: Score,
 ) -> Pf {
+    let ply = context.start_ply + vcf_ply;
     pv.clear();
+
     if TH::IS_MAIN
         && td.should_check_limit()
         && td.search_limit_exceeded()
@@ -363,22 +369,36 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
         } else if Pf::COMPLETE_PROOF {
             generate_full_endgame_moves::<R, { ThreatSearchKind::VCF }>(state)
         } else {
-            generate_endgame_moves::<R, { ThreatSearchKind::VCF }, 0>(
-                td, state,
-                state.history.previous_action().unwrap(),
-            )
+            if vcf_ply > 8 {
+                generate_endgame_moves::<R, { ThreatSearchKind::VCF }, 0>(
+                    td, state,
+                    state.history.previous_action().unwrap(),
+                )
+            } else {
+                generate_endgame_moves::<
+                    R,
+                    { ThreatSearchKind::VCF },
+                    { pattern::OPEN_THREE | pattern::POTENTIAL_FOUR | pattern::POTENTIAL_THREE }
+                >(
+                    td, state,
+                    state.history.previous_action().unwrap(),
+                )
+            }
         };
 
-        if let Some(tt_move) = tt_move.ok() {
-            for entry in moves.iter_mut() {
-                if entry.pos == tt_move {
-                    entry.score = i16::MAX;
-                    break;
-                }
-            }
+        if let Some(tt_move) = tt_move.ok()
+            && state.board.is_legal_move(tt_move)
+            && forced_move.ok().map_or_else(
+                || state.board.patterns.field[C][tt_move.idx_usize()].has_any_four(),
+                |forced_move| tt_move == forced_move,
+            )
+        {
+            moves.push(EndgameMoveEntry { pos: tt_move, score: TT_MOVE_SCORE });
         }
 
         let mut child_pv = PrincipalVariation::EMPTY;
+
+        let mut plied_moves = Bitfield::ZERO_FILLED;
 
         while let Some(EndgameMoveEntry { pos: four_pos, .. }) = moves.consume_best() {
             if TH::IS_MAIN
@@ -392,7 +412,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
                 return Pf::abort();
             }
 
-            if !state.board.is_legal_move(four_pos) {
+            if !state.board.is_legal_move(four_pos) || plied_moves.is_hot(four_pos) {
                 continue;
             }
 
@@ -401,6 +421,8 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
             if Pf::COMPLETE_PROOF && !player_pattern.has_any_four() {
                 continue;
             }
+
+            plied_moves.set(four_pos);
 
             let mut searched_response = MaybePos::NONE;
 
@@ -462,7 +484,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
                 td.evaluator.play(&state.board, artifact, response_pos.into());
 
                 let mut proof = try_vcf::<R, C, TH, Pf>(
-                    td, context, &mut child_pv, state, depth_left - 2, ply + 2, alpha,
+                    td, context, &mut child_pv, state, depth_left - 2, vcf_ply + 2, alpha,
                 );
 
                 searched_response = response_pos.into();
@@ -470,7 +492,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
                 let three_four_fork_proof = Pf::COMPLETE_PROOF
                     && player_pattern.has_open_three()
                     && proof.score() == Score::win_in(ply + 5)
-                    && state.board.patterns.five_pos[!C].is_none()
+                    && state.board.patterns.five_pos[!C][0].is_none()
                     && !state.board.patterns.effective_fork_four_field(C).is_empty();
 
                 let artifact = state.undo_mut(response_recovery_state);

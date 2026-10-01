@@ -32,7 +32,7 @@ mod test_movegen {
             let aborted = AtomicBool::new(false);
 
             let mut td = ThreadData::new(
-                WorkerThread::<Instant>::new(), 0,
+                WorkerThread::<Instant>::default(), 0,
                 SearchObjective::Best,
                 config,
                 evaluator,

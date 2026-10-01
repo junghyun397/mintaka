@@ -50,7 +50,7 @@ mod bench_endgame {
             let global_counter_in_1k = AtomicU32::new(0);
             let aborted = AtomicBool::new(false);
 
-            let td = ThreadData::new(WorkerThread::<Instant>::new(), 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
+            let td = ThreadData::new(WorkerThread::<Instant>::default(), 0, SearchObjective::Best, config, evaluator, tt.view(), ht, &aborted, &global_counter_in_1k);
 
             $bencher.iter(|| {
                 let mut pv = PrincipalVariation::EMPTY;

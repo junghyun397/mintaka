@@ -42,11 +42,11 @@ impl<const R: RuleKind> HeuristicEvaluator<R> {
                     let pos = start_pos.directional_offset_unchecked(direction, slice_idx as isize);
                     let key = encode_key(board.patterns.field[color][pos.idx_usize()]);
 
-                    let score = VALUE_SCORE_LUT[key];
+                    let score = VALUE_SCORE_LUT[lut_color::<R>(color)][key];
                     let old_score = std::mem::replace(&mut self.scores[color][pos.idx_usize()], score);
                     let pattern_delta = score as i32 - old_score as i32;
 
-                    let ordering_score = ORDERING_SCORE_LUT[key];
+                    let ordering_score = ORDERING_SCORE_LUT[lut_color::<R>(color)][key];
                     self.ordering_scores[pos.idx_usize()][color] = ordering_score;
 
                     score_delta += pattern_delta;
@@ -83,11 +83,11 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
 
         for color in [Color::Black, Color::White] {
             for idx in 0 .. pos::BOARD_SIZE {
-                let key = encode_key(board.patterns.field[color][idx]);
-                let pattern_score = VALUE_SCORE_LUT[key];
+                let key = encode_key(board.patterns.field[lut_color::<R>(color)][idx]);
+                let pattern_score = VALUE_SCORE_LUT[lut_color::<R>(color)][key];
 
                 self.scores[color][idx] = pattern_score;
-                self.ordering_scores[idx][color] = ORDERING_SCORE_LUT[key];
+                self.ordering_scores[idx][color] = ORDERING_SCORE_LUT[color][key];
             }
         }
 
@@ -110,8 +110,6 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
 
         self.hash_key = board.hash_key;
     }
-
-    fn eval_policy(&mut self, _: &GameState<R>) {}
 
     fn eval_value(&mut self, state: &GameState<R>) -> Score {
         let mut score_black = self.score_black;
@@ -170,15 +168,23 @@ fn encode_key(pattern: Pattern) -> usize {
     acc
 }
 
+fn lut_color<const R: RuleKind>(color: Color) -> Color {
+    if R == RuleKind::Renju {
+        color
+    } else {
+        Color::White
+    }
+}
+
 const SCORE_LUT_SIZE: usize = u8::MAX as usize + 1;
 
 type ScoreLut = [i16; SCORE_LUT_SIZE];
 
-const VALUE_SCORE_LUT: ScoreLut = build_score_lut::<EvaluationScores>();
-const ORDERING_SCORE_LUT: ScoreLut = build_score_lut::<OrderingScores>();
+const VALUE_SCORE_LUT: ColorContainer<ScoreLut> = build_score_lut::<EvaluationScores>();
+const ORDERING_SCORE_LUT: ColorContainer<ScoreLut> = build_score_lut::<OrderingScores>();
 
-const fn build_score_lut<W: WeightSet>() -> ScoreLut {
-    let mut lut = [0; SCORE_LUT_SIZE];
+const fn build_score_lut<W: WeightSet>() -> ColorContainer<ScoreLut> {
+    let mut lut = ColorContainer::new([0; SCORE_LUT_SIZE], [0; SCORE_LUT_SIZE]);
 
     const_for!(pattern_key in 0, SCORE_LUT_SIZE; {
         let closed_fours = pattern_key >> 6;
@@ -186,23 +192,29 @@ const fn build_score_lut<W: WeightSet>() -> ScoreLut {
         let potential_fours = (pattern_key >> 2) & 0b11;
         let potential_threes = pattern_key & 0b11;
 
-        lut[pattern_key] = if closed_fours > 1 { // double-four fork
+        let primary_index = if closed_fours != 0 {
+            2
+        } else if open_threes != 0 {
+            1
+        } else {
+            0
+        };
+
+        lut.0[Color::Black as usize][pattern_key] = if closed_fours > 1 { // double-four fork
             W::DOUBLE_FOUR_FORK
         } else if closed_fours == 1 && open_threes > 0 { // three-four fork
             W::THREE_FOUR_FORK
         } else if open_threes > 1 { // double-three fork
             W::DOUBLE_THREE_FORK
         } else {
-            let primary_index = if closed_fours != 0 {
-                2
-            } else if open_threes != 0 {
-                1
-            } else {
-                0
-            };
-
             W::MAIN_TABLE[primary_index][potential_threes][potential_fours]
-        }
+        };
+
+        lut.0[Color::White as usize][pattern_key] = if closed_fours == 1 && open_threes == 1 {
+            W::THREE_FOUR_FORK
+        } else {
+            W::MAIN_TABLE[primary_index][potential_threes][potential_fours]
+        };
     });
 
     lut

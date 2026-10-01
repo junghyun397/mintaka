@@ -17,23 +17,28 @@ mod test_eval {
         }};
     }
 
-    fn eval_distribution(state: &GameState<{ RuleKind::Renju }>) -> [f32; pos::BOARD_SIZE] {
-        let mut evaluator = ActiveEvaluator::from_state(state);
+    fn eval_distribution(state: &GameState<{ RuleKind::Renju }>) -> ([f32; pos::BOARD_SIZE], [f32; pos::BOARD_SIZE]) {
+        let evaluator = ActiveEvaluator::from_state(state);
 
-        let movegen_field = state.movegen_window.movegen_field & !state.board.legal_field(state.board.player_color);
+        let movegen_field = state.movegen_window.movegen_field & state.board.legal_field(state.board.player_color);
 
         let mut scores = [f32::NAN; pos::BOARD_SIZE];
+        let mut ordering_scores = [f32::NAN; pos::BOARD_SIZE];
 
         for pos in movegen_field.iter_hot_pos() {
+            ordering_scores[pos.idx_usize()] = evaluator.ordering_score(&state.board, pos) as f32;
             let mut state = *state;
-            state.play_mut(pos);
+            let mut evaluator = evaluator.clone();
+
+            let artifact = state.play_mut(pos);
+            evaluator.play(&state.board, artifact, pos.into());
 
             let score = -evaluator.eval_value(&state);
 
             scores[pos.idx_usize()] = score.value() as f32;
         }
 
-        scores
+        (scores, ordering_scores)
     }
 
     #[test]
@@ -59,10 +64,10 @@ mod test_eval {
 
         let state: GameState<{ RuleKind::Renju }> = board.into();
 
-        let scores = eval_distribution(&state);
+        let (scores, ordering_scores) = eval_distribution(&state);
 
-        println!("{:?}", scores);
-        println!("{}", state.board.to_string_with_heatmap(scores, true));
+        println!("{:?}, {}", scores, state.board.to_string_with_heatmap(scores, true));
+        println!("{:?}, {}", ordering_scores, state.board.to_string_with_heatmap(ordering_scores, true));
     }
 
     #[test]

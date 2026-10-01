@@ -268,7 +268,7 @@ impl<const R: RuleKind> GameAgent<R> {
 
             for tid in 1 .. config.workers {
                 let mut worker_td = ThreadData::new(
-                    WorkerThread::new(), tid,
+                    WorkerThread::default(), tid,
                     search_objective,
                     config,
                     self.evaluator.clone(),

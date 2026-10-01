@@ -132,8 +132,6 @@ pub fn generate_all_moves<const R: RuleKind>(
     td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
     state: &GameState<R>,
 ) {
-    td.evaluator.eval_policy(state);
-
     let field = state.board.legal_field(state.board.player_color) & state.movegen_window.movegen_field;
     let player_pattern = &state.board.patterns.field[state.board.player_color];
 

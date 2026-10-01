@@ -54,8 +54,8 @@ pub struct WorkerThread<CLK: MonotonicClock> {
     _phantom: std::marker::PhantomData<CLK>,
 }
 
-impl<CLK: MonotonicClock> WorkerThread<CLK> {
-    pub const fn new() -> Self {
+impl<CLK: MonotonicClock> Default for WorkerThread<CLK> {
+    fn default() -> Self {
         Self {
             _phantom: std::marker::PhantomData,
         }

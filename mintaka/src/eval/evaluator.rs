@@ -26,8 +26,6 @@ pub trait Evaluator<const R: RuleKind> {
 
     fn undo(&mut self, board: &Board<R>, artifact: MoveArtifact, removed: MaybePos);
 
-    fn eval_policy(&mut self, state: &GameState<R>);
-
     fn eval_value(&mut self, state: &GameState<R>) -> Score;
     
     fn ordering_score(&self, board: &Board<R>, pos: Pos) -> i16;
