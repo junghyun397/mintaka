@@ -152,7 +152,7 @@ impl Pattern {
 pub struct Patterns<const R: RuleKind> {
     pub field: AlignedColorContainer<[Pattern; PATTERN_SIZE]>,
     pub indexes: ColorContainer<PatternIndex<R>>,
-    pub five_pos: ColorContainer<MaybePos>,
+    pub five_pos: ColorContainer<[MaybePos; 2]>,
     pub candidate_overline_field: Bitfield,
     pub candidate_forbidden_field: Bitfield,
     pub forbidden_field: Bitfield,
@@ -163,7 +163,7 @@ impl<const R: RuleKind> Empty for Patterns<R> {
         Self {
             field: unsafe { std::mem::zeroed() },
             indexes: ColorContainer::new(PatternIndex::empty(), PatternIndex::empty()),
-            five_pos: ColorContainer::new(MaybePos::NONE, MaybePos::NONE),
+            five_pos: ColorContainer::new([MaybePos::NONE, MaybePos::NONE], [MaybePos::NONE, MaybePos::NONE]),
             candidate_overline_field: Bitfield::ZERO_FILLED,
             candidate_forbidden_field: Bitfield::ZERO_FILLED,
             forbidden_field: Bitfield::ZERO_FILLED,
@@ -255,11 +255,18 @@ impl<const R: RuleKind> Patterns<R> {
     ) -> u16 {
         const SLICE_PATTERN_FIVE_MASK: u128 = repeat!(FIVE, x16 u128);
 
-        if (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK) != 0 {
-            let slice_idx = (slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK).trailing_zeros() / 8;
+        let mut five_bitmask = slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK;
+        while five_bitmask != 0 {
+            let slice_idx = five_bitmask.trailing_zeros() / 8;
+            five_bitmask &= !(1 << (slice_idx * 8));
             let pos = Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8));
 
-            self.five_pos[C] = pos.into();
+            if self.five_pos[C][0] == pos.into() {
+                continue;
+            }
+
+            self.five_pos[C][1] = self.five_pos[C][0];
+            self.five_pos[C][0] = pos.into();
         }
 
         slice.pattern_bitmap[C] = slice_pattern.pattern_bitmap();

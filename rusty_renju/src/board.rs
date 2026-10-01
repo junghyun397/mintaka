@@ -291,11 +291,18 @@ impl<const R: RuleKind> Board<R> {
     }
 
     fn validate_five(&mut self) {
-        for (color, maybe_five) in self.patterns.five_pos.clone().iter() {
-            if let Some(pos) = maybe_five.ok()
-                && !self.patterns.field[color][pos.idx_usize()].has_five()
-            {
-                self.patterns.five_pos[color] = MaybePos::NONE;
+        for (color, [lo_five, hi_five]) in self.patterns.five_pos.clone().iter() {
+            if hi_five.ok().is_none_or(|five|
+                !self.patterns.field[color][five.idx_usize()].has_five()
+            ) {
+                self.patterns.five_pos[color][1] = MaybePos::NONE;
+            }
+
+            if lo_five.ok().is_none_or(|five|
+                !self.patterns.field[color][five.idx_usize()].has_five()
+            ) {
+                self.patterns.five_pos[color][0] = self.patterns.five_pos[color][1];
+                self.patterns.five_pos[color][1] = MaybePos::NONE;
             }
         }
     }
