@@ -9,6 +9,8 @@ use crate::slice_pattern::SlicePattern;
 use crate::utils::empty::Empty;
 use crate::{assert_struct_sizes, repeat, slice_pattern, step_idx};
 
+pub const NONE: u8                      = 0b0000_0000;
+
 pub const CLOSED_FOURS: u8              = 0b1100_0000;
 pub const CLOSED_FOUR_SINGLE: u8        = 0b1000_0000;
 

@@ -208,14 +208,14 @@ impl TTView<'_> {
             } else {
                 self.age != exist_entry.tt_flag.age()
                     || depth > Depth::ZERO && (maybe_score_kind == Some(ScoreKind::Exact)
-                    || depth.value() + 3 + 4 * is_pv as i32 > exist_entry.depth as i32)
+                    || depth.value_i32() + 3 + 4 * is_pv as i32 > exist_entry.depth as i32)
             };
 
             if should_replace {
                 let entry = TTEntry {
                     best_move: best_move.or(exist_entry.best_move),
                     tt_flag: TTFlag::new(self.age, maybe_score_kind, is_pv),
-                    depth: depth.value() as u8,
+                    depth: depth.value_i32() as u8,
                     quiescence_depth,
                     eval: eval.or(MaybeScore::from(exist_entry.eval as i32)).unwrap_unchecked() as i16,
                     score: score.unwrap_unchecked() as i16,
@@ -247,7 +247,7 @@ impl TTView<'_> {
             let entry = TTEntry {
                 best_move,
                 tt_flag: TTFlag::new(self.age, maybe_score_kind, is_pv),
-                depth: depth.value() as u8,
+                depth: depth.value_i32() as u8,
                 quiescence_depth,
                 eval: eval.unwrap_unchecked() as i16,
                 score: score.unwrap_unchecked() as i16,
@@ -279,7 +279,7 @@ impl TTView<'_> {
 
 pub fn encode_mate_distance(score: Score, ply: usize) -> Score {
     if score.is_mate() {
-        let score = score.value();
+        let score = score.value_i32();
 
         Score::from_i32(score + ply as i32 * score.signum())
     } else {
@@ -289,7 +289,7 @@ pub fn encode_mate_distance(score: Score, ply: usize) -> Score {
 
 pub fn decode_mate_distance(score: Score, ply: usize) -> Score {
     if score.is_mate() {
-        let score = score.value();
+        let score = score.value_i32();
 
         Score::from_i32(score - ply as i32 * score.signum())
     } else {

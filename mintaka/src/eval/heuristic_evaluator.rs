@@ -3,6 +3,7 @@ use crate::game_state::GameState;
 use rusty_renju::board::{Board, MoveArtifact};
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::color::{Color, ColorContainer};
+use rusty_renju::notation::direction::Direction;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::{ForbiddenKind, RuleKind};
@@ -23,38 +24,46 @@ pub struct HeuristicEvaluator<const R: RuleKind> {
 }
 
 impl<const R: RuleKind> HeuristicEvaluator<R> {
-    fn update(&mut self, board: &Board<R>, artifact: MoveArtifact, plied: Pos) {
-        for (color, directions) in artifact.iter() {
-            let mut score_delta = 0;
+    #[inline(always)]
+    fn update_direction<const C: Color, const D: Direction>(
+        &mut self, board: &Board<R>, mut changed_bitmap: u16, plied: Pos,
+    ) -> i32 {
+        let start_pos = Slices::slice_start_pos(D, plied);
+        let mut score_delta = 0;
 
-            for (direction, &changed_bitmap) in directions.iter() {
-                if changed_bitmap == 0 {
-                    continue;
-                }
+        while changed_bitmap != 0 {
+            let slice_idx = changed_bitmap.trailing_zeros() as usize;
+            changed_bitmap &= changed_bitmap - 1;
 
-                let start_pos = Slices::slice_start_pos(direction, plied);
-
-                let mut changed_bitmap = changed_bitmap;
-                while changed_bitmap != 0 {
-                    let slice_idx = changed_bitmap.trailing_zeros() as usize;
-                    changed_bitmap &= changed_bitmap - 1;
-
-                    let pos = start_pos.directional_offset_unchecked(direction, slice_idx as isize);
-                    let key = encode_key(board.patterns.field[color][pos.idx_usize()]);
-
-                    let score = VALUE_SCORE_LUT[lut_color::<R>(color)][key];
-                    let old_score = std::mem::replace(&mut self.scores[color][pos.idx_usize()], score);
-                    let pattern_delta = score as i32 - old_score as i32;
-
-                    let ordering_score = ORDERING_SCORE_LUT[lut_color::<R>(color)][key];
-                    self.ordering_scores[pos.idx_usize()][color] = ordering_score;
-
-                    score_delta += pattern_delta;
-                }
-            }
-
-            self.score_black += score_delta * BLACK_SIGNUM[color];
+            let pos = start_pos.directional_offset_unchecked(D, slice_idx as isize);
+            let key = encode_key(board.patterns.field[C][pos.idx_usize()]);
+            let score = VALUE_SCORE_LUT[lut_color::<R>(C)][key];
+            let old_score = std::mem::replace(&mut self.scores[C][pos.idx_usize()], score);
+            self.ordering_scores[pos.idx_usize()][C] = ORDERING_SCORE_LUT[lut_color::<R>(C)][key];
+            score_delta += score as i32 - old_score as i32;
         }
+
+        score_delta
+    }
+
+    fn update(&mut self, board: &Board<R>, artifact: MoveArtifact, plied: Pos) {
+        macro_rules! update_color {
+            ($color:expr) => {
+                self.update_direction::<{ $color }, { Direction::Horizontal }>(
+                    board, artifact[$color][Direction::Horizontal], plied,
+                ) + self.update_direction::<{ $color }, { Direction::Vertical }>(
+                    board, artifact[$color][Direction::Vertical], plied,
+                ) + self.update_direction::<{ $color }, { Direction::Ascending }>(
+                    board, artifact[$color][Direction::Ascending], plied,
+                ) + self.update_direction::<{ $color }, { Direction::Descending }>(
+                    board, artifact[$color][Direction::Descending], plied,
+                )
+            };
+        }
+
+        let black_delta = update_color!(Color::Black);
+        let white_delta = update_color!(Color::White);
+        self.score_black += black_delta - white_delta;
     }
 }
 
@@ -125,7 +134,7 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
             }
         }
 
-        let max_score = Score::MATE_MIN.value() - 1;
+        let max_score = Score::MATE_MIN.value_i32() - 1;
 
         Score::from_i32((score_black * BLACK_SIGNUM[state.board.player_color]).clamp(-max_score, max_score))
     }

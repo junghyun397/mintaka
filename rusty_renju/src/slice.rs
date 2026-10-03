@@ -90,13 +90,13 @@ impl Slice {
         let stones = self.stones[C];
         let blocks = self.blocks::<C>();
 
-        stones != 0
-            && (
-                // filter O X . . O X .
-                stones & !(blocks << 1) & !(blocks >> 1) != 0
-                    // accept X O . . . O X
-                    || stones & (stones >> 4) & (blocks << 1) & (blocks >> 5) != 0
-            )
+        // reject O X . . O X
+        let exposed = stones & !(blocks << 1) & !(blocks >> 1);
+
+        // accept O X . . . X O
+        let closed_five = stones & (stones >> 4) & (blocks << 1) & (blocks >> 5);
+
+        exposed | closed_five != 0
     }
 
     pub fn winner(&self) -> Option<Color> {

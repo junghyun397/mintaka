@@ -68,7 +68,7 @@ pub fn solve_endgame<const R: RuleKind>(
     let sequence = match threat_kind {
         ThreatSearchKind::VCF => search_endgame::endgame_proof::<R, { ThreatSearchKind::VCF }>(&mut td, &mut state),
         ThreatSearchKind::VCT => search_endgame::endgame_proof::<R, { ThreatSearchKind::VCT }>(&mut td, &mut state),
-        ThreatSearchKind::Forced => search_endgame::endgame_proof::<R, { ThreatSearchKind::Forced }>(&mut td, &mut state),
+        ThreatSearchKind::Forced => unimplemented!(),
     };
     
     let elapsed = start_time.elapsed();

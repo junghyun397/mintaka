@@ -20,7 +20,7 @@ impl Score {
         Self(value)
     }
 
-    pub const fn value(self) -> i32 {
+    pub const fn value_i32(self) -> i32 {
         self.0
     }
 

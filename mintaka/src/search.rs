@@ -73,7 +73,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     let mut best_move_changes = 0;
 
     let starting_depth = Depth::from_i32(td.tid as i32 % 10 + 1);
-    'iterative_deepening: for depth in starting_depth.value() ..= td.config.max_depth().value() {
+    'iterative_deepening: for depth in starting_depth.value_i32() ..= td.config.max_depth().value_i32() {
         let depth = Depth::from_i32(depth);
 
         let iter_score = if depth < Depth::from_i32(5) {
@@ -161,7 +161,7 @@ fn aspiration<const R: RuleKind, TH: ThreadType>(
 ) -> Score {
     let mut depth = max_depth;
 
-    let mut delta = params::ASPIRATION_DELTA_BASE + prev_score.value().pow(2) / params::ASPIRATION_DELTA_DIV;
+    let mut delta = params::ASPIRATION_DELTA_BASE + prev_score.value_i32().pow(2) / params::ASPIRATION_DELTA_DIV;
     let mut alpha = prev_score - delta;
     let mut beta = prev_score + delta;
 
@@ -341,7 +341,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         if !NT::IS_PV
             && entry_tt_score.is_some()
             && (
-                depth_left.value() <= entry.depth as i32 
+                depth_left.value_i32() <= entry.depth as i32 
                     || entry.quiescence_depth == TTEntry::QUIESCENCE_PROVEN_DEPTH
             )
             && let entry_tt_score = transposition_table::decode_mate_distance(entry_tt_score.unwrap(), td.ply)
@@ -386,11 +386,31 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
     td.ss[td.ply].static_eval = static_eval;
 
+    // razoring
+    if !NT::IS_PV
+        && threat_kind.is_none()
+        && !alpha.is_mate() && !beta.is_mate()
+        && depth_left <= params::RAZORING_MAX_DEPTH_LEFT
+        && static_eval + params::RAZORING_MARGIN[depth_left.value_usize()] < alpha
+    {
+        let score = quiescence_search::<R, { ThreatSearchKind::VCF }>(
+            td, &mut child_pv, Depth::ZERO, state, alpha, alpha + 1, false,
+        );
+
+        if td.is_aborted() {
+            return Score::DRAW;
+        }
+
+        if score <= alpha {
+            return score;
+        }
+    }
+
     let static_eval_improvement = if td.ply > 1 {
         static_eval - td.ss[td.ply - 2].static_eval
     } else {
         Score::DRAW
-    }.value();
+    }.value_i32();
 
     td.ss[td.ply].recovery_state = state.recovery_state();
 
@@ -437,7 +457,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             }
 
             // futility pruning
-            let fp_margin = params::FP_BASE + params::FP_MUL * depth_left.value() * depth_left.value();
+            let fp_margin = params::FP_BASE + params::FP_MUL * depth_left.value_i32() * depth_left.value_i32();
             if !alpha.is_win()
                  && static_eval + fp_margin <= alpha
             {
@@ -606,7 +626,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 }
 
 fn lookup_lmp_mc_table(depth: Depth, is_improving: bool) -> usize {
-    let clamped_depth = (depth.value() - 1).min(11) as usize;
+    let clamped_depth = (depth.value_i32() - 1).min(11) as usize;
 
     LMP_MC_TABLE[is_improving as usize][clamped_depth]
 }

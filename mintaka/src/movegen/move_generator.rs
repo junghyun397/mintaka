@@ -11,9 +11,9 @@ use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::Score;
 use rusty_renju::utils::empty::Empty;
 
-pub const TT_MOVE_SCORE: i16 = Score::MATE.value() as i16 - 300;
-pub const DIRECT_RESPONSE_SCORE: i16 = Score::INF.value() as i16 - 500;
-pub const KILLER_MOVE_SCORE: i16 = Score::INF.value() as i16 - 1000;
+pub const TT_MOVE_SCORE: i16 = Score::MATE.value_i32() as i16 - 300;
+pub const DIRECT_RESPONSE_SCORE: i16 = Score::INF.value_i32() as i16 - 500;
+pub const KILLER_MOVE_SCORE: i16 = Score::INF.value_i32() as i16 - 1000;
 pub const COUNTER_MOVE_BONUS: i16 = 100;
 
 static ENDGAME_MOVEGEN_IMPRINT_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_imprint_mask_lut([

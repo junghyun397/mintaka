@@ -132,7 +132,7 @@ impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, T
     }
 
     pub fn lookup_lmr_table(&self, depth_left: Depth, moves_made: usize) -> Depth {
-        let depth_clamped = depth_left.clamp_value(Depth::from_i32(63)).value();
+        let depth_clamped = depth_left.clamp_value(Depth::from_i32(63)).value_i32();
         let moves_made_clamped = moves_made.clamp(0, depth::MAX_PLY);
 
         self.lmr_table[depth_clamped as usize][moves_made_clamped]

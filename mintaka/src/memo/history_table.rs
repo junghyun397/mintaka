@@ -36,7 +36,7 @@ impl Empty for HistoryTable {
 
 impl HistoryTable {
     pub fn update_quiet(&mut self, history: &History, quiet_plied: Bitfield, color: Color, best_move: Pos, depth: Depth) {
-        let bonus = depth.value() * depth.value() * params::HT_QUIET_BONUS_MUL;
+        let bonus = depth.value_i32() * depth.value_i32() * params::HT_QUIET_BONUS_MUL;
 
         for pos in quiet_plied.iter_hot_pos() {
             let bonus = bonus * Self::is_equal_sign(pos, best_move);
@@ -52,7 +52,7 @@ impl HistoryTable {
     }
 
     pub fn update_tactical(&mut self, three_plied: Bitfield, four_plied: Bitfield, color: Color, best_move: Pos, depth: Depth) {
-        let bonus = depth.value() * depth.value() * params::HT_TACTICAL_BONUS_MUL;
+        let bonus = depth.value_i32() * depth.value_i32() * params::HT_TACTICAL_BONUS_MUL;
 
         for pos in three_plied.iter_hot_pos() {
             let bonus = bonus * Self::is_equal_sign(pos, best_move);

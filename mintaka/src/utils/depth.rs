@@ -16,8 +16,12 @@ impl Depth {
     pub const PLY_LIMIT: Depth = Depth(MAX_PLY as i32);
     pub const BOARD_LIMIT: Depth = Depth(pos::BOARD_SIZE as i32);
 
-    pub const fn value(self) -> i32 {
+    pub const fn value_i32(self) -> i32 {
         self.0
+    }
+    
+    pub const fn value_usize(self) -> usize {
+        self.0 as usize
     }
 
     pub const fn from_i32(value: i32) -> Self {

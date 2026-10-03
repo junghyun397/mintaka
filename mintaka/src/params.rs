@@ -1,3 +1,6 @@
+use rusty_renju::notation::score::Score;
+use crate::utils::depth::Depth;
+
 macro_rules! parse_int {
     ($name:literal,$t:ty,$default:expr) => {
         parse_or_default!($name,$t,1.0,$default)
@@ -35,8 +38,15 @@ pub const LMP_DIV_NON_IMPROVING: f64 = parse_float!("lmp_div_non_improving", f64
 pub const FP_BASE: i32 = parse_int!("fp_base", i32, 100);
 pub const FP_MUL: i32 = parse_int!("fp_mul", i32, 32);
 
-pub const RAZORING_MARGIN: i32 = parse_int!("razoring_margin", i32, 200);
-pub const RAZORING_MAX_DEPTH: i32 = parse_int!("razoring_max_depth", i32, 4);
+pub const RAZORING_MAX_DEPTH_LEFT: Depth = Depth::from_i32(parse_int!("razoring_max_depth", i32, 2));
+pub const RAZORING_MARGIN: [Score; 5] =
+    [
+        Score::from_i32(parse_int!("razoring_margin_0", i32, 200)),
+        Score::from_i32(parse_int!("razoring_margin_1", i32, 320)),
+        Score::from_i32(parse_int!("razoring_margin_2", i32, 480)),
+        Score::from_i32(parse_int!("razoring_margin_3", i32, 710)),
+        Score::from_i32(parse_int!("razoring_margin_4", i32, 1000)),
+    ];
 
 pub const HT_QUIET_BONUS_MUL: i32 = parse_int!("ht_quiet_bonus_mul", i32, 4);
 pub const HT_TACTICAL_BONUS_MUL: i32 = parse_int!("ht_tactical_bonus_mul", i32, 4);
