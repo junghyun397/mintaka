@@ -36,7 +36,6 @@ enum PiskvorkError {
 enum PiskvorkResponse {
     Message(String),
     Debug(String),
-    Unknown(String),
     About(String),
     Pos(Pos),
     Forbid(Option<Vec<Pos>>),
@@ -50,9 +49,6 @@ fn stdio_out(piskvork_response: Result<PiskvorkResponse, PiskvorkError>) {
         }
         Ok(PiskvorkResponse::Debug(message)) => {
             println!("DEBUG {}", message);
-        }
-        Ok(PiskvorkResponse::Unknown(message)) => {
-            println!("UNKNOWN {}", message);
         }
         Ok(PiskvorkResponse::About(message)) => {
             println!("{}", message);
@@ -186,13 +182,13 @@ fn piskvork_protocol<const R: RuleKind>() -> Result<(), impl Error> {
                 );
             }
             Message::Config(ConfigCommand::MaxMemory(max_size)) => {
-                const GENERAL_NPMS: Nodes = Nodes::from_in_1k(2);
+                const GENERAL_KNPMS: Nodes = Nodes::from_in_1k(2);
 
                 let optimal_size = config.initial_timer.turn
                     .or_else(|| config.initial_timer.total_remaining.map(|time| time / 20))
                     .map(|time| {
                         let nodes = match config.initial_timer.time_unit {
-                            TimeUnit::Clock => GENERAL_NPMS * time.to_duration().as_millis() as u32,
+                            TimeUnit::Clock => GENERAL_KNPMS * time.to_duration().as_millis() as u32,
                             TimeUnit::Nodes => time.to_nodes()
                         };
 
@@ -205,6 +201,8 @@ fn piskvork_protocol<const R: RuleKind>() -> Result<(), impl Error> {
                     (None, Some(max)) => max - ENGINE_SYSTEM_MEMORY,
                     (None, None) => ByteSize::from_mib(2048)
                 };
+
+                stdio_out(Ok(PiskvorkResponse::Message(format!("tt-size={} KiB", size.kib()))));
 
                 let _ = game_agent.command(Command::RebuildTT(size));
             }
@@ -493,6 +491,7 @@ fn parse_time(arg: Option<&str>) -> Result<u64, &'static str> {
 
 struct Presets;
 
+#[allow(dead_code)]
 impl Presets {
     const FASTGAME: Config = Config {
         draw_condition: None,

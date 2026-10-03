@@ -26,10 +26,10 @@ pub struct HistoryTable {
 impl Empty for HistoryTable {
     fn empty() -> Self {
         Self {
-            quiet: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
-            three: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
-            four: ColorContainer::new([0; pos::BOARD_SIZE], [0; pos::BOARD_SIZE]),
-            counter: ColorContainer::new([MaybePos::NONE; pos::BOARD_SIZE], [MaybePos::NONE; pos::BOARD_SIZE]),
+            quiet: ColorContainer::splat([0; pos::BOARD_SIZE]),
+            three: ColorContainer::splat([0; pos::BOARD_SIZE]),
+            four: ColorContainer::splat([0; pos::BOARD_SIZE]),
+            counter: ColorContainer::splat([MaybePos::NONE; pos::BOARD_SIZE]),
         }
     }
 }

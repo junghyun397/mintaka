@@ -1,5 +1,6 @@
 use crate::movegen::movegen_window::MovegenWindow;
-use rusty_renju::board::{Board, MoveArtifact};
+use rusty_renju::bitfield::Bitfield;
+use rusty_renju::board::{Board, MoveArtifact, UndoCache};
 use rusty_renju::board_io::BoardData;
 use rusty_renju::history::History;
 use rusty_renju::notation::pos::Pos;
@@ -30,22 +31,18 @@ impl<const R: RuleKind> Empty for GameState<R> {
 
 #[derive(Debug, Copy, Clone)]
 pub struct RecoveryState {
-    pub movegen_window: MovegenWindow
+    pub movegen_field: Bitfield,
+    pub unset_cache: UndoCache,
 }
 
 impl RecoveryState {
     pub const EMPTY: Self = Self {
-        movegen_window: MovegenWindow::EMPTY
+        movegen_field: Bitfield::ZERO_FILLED,
+        unset_cache: UndoCache::EMPTY,
     };
 }
 
 impl<const R: RuleKind> GameState<R> {
-    pub fn recovery_state(&self) -> RecoveryState {
-        RecoveryState {
-            movegen_window: self.movegen_window
-        }
-    }
-
     pub fn play(mut self, pos: Pos) -> Self {
         self.play_mut(pos);
         self
@@ -57,7 +54,7 @@ impl<const R: RuleKind> GameState<R> {
     }
 
     pub fn undo(mut self, recovery_state: RecoveryState) -> Self {
-        self.undo_mut(recovery_state);
+        self.undo_mut(&recovery_state);
         self
     }
 
@@ -66,11 +63,13 @@ impl<const R: RuleKind> GameState<R> {
         self
     }
 
-    pub fn play_mut(&mut self, pos: Pos) -> MoveArtifact {
+    pub fn play_mut(&mut self, pos: Pos) -> (MoveArtifact, RecoveryState) {
+        let movegen_field = self.movegen_window.movegen_field;
         self.history.set_mut(pos);
         self.movegen_window.imprint_window(pos);
 
-        self.board.set_mut(pos)
+        let (artifact, unset_cache) = self.board.set_mut(pos);
+        (artifact, RecoveryState { movegen_field, unset_cache })
     }
 
     pub fn pass_mut(&mut self) {
@@ -78,10 +77,18 @@ impl<const R: RuleKind> GameState<R> {
         self.history.pass_mut();
     }
 
-    pub fn undo_mut(&mut self, recovery_state: RecoveryState) -> MoveArtifact {
-        self.movegen_window = recovery_state.movegen_window;
+    pub fn undo_mut(&mut self, recovery_state: &RecoveryState) -> MoveArtifact {
+        self.movegen_window.movegen_field = recovery_state.movegen_field;
 
-        self.undo_move()
+        if let Some(action) = self.history.pop_mut() {
+            if let Some(pos) = action.ok() {
+                return self.board.restore_mut(pos, &recovery_state.unset_cache);
+            }
+
+            self.board.unpass_mut();
+        }
+
+        MoveArtifact::empty()
     }
 
     pub fn undo_rebuild_mut(&mut self) -> MoveArtifact {

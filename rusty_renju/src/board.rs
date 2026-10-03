@@ -5,7 +5,7 @@ use crate::notation::direction::{Direction, DirectionContainer};
 use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::RuleKind;
 use crate::pattern::Patterns;
-use crate::slice::Slices;
+use crate::slice::{Slice, Slices};
 use crate::utils::empty::Empty;
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "typeshare")]
@@ -58,6 +58,21 @@ pub enum MoveType {
 
 pub type MoveArtifact = ColorContainer<DirectionContainer<u16>>;
 
+#[derive(Debug, Copy, Clone)]
+pub struct UndoCache {
+    pub slices: ColorContainer<DirectionContainer<slice_pattern::SlicePattern>>,
+    pub changed: MoveArtifact,
+    pub bitmaps: MoveArtifact,
+}
+
+impl UndoCache {
+    pub const EMPTY: Self = Self {
+        slices: ColorContainer::splat(DirectionContainer::splat(slice_pattern::SlicePattern::EMPTY)),
+        changed: ColorContainer::splat(DirectionContainer::splat(0)),
+        bitmaps: ColorContainer::splat(DirectionContainer::splat(0)),
+    };
+}
+
 impl<const R: RuleKind> Board<R> {
     pub fn is_pos_empty(&self, pos: Pos) -> bool {
         self.hot_field.is_cold(pos)
@@ -82,12 +97,12 @@ impl<const R: RuleKind> Board<R> {
     }
 
     pub fn set(mut self, pos: Pos) -> Self {
-        self.set_mut(pos);
+        self.set_mut::<()>(pos);
         self
     }
 
     pub fn unset(mut self, pos: Pos) -> Self {
-        self.unset_mut(pos);
+        self.unset_mut::<()>(pos);
         self
     }
 
@@ -96,26 +111,35 @@ impl<const R: RuleKind> Board<R> {
         self
     }
 
-    pub fn set_mut(&mut self, pos: Pos) -> MoveArtifact {
+    pub fn set_mut<U: IncrementalUpdate>(&mut self, pos: Pos) -> U {
         self.stones += 1;
         self.hot_field.set(pos);
         self.hash_key = self.hash_key.set(self.player_color, pos);
 
-        let artifact = self.incremental_update::<{ MoveType::Set }>(pos);
+        let result = self.incremental_update::<{ MoveType::Set }, U>(pos);
 
         self.player_color = !self.player_color;
 
-        artifact
+        result
     }
 
-    pub fn unset_mut(&mut self, pos: Pos) -> MoveArtifact {
+    pub fn unset_mut<U: IncrementalUpdate>(&mut self, pos: Pos) -> U {
         self.player_color = !self.player_color;
 
         self.stones -= 1;
         self.hot_field.unset(pos);
         self.hash_key = self.hash_key.set(self.player_color, pos);
 
-        self.incremental_update::<{ MoveType::Unset }>(pos)
+        self.incremental_update::<{ MoveType::Unset }, U>(pos)
+    }
+
+    pub fn restore_mut(&mut self, pos: Pos, cache: &UndoCache) -> MoveArtifact {
+        self.player_color = !self.player_color;
+        self.stones -= 1;
+        self.hot_field.unset(pos);
+        self.hash_key = self.hash_key.set(self.player_color, pos);
+
+        self.restore_update(pos, cache)
     }
 
     pub fn pass_mut(&mut self) {
@@ -179,11 +203,13 @@ impl<const R: RuleKind> Board<R> {
         self.player_color = !self.player_color;
     }
 
-    fn incremental_update<const M: MoveType>(&mut self, pos: Pos) -> MoveArtifact {
-        let mut artifact = MoveArtifact::empty();
+    fn incremental_update<const M: MoveType, U: IncrementalUpdate>(&mut self, pos: Pos) -> U {
+        let mut update = U::EMPTY;
 
         macro_rules! update_by_slice_each_color {
             ($color:expr,$direction:expr,$slice:expr) => {
+                update.record_slice::<R, { $color }, { $direction }>(&self.patterns, $slice);
+
                 let unit_artifact = match (
                     $slice.pattern_bitmap[$color] != 0,
                     $slice.has_potential_pattern::<{ $color }>(),
@@ -195,7 +221,7 @@ impl<const R: RuleKind> Board<R> {
                     _ => 0
                 };
 
-                artifact[$color][$direction] = unit_artifact;
+                update.record_artifact::<{ $color }, { $direction }>(unit_artifact);
             }
         }
 
@@ -247,6 +273,40 @@ impl<const R: RuleKind> Board<R> {
 
         if R == RuleKind::Renju {
             self.validate_overlines::<M>();
+            self.validate_forbidden_moves();
+        }
+
+        update
+    }
+
+    fn restore_update(&mut self, pos: Pos, cache: &UndoCache) -> MoveArtifact {
+        let mut artifact = MoveArtifact::empty();
+
+        macro_rules! restore_slice {
+            ($slice:expr,$direction:expr,$slice_idx:expr) => {{
+                let slice = $slice;
+                slice.unset_mut(self.player_color, $slice_idx);
+                artifact[Color::Black][$direction] = self.patterns
+                    .restore_pattern_with_slice::<{ Color::Black }, { $direction }>(slice, cache);
+                artifact[Color::White][$direction] = self.patterns
+                    .restore_pattern_with_slice::<{ Color::White }, { $direction }>(slice, cache);
+            }};
+        }
+
+        restore_slice!(&mut self.slices.horizontal_slices[pos.row_usize()], Direction::Horizontal, pos.col());
+        restore_slice!(&mut self.slices.vertical_slices[pos.col_usize()], Direction::Vertical, pos.row());
+        if let Some(slice) = self.slices.ascending_slice_mut(pos) {
+            let slice_idx = pos.col() - slice.start_col;
+            restore_slice!(slice, Direction::Ascending, slice_idx);
+        }
+        if let Some(slice) = self.slices.descending_slice_mut(pos) {
+            let slice_idx = pos.col() - slice.start_col;
+            restore_slice!(slice, Direction::Descending, slice_idx);
+        }
+
+        self.validate_five();
+        if R == RuleKind::Renju {
+            self.validate_overlines::<{ MoveType::Unset }>();
             self.validate_forbidden_moves();
         }
 
@@ -521,6 +581,49 @@ impl<const R: RuleKind> Board<R> {
         let slice_idx = slice.calculate_slice_idx(direction, pos);
 
         ((((slice.stones[C] as u32) << 2) >> slice_idx) & 0b11111) as u8 // 0[00V00]0
+    }
+}
+
+pub trait IncrementalUpdate {
+    const EMPTY: Self;
+
+    #[inline(always)]
+    fn record_slice<const R: RuleKind, const C: Color, const D: Direction>(
+        &mut self, _: &Patterns<R>, _: &Slice,
+    ) {}
+
+    #[inline(always)]
+    fn record_artifact<const C: Color, const D: Direction>(&mut self, _: u16) {}
+}
+
+impl IncrementalUpdate for () {
+    const EMPTY: Self = ();
+}
+
+impl IncrementalUpdate for MoveArtifact {
+    const EMPTY: Self = ColorContainer::splat(DirectionContainer::splat(0));
+
+    #[inline(always)]
+    fn record_artifact<const C: Color, const D: Direction>(&mut self, artifact: u16) {
+        self[C][D] = artifact;
+    }
+}
+
+impl IncrementalUpdate for (MoveArtifact, UndoCache) {
+    const EMPTY: Self = (MoveArtifact::EMPTY, UndoCache::EMPTY);
+
+    #[inline(always)]
+    fn record_slice<const R: RuleKind, const C: Color, const D: Direction>(
+        &mut self, patterns: &Patterns<R>, slice: &Slice,
+    ) {
+        self.1.slices[C][D] = patterns.indexes[C].slice_pattern::<D>(slice.idx);
+        self.1.bitmaps[C][D] = slice.pattern_bitmap[C];
+    }
+
+    #[inline(always)]
+    fn record_artifact<const C: Color, const D: Direction>(&mut self, artifact: u16) {
+        self.0[C][D] = artifact;
+        self.1.changed[C][D] = artifact;
     }
 }
 

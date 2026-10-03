@@ -76,8 +76,8 @@ impl<const R: RuleKind> Evaluator<R> for HeuristicEvaluator<R> {
 
     fn from_state(state: &GameState<R>) -> Self {
         let mut evaluator = Self {
-            scores: ColorContainer::new([0; pattern::PATTERN_SIZE], [0; pattern::PATTERN_SIZE]),
-            ordering_scores: [ColorContainer::new(0, 0); pattern::PATTERN_SIZE],
+            scores: ColorContainer::splat([0; pattern::PATTERN_SIZE]),
+            ordering_scores: [ColorContainer::splat(0); pattern::PATTERN_SIZE],
             score_black: 0,
             hash_key: HashKey::empty(),
         };
@@ -193,7 +193,7 @@ const VALUE_SCORE_LUT: ColorContainer<ScoreLut> = build_score_lut::<EvaluationSc
 const ORDERING_SCORE_LUT: ColorContainer<ScoreLut> = build_score_lut::<OrderingScores>();
 
 const fn build_score_lut<W: WeightSet>() -> ColorContainer<ScoreLut> {
-    let mut lut = ColorContainer::new([0; SCORE_LUT_SIZE], [0; SCORE_LUT_SIZE]);
+    let mut lut = ColorContainer::splat([0; SCORE_LUT_SIZE]);
 
     const_for!(pattern_key in 0, SCORE_LUT_SIZE; {
         let closed_fours = pattern_key >> 6;

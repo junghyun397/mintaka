@@ -30,7 +30,7 @@ mod test_eval {
             let mut state = *state;
             let mut evaluator = evaluator.clone();
 
-            let artifact = state.play_mut(pos);
+            let (artifact, _) = state.play_mut(pos);
             evaluator.play(&state.board, artifact, pos.into());
 
             let score = -evaluator.eval_value(&state);

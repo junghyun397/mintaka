@@ -364,8 +364,8 @@ mod test_nested_forbid {
            A B C D E F G H I J K L M N O"});
 
         let mut case_mod = case;
-        case_mod.set_mut(pos_unchecked("j9"));
-        case_mod.unset_mut(pos_unchecked("j9"));
+        case_mod.set_mut::<()>(pos_unchecked("j9"));
+        case_mod.unset_mut::<()>(pos_unchecked("j9"));
 
         assert_eq!(case_mod.to_string(), case.to_string());
     }

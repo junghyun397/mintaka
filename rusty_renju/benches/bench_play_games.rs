@@ -4,7 +4,7 @@ extern crate test;
 
 mod bench_play_games {
     use std::str::FromStr;
-    use rusty_renju::board::Board;
+    use rusty_renju::board::{Board, MoveArtifact};
     use rusty_renju::history::History;
     use rusty_renju::notation::rule::RuleKind;
     use rusty_renju::utils::empty::Empty;
@@ -17,7 +17,7 @@ mod bench_play_games {
                 let mut board = Board::<{ RuleKind::Renju }>::empty();
 
                 for pos in history.iter() {
-                    let artifact = board.set_mut(pos.unwrap());
+                    let artifact = board.set_mut::<MoveArtifact>(pos.unwrap());
 
                     std::hint::black_box(artifact);
                 }

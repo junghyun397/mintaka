@@ -127,7 +127,7 @@ impl<const R: RuleKind> GameAgent<R> {
                         return Err(GameError::ForbiddenMove);
                     }
 
-                    let artifact = self.state.play_mut(pos);
+                    let (artifact, _) = self.state.play_mut(pos);
                     self.evaluator.play(&self.state.board, artifact, pos.into());
 
                     if let Some(winner) = self.state.board.find_winner(pos) {
@@ -168,11 +168,11 @@ impl<const R: RuleKind> GameAgent<R> {
                 self.state.movegen_window.imprint_window(pos);
 
                 if self.state.board.player_color == color {
-                    self.state.board.set_mut(pos);
+                    self.state.board.set_mut::<()>(pos);
                     self.state.board.switch_player_mut();
                 } else {
                     self.state.board.switch_player_mut();
-                    self.state.board.set_mut(pos);
+                    self.state.board.set_mut::<()>(pos);
                 }
             },
             Command::Unset { hash, pos, color } => {
@@ -184,9 +184,9 @@ impl<const R: RuleKind> GameAgent<R> {
                     Some(stone_color) if stone_color == color => {
                         if self.state.board.player_color == color {
                             self.state.board.switch_player_mut();
-                            self.state.board.unset_mut(pos);
+                            self.state.board.unset_mut::<()>(pos);
                         } else {
-                            self.state.board.unset_mut(pos);
+                            self.state.board.unset_mut::<()>(pos);
                             self.state.board.switch_player_mut();
                         }
                     },

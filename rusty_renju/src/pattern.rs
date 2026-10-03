@@ -8,6 +8,7 @@ use crate::slice::Slice;
 use crate::slice_pattern::SlicePattern;
 use crate::utils::empty::Empty;
 use crate::{assert_struct_sizes, repeat, slice_pattern, step_idx};
+use crate::board::UndoCache;
 
 pub const NONE: u8                      = 0b0000_0000;
 
@@ -164,8 +165,8 @@ impl<const R: RuleKind> Empty for Patterns<R> {
     fn empty() -> Self {
         Self {
             field: unsafe { std::mem::zeroed() },
-            indexes: ColorContainer::new(PatternIndex::empty(), PatternIndex::empty()),
-            five_pos: ColorContainer::new([MaybePos::NONE, MaybePos::NONE], [MaybePos::NONE, MaybePos::NONE]),
+            indexes: ColorContainer::splat(PatternIndex::empty()),
+            five_pos: ColorContainer::splat([MaybePos::NONE, MaybePos::NONE]),
             candidate_overline_field: Bitfield::ZERO_FILLED,
             candidate_forbidden_field: Bitfield::ZERO_FILLED,
             forbidden_field: Bitfield::ZERO_FILLED,
@@ -217,13 +218,89 @@ impl<const R: RuleKind> Patterns<R> {
 
         let touched_bitmask = match (slice.pattern_bitmap[C] == 0, slice_pattern.is_empty()) {
             (false, true) => self.clear_pattern_with_slice::<C, D>(slice),
-            (_, false) => self.update_with_slice_pattern::<C, D>(slice, slice_pattern),
+            (_, false) => {
+                let old_slice_pattern = self.indexes[C].slice_pattern::<D>(slice.idx);
+                let changed_bitmask = old_slice_pattern.changed_pattern_bitmap(slice_pattern);
+
+                self.apply_slice_pattern::<C, D>(
+                    slice, old_slice_pattern, slice_pattern, slice_pattern.pattern_bitmap(), changed_bitmask,
+                );
+
+                changed_bitmask
+            },
             _ => 0
         };
 
         self.update_overline_field::<C, D>(slice);
 
         touched_bitmask
+    }
+
+    #[inline(always)]
+    pub fn restore_pattern_with_slice<const C: Color, const D: Direction>(
+        &mut self, slice: &mut Slice, cache: &UndoCache,
+    ) -> u16 {
+        let slice_pattern = cache.slices[C][D];
+        if cache.changed[C][D] == 0
+            && (slice_pattern.patterns & repeat!(FIVE, x16 u128)) == 0
+        {
+            self.update_overline_field::<C, D>(slice);
+            return 0;
+        }
+
+        let old_slice_pattern = self.indexes[C].slice_pattern::<D>(slice.idx);
+        self.apply_slice_pattern::<C, D>(
+            slice, old_slice_pattern, slice_pattern, cache.bitmaps[C][D], cache.changed[C][D],
+        );
+        self.update_overline_field::<C, D>(slice);
+
+        cache.changed[C][D]
+    }
+
+    #[inline(never)]
+    fn apply_slice_pattern<const C: Color, const D: Direction>(
+        &mut self, slice: &mut Slice,
+        old_slice_pattern: SlicePattern, slice_pattern: SlicePattern,
+        pattern_bitmap: u16, changed_bitmask: u16,
+    ) {
+        let mut five_bitmask = slice_pattern.patterns & repeat!(FIVE, x16 u128);
+        while five_bitmask != 0 {
+            let slice_idx = five_bitmask.trailing_zeros() / 8;
+            five_bitmask &= !(1 << (slice_idx * 8));
+            let pos = Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8));
+
+            if self.five_pos[C][0] == pos.into() {
+                continue;
+            }
+
+            self.five_pos[C][1] = self.five_pos[C][0];
+            self.five_pos[C][0] = pos.into();
+        }
+
+        slice.pattern_bitmap[C] = pattern_bitmap;
+        self.indexes[C].replace_slice_bitmap::<D>(slice.idx, slice_pattern);
+
+        let slice_patterns = slice_pattern.patterns.to_le_bytes();
+
+        let start_idx = slice.start_pos.idx_usize();
+        let mut update_bitmask = changed_bitmask;
+        while update_bitmask != 0 {
+            let slice_idx = update_bitmask.trailing_zeros() as usize;
+            update_bitmask &= update_bitmask - 1;
+
+            let board_idx = step_idx!(D, start_idx, slice_idx);
+
+            self.field[C][board_idx].0[D] = slice_patterns[slice_idx];
+
+            if C == Color::Black && R == RuleKind::Renju
+                && self.field[Color::Black][board_idx].is_forbidden_unchecked()
+            {
+                self.candidate_forbidden_field.set_idx(board_idx);
+            }
+        }
+
+        self.indexes[C]
+            .update_slice_bitfields::<C, D>(&self.field[C], start_idx, old_slice_pattern, slice_pattern);
     }
 
     #[inline(never)] // reduce I-cache pressure
@@ -247,57 +324,6 @@ impl<const R: RuleKind> Patterns<R> {
 
         self.indexes[C]
             .update_slice_bitfields::<C, D>(&self.field[C], start_idx, old_bitmap, SlicePattern::EMPTY);
-
-        changed_bitmask
-    }
-
-    #[inline(always)]
-    fn update_with_slice_pattern<const C: Color, const D: Direction>(
-        &mut self, slice: &mut Slice, slice_pattern: SlicePattern
-    ) -> u16 {
-        const SLICE_PATTERN_FIVE_MASK: u128 = repeat!(FIVE, x16 u128);
-
-        let mut five_bitmask = slice_pattern.patterns & SLICE_PATTERN_FIVE_MASK;
-        while five_bitmask != 0 {
-            let slice_idx = five_bitmask.trailing_zeros() / 8;
-            five_bitmask &= !(1 << (slice_idx * 8));
-            let pos = Pos::from_index(step_idx!(D, slice.start_pos.idx(), slice_idx as u8));
-
-            if self.five_pos[C][0] == pos.into() {
-                continue;
-            }
-
-            self.five_pos[C][1] = self.five_pos[C][0];
-            self.five_pos[C][0] = pos.into();
-        }
-
-        slice.pattern_bitmap[C] = slice_pattern.pattern_bitmap();
-        let old_slice_bitmap = self.indexes[C]
-            .replace_slice_bitmap::<D>(slice.idx, slice_pattern);
-
-        let slice_patterns = slice_pattern.patterns.to_le_bytes();
-
-        let changed_bitmask = old_slice_bitmap.changed_pattern_bitmap(slice_pattern);
-
-        let start_idx = slice.start_pos.idx_usize();
-        let mut update_bitmask = changed_bitmask;
-        while update_bitmask != 0 {
-            let slice_idx = update_bitmask.trailing_zeros() as usize;
-            update_bitmask &= update_bitmask - 1;
-
-            let board_idx = step_idx!(D, start_idx, slice_idx);
-
-            self.field[C][board_idx].0[D] = slice_patterns[slice_idx];
-
-            if C == Color::Black && R == RuleKind::Renju
-                && self.field[Color::Black][board_idx].is_forbidden_unchecked() 
-            {
-                self.candidate_forbidden_field.set_idx(board_idx);
-            }
-        }
-
-        self.indexes[C]
-            .update_slice_bitfields::<C, D>(&self.field[C], start_idx, old_slice_bitmap, slice_pattern);
 
         changed_bitmask
     }

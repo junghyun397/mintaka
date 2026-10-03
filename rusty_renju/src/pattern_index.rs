@@ -40,6 +40,11 @@ impl<const R: RuleKind> PatternIndex<R> {
     }
 
     #[inline(always)]
+    pub fn slice_pattern<const D: Direction>(&self, slice_idx: u8) -> SlicePattern {
+        self.slice_bitmap[Self::local_slice_idx::<D>(slice_idx as usize)]
+    }
+
+    #[inline(always)]
     pub fn replace_slice_bitmap<const D: Direction>(
         &mut self,
         slice_idx: u8,

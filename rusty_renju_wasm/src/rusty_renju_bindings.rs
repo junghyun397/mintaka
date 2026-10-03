@@ -141,7 +141,7 @@ impl BoardWorker {
 
         dispatch_any_board!(&mut self.inner, board => {
             if let Some(pos) = maybe_pos.ok() {
-                board.set_mut(pos);
+                board.set_mut::<()>(pos);
             } else {
                 board.pass_mut();
             }
@@ -166,7 +166,7 @@ impl BoardWorker {
 
         dispatch_any_board!(&mut self.inner, board => {
             if let Some(pos) = maybe_pos.ok() {
-                board.unset_mut(pos);
+                board.unset_mut::<()>(pos);
             } else {
                 board.unpass_mut();
             }

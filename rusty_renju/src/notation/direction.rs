@@ -34,6 +34,12 @@ impl<T> DirectionContainer<T> {
     }
 }
 
+impl<T: Copy> DirectionContainer<T> {
+    pub const fn splat(value: T) -> Self {
+        Self([value; 4])
+    }
+}
+
 impl<T> Index<Direction> for DirectionContainer<T> {
     type Output = T;
 

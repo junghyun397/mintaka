@@ -256,25 +256,28 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 Score::DRAW
             };
 
+            {
+                let (artifact, recovery_state) = state.play_mut(pos);
+                td.push_ply(pos, recovery_state);
+                td.evaluator.play(&state.board, artifact, pos.into());
+            }
+
             td.ss[td.ply] = SearchFrame {
                 pos: pos.into(),
                 static_eval: parent_eval,
                 evaluator_eval: MaybeScore::NONE,
                 on_pv: NT::IS_PV,
-                recovery_state: state.recovery_state(),
                 searching: MaybePos::NONE,
             };
-
-            td.push_ply(pos);
-            let artifact = state.play_mut(pos);
-            td.evaluator.play(&state.board, artifact, pos.into());
 
             // no depth reduction for forced response
             let score = -pvs::<R, TH, NT::NextType>(td, &mut child_pv, state, depth_left, -beta, -alpha, cut_node);
 
-            td.pop_ply();
-            let artifact = state.undo_mut(td.ss[td.ply].recovery_state);
-            td.evaluator.undo(&state.board, artifact, pos.into());
+            {
+                let recovery_state = td.pop_ply();
+                let artifact = state.undo_mut(recovery_state);
+                td.evaluator.undo(&state.board, artifact, pos.into());
+            }
 
             if td.is_aborted() {
                 return Score::DRAW;
@@ -412,8 +415,6 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         Score::DRAW
     }.value_i32();
 
-    td.ss[td.ply].recovery_state = state.recovery_state();
-
     td.clear_killer();
 
     let original_alpha = alpha;
@@ -468,8 +469,8 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         td.tt.prefetch(state.board.hash_key.set(state.board.player_color, pos));
 
-        let artifact = state.play_mut(pos);
-        td.push_ply(pos);
+        let (artifact, recovery_state) = state.play_mut(pos);
+        td.push_ply(pos, recovery_state);
         td.evaluator.play(&state.board, artifact, pos.into());
 
         if threat_kind.is_none() {
@@ -554,9 +555,11 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             td.root_nodes[pos.idx_usize()] += td.batch_counter.count_local() - nodes_before;
         }
 
-        td.pop_ply();
-        let artifact = state.undo_mut(td.ss[td.ply].recovery_state);
-        td.evaluator.undo(&state.board, artifact, pos.into());
+        {
+            let recovery_state = td.pop_ply();
+            let artifact = state.undo_mut(recovery_state);
+            td.evaluator.undo(&state.board, artifact, pos.into());
+        }
 
         if td.is_aborted() {
             return Score::DRAW;

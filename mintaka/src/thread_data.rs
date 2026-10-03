@@ -23,7 +23,6 @@ pub struct SearchFrame {
     pub evaluator_eval: MaybeScore,
     pub static_eval: Score,
     pub on_pv: bool,
-    pub recovery_state: RecoveryState,
     pub searching: MaybePos,
 }
 
@@ -33,7 +32,6 @@ impl SearchFrame {
         evaluator_eval: MaybeScore::NONE,
         static_eval: Score::DRAW,
         on_pv: false,
-        recovery_state: RecoveryState::EMPTY,
         searching: MaybePos::NONE,
     };
 }
@@ -67,6 +65,7 @@ pub struct ThreadData<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> {
     pub tt: TTView<'a>,
     pub ht: Box<HistoryTable>,
     pub ss: Box<[SearchFrame; depth::MAX_PLY_SLOTS]>,
+    pub recovery_states: Box<[RecoveryState; depth::MAX_PLY_SLOTS]>,
     pub killers: Box<[[MaybePos; KILLER_MOVE_SLOTS]; depth::MAX_PLY_SLOTS]>,
     pub debug_statics: Box<[DebugStatics; depth::MAX_PLY_SLOTS]>,
 
@@ -103,6 +102,7 @@ impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, T
             evaluator,
             ht: Box::new(ht),
             ss: Box::new([SearchFrame::EMPTY; depth::MAX_PLY_SLOTS]),
+            recovery_states: Box::new([RecoveryState::EMPTY; depth::MAX_PLY_SLOTS]),
             killers: Box::new([[MaybePos::NONE; 2]; depth::MAX_PLY_SLOTS]),
             lmr_table: Box::new(build_lmr_table(config)),
             debug_statics: Box::new([DebugStatics::EMPTY; depth::MAX_PLY_SLOTS]),
@@ -138,13 +138,15 @@ impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, T
         self.lmr_table[depth_clamped as usize][moves_made_clamped]
     }
 
-    pub fn push_ply(&mut self, pos: Pos) {
+    pub fn push_ply(&mut self, pos: Pos, recovery_state: RecoveryState) {
+        self.recovery_states[self.ply] = recovery_state;
         self.ply += 1;
         self.ss[self.ply].pos = pos.into();
     }
 
-    pub fn pop_ply(&mut self) {
+    pub fn pop_ply(&mut self) -> &RecoveryState {
         self.ply -= 1;
+        &self.recovery_states[self.ply]
     }
 
     pub fn push_killer(&mut self, pos: Pos) {

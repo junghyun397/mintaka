@@ -74,10 +74,10 @@ pub fn find_immediate_win<const R: RuleKind>(config: &Config, state: &mut GameSt
             .find_map(|pos|
                 state.board.patterns.field[Color::White][pos.idx_usize()].has_any_four()
                     .then(|| {
-                        state.board.set_mut(pos);
+                        let (_, unset_cache) = state.board.set_mut(pos);
                         let still_forbidden = !state.board.is_legal_move(pos);
                         let five_pos = state.board.patterns.five_pos[Color::White][0].unwrap();
-                        state.board.unset_mut(pos);
+                        state.board.restore_mut(pos, &unset_cache);
 
                         still_forbidden.then_some(five_pos)
                     })
@@ -472,9 +472,13 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
 
             let mut searched_response = MaybePos::NONE;
 
-            let recovery_state = state.recovery_state();
-            let artifact = state.play_mut(four_pos);
-            td.evaluator.play(&state.board, artifact, four_pos.into());
+            {
+                let (artifact, recovery_state) = state.play_mut(four_pos);
+                td.push_ply(four_pos, recovery_state);
+
+                td.evaluator.play(&state.board, artifact, four_pos.into());
+            }
+
             td.batch_counter.increment();
 
             if !Pf::COMPLETE_PROOF {
@@ -525,9 +529,12 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
 
                 td.tt.prefetch(state.board.hash_key.set(!C, response_pos));
 
-                let response_recovery_state = state.recovery_state();
-                let artifact = state.play_mut(response_pos);
-                td.evaluator.play(&state.board, artifact, response_pos.into());
+                {
+                    let (artifact, recovery_state) = state.play_mut(response_pos);
+                    td.push_ply(response_pos, recovery_state);
+
+                    td.evaluator.play(&state.board, artifact, response_pos.into());
+                }
 
                 let mut proof = try_vcf::<R, C, TH, Pf>(
                     td, context, &mut child_pv, state, four_pos, depth_left - 2, vcf_ply + 2, alpha,
@@ -541,8 +548,11 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
                     && state.board.patterns.five_pos[!C][0].is_none()
                     && !state.board.patterns.effective_fork_four_field(C).is_empty();
 
-                let artifact = state.undo_mut(response_recovery_state);
-                td.evaluator.undo(&state.board, artifact, response_pos.into());
+                {
+                    let recovery_state = td.pop_ply();
+                    let artifact = state.undo_mut(recovery_state);
+                    td.evaluator.undo(&state.board, artifact, response_pos.into());
+                }
 
                 if td.is_aborted() {
                     break 'candidate Pf::abort();
@@ -574,8 +584,11 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
                 proof
             };
 
-            let artifact = state.undo_mut(recovery_state);
-            td.evaluator.undo(&state.board, artifact, four_pos.into());
+            {
+                let recovery_state = td.pop_ply();
+                let artifact = state.undo_mut(recovery_state);
+                td.evaluator.undo(&state.board, artifact, four_pos.into());
+            }
 
             if td.is_aborted() {
                 return Pf::abort();

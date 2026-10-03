@@ -280,8 +280,7 @@ impl Slices {
         self.horizontal_slices.iter()
             .enumerate()
             .fold(
-                ColorContainer::new(
-                    Bitfield::empty(), Bitfield::empty()),
+                ColorContainer::splat(Bitfield::empty()),
                 |mut bitfield_container, (row_idx, slice)| {
                       for col_idx in 0..pos::BOARD_WIDTH {
                           if let Some(color) = slice.stone_kind(col_idx) {

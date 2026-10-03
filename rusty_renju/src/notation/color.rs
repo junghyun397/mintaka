@@ -123,6 +123,12 @@ macro_rules! impl_color_container {
             }
         }
 
+        impl<T: Copy> $name<T> {
+            pub const fn splat(value: T) -> Self {
+                Self([value; 2])
+            }
+        }
+
         impl<T> std::ops::Index<Color> for $name<T> {
             type Output = T;
 
