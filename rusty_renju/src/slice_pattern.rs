@@ -147,6 +147,27 @@ pub fn contains_five_in_a_row(stones: u16) -> bool {
 }
 
 #[inline(always)]
+pub(crate) fn match_five_positions<const R: RuleKind>(stones: u32, blocks: u32, color: Color) -> u32 {
+    let window_mask = match (R, color) {
+        (RuleKind::Renju, Color::Black) | (RuleKind::Gomoku, _) => !(stones | (stones >> 6)) & 0b11111,
+        (RuleKind::Renju, Color::White) | (RuleKind::Freestyle, _) => 0b11111,
+    };
+
+    let shifted = stones >> 1;
+    let two = shifted & (shifted >> 1);
+    let three = two & (shifted >> 2);
+    let four = two & (two >> 2);
+
+    let matches = (((four >> 1) & window_mask) << 1)    // .OOOO
+        | ((shifted & (three >> 2) & window_mask) << 2) // O.OOO
+        | ((two & (two >> 3) & window_mask) << 3)       // OO.OO
+        | ((three & (shifted >> 4) & window_mask) << 4) // OOO.O
+        | ((four & window_mask) << 5);                  // OOOO.
+
+    matches & !(stones | blocks)
+}
+
+#[inline(always)]
 pub fn match_overline_positions(stones: u16, blocks: u16) -> u16 {
     let two = stones & (stones >> 1);
     let three = two & (stones >> 2);

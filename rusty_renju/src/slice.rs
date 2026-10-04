@@ -199,6 +199,21 @@ impl Slices {
         }
     }
 
+    #[inline(always)]
+    pub fn calculate_window<const WINDOW_SIZE: usize>(&self, color: Color, direction: Direction, pos: Pos) -> (u32, u32) {
+        let slice = self.access_slice_unchecked(direction, pos);
+        let slice_idx = slice.calculate_slice_idx(direction, pos);
+
+        let padding = (WINDOW_SIZE - 1) / 2;
+        let mask = u32::MAX >> (32 - WINDOW_SIZE);
+
+        let stones = ((slice.stones[color] as u32) << padding) >> slice_idx;
+        let blocks = u16::MAX << slice.length | slice.stones[!color];
+        let blocks = (((blocks as u32) << padding) | ((1 << padding) - 1)) >> slice_idx;
+
+        (stones & mask, blocks & mask)
+    }
+
     pub fn simulate_set_slices(&self, color: Color, pos: Pos) -> [u16; 4] {
         [
             self.horizontal_slices[pos.row_usize()].stones[color] | 0b1 << pos.col_usize(),

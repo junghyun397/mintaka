@@ -118,7 +118,7 @@ impl<const R: RuleKind> PatternIndex<R> {
             has_closed_four
         );
 
-        if R == RuleKind::Renju && C == Color::Black {
+        if R != RuleKind::Renju || C == Color::White {
             let old_open_fours = pattern_bitmask(old_patterns, pattern::OPEN_FOUR);
             let new_open_fours = pattern_bitmask(new_patterns, pattern::OPEN_FOUR);
             let old_closed_fours = pattern_bitmask(old_patterns, pattern::CLOSED_FOUR_SINGLE);
@@ -133,10 +133,8 @@ impl<const R: RuleKind> PatternIndex<R> {
 
                 let idx = step_idx!(D, start_idx, slice_idx);
 
-                let is_fork_four = match (R, C) {
-                    (RuleKind::Renju, Color::Black) => pattern_field[idx].has_open_four(),
-                    _ => pattern_field[idx].has_any_fours(),
-                };
+                let is_fork_four = pattern_field[idx].has_open_four()
+                    || pattern_field[idx].has_any_fours();
 
                 self.fork_fours.set_bit_idx(
                     idx,

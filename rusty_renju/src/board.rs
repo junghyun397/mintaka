@@ -4,7 +4,7 @@ use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::{Direction, DirectionContainer};
 use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::RuleKind;
-use crate::pattern::Patterns;
+use crate::pattern::{Patterns, CLOSED_FOUR_SINGLE};
 use crate::slice::{Slice, Slices};
 use crate::utils::empty::Empty;
 use std::hash::{Hash, Hasher};
@@ -487,7 +487,7 @@ impl<const R: RuleKind> Board<R> {
                 continue;
             }
 
-            if match self.calculate_near_four_window::<{ Color::Black }>(direction, pos) {
+            if match self.slices.calculate_window::<5>(Color::Black, direction, pos).0 {
                 /* .VOO. */ 0b11000 => self.has_invalid_three_components(context, direction, [-1, 3]),
                 /* .OOV. */ 0b00011 => self.has_invalid_three_components(context, direction, [-3, 1]),
                 /* V.OO  */ 0b10000 => self.has_invalid_three_component(context, direction, 1),
@@ -528,10 +528,8 @@ impl<const R: RuleKind> Board<R> {
                 continue;
             }
 
-            let slice = self.slices.access_slice_unchecked(direction, pos);
-            let slice_idx = slice.calculate_slice_idx(direction, pos);
-            let stones = (((slice.stones[Color::Black] as u32) << 5) >> slice_idx) | 0b100000;
-            let blocks = (((slice.blocks::<{ Color::Black }>() as u32) << 5) | 0b11111) >> slice_idx;
+            let (stones, blocks) = self.slices.calculate_window::<11>(Color::Black, direction, pos);
+            let stones = stones | 0b100000;
 
             for shift in 0 .. 5 {
                 if (blocks >> shift) & 0b0111110 != 0 {
@@ -562,7 +560,7 @@ impl<const R: RuleKind> Board<R> {
     }
 
     fn update_four_overrides_each_direction(&self, overrides: &mut SetOverrides, direction: Direction, pos: Pos) {
-        match self.calculate_near_four_window::<{ Color::Black }>(direction, pos) {
+        match self.slices.calculate_window::<5>(Color::Black, direction, pos).0 {
             /* .VOO.  */ 0b11000 => overrides.set_with_directional_offsets(pos, direction, [-1, 3]),
             /* .OOV.  */ 0b00011 => overrides.set_with_directional_offsets(pos, direction, [-3, 1]),
             /* .V.OO. */ 0b10000 => overrides.set_with_directional_offsets(pos, direction, [-1, 1, 3]),
@@ -576,11 +574,15 @@ impl<const R: RuleKind> Board<R> {
         }
     }
 
-    fn calculate_near_four_window<const C: Color>(&self, direction: Direction, pos: Pos) -> u8 {
-        let slice = self.slices.access_slice_unchecked(direction, pos);
-        let slice_idx = slice.calculate_slice_idx(direction, pos);
+    pub fn closed_four_response(&self, color: Color, pos: Pos, direction: Direction) -> Option<Pos> {
+        debug_assert!(self.patterns.field[color][pos.idx_usize()].has_at::<CLOSED_FOUR_SINGLE>(direction));
 
-        ((((slice.stones[C] as u32) << 2) >> slice_idx) & 0b11111) as u8 // 0[00V00]0
+        let (stones, blocks) = self.slices.calculate_window::<11>(color, direction, pos);
+
+        let responses = slice_pattern::match_five_positions::<R>(stones | 0b100000, blocks, color);
+        (responses != 0).then(||
+            pos.directional_offset_unchecked(direction, responses.trailing_zeros() as isize - 5)
+        )
     }
 }
 

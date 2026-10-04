@@ -138,6 +138,10 @@ impl Pattern {
         DirectionIterator { packed_unit: self.apply_mask(repeat!(OPEN_THREE, x4 u32)) }
     }
 
+    pub fn iter_closed_four_directions(&self) -> impl Iterator<Item=Direction> + '_ {
+        DirectionIterator { packed_unit: self.apply_mask(repeat!(CLOSED_FOUR_SINGLE, x4 u32)) }
+    }
+
     pub fn iter_potential_four_directions(&self) -> impl Iterator<Item=Direction> + '_ {
         DirectionIterator { packed_unit: self.apply_mask(repeat!(POTENTIAL_FOUR, x4 u32)) }
     }
