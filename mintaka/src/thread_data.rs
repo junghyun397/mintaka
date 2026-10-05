@@ -1,19 +1,19 @@
 use crate::batch_counter::BatchCounter;
 use crate::config::{Config, SearchObjective};
-use crate::eval::evaluator::Evaluator;
+use crate::eval::evaluator::ActiveEvaluator;
 use crate::game_state::RecoveryState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::params;
+use crate::protocol::nodes::Nodes;
 use crate::thread_type::ThreadType;
 use crate::utils::depth;
 use crate::utils::depth::Depth;
+use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{MaybeScore, Score};
-use rusty_renju::notation::pos;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use crate::protocol::nodes::Nodes;
 
 pub const KILLER_MOVE_SLOTS: usize = 2;
 
@@ -54,13 +54,13 @@ impl DebugStatics {
 }
 
 #[derive(Clone)]
-pub struct ThreadData<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> {
+pub struct ThreadData<'a, const R: RuleKind, TH: ThreadType> {
     pub thread_type: TH,
     pub search_objective: SearchObjective,
     pub tid: u32,
     pub config: Config,
 
-    pub evaluator: E,
+    pub evaluator: ActiveEvaluator<R>,
 
     pub tt: TTView<'a>,
     pub ht: Box<HistoryTable>,
@@ -82,12 +82,12 @@ pub struct ThreadData<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> {
     pub ply: usize,
 }
 
-impl<'a, const R: RuleKind, TH: ThreadType, E: Evaluator<R>> ThreadData<'a, R, TH, E> {
+impl<'a, const R: RuleKind, TH: ThreadType> ThreadData<'a, R, TH> {
     pub fn new(
         thread_type: TH, tid: u32,
         search_objective: SearchObjective,
         config: Config,
-        evaluator: E,
+        evaluator: ActiveEvaluator<R>,
         tt: TTView<'a>,
         ht: HistoryTable,
         aborted: &'a AtomicBool,

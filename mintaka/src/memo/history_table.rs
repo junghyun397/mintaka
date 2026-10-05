@@ -77,6 +77,7 @@ impl HistoryTable {
     }
 
     fn update_gravity_score(score: &mut i16, bonus: i32) {
+        let bonus = bonus.clamp(-MAX_HISTORY_SCORE, MAX_HISTORY_SCORE);
         let current = *score as i32;
 
         *score = (current + bonus - current * bonus.abs() / MAX_HISTORY_SCORE)

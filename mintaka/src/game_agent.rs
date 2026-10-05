@@ -1,5 +1,5 @@
 use crate::config::{Config, SearchObjective};
-use crate::eval::evaluator::{ActiveEvaluator, Evaluator};
+use crate::eval::evaluator::ActiveEvaluator;
 use crate::game_state::{GameState, GameStateData};
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::{TTImportError, TranspositionTable};

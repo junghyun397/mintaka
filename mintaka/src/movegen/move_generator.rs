@@ -1,4 +1,3 @@
-use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::movegen::move_list::{EndgameMoveEntry, EndgameMoveList, MainMoveEntry, MainMoveList};
 use crate::search_endgame::ThreatSearchKind;
@@ -48,7 +47,7 @@ pub fn generate_full_endgame_moves<const R: RuleKind, const T: ThreatSearchKind>
 }
 
 pub fn generate_endgame_moves<const R: RuleKind, const T: ThreatSearchKind, const FILTER: u8>(
-    td: &ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+    td: &ThreadData<R, impl ThreadType>,
     state: &GameState<R>,
     recent_four: Pos,
 ) -> EndgameMoveList {
@@ -81,7 +80,7 @@ pub fn generate_endgame_moves<const R: RuleKind, const T: ThreatSearchKind, cons
 
 pub fn generate_threat_direct_response<const R: RuleKind>(
     buffer: &mut MainMoveList,
-    _td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+    _td: &mut ThreadData<R, impl ThreadType>,
     state: &GameState<R>,
     field: &Bitfield,
 ) {
@@ -99,7 +98,7 @@ pub fn generate_threat_direct_response<const R: RuleKind>(
 
 pub fn generate_extend_four_response<const R: RuleKind>(
     buffer: &mut MainMoveList,
-    td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+    td: &mut ThreadData<R, impl ThreadType>,
     state: &GameState<R>,
 ) {
     let maybe_last_pos = state.history.last_action_or_none();
@@ -129,7 +128,7 @@ pub fn generate_extend_four_response<const R: RuleKind>(
 
 pub fn generate_all_moves<const R: RuleKind>(
     buffer: &mut MainMoveList,
-    td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+    td: &mut ThreadData<R, impl ThreadType>,
     state: &GameState<R>,
 ) {
     let field = state.board.legal_field(state.board.player_color) & state.movegen_window.movegen_field;
@@ -165,12 +164,15 @@ pub fn generate_all_moves<const R: RuleKind>(
             score += history_score / 512;
         };
 
-        buffer.push(MainMoveEntry { pos, score, lp_quiet: false, history_score: Some(history_score) });
+        let lp_quiet = !player_pattern.is_tactical()
+            && !state.board.patterns.field[!state.board.player_color][idx].has_open_three();
+
+        buffer.push(MainMoveEntry { pos, score, lp_quiet, history_score: Some(history_score) });
     }
 }
 
 fn counter_move_from<const R: RuleKind>(
-    td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+    td: &mut ThreadData<R, impl ThreadType>,
     state: &GameState<R>,
 ) -> Option<Pos> {
     state.history.last_action()

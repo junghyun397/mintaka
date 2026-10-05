@@ -1,15 +1,14 @@
-use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::movegen::move_generator;
 use crate::movegen::move_list::{MainMoveEntry, MainMoveList, MoveList};
+use crate::thread_data;
 use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::notation::pos::{MaybePos, Pos};
+use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::utils::empty::Empty;
 use std::cmp::PartialEq;
-use rusty_renju::notation::rule::RuleKind;
-use crate::thread_data;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub enum ThreatKind {
@@ -70,11 +69,12 @@ impl<const R: RuleKind> MovePicker<R> {
 
     pub fn skip_lp_quiets(&mut self) {
         self.skip_lp_quiets = true;
+        self.moves_buffer.retain(|entry| !entry.lp_quiet);
     }
 
     pub fn next(
         &mut self,
-        td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+        td: &mut ThreadData<R, impl ThreadType>,
         state: &GameState<R>,
     ) -> Option<MainMoveEntry> {
         loop {
@@ -137,12 +137,16 @@ impl<const R: RuleKind> MovePicker<R> {
                             move_generator::generate_extend_four_response(&mut self.moves_buffer, td, state),
                     }
 
+                    if self.skip_lp_quiets {
+                        self.moves_buffer.retain(|entry| !entry.lp_quiet);
+                    }
+
                     self.stage = MoveStage::Moves(kind);
                 }
                 MoveStage::Moves(kind) => {
                     while let Some(next_move) = self.moves_buffer.consume_best() {
                         if self.skip_lp_quiets && next_move.lp_quiet {
-                            return None
+                            continue;
                         }
 
                         if self.occupied_moves.is_hot(next_move.pos) {

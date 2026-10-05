@@ -1,4 +1,3 @@
-use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::memo::transposition_table;
 use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucketProbe};
@@ -8,16 +7,16 @@ use crate::movegen::move_picker::{MovePicker, ThreatKind};
 use crate::params;
 use crate::principal_variation::PrincipalVariation;
 use crate::protocol::response::Response;
-use crate::search_endgame::{find_immediate_win, min_endgame_stones, quiescence_search, ThreatSearchKind};
-use crate::thread_data::{SearchFrame, ThreadData};
+use crate::search_endgame::{ThreatSearchKind, find_immediate_win, min_endgame_stones, quiescence_search};
+use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
+use crate::utils::depth;
 use crate::utils::depth::Depth;
 use rusty_renju::bitfield::Bitfield;
 use rusty_renju::const_for;
 use rusty_renju::notation::pos::{self, MaybePos};
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{MaybeScore, Score};
-use crate::utils::depth;
 
 trait NodeType {
     const IS_ROOT: bool;
@@ -57,7 +56,7 @@ impl SearchResult {
 }
 
 pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
-    td: &mut ThreadData<R, TH, impl Evaluator<R>>,
+    td: &mut ThreadData<R, TH>,
     mut state: GameState<R>,
 ) -> SearchResult {
     let position_hash = state.board.hash_key;
@@ -154,7 +153,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
 
 fn aspiration<const R: RuleKind, TH: ThreadType>(
     pv: &mut PrincipalVariation,
-    td: &mut ThreadData<R, TH, impl Evaluator<R>>,
+    td: &mut ThreadData<R, TH>,
     state: &mut GameState<R>,
     max_depth: Depth,
     prev_score: Score,
@@ -192,7 +191,7 @@ fn aspiration<const R: RuleKind, TH: ThreadType>(
 }
 
 fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
-    td: &mut ThreadData<R, TH, impl Evaluator<R>>,
+    td: &mut ThreadData<R, TH>,
     pv: &mut PrincipalVariation,
     state: &mut GameState<R>,
     depth_left: Depth,
@@ -225,8 +224,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
     }
 
     td.batch_counter.increment();
-
-    td.selective_depth = td.selective_depth.max((td.ply as i32).into());
+    td.selective_depth = td.selective_depth.max(Depth::from_i32(td.ply as i32));
 
     let mut child_pv = PrincipalVariation::EMPTY;
 
@@ -256,22 +254,20 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 Score::DRAW
             };
 
+            td.ss[td.ply].static_eval = parent_eval;
+            td.ss[td.ply].evaluator_eval = MaybeScore::NONE;
+            td.ss[td.ply].on_pv = NT::IS_PV;
+
             {
                 let (artifact, recovery_state) = state.play_mut(pos);
                 td.push_ply(pos, recovery_state);
                 td.evaluator.play(&state.board, artifact, pos.into());
             }
 
-            td.ss[td.ply] = SearchFrame {
-                pos: pos.into(),
-                static_eval: parent_eval,
-                evaluator_eval: MaybeScore::NONE,
-                on_pv: NT::IS_PV,
-                searching: MaybePos::NONE,
-            };
-
             // no depth reduction for forced response
-            let score = -pvs::<R, TH, NT::NextType>(td, &mut child_pv, state, depth_left, -beta, -alpha, cut_node);
+            let score = -pvs::<R, TH, NT::NextType>(
+                td, &mut child_pv, state, depth_left, -beta, -alpha, !NT::IS_PV && !cut_node,
+            );
 
             {
                 let recovery_state = td.pop_ply();
@@ -313,7 +309,9 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         let fork_four_field = state.board.patterns.effective_fork_four_field(!state.board.player_color);
 
         if !fork_four_field.is_empty() {
-            break 'threat_kind Some(ThreatKind::ForkFour(fork_four_field));
+            break 'threat_kind Some(ThreatKind::ForkFour(
+                fork_four_field | state.board.patterns.indexes[!state.board.player_color].closed_fours
+            ));
         }
 
         let fork_three_four_field = state.board.patterns.effective_fork_three_four_field(!state.board.player_color);
@@ -322,6 +320,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             break 'threat_kind Some(ThreatKind::ForkThreeFour(
                 fork_three_four_field
                     | state.board.patterns.indexes[!state.board.player_color].open_threes
+                    | state.board.patterns.indexes[!state.board.player_color].closed_fours
             ));
         }
 
@@ -409,7 +408,9 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         }
     }
 
-    let static_eval_improvement = if td.ply > 1 {
+    let static_eval_improvement = if td.ply > 1
+        && td.ss[td.ply - 2].evaluator_eval.is_some()
+    {
         static_eval - td.ss[td.ply - 2].static_eval
     } else {
         Score::DRAW
@@ -423,6 +424,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
     let mut moves_made = 0;
     let mut searched_moves = 0;
+    let mut leading_move_score = i16::MIN;
 
     let mut quiet_plied = Bitfield::ZERO_FILLED;
     let mut three_plied = Bitfield::ZERO_FILLED;
@@ -435,6 +437,14 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         }
 
         moves_made += 1;
+
+        let policy_score = if move_score >= move_generator::KILLER_MOVE_SCORE {
+            td.evaluator.ordering_score(&state.board, pos)
+        } else {
+            move_score
+        };
+        leading_move_score = leading_move_score.max(policy_score);
+        let policy_gap = leading_move_score as i32 - policy_score as i32;
 
         let player_pattern = state.board.patterns.field[state.board.player_color][pos.idx_usize()];
         let opponent_pattern = state.board.patterns.field[!state.board.player_color][pos.idx_usize()];
@@ -452,7 +462,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         {
             // move count pruning
             let lmp_margin = lookup_lmp_mc_table(depth_left, static_eval_improvement > 0);
-            if moves_made >= lmp_margin {
+            if moves_made >= lmp_margin && policy_gap > 192 {
                 move_picker.skip_lp_quiets();
                 continue 'position_search;
             }
@@ -483,7 +493,11 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             }
         }
 
-        let new_full_depth = depth_left - 1;
+        let extend_three = on_three && threat_kind.is_none()
+            && !state.board.patterns.indexes[state.board.player_color].has_any_four()
+            && !state.board.patterns.effective_fork_four_field(!state.board.player_color).is_empty();
+
+        let new_full_depth = depth_left - 1 + extend_three as i32;
         let mut reduction = Depth::ZERO;
 
         // late move reduction
@@ -516,7 +530,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
                 }
             }
 
-            reduction = reduction.clamp_value(new_full_depth);
+            reduction = reduction.clamp_value(new_full_depth - 1);
         }
 
         let new_depth = (new_full_depth - reduction).clamp_value(new_full_depth);

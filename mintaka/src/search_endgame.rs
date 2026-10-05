@@ -1,4 +1,3 @@
-use crate::eval::evaluator::Evaluator;
 use crate::game_state::GameState;
 use crate::memo::transposition_table;
 use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucketProbe};
@@ -67,39 +66,60 @@ pub fn find_immediate_win<const R: RuleKind>(config: &Config, state: &mut GameSt
     }
 
     // forbidden
-    if R == RuleKind::Renju
-        && state.board.player_color == Color::White
-        && !state.board.patterns.forbidden_field.is_empty()
-        && let Some(pos) = state.board.patterns.forbidden_field.clone().iter_hot_pos()
-            .find_map(|pos|
-                state.board.patterns.field[Color::White][pos.idx_usize()].has_any_four()
-                    .then(|| {
-                        let (_, unset_cache) = state.board.set_mut(pos);
-                        let still_forbidden = !state.board.is_legal_move(pos);
-                        let five_pos = state.board.patterns.five_pos[Color::White][0].unwrap();
-                        state.board.restore_mut(pos, &unset_cache);
+    if R == RuleKind::Renju && state.board.player_color == Color::White
+        && let candidate_field = state.board.patterns.indexes[Color::White].closed_fours
+            & state.board.patterns.candidate_forbidden_field
+        && let Some(pos) = candidate_field.iter_hot_pos()
+            .find_map(|defense| {
+                let direction = state.board.patterns.field[Color::White][defense.idx_usize()].iter_closed_four_directions().next()?;
+                let attack = state.board.closed_four_response(Color::White, defense, direction)?;
 
-                        still_forbidden.then_some(five_pos)
-                    })
-        )
+                let (_, unset_cache) = state.board.set_mut(attack);
+                let forbidden_defense = !state.board.is_legal_move(defense);
+                state.board.restore_mut(attack, &unset_cache);
+
+                forbidden_defense.then_some(attack)
+            })
     {
         return mate_in_ply(config, state, 3, Score::win_in(ply + 3), pos.into())
     }
 
     // three-four fork
-    if let Some(pos) = state.board.patterns.effective_fork_three_four_field(state.board.player_color).first_pos()
-        && !state.board.patterns.indexes[!state.board.player_color].has_any_four()
+    if let candidate_field = state.board.patterns.effective_fork_three_four_field(state.board.player_color)
+        && let Some(pos) = candidate_field.iter_hot_pos()
+            .find_map(|pos| 'inspect: {
+                let direction = state.board.patterns.field[state.board.player_color][pos.idx_usize()].iter_closed_four_directions().next()?;
+                let defense = state.board.closed_four_response(state.board.player_color, pos, direction)?;
+
+                if state.board.patterns.field[!state.board.player_color][defense.idx_usize()].has_any_four() {
+                    break 'inspect None;
+                }
+
+                if R != RuleKind::Renju || state.board.player_color == Color::White {
+                    break 'inspect Some(pos);
+                }
+
+                let (_, attack_cache) = state.board.set_mut(pos);
+                let (_, defense_cache) = state.board.set_mut(defense);
+
+                let has_open_four = !state.board.patterns.effective_fork_four_field(Color::Black).is_empty();
+
+                state.board.restore_mut(defense, &defense_cache);
+                state.board.restore_mut(pos, &attack_cache);
+
+                has_open_four.then_some(pos)
+            })
     {
         return mate_in_ply(config, state, 5, Score::win_in(ply + 5), pos.into())
     }
 
     // double three
     if (R != RuleKind::Renju || state.board.player_color == Color::White)
+        && !state.board.patterns.indexes[!state.board.player_color].has_any_four()
         && let Some(pos) = state.board.patterns.indexes[state.board.player_color].open_threes.iter_hot_pos()
             .find(|pos|
                 state.board.patterns.field[state.board.player_color][pos.idx_usize()].has_open_threes()
             )
-        && !state.board.patterns.indexes[!state.board.player_color].has_any_four()
     {
         return mate_in_ply(config, state, 5, Score::win_in(ply + 5), pos.into())
     }
@@ -196,7 +216,7 @@ impl EndgameProof for SequenceProof {
 }
 
 pub fn quiescence_search<const R: RuleKind, const T: ThreatSearchKind>(
-    td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+    td: &mut ThreadData<R, impl ThreadType>,
     pv: &mut PrincipalVariation,
     depth_left: Depth,
     state: &mut GameState<R>,
@@ -229,7 +249,7 @@ pub fn quiescence_search<const R: RuleKind, const T: ThreatSearchKind>(
 }
 
 pub fn endgame_proof<const R: RuleKind, const T: ThreatSearchKind>(
-    td: &mut ThreadData<R, impl ThreadType, impl Evaluator<R>>,
+    td: &mut ThreadData<R, impl ThreadType>,
     state: &mut GameState<R>,
 ) -> Option<Vec<Pos>> {
     let context = EndgameContext {
@@ -265,7 +285,7 @@ pub fn endgame_proof<const R: RuleKind, const T: ThreatSearchKind>(
 }
 
 fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
-    td: &mut ThreadData<R, TH, impl Evaluator<R>>,
+    td: &mut ThreadData<R, TH>,
     context: &EndgameContext,
     pv: &mut PrincipalVariation,
     state: &mut GameState<R>,
@@ -329,7 +349,13 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
         return Pf::stand_pat(score);
     }
 
-    let mut quiescence_depth = (depth_left - context.min_depth).value_i32().max(0) as u8 + 1;
+    let tt_depth = if Pf::COMPLETE_PROOF {
+        depth_left - context.min_depth
+    } else {
+        depth_left + Depth::PLY_LIMIT
+    };
+
+    let mut quiescence_depth = tt_depth.value_i32().max(0) as u8 + 1;
     let mut beta = context.beta;
 
     if !Pf::COMPLETE_PROOF {
@@ -401,7 +427,7 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
 
         if !Pf::COMPLETE_PROOF && forced_move.is_none() {
             if best_score >= beta {
-                quiescence_depth = 1;
+                quiescence_depth = 0;
                 break 'search;
             }
 
@@ -416,6 +442,14 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
             EndgameMoveList::unit(EndgameMoveEntry { pos, score: 0 })
         } else if Pf::COMPLETE_PROOF {
             generate_full_endgame_moves::<R, { ThreatSearchKind::VCF }>(state)
+        } else if vcf_ply == 0 {
+            let mut moves = generate_full_endgame_moves::<R, { ThreatSearchKind::VCF }>(state);
+
+            for entry in moves.iter_mut() {
+                entry.score = td.evaluator.ordering_score(&state.board, entry.pos);
+            }
+
+            moves
         } else {
             if vcf_ply < 8 {
                 generate_endgame_moves::<R, { ThreatSearchKind::VCF }, { pattern::NONE }>(

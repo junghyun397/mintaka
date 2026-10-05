@@ -6,7 +6,6 @@ mod bench_endgame {
     use indoc::indoc;
     use mintaka::config::{Config, SearchObjective};
     use mintaka::eval::evaluator::ActiveEvaluator;
-    use mintaka::eval::evaluator::Evaluator;
     use mintaka::game_state::GameStateData;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;

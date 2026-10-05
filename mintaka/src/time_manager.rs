@@ -1,9 +1,9 @@
-use std::time::Duration;
-use rusty_renju::utils::empty::Empty;
 use crate::batch_counter::BatchCounter;
 use crate::protocol::time::{TimeUnit, TimeValue};
 use crate::protocol::timer::Timer;
 use crate::utils::monotonic_clock::MonotonicClock;
+use rusty_renju::utils::empty::Empty;
+use std::time::Duration;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 struct TimeFactors {
@@ -77,9 +77,9 @@ impl<CLK: MonotonicClock> TimeManager<CLK> {
                 }
             },
             (Some(total_remaining), turn, increment) => {
-                let turn = turn.unwrap_or(TimeValue::INFINITE);
+                let turn = turn.unwrap_or(TimeValue::INFINITE).min(total_remaining);
 
-                let allocation = (total_remaining / 20 + increment / 2).min(turn);
+                let allocation = (total_remaining / 12 + increment * 3 / 4).min(turn);
                 let soft_limit = allocation.multiply_clamp(0.8, turn);
 
                 Self {

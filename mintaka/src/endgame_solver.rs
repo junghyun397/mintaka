@@ -1,9 +1,11 @@
 use crate::config::{Config, SearchObjective};
-use crate::eval::evaluator::{ActiveEvaluator, Evaluator};
+use crate::eval::evaluator::ActiveEvaluator;
 use crate::game_state::GameState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TranspositionTable;
+use crate::protocol::nodes::Nodes;
 use crate::protocol::response::NullResponseSender;
+use crate::protocol::time::TimeUnit;
 use crate::protocol::timer::Timer;
 use crate::search_endgame;
 use crate::search_endgame::ThreatSearchKind;
@@ -18,8 +20,6 @@ use rusty_renju::utils::empty::Empty;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::time::{Duration, Instant};
-use crate::protocol::nodes::Nodes;
-use crate::protocol::time::TimeUnit;
 
 pub struct EndgameSolution {
     pub sequence: Option<Vec<Pos>>,

@@ -31,7 +31,7 @@ impl MoveEntry for EndgameMoveEntry {
     }
 }
 
-pub type MainMoveList = MoveList<MainMoveEntry, 192>;
+pub type MainMoveList = MoveList<MainMoveEntry, { pos::BOARD_SIZE }>;
 
 pub type EndgameMoveList = MoveList<EndgameMoveEntry, { pos::BOARD_SIZE }>;
 
@@ -65,6 +65,17 @@ impl<E: MoveEntry, const N: usize> MoveList<E, N> {
     pub fn push(&mut self, entry: E) {
         self.moves[self.top] = entry;
         self.top += 1;
+    }
+
+    pub fn retain(&mut self, keep: impl Fn(&E) -> bool) {
+        let mut top = 0;
+        for idx in 0 .. self.top {
+            if keep(&self.moves[idx]) {
+                self.moves[top] = self.moves[idx];
+                top += 1;
+            }
+        }
+        self.top = top;
     }
 
     pub fn consume_best(&mut self) -> Option<E> {

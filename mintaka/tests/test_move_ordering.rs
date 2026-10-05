@@ -1,20 +1,20 @@
 #[cfg(test)]
 mod test_movegen {
     use mintaka::config::{Config, SearchObjective};
-    use mintaka::eval::evaluator::{ActiveEvaluator, Evaluator};
+    use mintaka::eval::evaluator::ActiveEvaluator;
     use mintaka::memo::history_table::HistoryTable;
     use mintaka::memo::transposition_table::TranspositionTable;
+    use mintaka::movegen::move_list::MainMoveEntry;
     use mintaka::movegen::move_picker::MovePicker;
     use mintaka::thread_data::ThreadData;
     use mintaka::thread_type::WorkerThread;
     use rusty_renju::history::History;
     use rusty_renju::notation::pos;
     use rusty_renju::notation::pos::MaybePos;
+    use rusty_renju::notation::rule::RuleKind;
     use rusty_renju::utils::empty::Empty;
     use std::sync::atomic::{AtomicBool, AtomicU32};
     use std::time::Instant;
-    use mintaka::movegen::move_list::MainMoveEntry;
-    use rusty_renju::notation::rule::RuleKind;
 
     macro_rules! test_move_ordering {
         ($history:literal) => {{
