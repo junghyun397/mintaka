@@ -71,7 +71,7 @@ def finish_on_interrupt():
 
     interrupted = False
 
-    def interrupt(signum, frame):
+    def interrupt(_, __):
         nonlocal interrupted
         interrupted = True
 
@@ -151,10 +151,8 @@ class WorkerManager:
         remote = None
         if address == "local":
             config = binary_manager.build_config(sources, settings)
-            play = partial(
-                arena.play_pair, config.path_params_resource, config.args.draw_in,
-                log_prefix_filter=tuple(config.args.log_prefix_filter or ()),
-            )
+            affinity_queue = arena.create_affinity_queue(config, count)
+            play = partial(arena.play_pair, config, affinity_queue=affinity_queue)
         else:
             remote = RemoteWorker(address, self.run_id)
             play = remote.play

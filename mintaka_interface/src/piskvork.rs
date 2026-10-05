@@ -1,7 +1,9 @@
 use mintaka::config::{Config, SearchObjective};
 use mintaka::game_agent::{ComputingResource, GameAgent, GameError};
 use mintaka::game_state::GameState;
+use mintaka::memo::transposition_table::TranspositionTable;
 use mintaka::protocol::command::Command;
+use mintaka::protocol::nodes::Nodes;
 use mintaka::protocol::response::{CallBackResponseSender, Response};
 use mintaka::protocol::time::{TimeUnit, TimeValue};
 use mintaka::protocol::timer::Timer;
@@ -18,8 +20,6 @@ use std::io::{BufRead, Write};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
-use mintaka::memo::transposition_table::TranspositionTable;
-use mintaka::protocol::nodes::Nodes;
 
 pub fn entry<const R: RuleKind>() -> Result<(), impl Error> {
     piskvork_protocol::<R>()
@@ -249,6 +249,7 @@ fn match_command<const R: RuleKind>(
     aborted: &Arc<AtomicBool>,
     message_sender: &MessageSender,
     line: String,
+    reader: &mut impl BufRead,
 ) -> Result<(), PiskvorkError> {
     let mut args = line.split(' ').into_iter();
 
@@ -352,8 +353,7 @@ fn match_command<const R: RuleKind>(
             let mut buf = String::new();
             loop {
                 buf.clear();
-                std::io::stdin()
-                    .read_line(&mut buf)
+                reader.read_line(&mut buf)
                     .map_err(|_| PiskvorkError::Error("failed to stdio".to_string()))?;
 
                 if buf.trim() == DONE_TOKEN {
@@ -441,10 +441,18 @@ fn spawn_command_listener<const R: RuleKind>(
 ) {
     std::thread::spawn(move || {
         let stdin = std::io::stdin();
-        let stdin_lines = stdin.lock().lines();
+        let mut reader = stdin.lock();
+        let mut line = String::new();
 
-        for line in stdin_lines.map(Result::unwrap) {
-            let result = match_command::<R>(&aborted, &message_sender, line.to_uppercase());
+        loop {
+            line.clear();
+            if reader.read_line(&mut line).unwrap() == 0 {
+                break;
+            }
+
+            let line = line.trim_end_matches(['\r', '\n']).to_uppercase();
+
+            let result = match_command::<R>(&aborted, &message_sender, line, &mut reader);
 
             if let Err(error) = result {
                 stdio_out(Err(error));

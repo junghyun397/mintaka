@@ -35,8 +35,8 @@ python3 mintaka_arena/sprt.py
 --base-params "--workers 1 --memory-in-mib 32"
 --target-params "--workers 1 --memory-in-mib 32"
 --concurrency 8
---openings-file openings.csv
-
+--affinity 1
+--openings-file openings/renju/openings.csv
 --time-unit Clock
 --time 500 100 0
 --max-openings 500
@@ -68,7 +68,8 @@ python3 mintaka_arena/elo.py
 --base-params "--workers 1 --memory-in-mib 256"
 --target-params "--workers 1 --memory-in-mib 256"
 --concurrency 8
---openings-file openings.csv
+--affinity 1
+--openings-file openings/renju/openings.csv
 --time-unit Clock
 --time 120000 0 30000
 --min-openings 500

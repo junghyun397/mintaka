@@ -5,6 +5,7 @@ import threading
 import time
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from queue import Queue
 
 import arena
 import binary_manager
@@ -16,6 +17,7 @@ class Run:
     run_id: str
     workers: int
     config: arena.Config | None = None
+    affinity_queue: Queue | None = None
     preparing: bool = True
     stopping: bool = False
     active: int = 0
@@ -68,6 +70,7 @@ class ArenaWorker(ThreadingHTTPServer):
                 binary_manager.fetch_master()
 
             config = binary_manager.build_config(sources, data["settings"])
+            affinity_queue = arena.create_affinity_queue(config, workers)
         except BaseException:
             with self.lock:
                 run.preparing = False
@@ -77,6 +80,7 @@ class ArenaWorker(ThreadingHTTPServer):
 
         with self.lock:
             run.config = config
+            run.affinity_queue = affinity_queue
             run.preparing = False
             self.lock.notify_all()
             if run.stopping:
@@ -107,10 +111,7 @@ class ArenaWorker(ThreadingHTTPServer):
         try:
             logging.info(f"Arena Play [{run.run_id}]: opening={opening.sequence}")
 
-            pair = arena.play_pair(
-                run.config.path_params_resource, run.config.args.draw_in, opening,
-                log_prefix_filter=tuple(run.config.args.log_prefix_filter or ()),
-            )
+            pair = arena.play_pair(run.config, opening, run.affinity_queue)
         except BaseException:
             with self.lock:
                 run.stopping = True

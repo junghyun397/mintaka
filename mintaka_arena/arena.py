@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import copy
 import logging
+import os
 import random
 import re
 import secrets
@@ -15,6 +16,7 @@ from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
+from queue import Queue
 
 
 class Rule(Enum):
@@ -55,6 +57,7 @@ class TimeUnit(Enum):
 
 GAME_SETTINGS = (
     "rule", "base_params", "target_params", "time_unit", "time", "draw_in", "log_prefix_filter",
+    "affinity",
 )
 
 
@@ -74,6 +77,19 @@ class Config:
                 (Player.TARGET, self.args.target_path, self.args.target_params),
             )
         }
+
+
+def create_affinity_queue(config: Config, concurrency: int) -> Queue | None:
+    count = config.args.affinity
+
+    if sys.platform != "linux" or count is None:
+        return None
+
+    cpus = sorted(os.sched_getaffinity(0))
+    affinity_queue = Queue()
+    for slot in range(concurrency):
+        affinity_queue.put(cpus[slot * count:(slot + 1) * count])
+    return affinity_queue
 
 
 @dataclass
@@ -271,8 +287,8 @@ def command_process(
 
 
 def play_game(
-        path_params_resource: PathParamsResource, draw_in: int, opening: Opening, first_player: Player,
-        log_prefix_filter: tuple[str, ...],
+        path_params_resource: PathParamsResource,
+        draw_in: int, opening: Opening, first_player: Player, log_prefix_filter: tuple[str, ...]
 ) -> GameSnapshot:
     game_timer = time.perf_counter_ns()
     colors = {first_player: opening.initial_color, first_player.flip(): opening.initial_color.flip()}
@@ -280,9 +296,11 @@ def play_game(
 
     with ExitStack() as stack:
         engines = {}
+
         for player, (path, params, resource) in path_params_resource.items():
             process = stack.enter_context(spawn_process(path, params, resource, opening))
             stack.callback(process.terminate)
+
             engines[player] = Engine(process, copy.copy(resource), log_prefix_filter)
 
         player = first_player
@@ -320,16 +338,24 @@ def play_game(
     return GameSnapshot(winner=winner, duration=duration, history=history)
 
 
-def play_pair(
-        path_params_resource: PathParamsResource, draw_in: int, opening: Opening,
-        log_prefix_filter: tuple[str, ...],
-) -> PairResult:
-    snapshots = {
-        first_player: play_game(path_params_resource, draw_in, opening, first_player, log_prefix_filter)
-        for first_player in Player
-    }
+def play_pair(config: Config, opening: Opening, affinity_queue: Queue | None) -> PairResult:
+    with ExitStack() as stack:
+        if affinity_queue is not None:
+            cpus = affinity_queue.get()
+            stack.callback(affinity_queue.put, cpus)
+            stack.callback(os.sched_setaffinity, 0, os.sched_getaffinity(0))
+            os.sched_setaffinity(0, cpus)
 
-    return PairResult(opening, snapshots)
+        snapshots = {
+            first_player: play_game(
+                config.path_params_resource,
+                config.args.draw_in, opening, first_player,
+                config.args.log_prefix_filter
+            )
+            for first_player in Player
+        }
+
+        return PairResult(opening, snapshots)
 
 
 def game_results(snapshots: Iterable[GameSnapshot]) -> GameResults:
@@ -385,6 +411,7 @@ def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
 
     parser.add_argument("--max-openings", type=int, default=100)
     parser.add_argument("--concurrency", type=int, default=2)
+    parser.add_argument("--affinity", type=int)
 
     parser.add_argument("--time-unit", type=str, choices=[unit.value for unit in TimeUnit], default=TimeUnit.CLOCK.value)
     parser.add_argument("--time", type=int, nargs=3, default=default_time, metavar=("TOTAL", "INCREMENT", "TURN"))
