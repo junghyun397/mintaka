@@ -1,4 +1,5 @@
 use crate::bitfield::Bitfield;
+use crate::board::UndoCache;
 use crate::notation::color::{AlignedColorContainer, Color, ColorContainer};
 use crate::notation::direction::{Direction, DirectionContainer};
 use crate::notation::pos::{MaybePos, Pos};
@@ -8,7 +9,6 @@ use crate::slice::Slice;
 use crate::slice_pattern::SlicePattern;
 use crate::utils::empty::Empty;
 use crate::{assert_struct_sizes, repeat, slice_pattern, step_idx};
-use crate::board::UndoCache;
 
 pub const NONE: u8                      = 0b0000_0000;
 
@@ -35,13 +35,13 @@ assert_struct_sizes!(Pattern, size=4, align=1);
 
 impl From<Pattern> for u32 {
     fn from(value: Pattern) -> Self {
-        unsafe { std::mem::transmute::<Pattern, u32>(value) }
+        u32::from_ne_bytes(value.0.into())
     }
 }
 
 impl From<u32> for Pattern {
     fn from(value: u32) -> Self {
-        unsafe { std::mem::transmute::<u32, Pattern>(value) }
+        Self(value.to_ne_bytes().into())
     }
 }
 

@@ -130,6 +130,7 @@ pub struct BoardDescribe {
     pub hash_key: u64,
     pub player_color: u8,
     pub bitfield: [[u64; 4]; 2],
+    pub five_pos: [[u8; 2]; 2],
     pub field: [BoardExportItem; rusty_renju::notation::pos::BOARD_SIZE],
     pub winner: BoardWinner
 }
@@ -145,6 +146,7 @@ impl From<rusty_renju::board_io::BoardDescribe> for BoardDescribe {
                 value.bitfield[rusty_renju::notation::color::Color::Black].0,
                 value.bitfield[rusty_renju::notation::color::Color::White].0,
             ],
+            five_pos: value.five_pos.map(|_, five_pos| five_pos.map(u8::from)).into(),
             field: std::array::from_fn(|idx| {
                 value.field.get(idx)
                     .copied()
@@ -399,9 +401,8 @@ pub extern "C" fn rusty_renju_board_describe(
     board: *const rusty_renju::board_io::AnyBoard,
     out: *mut BoardDescribe,
 ) -> bool {
-    if out.is_aligned()
+    if !out.is_null()
         && let Some(board) = unsafe { board.as_ref() }
-        && !out.is_null()
     {
         unsafe { out.write(dispatch_any_board!(board, board => board.describe().into())) }
 
@@ -416,8 +417,8 @@ pub extern "C" fn rusty_renju_board_pattens(
     board: *const rusty_renju::board_io::AnyBoard,
     out: *mut BoardPattens,
 ) -> bool {
-    if let Some(board) = unsafe { board.as_ref() }
-        && !out.is_null()
+    if !out.is_null()
+        && let Some(board) = unsafe { board.as_ref() }
     {
         unsafe { out.write(dispatch_any_board!(board, board => BoardPattens {
             black_pattens: board.patterns.field[rusty_renju::notation::color::Color::Black]

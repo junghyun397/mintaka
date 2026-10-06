@@ -115,6 +115,12 @@ macro_rules! impl_color_container {
             pub const fn new(black: T, white: T) -> Self {
                 Self([black, white])
             }
+            
+            pub fn map<R>(self, f: impl Fn(Color, T) -> R) -> $name<R> {
+                let [black, white] = self.0;
+
+                $name([f(Color::Black, black), f(Color::White, white)])
+            }
 
             pub fn iter(&self) -> impl Iterator<Item = (Color, &T)> {
                 [Color::Black, Color::White]
@@ -151,23 +157,23 @@ macro_rules! impl_color_container {
             }
         }
 
-        impl <T: PartialEq> PartialEq for $name<T> {
+        impl<T: PartialEq> PartialEq for $name<T> {
             fn eq(&self, other: &Self) -> bool {
                 self.0 == other.0
             }
         }
 
-        impl <T: Eq> Eq for $name<T> { }
+        impl<T: Eq> Eq for $name<T> { }
 
-        impl <T: Copy> Copy for $name<T> {}
+        impl<T: Copy> Copy for $name<T> {}
 
-        impl <T: Clone> Clone for $name<T> {
+        impl<T: Clone> Clone for $name<T> {
             fn clone(&self) -> Self {
                 Self::new(self[Color::Black].clone(), self[Color::White].clone())
             }
         }
 
-        impl <T: std::fmt::Debug> std::fmt::Debug for $name<T> {
+        impl<T: std::fmt::Debug> std::fmt::Debug for $name<T> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.debug_struct("ColorContainer")
                     .field("black", &self.0[0])
@@ -179,6 +185,18 @@ macro_rules! impl_color_container {
         impl<T: Default> Default for $name<T> {
             fn default() -> Self {
                 Self::new(T::default(), T::default())
+            }
+        }
+        
+        impl<T> From<[T; 2]> for $name<T> {
+            fn from(value: [T; 2]) -> Self {
+                Self(value)
+            }
+        }
+        
+        impl<T> From<$name<T>> for [T; 2] {
+            fn from(value: $name<T>) -> Self {
+                value.0
             }
         }
     };

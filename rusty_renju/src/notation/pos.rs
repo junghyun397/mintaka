@@ -2,7 +2,6 @@ use crate::notation::direction::Direction;
 use crate::utils::str_utils::u8_from_str;
 use crate::{const_for, const_max, impl_debug_from_display};
 use std::fmt::{Debug, Display, Formatter};
-use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
@@ -294,6 +293,12 @@ impl MaybePos {
     }
 }
 
+impl From<MaybePos> for u8 {
+    fn from(value: MaybePos) -> Self {
+        value.0.idx()
+    }
+}
+
 impl TryFrom<u8> for MaybePos {
     type Error = PosError;
 
@@ -371,58 +376,6 @@ impl Display for MaybePos {
 }
 
 impl_debug_from_display!(MaybePos);
-
-#[derive(Copy, Clone)]
-pub struct PosList<const N: usize> {
-    pub entries: [Pos; N],
-    pub top: usize,
-}
-
-impl<const N: usize> PosList<N> {
-
-    pub const EMPTY: Self = Self {
-        entries: [MaybePos::INVALID_POS; N],
-        top: 0,
-    };
-
-    pub fn push(&mut self, pos: Pos) {
-        debug_assert!(self.top < N);
-
-        self.entries[self.top] = pos;
-        self.top += 1;
-    }
-
-    pub fn len(&self) -> usize {
-        self.top
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.top == 0
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &Pos> {
-        self.entries[..self.top].iter()
-    }
-
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Pos> {
-        self.entries[..self.top].iter_mut()
-    }
-
-}
-
-impl<const N: usize> Index<usize> for PosList<N> {
-    type Output = Pos;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.entries[index]
-    }
-}
-
-impl<const N: usize> IndexMut<usize> for PosList<N> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.entries[index]
-    }
-}
 
 static CHEBYSHEV_DISTANCE_LUT: [[u8; BOARD_SIZE]; BOARD_SIZE] = build_chebyshev_distance_lut();
 

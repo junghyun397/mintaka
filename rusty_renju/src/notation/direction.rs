@@ -1,6 +1,6 @@
+use crate::utils::empty::Empty;
 use std::fmt::Debug;
 use std::ops::{Index, IndexMut};
-use crate::utils::empty::Empty;
 
 #[derive(std::marker::ConstParamTy, PartialEq, Eq, Copy, Clone, Debug)]
 #[repr(u8)]
@@ -25,6 +25,17 @@ pub struct DirectionContainer<T>(pub [T; 4]);
 impl<T> DirectionContainer<T> {
     pub const fn new(horizontal: T, vertical: T, ascending: T, descending: T) -> Self {
         Self([horizontal, vertical, ascending, descending])
+    }
+
+    pub fn map<R>(self, f: impl Fn(Direction, T) -> R) -> DirectionContainer<R> {
+        let [horizontal, vertical, ascending, descending] = self.0;
+
+        DirectionContainer([
+            f(Direction::Horizontal, horizontal),
+            f(Direction::Vertical, vertical),
+            f(Direction::Ascending, ascending),
+            f(Direction::Descending, descending)
+        ])
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (Direction, &T)> {
@@ -60,29 +71,29 @@ impl<T: Empty> Empty for DirectionContainer<T> {
     }
 }
 
-impl <T: PartialEq> PartialEq for DirectionContainer<T> {
+impl<T: PartialEq> PartialEq for DirectionContainer<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
 
-impl <T: Eq> Eq for DirectionContainer<T> { }
+impl<T: Eq> Eq for DirectionContainer<T> { }
 
-impl <T: Copy> Copy for DirectionContainer<T> {}
+impl<T: Copy> Copy for DirectionContainer<T> {}
 
-impl <T: Clone> Clone for DirectionContainer<T> {
+impl<T: Clone> Clone for DirectionContainer<T> {
     fn clone(&self) -> Self {
         Self::new(self.0[0].clone(), self.0[1].clone(), self.0[2].clone(), self.0[3].clone())
     }
 }
 
-impl <T: Default> Default for DirectionContainer<T> {
+impl<T: Default> Default for DirectionContainer<T> {
     fn default() -> Self {
         Self::new(T::default(), T::default(), T::default(), T::default())
     }
 }
 
-impl <T: Debug> Debug for DirectionContainer<T> {
+impl<T: Debug> Debug for DirectionContainer<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DirectionContainer")
             .field("horizontal", &self.0[0])
@@ -90,5 +101,17 @@ impl <T: Debug> Debug for DirectionContainer<T> {
             .field("ascending", &self.0[2])
             .field("descending", &self.0[3])
             .finish()
+    }
+}
+
+impl<T> From<[T; 4]> for DirectionContainer<T> {
+    fn from(value: [T; 4]) -> Self {
+        Self(value)
+    }
+}
+
+impl<T> From<DirectionContainer<T>> for [T; 4] {
+    fn from(value: DirectionContainer<T>) -> Self {
+        value.0
     }
 }

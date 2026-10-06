@@ -45,8 +45,6 @@ pub fn deserialize_color_container_array<'de, D, T, const N: usize>(deserializer
     let white = array.split_off(N);
     let black = array;
 
-    Ok(ColorContainer::new(
-        black.try_into().unwrap(),
-        white.try_into().unwrap()
-    ))
+    Ok(ColorContainer::from([black, white])
+        .map(|_, values| values.try_into().unwrap()))
 }

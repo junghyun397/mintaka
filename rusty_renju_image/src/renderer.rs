@@ -3,18 +3,18 @@ Converted from the Java AWT version with the help of a coding agent.
 Original source = https://github.com/junghyun397/GomokuBot/blob/fbfc977210fbe238ecdd9e1b172d88203951b00c/core/src/main/kotlin/core/interact/message/graphics/ImageBoardRenderer.kt
 */
 
-use std::array;
-use std::sync::OnceLock;
+use crate::text::raster_text;
+use crate::{HistoryRender, RenderPayloads};
 use fontdue::Font;
-use tiny_skia::{FillRule, Paint, Path, PathBuilder, Pixmap, PixmapPaint, PremultipliedColorU8, Rect, Transform};
+use rusty_renju::board_io::AnyBoard;
 use rusty_renju::board_iter::BoardExportItem;
 use rusty_renju::dispatch_any_board;
 use rusty_renju::history::{History, MAX_HISTORY_SIZE};
 use rusty_renju::notation::color::{Color, ColorContainer};
-use rusty_renju::board_io::AnyBoard;
-use rusty_renju::notation::pos::{Pos, BOARD_SIZE, U_BOARD_WIDTH};
-use crate::{HistoryRender, RenderPayloads};
-use crate::text::raster_text;
+use rusty_renju::notation::pos::{BOARD_SIZE, Pos, U_BOARD_WIDTH};
+use std::array;
+use std::sync::OnceLock;
+use tiny_skia::{FillRule, Paint, Path, PathBuilder, Pixmap, PixmapPaint, PremultipliedColorU8, Rect, Transform};
 
 pub fn render_pixmap(
     board: &AnyBoard,
@@ -223,14 +223,10 @@ fn build_base_layer(font: &Font, palette: &Palette) -> Pixmap {
 }
 
 fn build_lut(font: &Font, palette: &Palette) -> Lut {
-    fn by_color<F: FnMut(Color) -> Pixmap>(mut f: F) -> ColorContainer<Pixmap> {
-        ColorContainer::new(f(Color::Black), f(Color::White))
-    }
-
     let cell = || Pixmap::new(POINT_SIZE, POINT_SIZE).unwrap();
 
     let stone_like = |outer, inner_black, inner_white| {
-        by_color(|color| {
+        ColorContainer::new(inner_black, inner_white).map(|_, inner| {
             let mut pixmap = cell();
             let mut paint = Paint::default();
             paint.anti_alias = true;
@@ -244,17 +240,17 @@ fn build_lut(font: &Font, palette: &Palette) -> Lut {
                 CELL_CENTER,
                 STONE_SIZE as f32 / 2.0 - BORDER_SIZE as f32,
             );
-            paint.set_color(match color { Color::Black => inner_black, Color::White => inner_white });
+            paint.set_color(inner);
             pixmap.fill_path(&inner_path, &paint, FillRule::Winding, Transform::identity(), None);
             pixmap
         })
     };
 
     let marker = |draw: fn(&mut Pixmap, &mut Paint)| {
-        by_color(|color| {
+        ColorContainer::new(palette.white, palette.black).map(|_, color| {
             let mut pixmap = cell();
             let mut paint = Paint::default();
-            paint.set_color(match color { Color::Black => palette.white, Color::White => palette.black });
+            paint.set_color(color);
             draw(&mut pixmap, &mut paint);
             pixmap
         })
@@ -329,8 +325,9 @@ fn build_number_lut(font: &Font, palette: &Palette) -> ColorContainer<Vec<GlyphP
             }
         })
         .collect();
-    let build = |color| numbers.iter().map(|glyph| glyph_pixmap(glyph, color)).collect();
-    ColorContainer::new(build(palette.black_px), build(palette.white_px))
+
+    ColorContainer::new(palette.black_px, palette.white_px)
+        .map(|_, color| numbers.iter().map(|glyph| glyph_pixmap(glyph, color)).collect())
 }
 
 fn glyph_pixmap(glyph: &TextBitmap, color: PremultipliedColorU8) -> GlyphPixmap {
