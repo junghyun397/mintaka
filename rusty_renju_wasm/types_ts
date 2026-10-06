@@ -73,6 +73,7 @@ export interface BoardWinner {
 export interface BoardDescribe {
 	hash_key: HashKey;
 	player_color: Color;
+	bitfield: ColorContainer<Bitfield>;
 	field: BoardExportItem[];
 	winner?: BoardWinner;
 }

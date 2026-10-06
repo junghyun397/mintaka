@@ -1,8 +1,23 @@
-use rusty_renju::{dispatch_any_board, repeat};
 use rusty_renju::utils::empty::Empty;
+use rusty_renju::{dispatch_any_board, repeat};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
-use std::ptr;
+
+macro_rules! size_and_align {
+    ($struct_name:ty,$size_name:ident,$align_name:ident) => {
+        #[unsafe(no_mangle)]
+        pub extern "C" fn $size_name() -> usize {
+            size_of::<$struct_name>()
+        }
+
+        #[unsafe(no_mangle)]
+        pub extern "C" fn $align_name() -> usize {
+            align_of::<$struct_name>()
+        }
+    };
+}
+
+size_and_align!(rusty_renju::board_io::AnyBoard, rusty_renju_board_size, rusty_renju_board_align);
 
 const COLOR_NONE: u8 = u8::MAX;
 
@@ -59,6 +74,10 @@ pub extern "C" fn rusty_renju_open_four_mask() -> u32 { repeat!(rusty_renju::pat
 pub extern "C" fn rusty_renju_open_three_mask() -> u32 { repeat!(rusty_renju::pattern::OPEN_THREE, x4 u32) }
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_close_three_mask() -> u32 { repeat!(rusty_renju::pattern::CLOSE_THREE, x4 u32) }
+#[unsafe(no_mangle)]
+pub extern "C" fn rusty_renju_potential_three_mask() -> u32 { repeat!(rusty_renju::pattern::POTENTIAL_THREE, x4 u32) }
+#[unsafe(no_mangle)]
+pub extern "C" fn rusty_renju_potential_four_mask() -> u32 { repeat!(rusty_renju::pattern::POTENTIAL_FOUR, x4 u32) }
 
 #[repr(C)]
 pub struct BoardExportItem {
@@ -110,15 +129,22 @@ impl From<Option<rusty_renju::board_utils::BoardWinner>> for BoardWinner {
 pub struct BoardDescribe {
     pub hash_key: u64,
     pub player_color: u8,
+    pub bitfield: [[u64; 4]; 2],
     pub field: [BoardExportItem; rusty_renju::notation::pos::BOARD_SIZE],
     pub winner: BoardWinner
 }
+
+size_and_align!(BoardDescribe, rusty_renju_board_describe_size, rusty_renju_board_describe_align);
 
 impl From<rusty_renju::board_io::BoardDescribe> for BoardDescribe {
     fn from(value: rusty_renju::board_io::BoardDescribe) -> Self {
         Self {
             hash_key: u64::from(value.hash_key),
             player_color: value.player_color as u8,
+            bitfield: [
+                value.bitfield[rusty_renju::notation::color::Color::Black].0,
+                value.bitfield[rusty_renju::notation::color::Color::White].0,
+            ],
             field: std::array::from_fn(|idx| {
                 value.field.get(idx)
                     .copied()
@@ -136,6 +162,8 @@ pub struct BoardPattens {
     pub white_pattens: [u32; rusty_renju::pattern::PATTERN_SIZE],
 }
 
+size_and_align!(BoardPattens, rusty_renju_board_patterns_size, rusty_renju_board_patterns_align);
+
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_empty_hash() -> u64 {
     rusty_renju::hash_key::HashKey::empty().into()
@@ -143,13 +171,7 @@ pub extern "C" fn rusty_renju_empty_hash() -> u64 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_version() -> *const c_char {
-    CString::new(env!("CARGO_PKG_VERSION")).unwrap().into_raw()
-}
-
-fn into_raw_board(
-    board: rusty_renju::board_io::AnyBoard,
-) -> *mut rusty_renju::board_io::AnyBoard {
-    Box::into_raw(Box::new(board))
+    concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr().cast()
 }
 
 fn rule_kind_from_u8(rule_kind: u8) -> Option<rusty_renju::notation::rule::RuleKind> {
@@ -180,13 +202,22 @@ fn any_board_from_history(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_empty_board(rule_kind: u8) -> *mut rusty_renju::board_io::AnyBoard {
-    if let Some(rule_kind) = rule_kind_from_u8(rule_kind) {
-        into_raw_board(dispatch_any_board!(wrap rule_kind, 
+pub extern "C" fn rusty_renju_empty_board(
+    rule_kind: u8,
+    out: *mut rusty_renju::board_io::AnyBoard,
+) -> bool {
+    if !out.is_null() && out.is_aligned()
+        && let Some(rule_kind) = rule_kind_from_u8(rule_kind)
+    {
+        let board = dispatch_any_board!(wrap rule_kind,
             rusty_renju::board::Board::empty()
-        ))
+        );
+
+        unsafe { out.write(board); }
+
+        true
     } else {
-        ptr::null_mut()
+        false
     }
 }
 
@@ -195,15 +226,21 @@ pub extern "C" fn rusty_renju_board_from_history(
     rule_kind: u8,
     actions: *const u32,
     len: usize,
-) -> *mut rusty_renju::board_io::AnyBoard {
-    if let Some(rule_kind) = rule_kind_from_u8(rule_kind)
+    out: *mut rusty_renju::board_io::AnyBoard,
+) -> bool {
+    if !out.is_null() && out.is_aligned()
+        && let Some(rule_kind) = rule_kind_from_u8(rule_kind)
         && let Some(actions) = unsafe {
             rusty_renju::utils::ffi::try_from_raw_slice::<rusty_renju::notation::pos::MaybePos>(actions, len)
         }
     {
-        into_raw_board(any_board_from_history(rule_kind, actions))
+        let board = any_board_from_history(rule_kind, actions);
+
+        unsafe { out.write(board); }
+
+        true
     } else {
-        ptr::null_mut()
+        false
     }
 }
 
@@ -211,28 +248,40 @@ pub extern "C" fn rusty_renju_board_from_history(
 pub extern "C" fn rusty_renju_board_from_string(
     rule_kind: u8,
     source: *const c_char,
-) -> *mut rusty_renju::board_io::AnyBoard {
-    if let Some(rule_kind) = rule_kind_from_u8(rule_kind)
+    out: *mut rusty_renju::board_io::AnyBoard,
+) -> bool {
+    if !out.is_null() && out.is_aligned()
+        && let Some(rule_kind) = rule_kind_from_u8(rule_kind)
         && let Some(source) = unsafe { source.as_ref() }
         && let Ok(source) = unsafe { CStr::from_ptr(source) }.to_str()
         && let Some(board) = any_board_from_string(rule_kind, source)
     {
-        into_raw_board(board)
+        unsafe { out.write(board); }
+
+        true
     } else {
-        ptr::null_mut()
+        false
     }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn rusty_renju_board_to_string(
     board: *const rusty_renju::board_io::AnyBoard,
-) -> *mut c_char {
+    out: *mut c_char,
+    capacity: usize,
+) -> usize {
     if let Some(board) = unsafe { board.as_ref() }
         && let Ok(result) = dispatch_any_board!(board, board => CString::new(board.to_string()))
     {
-        result.into_raw()
+        let bytes = result.as_bytes_with_nul();
+
+        if !out.is_null() && capacity >= bytes.len() {
+            unsafe { out.cast::<u8>().copy_from_nonoverlapping(bytes.as_ptr(), bytes.len()); }
+        }
+
+        bytes.len()
     } else {
-        ptr::null_mut()
+        0
     }
 }
 
@@ -240,8 +289,10 @@ pub extern "C" fn rusty_renju_board_to_string(
 pub extern "C" fn rusty_renju_board_set(
     board: *const rusty_renju::board_io::AnyBoard,
     pos: u32,
-) -> *mut rusty_renju::board_io::AnyBoard {
-    if let Some(board) = unsafe { board.as_ref() }
+    out: *mut rusty_renju::board_io::AnyBoard,
+) -> bool {
+    if out.is_aligned()
+        && let Some(board) = unsafe { board.as_ref() }
         && let Ok(action) = rusty_renju::notation::pos::MaybePos::try_from(pos as u8)
     {
         let board = dispatch_any_board!(wrap board, board => {
@@ -252,9 +303,34 @@ pub extern "C" fn rusty_renju_board_set(
             }
         });
 
-        into_raw_board(board)
+        unsafe { out.write(board); }
+
+        true
     } else {
-        ptr::null_mut()
+        false
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rusty_renju_board_set_mut(
+    board: *mut rusty_renju::board_io::AnyBoard,
+    pos: u32,
+) -> bool {
+    if board.is_aligned()
+        && let Some(board) = unsafe { board.as_mut() }
+        && let Ok(maybe_pos) = rusty_renju::notation::pos::MaybePos::try_from(pos)
+    {
+        dispatch_any_board!(board, board => {
+            if let Some(pos) = maybe_pos.ok() {
+                board.set_mut::<()>(pos);
+            } else {
+                board.pass_mut();
+            }
+        });
+
+        true
+    } else {
+        false
     }
 }
 
@@ -262,8 +338,10 @@ pub extern "C" fn rusty_renju_board_set(
 pub extern "C" fn rusty_renju_board_unset(
     board: *const rusty_renju::board_io::AnyBoard,
     pos: u32,
-) -> *mut rusty_renju::board_io::AnyBoard {
-    if let Some(board) = unsafe { board.as_ref() }
+    out: *mut rusty_renju::board_io::AnyBoard,
+) -> bool {
+    if out.is_aligned()
+        && let Some(board) = unsafe { board.as_ref() }
         && let Ok(maybe_pos) = rusty_renju::notation::pos::MaybePos::try_from(pos as u8)
     {
         let board = dispatch_any_board!(wrap board, board => {
@@ -274,18 +352,34 @@ pub extern "C" fn rusty_renju_board_unset(
             }
         });
 
-        into_raw_board(board)
+        unsafe { out.write(board); }
+
+        true
     } else {
-        ptr::null_mut()
+        false
     }
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_free(
+pub extern "C" fn rusty_renju_board_unset_mut(
     board: *mut rusty_renju::board_io::AnyBoard,
-) {
-    if !board.is_null() {
-        unsafe { drop(Box::from_raw(board)); }
+    pos: u32,
+) -> bool {
+    if board.is_aligned()
+        && let Some(board) = unsafe { board.as_mut() }
+        && let Ok(maybe_pos) = rusty_renju::notation::pos::MaybePos::try_from(pos)
+    {
+        dispatch_any_board!(board, board => {
+            if let Some(pos) = maybe_pos.ok() {
+                board.unset_mut::<()>(pos);
+            } else {
+                board.pass_mut();
+            }
+        });
+
+        true
+    } else {
+        false
     }
 }
 
@@ -305,7 +399,8 @@ pub extern "C" fn rusty_renju_board_describe(
     board: *const rusty_renju::board_io::AnyBoard,
     out: *mut BoardDescribe,
 ) -> bool {
-    if let Some(board) = unsafe { board.as_ref() }
+    if out.is_aligned()
+        && let Some(board) = unsafe { board.as_ref() }
         && !out.is_null()
     {
         unsafe { out.write(dispatch_any_board!(board, board => board.describe().into())) }

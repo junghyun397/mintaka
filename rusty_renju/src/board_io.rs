@@ -36,6 +36,7 @@ enum BoardElement {
 pub struct BoardDescribe {
     pub hash_key: HashKey,
     pub player_color: Color,
+    pub bitfield: ColorContainer<Bitfield>,
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -266,6 +267,7 @@ impl<const R: RuleKind> Board<R> {
         BoardDescribe {
             hash_key: self.hash_key,
             player_color: self.player_color,
+            bitfield: self.slices.bitfield(),
             field: self.export_items(),
             winner: self.find_global_winning_moves(),
         }
