@@ -8,16 +8,6 @@
 * Patch Out: `artifacts/patches/patch-<commit>-<patch_name>`
 * Engine Out: `artifacts/engines/<enginename>-<commit>[-<patch_name>]`
 
-## snapshot.py Snapshot Builder
-
-```shell
-python3 mintaka_arena/snapshot.py --name patch_name
-```
-
-* Patch Out: `artifacts/patches/patch-commit-patch_name`
-* Engine Out: `artifacts/engines/patch-commit-patch_name`
-
-
 ## Arena Remote Worker
 
 ```shell

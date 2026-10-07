@@ -41,11 +41,11 @@ class RemoteWorker:
     address: str
     run_id: str
 
-    def play(self, opening):
+    def play(self, opening, timeout=None):
         return arena.PairResult.from_json(request_json(self.address, "/play", {
             "run_id": self.run_id,
             "opening": opening.to_json(),
-        }))
+        }, timeout=timeout))
 
     def stop(self, timeout=None):
         try:
@@ -94,9 +94,8 @@ class WorkerManager:
         self.config = config
         self.run_id = secrets.token_hex(16)
         self.workers: list[Worker] = []
-        self.lock = threading.Condition()
+        self.lock = threading.Lock()
         self.executor = None
-        self.failure = None
 
     @property
     def concurrency(self) -> int:
@@ -116,7 +115,7 @@ class WorkerManager:
         args = self.config.args
         remaining = args.concurrency
         addresses = list(dict.fromkeys(args.worker_addresses or ["local"]))
-        sources = binary_manager.prepare_sources(args)
+        sources = binary_manager.prepare_sources(args, cache_only=args.cache_only)
         settings = {name: getattr(args, name) for name in arena.GAME_SETTINGS}
 
         with ThreadPoolExecutor(max_workers=len(addresses)) as executor:
@@ -134,9 +133,11 @@ class WorkerManager:
             for future in starts:
                 future.result()
 
-        remaining = self.config.args.concurrency - self.concurrency
-        if remaining:
-            raise RuntimeError(f"insufficient arena workers: requested {self.config.args.concurrency}, missing {remaining}")
+        concurrency = self.concurrency
+        if concurrency == 0:
+            raise RuntimeError("no arena workers remaining")
+        if concurrency < args.concurrency:
+            logging.warning(f"Arena concurrency: requested={args.concurrency}, available={concurrency}")
 
     def capacity(self, address):
         if address == "local":
@@ -155,7 +156,7 @@ class WorkerManager:
             play = partial(arena.play_pair, config, affinity_queue=affinity_queue)
         else:
             remote = RemoteWorker(address, self.run_id)
-            play = remote.play
+            play = partial(remote.play, timeout=self.config.args.timeout_play)
 
         worker = Worker(count, play, remote)
         with self.lock:
@@ -166,79 +167,70 @@ class WorkerManager:
                     "run_id": self.run_id,
                     "workers": count,
                     "sources": {
-                        name: source.to_json() if isinstance(source, binary_manager.Source) else source
-                        for name, source in sources.items()
+                        str(player): source.to_json() if isinstance(source, binary_manager.Source) else source
+                        for player, source in sources.items()
                     },
                     "settings": settings,
-                })
-            except HTTPError as error:
-                if error.status != 409:
-                    raise
-                with self.lock:
-                    self.workers.remove(worker)
-                logging.warning(f"Arena skipping {address}: {error}")
+                }, timeout=self.config.args.timeout_start)
+            except Exception as error:
+                if isinstance(error, HTTPError) and error.status == 409:
+                    with self.lock:
+                        self.workers.remove(worker)
+                    logging.warning(f"Arena skipping {address}: {error}")
+                else:
+                    self.disable_worker(worker, error)
                 return
 
         if self.config.args.worker_addresses:
             logging.info(f"Arena workers: {address}={count}")
 
-    def submit(self, opening: arena.Opening):
+    def disable_worker(self, worker, error):
         with self.lock:
-            if self.failure is not None:
-                raise RuntimeError("arena worker failed") from self.failure
-            return self.executor.submit(self.play, opening)
+            if not worker.concurrency:
+                return
+            removed = worker.concurrency
+            worker.concurrency = 0
+
+        logging.warning(f"Arena disabled {worker.remote.address}: "
+                        f"removed concurrency={removed}, adjusted concurrency={self.concurrency}: {error}")
 
     def results(self, openings: list[arena.Opening]) -> Iterator[arena.PairResult]:
-        pending = set()
+        pending = {}
         next_opening = 0
 
         try:
-            while pending or next_opening < self.config.args.max_openings:
-                while next_opening < self.config.args.max_openings and len(pending) < self.concurrency:
-                    pending.add(self.submit(openings[next_opening]))
-                    next_opening += 1
+            while True:
+                with self.lock:
+                    for worker in self.workers:
+                        while worker.active < worker.concurrency and next_opening < self.config.args.max_openings:
+                            future = self.executor.submit(self.play, worker, openings[next_opening])
+                            pending[future] = worker
+                            worker.active += 1
+                            next_opening += 1
+
+                if not pending:
+                    if self.concurrency == 0:
+                        raise RuntimeError("no arena workers remaining")
+                    return
 
                 done, _ = wait(pending, return_when=FIRST_COMPLETED)
-                future = done.pop()
-                pending.remove(future)
-                pair = future.result()
-                if pair is not None:
-                    yield pair
+                for future in done:
+                    worker = pending.pop(future)
+                    worker.active -= 1
+                    pair = future.result()
+                    if pair is not None:
+                        yield pair
         finally:
             for future in pending:
                 future.cancel()
 
-    def play(self, opening: arena.Opening) -> arena.PairResult | None:
-        with self.lock:
-            while True:
-                if self.failure is not None:
-                    raise RuntimeError("arena worker failed") from self.failure
-                worker = next((worker for worker in self.workers if worker.active < worker.concurrency), None)
-                if worker is not None:
-                    worker.active += 1
-                    break
-                self.lock.wait()
-
+    def play(self, worker: Worker, opening: arena.Opening) -> arena.PairResult | None:
         try:
             return worker.play(opening)
-        except BaseException as error:
-            with self.lock:
-                if worker.remote is None or not isinstance(error, Exception):
-                    self.failure = self.failure or error
-                    raise
-                if worker.concurrency:
-                    removed = worker.concurrency
-                    worker.concurrency = 0
-                    logging.warning(f"Arena disabled {worker.remote.address}: "
-                                    f"removed concurrency={removed}, adjusted concurrency={self.concurrency}: {error}")
-                if self.concurrency == 0:
-                    self.failure = self.failure or error
-                    raise RuntimeError("no arena workers remaining") from error
-            return None
-        finally:
-            with self.lock:
-                worker.active -= 1
-                self.lock.notify_all()
+        except Exception as error:
+            if worker.remote is None:
+                raise
+            self.disable_worker(worker, error)
 
     def __exit__(self, exc_type, exc_value, traceback):
         cleanup_error = None
@@ -256,8 +248,5 @@ class WorkerManager:
                     else:
                         logging.error(f"Arena stop failed for {worker.remote.address}: {error}")
                         cleanup_error = cleanup_error or error
-        if exc_type is None:
-            if self.failure is not None:
-                raise RuntimeError("arena worker failed") from self.failure
-            if cleanup_error is not None:
-                raise cleanup_error
+        if exc_type is None and cleanup_error is not None:
+            raise cleanup_error

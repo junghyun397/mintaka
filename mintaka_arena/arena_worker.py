@@ -53,7 +53,7 @@ class ArenaWorker(ThreadingHTTPServer):
             raise worker_manager.HTTPError(400, "allocation > capacity")
 
         sources = {
-            name: binary_manager.Source.from_json(source) if isinstance(source, dict) else source
+            arena.Player[name.upper()]: binary_manager.Source.from_json(source) if isinstance(source, dict) else source
             for name, source in data["sources"].items()
         }
 
@@ -69,20 +69,18 @@ class ArenaWorker(ThreadingHTTPServer):
             if any(isinstance(source, binary_manager.Source) for source in sources.values()):
                 binary_manager.fetch_master()
 
-            config = binary_manager.build_config(sources, data["settings"])
-            affinity_queue = arena.create_affinity_queue(config, workers)
+            run.config = binary_manager.build_config(sources, data["settings"])
+            run.affinity_queue = arena.create_affinity_queue(run.config, workers)
         except BaseException:
             with self.lock:
-                run.preparing = False
                 self.run = None
-                self.lock.notify_all()
             raise
+        finally:
+            with self.lock:
+                run.preparing = False
+                self.lock.notify_all()
 
         with self.lock:
-            run.config = config
-            run.affinity_queue = affinity_queue
-            run.preparing = False
-            self.lock.notify_all()
             if run.stopping:
                 raise worker_manager.HTTPError(409, "run is stopping")
 
@@ -132,11 +130,9 @@ class ArenaWorker(ThreadingHTTPServer):
         with self.lock:
             run = self.owned_run(data["run_id"])
             run.stopping = True
-            while run.preparing or run.active:
-                self.lock.wait()
+            self.lock.wait_for(lambda: not run.preparing and not run.active)
             if self.run is run:
                 self.run = None
-            self.lock.notify_all()
 
         logging.info(f"Arena Worker [{run.run_id}]: stopped")
         return {"stopped": True}
@@ -161,11 +157,7 @@ class ArenaWorkerHandler(BaseHTTPRequestHandler):
             pass
 
     def do_GET(self):
-        self.dispatch(
-            {
-                "/status": self.server.status,
-            }
-        )
+        self.dispatch({"/status": self.server.status})
 
     def do_POST(self):
         data = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
