@@ -1,4 +1,4 @@
-FROM rust:alpine
+FROM rust:bookwarm
 
 RUN apk add --no-cache build-base git openssh-client python3
 
@@ -10,4 +10,4 @@ COPY . .
 
 RUN rustup toolchain install --profile minimal
 
-ENTRYPOINT ["python3", "-u", "mintaka_arena/arena_worker.py"]
+ENTRYPOINT ["python3", "-m", "mintaka_arena.arena_worker"]

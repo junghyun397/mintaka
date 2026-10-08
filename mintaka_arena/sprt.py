@@ -2,8 +2,8 @@ import logging
 import math
 import signal
 
-import arena
-import worker_manager
+from . import arena
+from . import worker_manager
 
 
 def score_from_elo(elo: float) -> float:

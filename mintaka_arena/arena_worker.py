@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from queue import Queue
 
-import arena
-import binary_manager
-import worker_manager
+from . import arena
+from . import binary_manager
+from . import worker_manager
 
 
 @dataclass

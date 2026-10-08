@@ -12,8 +12,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
 
-import arena
-import binary_manager
+from . import arena
+from . import binary_manager
 
 
 class HTTPError(RuntimeError):

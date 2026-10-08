@@ -1,1 +1,5 @@
-/remote-worker
+/cloud_worker/.terraform.lock.hcl
+/cloud_worker/.terraform/
+/cloud_worker/*.tfstate*
+/cloud_worker/.terraform.tfstate.lock.info
+/cloud_worker/transfer

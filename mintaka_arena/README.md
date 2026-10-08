@@ -1,9 +1,7 @@
 # mintaka-arena
+All scripts must be run from **project root**.
 
-* All scripts must be run from **project root**.
-* binary_manager.py creates a patch based on origin/master.
-
-## binary_manager.py Artifacts
+## binary_manager.py
 
 * Patch Out: `artifacts/patches/patch-<commit>-<patch_name>`
 * Engine Out: `artifacts/engines/<enginename>-<commit>[-<patch_name>]`
@@ -18,14 +16,15 @@ docker compose -f mintaka_arena/docker-compose.yml up --build -d
 ## sprt.py Sequential Probability Ratio Tester
 
 ```shell
-python3 mintaka_arena/sprt.py
---rule Renju
+python3 -m mintaka_arena.sprt
+--concurrency 8
 --base-path artifacts/engines/mintaka_text_protocol_renju
---target-path target/release/mintaka_text_protocol_renju
+--target-ref commit_hash
+--target-patch artifacts/patches/patch-commit_hash-patch_name
 --base-params "--workers 1 --memory-in-mib 32"
 --target-params "--workers 1 --memory-in-mib 32"
---concurrency 8
 --affinity 1
+--rule Renju
 --openings-file openings/renju/openings.csv
 --time-unit Clock
 --time 500 100 0
@@ -51,14 +50,15 @@ python3 mintaka_arena/sprt.py
 ## elo.py CI95 ELO Tester
 
 ```shell
-python3 mintaka_arena/elo.py
---rule Renju
---base-path artifacts/engines/mintaka_text_protocol_renju
---target-path target/release/mintaka_text_protocol_renju
+python3 -m mintaka_arena.elo
+--worker-addresses http://test-server-1:8095 http://test-server-2:8095 local
+--concurrency 24
+--base-ref commit_hash
+--target-ref commit_hash
 --base-params "--workers 1 --memory-in-mib 256"
 --target-params "--workers 1 --memory-in-mib 256"
---concurrency 8
 --affinity 1
+--rule Renju
 --openings-file openings/renju/openings.csv
 --time-unit Clock
 --time 120000 0 30000
@@ -66,29 +66,4 @@ python3 mintaka_arena/elo.py
 --max-openings 4000
 --base-elo 1000
 --target-elo 1000
-```
-
-## Examples
-* Base: unspecified(origin/master ref) || ref || (ref && patch)
-* Target: unspecified(generate origin/master ref with a worktree patch) || ref || (ref && patch)
-
-* origin/master HEAD vs. worktree, remote
-```shell
---concurrency 172
---worker-addresses http://100.80.10.10:8095
-```
-
-* origin/master@commit vs. target patch, remote and local
-```shell
---concurrency 182
---base-ref commit_hash
---target-patch artifacts/patches/patch-commit_hash-patch_name
---worker-addresses http://100.80.10.10:8095 local
-```
-
-* base patch vs. target patch, local
-```shell
---concurrency 8
---base-ref commit_hash
---target-patch artifacts/patches/patch-commit_hash-patch_name
 ```

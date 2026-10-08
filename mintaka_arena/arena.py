@@ -64,6 +64,7 @@ GAME_SETTINGS = (
 class Config:
     def __init__(self, args):
         self.args = args
+        self.args.log_prefix_filter = tuple(args.log_prefix_filter or ())
 
         self.path_params_resource: PathParamsResource = {
             player: (path, params, TimeManager(
@@ -390,16 +391,11 @@ pentanomial_score = {
 def add_build_arguments(parser: argparse.ArgumentParser):
     parser.add_argument("--rule", type=str, choices=[rule.value for rule in Rule], default=Rule.RENJU.value)
 
-    base_source = parser.add_mutually_exclusive_group()
-    base_source.add_argument("--base-path", type=str)
-    base_source.add_argument("--base-ref", type=str, help="Base commit (default: patch commit or origin/master)")
-    parser.add_argument("--base-patch", type=str, help="Base patch file")
-
-    target_source = parser.add_mutually_exclusive_group()
-    target_source.add_argument("--target-path", type=str)
-    target_source.add_argument("--target-ref", type=str,
-                               help="Target commit (default: patch commit or origin/master with a worktree patch)")
-    parser.add_argument("--target-patch", type=str, help="Target patch file")
+    for player in Player:
+        base_source = parser.add_mutually_exclusive_group()
+        base_source.add_argument(f"--{player}-path", type=str)
+        base_source.add_argument(f"--{player}-ref", type=str, help="commit (default: patch commit or origin/master)")
+        parser.add_argument(f"--{player}-patch", type=str, help="Base patch file")
 
 
 def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
@@ -410,11 +406,11 @@ def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
 
     parser.add_argument("--worker-addresses", type=str, nargs="+")
     parser.add_argument("--cache-only", action="store_true")
-    parser.add_argument("--timeout-start", type=float, help="Remote /start timeout in seconds")
-    parser.add_argument("--timeout-play", type=float, help="Remote /play timeout in seconds")
+    parser.add_argument("--timeout-start", type=float, help="in seconds")
+    parser.add_argument("--timeout-play", type=float, help="in seconds")
 
-    parser.add_argument("--base-params", type=str, default="")
-    parser.add_argument("--target-params", type=str, default="")
+    for player in Player:
+        parser.add_argument(f"--{player}-params", type=str, default="")
 
     parser.add_argument("--max-openings", type=int, default=100)
     parser.add_argument("--concurrency", type=int, default=2)

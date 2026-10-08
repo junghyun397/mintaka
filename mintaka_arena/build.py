@@ -1,12 +1,12 @@
 import argparse
 import logging
 
-import arena
-import binary_manager
+from . import arena
+from . import binary_manager
 
 
 def main():
-    parser = argparse.ArgumentParser(allow_abbrev=True)
+    parser = argparse.ArgumentParser()
 
     arena.add_build_arguments(parser)
     parser.add_argument("--name", type=str)
@@ -17,6 +17,7 @@ def main():
 
     rule = arena.Rule(args.rule)
 
+    paths = {}
     for player, source in binary_manager.prepare_sources(args).items():
         if isinstance(source, binary_manager.Source):
             if player == arena.Player.TARGET and args.name:
@@ -27,6 +28,9 @@ def main():
             path = source
 
         logging.info(f"Arena {player} engine: {path}")
+        paths[player] = path
+
+    return paths
 
 
 if __name__ == "__main__":

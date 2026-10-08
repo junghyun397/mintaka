@@ -9,7 +9,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-import arena
+from . import arena
 
 
 def git(*args, cwd=None) -> bytes:

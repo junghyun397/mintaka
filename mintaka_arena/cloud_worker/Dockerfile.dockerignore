@@ -1,0 +1,15 @@
+artifacts
+target
+temp
+.idea
+.venv
+.DS_Store
+.env
+**/.env
+.pnpm-store
+sessions
+openings
+**/node_modules
+**/.state*
+**/.terraform
+**/__pycache__
