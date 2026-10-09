@@ -2,7 +2,6 @@ import argparse
 import base64
 import hashlib
 import logging
-import re
 import shutil
 import subprocess
 import tempfile
@@ -12,111 +11,100 @@ from pathlib import Path
 from . import arena
 
 
-def git(*args, cwd=None) -> bytes:
-    try:
-        return subprocess.check_output(["git", *args], cwd=cwd, stderr=subprocess.PIPE)
-    except subprocess.CalledProcessError as error:
-        message = error.stderr.decode(errors="replace").strip()
-        raise RuntimeError(f"{error}\n{message}") from error
+def add_build_arguments(parser: argparse.ArgumentParser):
+    parser.add_argument("--rule", type=str, choices=[rule.value for rule in arena.Rule], default=arena.Rule.RENJU.value)
+
+    for player in arena.Player:
+        ref_group = parser.add_mutually_exclusive_group()
+        ref_group.add_argument(f"--{player}-path", type=str, help="exact engine binary path")
+        ref_group.add_argument(f"--{player}-ref", type=str, help="REMOTE/BRANCH[@COMMIT] (default: origin/master)")
+
+        parser.add_argument(f"--{player}-patch", type=str, help="exact patch file path")
+
+
+def git(*args, cwd=None, input=None) -> bytes:
+    return subprocess.check_output(["git", *args], cwd=cwd, input=input, stderr=subprocess.PIPE)
 
 
 def resolve_commit(ref: str) -> str:
     return git("rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}").decode().strip()
 
 
-def fetch_master():
-    git("fetch", "origin", "+master:refs/remotes/origin/master")
+def parse_ref(value: str) -> tuple[str, str | None]:
+    ref, separator, commit = value.partition("@")
+    if "/" not in ref or (separator and not commit):
+        raise ValueError(f"Expected REMOTE/BRANCH[@COMMIT], got: {value}")
+    return ref, commit or None
+
+
+def fetch(refs):
+    for ref in dict.fromkeys(refs):
+        remote, separator, branch = ref.partition("/")
+        if not remote or not separator or not branch:
+            raise ValueError(f"Expected REMOTE/BRANCH, got: {ref}")
+
+        git("check-ref-format", f"refs/heads/{branch}")
+        git("check-ref-format", f"refs/remotes/{ref}")
+        git("fetch", "--", remote, f"+refs/heads/{branch}:refs/remotes/{ref}")
 
 
 @dataclass(frozen=True)
 class Source:
+    ref: str
     commit: str
     patch: bytes | None = None
-    name: str | None = None
 
     def key(self) -> str:
-        if not self.patch:
-            return self.commit
-        return f"{self.commit}-{self.name or hashlib.sha256(self.patch).hexdigest()}"
+        ref = self.ref.replace("/", "-")
+        key = f"{ref}-{self.commit}"
+
+        if self.patch:
+            return f"{key}-{hashlib.sha256(self.patch).hexdigest()}"
+        else:
+            return key
 
     def cache_path(self, rule: arena.Rule) -> Path:
         return Path("artifacts/engines") / f"mintaka_text_protocol_{rule}-{self.key()}"
 
     def to_json(self):
         return {
+            "ref": self.ref,
             "commit": self.commit,
-            "name": self.name,
             "patch": base64.b64encode(self.patch).decode("ascii") if self.patch else None,
         }
 
     @classmethod
     def from_json(cls, data):
         patch = base64.b64decode(data["patch"]) if data["patch"] else None
-
-        return cls(data["commit"], patch, data.get("name"))
-
-    @classmethod
-    def from_patch(cls, path: Path, ref: str | None = None):
-        match = re.fullmatch(r"patch-([0-9a-f]+)-(.+)", path.name)
-        if match is None:
-            raise ValueError(f"Cannot parse commit from patch filename: {path}")
-        return cls(resolve_commit(ref or match[1]), path.read_bytes() or None, match[2])
-
-    @classmethod
-    def from_worktree(cls, commit: str, name: str | None = None):
-        patch = git(
-            "diff", "--binary", "--no-ext-diff", "--no-textconv", "--no-color",
-            "--src-prefix=a/", "--dst-prefix=b/", commit, "--",
-        )
-        return cls(commit, patch or None, name)
+        return cls(data["ref"], data["commit"], patch)
 
 
-def save_patch(key: str, patch: bytes) -> Path:
-    path = Path("artifacts/patches") / f"patch-{key}"
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    if path.is_file():
-        if path.read_bytes() != patch:
-            raise FileExistsError(f"Patch already exists with different contents: {path}")
-    else:
-        path.write_bytes(patch)
-
-    logging.info(f"Arena patch: {path}")
-    return path
-
-
-def prepare_sources(args, *, cache_only: bool = False) -> dict[arena.Player, Source | str]:
-    if not cache_only and any(not getattr(args, f"{player}_path") for player in arena.Player):
-        fetch_master()
+def prepare_sources(args) -> dict[arena.Player, Source | str]:
+    refs = {
+        player: parse_ref(getattr(args, f"{player}_ref") or "origin/master")
+        for player in arena.Player
+        if not getattr(args, f"{player}_path")
+    }
+    fetch(ref for ref, _ in refs.values())
 
     sources = {}
     for player in arena.Player:
-        path = getattr(args, f"{player}_path")
-        ref = getattr(args, f"{player}_ref")
-        patch = getattr(args, f"{player}_patch")
-        if path:
-            if patch:
-                raise ValueError(f"--{player}-patch cannot be used with --{player}-path")
+        if path := getattr(args, f"{player}_path"):
             sources[player] = path
             continue
 
-        if patch:
-            source = Source.from_patch(Path(patch), ref)
-        else:
-            commit = resolve_commit(ref or "origin/master")
-            if player == arena.Player.TARGET and not ref:
-                source = Source.from_worktree(commit)
-            else:
-                source = Source(commit)
-
-        sources[player] = str(source.cache_path(arena.Rule(args.rule))) if cache_only else source
+        ref, commit = refs[player]
+        commit = resolve_commit(commit or f"refs/remotes/{ref}")
+        git("merge-base", "--is-ancestor", commit, f"refs/remotes/{ref}")
+        patch = getattr(args, f"{player}_patch")
+        patch_data = Path(patch).read_bytes() if patch else None
+        sources[player] = Source(ref, commit, patch_data or None)
 
     return sources
 
 
 def build_binary(source: Source, rule: arena.Rule = arena.Rule.RENJU) -> Path:
     key = source.key()
-    patch_path = save_patch(key, source.patch) if source.patch else None
 
     binary_name = f"mintaka_text_protocol_{rule}"
     cached = source.cache_path(rule)
@@ -132,7 +120,7 @@ def build_binary(source: Source, rule: arena.Rule = arena.Rule.RENJU) -> Path:
         git("worktree", "add", "--detach", str(worktree), source.commit)
         try:
             if source.patch:
-                git("apply", "--binary", "--whitespace=nowarn", str(patch_path.absolute()), cwd=worktree)
+                git("apply", "--binary", "--whitespace=nowarn", "-", cwd=worktree, input=source.patch)
             subprocess.run(
                 ["cargo", "build", "--release", "-p", "mintaka_interface",
                  "--bin", binary_name, "--target-dir", str(target)],
@@ -150,4 +138,5 @@ def build_config(sources: dict[arena.Player, Source | str], settings: dict) -> a
         f"{player}_path": str(build_binary(source, rule)) if isinstance(source, Source) else source
         for player, source in sources.items()
     }
+
     return arena.Config(argparse.Namespace(**settings, **paths))

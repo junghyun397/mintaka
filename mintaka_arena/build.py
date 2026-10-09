@@ -8,8 +8,7 @@ from . import binary_manager
 def main():
     parser = argparse.ArgumentParser()
 
-    arena.add_build_arguments(parser)
-    parser.add_argument("--name", type=str)
+    binary_manager.add_build_arguments(parser)
 
     args = parser.parse_args()
 
@@ -20,9 +19,6 @@ def main():
     paths = {}
     for player, source in binary_manager.prepare_sources(args).items():
         if isinstance(source, binary_manager.Source):
-            if player == arena.Player.TARGET and args.name:
-                source = binary_manager.Source(source.commit, source.patch, args.name)
-
             path = binary_manager.build_binary(source, rule=rule)
         else:
             path = source

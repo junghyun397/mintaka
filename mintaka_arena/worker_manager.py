@@ -115,7 +115,7 @@ class WorkerManager:
         args = self.config.args
         remaining = args.concurrency
         addresses = list(dict.fromkeys(args.worker_addresses or ["local"]))
-        sources = binary_manager.prepare_sources(args, cache_only=args.cache_only)
+        sources = binary_manager.prepare_sources(args)
         settings = {name: getattr(args, name) for name in arena.GAME_SETTINGS}
 
         with ThreadPoolExecutor(max_workers=len(addresses)) as executor:
@@ -196,7 +196,9 @@ class WorkerManager:
 
     def results(self, openings: list[arena.Opening]) -> Iterator[arena.PairResult]:
         pending = {}
+        completed = {}
         next_opening = 0
+        next_result = 0
 
         try:
             while True:
@@ -204,7 +206,7 @@ class WorkerManager:
                     for worker in self.workers:
                         while worker.active < worker.concurrency and next_opening < self.config.args.max_openings:
                             future = self.executor.submit(self.play, worker, openings[next_opening])
-                            pending[future] = worker
+                            pending[future] = worker, next_opening
                             worker.active += 1
                             next_opening += 1
 
@@ -215,9 +217,18 @@ class WorkerManager:
 
                 done, _ = wait(pending, return_when=FIRST_COMPLETED)
                 for future in done:
-                    worker = pending.pop(future)
+                    worker, opening_index = pending.pop(future)
                     worker.active -= 1
                     pair = future.result()
+
+                    if pair is not None:
+                        address = worker.remote.address if worker.remote is not None else "local"
+                        logging.debug(f"Arena result received: worker={address}, opening={opening_index + 1}")
+                    completed[opening_index] = pair
+
+                while next_result in completed:
+                    pair = completed.pop(next_result)
+                    next_result += 1
                     if pair is not None:
                         yield pair
         finally:

@@ -66,8 +66,11 @@ class ArenaWorker(ThreadingHTTPServer):
         try:
             logging.info(f"Arena Worker [{run_id}]: preparing {workers} workers")
 
-            if any(isinstance(source, binary_manager.Source) for source in sources.values()):
-                binary_manager.fetch_master()
+            binary_manager.fetch(
+                source.ref for source in sources.values()
+                if isinstance(source, binary_manager.Source)
+                and not source.cache_path(arena.Rule(data["settings"]["rule"])).is_file()
+            )
 
             run.config = binary_manager.build_config(sources, data["settings"])
             run.affinity_queue = arena.create_affinity_queue(run.config, workers)

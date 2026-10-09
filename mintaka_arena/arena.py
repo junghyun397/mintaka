@@ -388,24 +388,15 @@ pentanomial_score = {
 }
 
 
-def add_build_arguments(parser: argparse.ArgumentParser):
-    parser.add_argument("--rule", type=str, choices=[rule.value for rule in Rule], default=Rule.RENJU.value)
-
-    for player in Player:
-        base_source = parser.add_mutually_exclusive_group()
-        base_source.add_argument(f"--{player}-path", type=str)
-        base_source.add_argument(f"--{player}-ref", type=str, help="commit (default: patch commit or origin/master)")
-        parser.add_argument(f"--{player}-patch", type=str, help="Base patch file")
-
-
 def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(allow_abbrev=False)
-    add_build_arguments(parser)
+    from . import binary_manager
 
-    parser.add_argument("--seed", type=int, default=secrets.randbits(32))
+    parser = argparse.ArgumentParser()
+    binary_manager.add_build_arguments(parser)
 
-    parser.add_argument("--worker-addresses", type=str, nargs="+")
-    parser.add_argument("--cache-only", action="store_true")
+    parser.add_argument("--seed", type=int, default=secrets.randbits(42))
+
+    parser.add_argument("--worker-addresses", type=str, nargs="+", help="http(s)://HOST:PORT .. <local>")
     parser.add_argument("--timeout-start", type=float, help="in seconds")
     parser.add_argument("--timeout-play", type=float, help="in seconds")
 
@@ -414,10 +405,10 @@ def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
 
     parser.add_argument("--max-openings", type=int, default=100)
     parser.add_argument("--concurrency", type=int, default=2)
-    parser.add_argument("--affinity", type=int)
+    parser.add_argument("--affinity", type=int, help="affinity per each player")
 
     parser.add_argument("--time-unit", type=str, choices=[unit.value for unit in TimeUnit], default=TimeUnit.CLOCK.value)
-    parser.add_argument("--time", type=int, nargs=3, default=default_time, metavar=("TOTAL", "INCREMENT", "TURN"))
+    parser.add_argument("--time", type=int, nargs=3, default=default_time, metavar=("TOTAL", "INCREMENT", "TURN"), help="in ms")
 
     parser.add_argument("--openings-file", type=str, required=True)
     parser.add_argument("--draw-in", type=int, default=225)

@@ -1,11 +1,6 @@
 # mintaka-arena
 All scripts must be run from **project root**.
 
-## binary_manager.py
-
-* Patch Out: `artifacts/patches/patch-<commit>-<patch_name>`
-* Engine Out: `artifacts/engines/<enginename>-<commit>[-<patch_name>]`
-
 ## Arena Remote Worker
 
 ```shell
@@ -18,9 +13,7 @@ docker compose -f mintaka_arena/docker-compose.yml up --build -d
 ```shell
 python3 -m mintaka_arena.sprt
 --concurrency 8
---base-path artifacts/engines/mintaka_text_protocol_renju
---target-ref commit_hash
---target-patch artifacts/patches/patch-commit_hash-patch_name
+--base-ref origin/master
 --base-params "--workers 1 --memory-in-mib 32"
 --target-params "--workers 1 --memory-in-mib 32"
 --affinity 1
@@ -53,8 +46,8 @@ python3 -m mintaka_arena.sprt
 python3 -m mintaka_arena.elo
 --worker-addresses http://test-server-1:8095 http://test-server-2:8095 local
 --concurrency 24
---base-ref commit_hash
---target-ref commit_hash
+--base-ref origin/master@commit_hash
+--target-ref ${mintaka_arena/checkpoint.sh}
 --base-params "--workers 1 --memory-in-mib 256"
 --target-params "--workers 1 --memory-in-mib 256"
 --affinity 1

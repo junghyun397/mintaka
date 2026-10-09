@@ -4,11 +4,20 @@ import os
 import signal
 import subprocess
 import sys
+import tarfile
 import urllib.request
 from contextlib import contextmanager
 from pathlib import Path
 
 from .. import worker_manager
+
+
+def cached_engines(archive):
+    with tarfile.open(archive) as cache:
+        members = sorted(cache.getmembers(), key=lambda member: member.mtime)
+    engines = [member.name for member in members if "/mintaka_text_protocol_" in member.name]
+
+    return engines[0], engines[-1]
 
 
 @contextmanager
@@ -63,15 +72,17 @@ def main():
     if params[:1] == ["--"]:
         params = params[1:]
 
+    base_path, target_path = cached_engines(args.cache)
+
     signal.signal(signal.SIGTERM, signal.default_int_handler)
 
     with cloud_workers(args) as addresses:
         concurrency = sum(worker_manager.request_json(address, "/status", timeout=5) for address in addresses)
         subprocess.run([
             sys.executable, "-u", "-m", f"mintaka_arena.{args.suit}",
-            "--cache-only",
             "--concurrency", str(concurrency),
             *params,
+            "--base-path", base_path, "--target-path", target_path,
             "--worker-addresses", *addresses,
         ], check=True)
 

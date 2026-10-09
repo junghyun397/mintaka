@@ -8,15 +8,13 @@ COPY rust-toolchain.toml .
 RUN rustup toolchain install --profile minimal
 COPY . .
 
-ARG TARGET_CPU=znver5
+ARG TARGET_CPU="znver5"
+ARG RULE="Renju"
 ARG BASE_REF=""
-ARG BASE_PATCH=""
 ARG TARGET_REF=""
-ARG TARGET_PATCH=""
 ENV RUSTFLAGS="-C target-cpu=${TARGET_CPU}"
 
-RUN python3 -B -m mintaka_arena.build --base-ref="$BASE_REF" --base-patch="$BASE_PATCH" \
-    --target-ref="$TARGET_REF" --target-patch="$TARGET_PATCH"
+RUN python3 -B -m mintaka_arena.build --rule="$RULE" --base-ref="$BASE_REF" --target-ref="$TARGET_REF"
 
 RUN rm -rf mintaka_arena/cloud_worker
 
