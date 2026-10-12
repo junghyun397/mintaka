@@ -2,8 +2,8 @@ services:
   mintaka-server:
     container_name: mintaka-server
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: mintaka_server/Dockerfile
     image: mintaka-server:latest
     environment:
       WEBUI: ${WEBUI:-true}
@@ -14,7 +14,7 @@ services:
     ports:
       - "${MINTAKA_PORT:-8085}:${MINTAKA_PORT:-8085}"
     volumes:
-      - ./sessions:/var/lib/mintaka/sessions
+      - ../sessions:/var/lib/mintaka/sessions
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${MINTAKA_PORT:-8085}/status"]
       interval: 3s

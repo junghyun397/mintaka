@@ -5,7 +5,7 @@ All scripts must be run from **project root**.
 
 ```shell
 export ADDRESS=0.0.0.0 PORT=8095 CONCURRENCY=8
-docker compose -f mintaka_arena/docker-compose.yml up --build -d
+docker compose -f mintaka_arena/compose.yml up --build -d
 ```
 
 ## sprt.py Sequential Probability Ratio Tester
