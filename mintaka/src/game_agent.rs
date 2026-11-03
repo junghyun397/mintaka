@@ -165,7 +165,7 @@ impl<const R: RuleKind> GameAgent<R> {
                     return Err(GameError::StoneAlreadyExist);
                 }
 
-                self.state.movegen_window.imprint_window(pos);
+                self.state.movegen_window.imprint_window(0, pos);
 
                 if self.state.board.player_color == color {
                     self.state.board.set_mut::<()>(pos);
@@ -314,10 +314,11 @@ impl<const R: RuleKind> GameAgent<R> {
             position_hash: self.state.board.hash_key,
             best_move: result.best_move(),
             score: result.score,
+            pv: result.pv,
+            depth: result.depth,
             selective_depth: result.selective_depth,
             total_nodes: main_td.batch_counter.count_global(),
             time_elapsed: started_time.elapsed(),
-            pv: result.pv
         }
     }
 }

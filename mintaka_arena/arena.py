@@ -206,7 +206,8 @@ class Engine:
     def apply_increment(self):
         if self.resource.total_remaining is not None:
             self.resource.total_remaining += self.resource.increment
-            self.command(f"time total {self.resource.total_remaining}")
+            remaining = max(1, self.resource.total_remaining)
+            self.command(f"time total {remaining}")
 
 
 class UTCFormatter(logging.Formatter):
@@ -405,6 +406,7 @@ def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
 
     parser.add_argument("--max-openings", type=int, default=100)
     parser.add_argument("--concurrency", type=int, default=2)
+    parser.add_argument("--local-concurrency", type=int, help="maximum local game slots")
     parser.add_argument("--affinity", type=int, help="affinity per each player")
 
     parser.add_argument("--time-unit", type=str, choices=[unit.value for unit in TimeUnit], default=TimeUnit.CLOCK.value)

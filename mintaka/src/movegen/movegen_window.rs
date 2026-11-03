@@ -19,15 +19,28 @@ impl Default for MovegenWindow {
 
 const MOVEGEN_WINDOW_MARGIN: u8 = 3;
 
-static MOVEGEN_IMPRINT_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_imprint_mask_lut([
-    0b1001001,
-    0b0111110,
-    0b0111110,
-    0b1110111,
-    0b0111110,
-    0b0111110,
-    0b1001001,
-]);
+static MOVEGEN_IMPRINT_MASK_LUT: [[Bitfield; pos::BOARD_SIZE]; 2] = [
+    build_imprint_mask_lut([
+        0b100010001,
+        0b011111110,
+        0b011111110,
+        0b011111110,
+        0b111101111,
+        0b011111110,
+        0b011111110,
+        0b011111110,
+        0b100010001,
+    ]),
+    build_imprint_mask_lut([
+        0b1001001,
+        0b0111110,
+        0b0111110,
+        0b1110111,
+        0b0111110,
+        0b0111110,
+        0b1001001,
+    ]),
+];
 
 impl MovegenWindow {
 
@@ -98,14 +111,8 @@ impl MovegenWindow {
         self.fill_bounds();
     }
 
-    pub fn imprint_window(&mut self, pos: Pos) {
-        self.movegen_field |= MOVEGEN_IMPRINT_MASK_LUT[pos.idx_usize()];
-    }
-
-    pub fn batch_imprint_window(&mut self, moves: &[Pos]) {
-        for pos in moves {
-            self.movegen_field |= MOVEGEN_IMPRINT_MASK_LUT[pos.idx_usize()];
-        }
+    pub fn imprint_window(&mut self, level: usize, pos: Pos) {
+        self.movegen_field |= MOVEGEN_IMPRINT_MASK_LUT[level][pos.idx_usize()];
     }
 
 }
@@ -115,7 +122,7 @@ impl From<&Bitfield> for MovegenWindow {
         let mut acc = Self::default();
 
         for pos in value.iter_hot_pos() {
-            acc.imprint_window(pos);
+            acc.imprint_window(0, pos);
         }
 
         acc

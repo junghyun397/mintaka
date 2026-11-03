@@ -95,13 +95,13 @@ impl<const R: RuleKind> Params<R> {
         let unit = config.initial_timer.time_unit;
 
         if let Some(total) = time_total {
-            config.initial_timer.total_remaining = (total != 0).then_some(TimeValue::from_value(total as u64, unit));
+            config.initial_timer.total_remaining = (total != 0).then_some(TimeValue::from_input_in_1k_or_ms(total as u64, unit));
         }
         if let Some(increment) = time_increment {
-            config.initial_timer.increment = TimeValue::from_value(increment as u64, unit);
+            config.initial_timer.increment = TimeValue::from_input_in_1k_or_ms(increment as u64, unit);
         }
         if let Some(turn) = time_turn {
-            config.initial_timer.turn = (turn != 0).then_some(TimeValue::from_value(turn as u64, unit));
+            config.initial_timer.turn = (turn != 0).then_some(TimeValue::from_input_in_1k_or_ms(turn as u64, unit));
         }
 
         Ok(Self {

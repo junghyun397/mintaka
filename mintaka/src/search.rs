@@ -46,6 +46,7 @@ struct OffPVNode; impl NodeType for OffPVNode {
 pub struct SearchResult {
     pub score: Score,
     pub pv: PrincipalVariation,
+    pub depth: Depth,
     pub selective_depth: Depth,
 }
 
@@ -65,6 +66,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
     let mut result = SearchResult {
         score: Score::DRAW,
         pv: PrincipalVariation::EMPTY,
+        depth: Depth::ZERO,
         selective_depth: Depth::ZERO,
     };
 
@@ -85,13 +87,14 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
             break 'iterative_deepening;
         }
 
-        if result.best_move() != pv.first() {
+        if result.best_move().is_some() && result.best_move() != pv.first() {
             best_move_changes += 1;
         }
 
         result = SearchResult {
             score: iter_score,
             pv,
+            depth,
             selective_depth: td.selective_depth,
         };
 
@@ -103,6 +106,7 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
                 pv: result.pv,
                 total_nodes: td.batch_counter.count_global(),
                 time_elapsed: td.thread_type.time_manager().elapsed(),
+                depth,
                 selective_depth: result.selective_depth,
             })
         }
@@ -122,9 +126,9 @@ pub fn iterative_deepening<const R: RuleKind, TH: ThreadType>(
         if TH::IS_MAIN {
             let best_move_search_share = result.best_move().ok()
                 .map(|pos|
-                    td.root_nodes[pos.idx_usize()].in_1k as f64 / td.batch_counter.count_local().in_1k.max(1) as f64
+                    td.root_exact_nodes[pos.idx_usize()] as f64 / td.batch_counter.count_local_exact().max(1) as f64
                 )
-                .unwrap_or(0.0);
+                .unwrap_or(1.0);
 
             td.thread_type.time_manager_mut().update_each_depth(
                 td.singular_root,
@@ -535,7 +539,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
 
         let new_depth = (new_full_depth - reduction).clamp_value(new_full_depth);
 
-        let nodes_before = td.batch_counter.count_local();
+        let nodes_before = td.batch_counter.count_local_exact();
 
         searched_moves += 1;
 
@@ -566,7 +570,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
         };
 
         if NT::IS_ROOT {
-            td.root_nodes[pos.idx_usize()] += td.batch_counter.count_local() - nodes_before;
+            td.root_exact_nodes[pos.idx_usize()] += td.batch_counter.count_local_exact() - nodes_before;
         }
 
         {
@@ -624,7 +628,7 @@ fn pvs<const R: RuleKind, TH: ThreadType, NT: NodeType>(
             }
 
             td.ht.update_tactical(three_plied, four_plied, state.board.player_color, best_move, depth_left);
-            td.ht.update_quiet(&state.history, quiet_plied, state.board.player_color, best_move, depth_left)
+            td.ht.update_quiet(&state.history, quiet_plied, state.board.player_color, best_move, depth_left);
         }
     }
 

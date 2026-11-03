@@ -116,6 +116,7 @@ impl<CLK: MonotonicClock> TimeManager<CLK> {
         best_move_search_share: f64,
     ) {
         if let LimitKind::Dynamic { factors, base_soft_limit, soft_limit, turn, base_hard_limit, hard_limit } = &mut self.limit_kind {
+            factors.fail_lows = factors.fail_lows.saturating_sub(1);
             factors.forced_move = forced_move;
             factors.best_move_changes = best_move_changes;
             factors.best_move_search_share = best_move_search_share;

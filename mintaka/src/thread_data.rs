@@ -5,7 +5,6 @@ use crate::game_state::RecoveryState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::params;
-use crate::protocol::nodes::Nodes;
 use crate::thread_type::ThreadType;
 use crate::utils::depth;
 use crate::utils::depth::Depth;
@@ -71,7 +70,7 @@ pub struct ThreadData<'a, const R: RuleKind, TH: ThreadType> {
 
     pub lmr_table: Box<[[Depth; depth::MAX_PLY_SLOTS]; 64]>,
 
-    pub root_nodes: [Nodes; pos::BOARD_SIZE],
+    pub root_exact_nodes: [u64; pos::BOARD_SIZE],
     pub singular_root: bool,
 
     pub batch_counter: BatchCounter<'a>,
@@ -84,14 +83,15 @@ pub struct ThreadData<'a, const R: RuleKind, TH: ThreadType> {
 
 impl<'a, const R: RuleKind, TH: ThreadType> ThreadData<'a, R, TH> {
     pub fn new(
-        thread_type: TH, tid: u32,
+        thread_type: TH,
+        tid: u32,
         search_objective: SearchObjective,
         config: Config,
         evaluator: ActiveEvaluator<R>,
         tt: TTView<'a>,
         ht: HistoryTable,
         aborted: &'a AtomicBool,
-        global_counter_in_1k: &'a AtomicU32
+        global_counter_in_1k: &'a AtomicU32,
     ) -> Self {
         Self {
             thread_type,
@@ -106,7 +106,7 @@ impl<'a, const R: RuleKind, TH: ThreadType> ThreadData<'a, R, TH> {
             killers: Box::new([[MaybePos::NONE; 2]; depth::MAX_PLY_SLOTS]),
             lmr_table: Box::new(build_lmr_table(config)),
             debug_statics: Box::new([DebugStatics::EMPTY; depth::MAX_PLY_SLOTS]),
-            root_nodes: [Nodes::ZERO; pos::BOARD_SIZE],
+            root_exact_nodes: [0; pos::BOARD_SIZE],
             singular_root: false,
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
@@ -120,7 +120,9 @@ impl<'a, const R: RuleKind, TH: ThreadType> ThreadData<'a, R, TH> {
     }
 
     pub fn search_limit_exceeded(&self) -> bool {
-        self.thread_type.time_manager().is_hard_limit_reached(&self.batch_counter)
+        self.thread_type
+            .time_manager()
+            .is_hard_limit_reached(&self.batch_counter)
     }
 
     pub fn set_aborted(&self) {
@@ -163,7 +165,6 @@ impl<'a, const R: RuleKind, TH: ThreadType> ThreadData<'a, R, TH> {
             self.killers[self.ply + 2] = [MaybePos::NONE; 2];
         }
     }
-
 }
 
 fn build_lmr_table(config: Config) -> [[Depth; depth::MAX_PLY_SLOTS]; 64] {
@@ -172,10 +173,10 @@ fn build_lmr_table(config: Config) -> [[Depth; depth::MAX_PLY_SLOTS]; 64] {
     let worker_factor = 1.0 + (config.workers.min(16) as f64) / 100.0;
     let lmr_div = params::LMR_DIV * worker_factor;
 
-    for depth in 1 .. 64 {
-        for played in 1 .. depth::MAX_PLY_SLOTS {
+    for depth in 1..64 {
+        for played in 1..depth::MAX_PLY_SLOTS {
             lmr_table[depth][played] = Depth::from_i32(
-                (params::LMR_BASE + (depth as f64).ln() * (played as f64).ln() / lmr_div) as i32
+                (params::LMR_BASE + (depth as f64).ln() * (played as f64).ln() / lmr_div) as i32,
             );
         }
     }

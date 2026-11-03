@@ -1,9 +1,9 @@
+#[cfg(feature = "serde")]
+use serde_with::{As, DisplayFromStr, IfIsHumanReadable};
 use std::fmt::Display;
 use std::ops::{Add, Div, Mul, Sub};
 use std::str::FromStr;
 use std::time::Duration;
-#[cfg(feature = "serde")]
-use serde_with::{As, DisplayFromStr, IfIsHumanReadable};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
 use crate::protocol::nodes::Nodes;
@@ -54,7 +54,7 @@ impl TimeValue {
         Self(value)
     }
 
-    pub const fn from_value(value: u64, unit: TimeUnit) -> Self {
+    pub const fn from_input_in_1k_or_ms(value: u64, unit: TimeUnit) -> Self {
         match unit {
             TimeUnit::Clock => Self::from_duration(Duration::from_millis(value)),
             TimeUnit::Nodes => Self::from_nodes(Nodes::from_in_1k(value as u32)),

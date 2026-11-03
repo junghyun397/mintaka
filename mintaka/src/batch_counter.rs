@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicU32, Ordering};
 use crate::protocol::nodes::Nodes;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 #[derive(Clone)]
 pub struct BatchCounter<'a> {
@@ -32,6 +32,10 @@ impl<'a> BatchCounter<'a> {
 
     pub fn count_local(&self) -> Nodes {
         Nodes::from_in_1k(self.local_counter_in_1k + (self.buffer / 1000))
+    }
+
+    pub fn count_local_exact(&self) -> u64 {
+        self.local_counter_in_1k as u64 * 1000 + self.buffer as u64
     }
 
     pub fn buffer_zero(&self) -> bool {

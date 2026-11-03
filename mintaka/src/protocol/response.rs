@@ -1,11 +1,11 @@
 use crate::principal_variation::PrincipalVariation;
+use crate::protocol::nodes::Nodes;
+use crate::protocol::time::{TimeUnit, TimeValue};
+use crate::utils::depth::Depth;
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::score::Score;
 use std::time::Duration;
-use crate::protocol::nodes::Nodes;
-use crate::protocol::time::{TimeUnit, TimeValue};
-use crate::utils::depth::Depth;
 
 #[cfg_attr(feature = "typeshare", typeshare::typeshare)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -27,6 +27,7 @@ pub enum Response {
         hash: HashKey,
         best_move: MaybePos,
         score: Score,
+        depth: Depth,
         selective_depth: Depth,
         total_nodes: Nodes,
         pv: PrincipalVariation,
@@ -42,6 +43,7 @@ pub enum Response {
         hash: HashKey,
         best_move: MaybePos,
         score: Score,
+        depth: Depth,
         selective_depth: Depth,
         total_nodes: Nodes,
         pv: PrincipalVariation,

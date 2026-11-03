@@ -17,7 +17,7 @@ pub enum ThreatKind {
 }
 
 impl ThreatKind {
-    fn bitfield(&self) -> &Bitfield {
+    fn bitfield(self) -> Bitfield {
         match self {
             ThreatKind::ForkFour(field) => field,
             ThreatKind::ForkThreeFour(field) => field,
@@ -29,15 +29,8 @@ impl ThreatKind {
 enum MoveStage {
     TT,
     Killer,
-    Generate(MoveKind),
-    Moves(MoveKind),
-}
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-enum MoveKind {
-    All,
-    ThreatDirect,
-    ExtendFour
+    Generate,
+    Moves,
 }
 
 pub struct MovePicker<const R: RuleKind> {
@@ -98,14 +91,7 @@ impl<const R: RuleKind> MovePicker<R> {
                 MoveStage::Killer => {
                     loop {
                         let Some(killer_move) = self.killer_moves[0].ok() else {
-                            match self.threat_kind {
-                                Some(_) => {
-                                    self.stage = MoveStage::Generate(MoveKind::ThreatDirect)
-                                },
-                                None => {
-                                    self.stage = MoveStage::Generate(MoveKind::All)
-                                }
-                            }
+                            self.stage = MoveStage::Generate;
 
                             break;
                         };
@@ -127,23 +113,26 @@ impl<const R: RuleKind> MovePicker<R> {
                         }
                     }
                 }
-                MoveStage::Generate(kind) => {
-                    match kind {
-                        MoveKind::All =>
-                            move_generator::generate_all_moves(&mut self.moves_buffer, td, state),
-                        MoveKind::ThreatDirect =>
-                            move_generator::generate_threat_direct_response(&mut self.moves_buffer, td, state, self.threat_kind.unwrap().bitfield()),
-                        MoveKind::ExtendFour =>
-                            move_generator::generate_extend_four_response(&mut self.moves_buffer, td, state),
+                MoveStage::Generate => {
+                    if let Some(threat_kind) = self.threat_kind {
+                        let responses = threat_kind.bitfield()
+                            | state.board.patterns.indexes[state.board.player_color].closed_fours;
+
+                        move_generator::generate_moves::<_, true>(&mut self.moves_buffer, td, state, responses);
+                    } else {
+                        let field = state.board.legal_field(state.board.player_color) 
+                            & state.movegen_window.movegen_field;
+
+                        move_generator::generate_moves::<_, false>(&mut self.moves_buffer, td, state, field);
                     }
 
                     if self.skip_lp_quiets {
                         self.moves_buffer.retain(|entry| !entry.lp_quiet);
                     }
 
-                    self.stage = MoveStage::Moves(kind);
+                    self.stage = MoveStage::Moves;
                 }
-                MoveStage::Moves(kind) => {
+                MoveStage::Moves => {
                     while let Some(next_move) = self.moves_buffer.consume_best() {
                         if self.skip_lp_quiets && next_move.lp_quiet {
                             continue;
@@ -158,10 +147,7 @@ impl<const R: RuleKind> MovePicker<R> {
                         return Some(next_move);
                     }
 
-                    match kind {
-                        MoveKind::ThreatDirect => self.stage = MoveStage::Generate(MoveKind::ExtendFour),
-                        _ => return None,
-                    }
+                    return None;
                 }
             }
         }

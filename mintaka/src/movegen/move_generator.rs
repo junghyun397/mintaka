@@ -11,9 +11,12 @@ use rusty_renju::notation::score::Score;
 use rusty_renju::utils::empty::Empty;
 
 pub const TT_MOVE_SCORE: i16 = Score::MATE.value_i32() as i16 - 300;
-pub const DIRECT_RESPONSE_SCORE: i16 = Score::INF.value_i32() as i16 - 500;
 pub const KILLER_MOVE_SCORE: i16 = Score::INF.value_i32() as i16 - 1000;
 pub const COUNTER_MOVE_BONUS: i16 = 100;
+
+const TACTICAL_HISTORY_DIVISOR: i16 = 256;
+const RESPONSE_HISTORY_DIVISOR: i16 = 128;
+const QUIET_HISTORY_DIVISOR: i16 = 512;
 
 static ENDGAME_MOVEGEN_IMPRINT_MASK_LUT: [Bitfield; pos::BOARD_SIZE] = build_imprint_mask_lut([
     0b100010001,
@@ -78,96 +81,61 @@ pub fn generate_endgame_moves<const R: RuleKind, const T: ThreatSearchKind, cons
     moves
 }
 
-pub fn generate_threat_direct_response<const R: RuleKind>(
-    buffer: &mut MainMoveList,
-    _td: &mut ThreadData<R, impl ThreadType>,
-    state: &GameState<R>,
-    field: &Bitfield,
-) {
-    for pos in field.iter_hot_pos() {
-        let mut score = DIRECT_RESPONSE_SCORE;
-
-        // threat score
-        if state.board.patterns.field[state.board.player_color][pos.idx_usize()].is_tactical() {
-            score += 100;
-        }
-
-        buffer.push(MainMoveEntry { pos, score, lp_quiet: false, history_score: None });
-    }
-}
-
-pub fn generate_extend_four_response<const R: RuleKind>(
+pub fn generate_moves<const R: RuleKind, const ON_THREAT: bool>(
     buffer: &mut MainMoveList,
     td: &mut ThreadData<R, impl ThreadType>,
     state: &GameState<R>,
+    field: Bitfield,
 ) {
-    let maybe_last_pos = state.history.last_action_or_none();
-
-    let counter_move = counter_move_from(td, state)
-        .filter(|pos| state.board.patterns.field[state.board.player_color][pos.idx_usize()].has_closed_four());
-
-    for pos in state.board.patterns.indexes[state.board.player_color].closed_fours.iter_hot_pos() {
-        let mut score = 0;
-
-        // distance score
-        if let Some(last_pos) = maybe_last_pos.ok() {
-            score += (15 - pos.distance(last_pos)) as i16;
-        }
-
-        // counter-move score
-        if let Some(counter_move) = counter_move && counter_move == pos {
-            score += COUNTER_MOVE_BONUS;
-        }
-
-        // history score
-        score += td.ht.four[state.board.player_color][pos.idx_usize()] / 128;
-
-        buffer.push(MainMoveEntry { pos, score, lp_quiet: false, history_score: None });
-    }
-}
-
-pub fn generate_all_moves<const R: RuleKind>(
-    buffer: &mut MainMoveList,
-    td: &mut ThreadData<R, impl ThreadType>,
-    state: &GameState<R>,
-) {
-    let field = state.board.legal_field(state.board.player_color) & state.movegen_window.movegen_field;
-    let player_pattern = &state.board.patterns.field[state.board.player_color];
+    let color = state.board.player_color;
+    let player_patterns = &state.board.patterns.field[color];
+    let opponent_patterns = &state.board.patterns.field[!color];
 
     let counter_move = counter_move_from(td, state);
+    let tactical_history_divisor = if ON_THREAT {
+        RESPONSE_HISTORY_DIVISOR
+    } else {
+        TACTICAL_HISTORY_DIVISOR
+    };
 
     for pos in field.iter_hot_pos() {
         let idx = pos.idx_usize();
-        let player_pattern = player_pattern[idx];
+        let player_pattern = player_patterns[idx];
 
-        // policy score
-        let mut score = td.evaluator.ordering_score(&state.board, pos);
+        let use_history = !ON_THREAT || player_pattern.has_closed_four();
+        let history_score = if !use_history {
+            0
+        } else if player_pattern.has_open_three() {
+            td.ht.three[color][idx]
+        } else if player_pattern.has_any_four() {
+            td.ht.four[color][idx]
+        } else {
+            td.ht.quiet[color][idx]
+        };
 
-        // counter-move score
-        if let Some(counter_move) = counter_move && pos == counter_move {
+        let history_bonus = if player_pattern.is_tactical() {
+            history_score / tactical_history_divisor
+        } else {
+            history_score / QUIET_HISTORY_DIVISOR
+        };
+
+        let mut score = td.evaluator.ordering_score(&state.board, pos)
+            + history_bonus;
+
+        if use_history && counter_move == Some(pos) {
             score += COUNTER_MOVE_BONUS;
         }
 
-        // history score
-        let history_score;
-        if player_pattern.has_open_three() {
-            history_score = td.ht.three[state.board.player_color][idx];
+        let lp_quiet = !ON_THREAT
+            && !player_pattern.is_tactical()
+            && !opponent_patterns[idx].has_open_three();
 
-            score += history_score / 256;
-        } else if player_pattern.has_any_four() {
-            history_score = td.ht.four[state.board.player_color][idx];
-
-            score += history_score / 256;
-        } else {
-            history_score = td.ht.quiet[state.board.player_color][idx];
-
-            score += history_score / 512;
-        };
-
-        let lp_quiet = !player_pattern.is_tactical()
-            && !state.board.patterns.field[!state.board.player_color][idx].has_open_three();
-
-        buffer.push(MainMoveEntry { pos, score, lp_quiet, history_score: Some(history_score) });
+        buffer.push(MainMoveEntry {
+            pos,
+            score,
+            history_score: Some(history_score),
+            lp_quiet,
+        });
     }
 }
 

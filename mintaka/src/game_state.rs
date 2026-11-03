@@ -66,7 +66,7 @@ impl<const R: RuleKind> GameState<R> {
     pub fn play_mut(&mut self, pos: Pos) -> (MoveArtifact, RecoveryState) {
         let movegen_field = self.movegen_window.movegen_field;
         self.history.set_mut(pos);
-        self.movegen_window.imprint_window(pos);
+        self.movegen_window.imprint_window(0, pos);
 
         let (artifact, unset_cache) = self.board.set_mut(pos);
         (artifact, RecoveryState { movegen_field, unset_cache })

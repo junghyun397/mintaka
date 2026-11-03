@@ -73,8 +73,9 @@ fn print_response(response: Response) {
     let log = match response {
         Response::Begins(ComputingResource { workers, time_unit, time_limit }) =>
             format!("begins: workers={workers}, time-unit={time_unit}, resource={time_limit:?}"),
-        Response::Status { best_move, score, pv, total_nodes: total_nodes_in_1k, selective_depth, .. } =>
-            format!("status: depth={selective_depth}, score={score}, best_move={best_move}, total_nodes_in_1k={total_nodes_in_1k}, pv={pv:?}"),
+        Response::Status { best_move, score, pv, total_nodes, depth, selective_depth, .. } =>
+            format!("status: depth={depth}, sel_depth={selective_depth}, \
+            score={score}, best_move={best_move}, total_nodes_in_1k={}, pv={pv:?}", total_nodes.in_1k),
     };
 
     stdio_out(Ok(TextProtocolResponse::Log(log)));
@@ -139,6 +140,8 @@ fn text_protocol<const R: RuleKind>(
                 )));
 
                 if apply {
+                    timer.consume(best_move.run_time(timer.time_unit));
+
                     let command = Command::Play {
                         hash: game_agent.state.board.hash_key,
                         pos: best_move.best_move.into(),
@@ -146,6 +149,10 @@ fn text_protocol<const R: RuleKind>(
                     };
 
                     let response = execute_command(&mut game_agent, command);
+
+                    if response.is_ok() {
+                        timer.apply_increment();
+                    }
 
                     stdio_out(response);
                 }
@@ -160,16 +167,16 @@ fn text_protocol<const R: RuleKind>(
                 timer.time_unit = unit;
             }
             Message::Config(ConfigCommand::TotalTime(total)) => {
-                timer.total_remaining = total.map(|total| TimeValue::from_value(total, timer.time_unit));
+                timer.total_remaining = total.map(|total| TimeValue::from_input_in_1k_or_ms(total, timer.time_unit));
             }
             Message::Config(ConfigCommand::IncrementTime(increment)) => {
-                let increment = TimeValue::from_value(increment, timer.time_unit);
+                let increment = TimeValue::from_input_in_1k_or_ms(increment, timer.time_unit);
 
                 config.initial_timer.increment = increment;
                 timer.increment = increment;
             }
             Message::Config(ConfigCommand::TurnTime(turn)) => {
-                let turn = turn.map(|turn| TimeValue::from_value(turn, TimeUnit::Clock));
+                let turn = turn.map(|turn| TimeValue::from_input_in_1k_or_ms(turn, timer.time_unit));
 
                 config.initial_timer.turn = turn;
                 timer.turn = turn;
@@ -434,9 +441,9 @@ fn format_time_value(unit: TimeUnit, value: Option<TimeValue>) -> String {
         (TimeUnit::Clock, Some(value)) => {
             let duration = value.to_duration();
 
-            format!("{}.{}s", duration.as_secs(), duration.subsec_millis())
+            format!("{}.{:03}s", duration.as_secs(), duration.subsec_millis())
         },
-        (TimeUnit::Nodes, Some(value)) => format!("{}K nodes", value.to_nodes()),
+        (TimeUnit::Nodes, Some(value)) => format!("{} nodes", value.to_nodes()),
         _ => "infinite".to_string()
     }
 }

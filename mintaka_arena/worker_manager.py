@@ -141,7 +141,10 @@ class WorkerManager:
 
     def capacity(self, address):
         if address == "local":
-            return self.config.args.concurrency
+            limit = self.config.args.local_concurrency
+            if limit is None:
+                return self.config.args.concurrency
+            return min(self.config.args.concurrency, max(0, limit))
         try:
             return request_json(address, "/status", timeout=5)
         except (HTTPError, OSError) as error:

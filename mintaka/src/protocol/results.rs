@@ -1,4 +1,7 @@
 use crate::principal_variation::PrincipalVariation;
+use crate::protocol::nodes::Nodes;
+use crate::protocol::time::{TimeUnit, TimeValue};
+use crate::utils::depth::Depth;
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::impl_debug_from_display;
 use rusty_renju::notation::color::Color;
@@ -6,8 +9,6 @@ use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::score::Score;
 use std::fmt::Display;
 use std::time::Duration;
-use crate::protocol::nodes::Nodes;
-use crate::utils::depth::Depth;
 
 // typeshare-cli does not read `cfg_attr(..., serde(...))`, so keep serde attrs direct.
 #[cfg(feature = "serde")]
@@ -66,8 +67,18 @@ pub struct BestMove {
     pub position_hash: HashKey,
     pub best_move: MaybePos,
     pub score: Score,
+    pub pv: PrincipalVariation,
+    pub depth: Depth,
     pub selective_depth: Depth,
     pub total_nodes: Nodes,
-    pub pv: PrincipalVariation,
     pub time_elapsed: Duration,
+}
+
+impl BestMove {
+    pub fn run_time(&self, time_unit: TimeUnit) -> TimeValue {
+        match time_unit {
+            TimeUnit::Clock => TimeValue::from_duration(self.time_elapsed),
+            TimeUnit::Nodes => TimeValue::from_nodes(self.total_nodes),
+        }
+    }
 }

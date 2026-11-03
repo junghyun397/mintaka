@@ -1,11 +1,12 @@
-branch="$(date +%Y%m%d)-${1:-$(date +%H%M)}"
-commit=$(git stash create)
+#!/usr/bin/env bash
+set -euo pipefail
 
-if [[ -z "$commit" ]]; then
-    echo "No changes to checkpoint."
-    exit 1
-fi
+branch="$(date +%F)-${1:-$(date +%H%M%S)}"
+git check-ref-format "refs/heads/$branch"
 
-git push --force archive "$commit:refs/heads/$branch"
+commit=$(git stash create "Checkpoint $branch")
+commit=${commit:-$(git rev-parse HEAD)}
 
-printf "archive/%s@%s" "$branch" "$commit"
+git push personal "$commit:refs/heads/$branch" >&2
+
+printf "personal/%s@%s\n" "$branch" "$commit"

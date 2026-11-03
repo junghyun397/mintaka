@@ -8,6 +8,7 @@ use mintaka::protocol::response::{CallBackResponseSender, Response};
 use mintaka::protocol::time::{TimeUnit, TimeValue};
 use mintaka::protocol::timer::Timer;
 use mintaka_interface::message::{ConfigCommand, Message, MessageCommand, MessagePacket, MessageSender, StatusCommand};
+use rusty_renju::board::Board;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::Pos;
@@ -159,19 +160,23 @@ fn piskvork_protocol<const R: RuleKind>() -> Result<(), impl Error> {
                     }
                 }
 
-                stdio_out(Ok(PiskvorkResponse::Pos(best_move.best_move.unwrap_or(Pos::from_cartesian(7, 7)))));
+                let best_move = best_move.best_move.ok()
+                    .or_else(|| alternative_forbidden_move(&game_agent.state.board))
+                    .unwrap_or_else(|| pos::CENTER);
+
+                stdio_out(Ok(PiskvorkResponse::Pos(best_move)));
             }
             Message::Config(ConfigCommand::TotalTime(total)) => {
-                timer.total_remaining = total.map(|total| TimeValue::from_value(total, TimeUnit::Clock));
+                timer.total_remaining = total.map(|total| TimeValue::from_input_in_1k_or_ms(total, TimeUnit::Clock));
             }
             Message::Config(ConfigCommand::IncrementTime(increment)) => {
-                let increment = TimeValue::from_value(increment, TimeUnit::Clock);
+                let increment = TimeValue::from_input_in_1k_or_ms(increment, TimeUnit::Clock);
 
                 config.initial_timer.increment = increment;
                 timer.increment = increment;
             }
             Message::Config(ConfigCommand::TurnTime(turn)) => {
-                let turn = turn.map(|turn| TimeValue::from_value(turn, TimeUnit::Clock));
+                let turn = turn.map(|turn| TimeValue::from_input_in_1k_or_ms(turn, TimeUnit::Clock));
 
                 config.initial_timer.turn = turn;
                 timer.turn = turn
@@ -495,6 +500,18 @@ fn parse_time(arg: Option<&str>) -> Result<u64, &'static str> {
     arg
         .ok_or("missing info value.")
         .and_then(|token| token.parse::<u64>().map_err(|_| "time parsing failed."))
+}
+
+fn alternative_forbidden_move<const R: RuleKind>(board: &Board<R>) -> Option<Pos> {
+    if R != RuleKind::Renju || board.player_color != Color::Black {
+        return None;
+    }
+
+    board.patterns.forbidden_field.iter_hot_pos().find(|pos|
+        board.patterns.five_pos[Color::White].contains(&((*pos).into()))
+    ).or_else(||
+        board.patterns.five_pos[Color::White].iter().find_map(|pos| pos.ok())
+    )
 }
 
 struct Presets;
