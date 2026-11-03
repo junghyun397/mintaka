@@ -357,11 +357,9 @@ impl Iterator for DirectionIterator {
     type Item = Direction;
 
     fn next(&mut self) -> Option<Self::Item> {
-        (self.packed_unit != 0).then(|| {
-            let tails = self.packed_unit.trailing_zeros();
-            self.packed_unit &= self.packed_unit - 1;
+        let tails = self.packed_unit.lowest_one()?;
+        self.packed_unit &= self.packed_unit - 1;
 
-            Direction::from(tails as u8 / 8)
-        })
+        Some(Direction::from(tails as u8 / 8))
     }
 }

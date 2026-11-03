@@ -274,11 +274,7 @@ impl Iterator for BitfieldHotBitsIterator {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.chunk_mask == 0 {
-            return None;
-        }
-
-        let chunk_idx = self.chunk_mask.trailing_zeros() as usize;
+        let chunk_idx = self.chunk_mask.lowest_one()? as usize;
         let idx = chunk_idx * 64 + self.chunks[chunk_idx].trailing_zeros() as usize;
 
         self.chunks[chunk_idx] &= self.chunks[chunk_idx] - 1;

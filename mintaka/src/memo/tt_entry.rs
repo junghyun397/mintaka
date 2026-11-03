@@ -1,8 +1,8 @@
-use std::simd::cmp::SimdPartialEq;
-use std::simd::Simd;
 use rusty_renju::assert_struct_sizes;
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
+use std::simd::Simd;
+use std::simd::cmp::SimdPartialEq;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const KEY_SIZE: usize = 21;
@@ -171,13 +171,9 @@ impl TTEntryBucket {
                 & entries.simd_ne(Simd::<u64, 8>::splat(0))
         ).to_bitmask() & 0b111111;
 
-        if signature_matches == 0 {
-            None
-        } else {
-            let slot = signature_matches.trailing_zeros() as usize;
+        let slot = signature_matches.lowest_one()? as usize;
 
-            Some(TTEntryBucketProbe { slot, entry: entries[slot].into() })
-        }
+        Some(TTEntryBucketProbe { slot, entry: entries[slot].into() })
     }
 
     pub fn store(&self, slot: usize, key: HashKey, entry: TTEntry) {

@@ -3,8 +3,8 @@ use crate::notation::rule::RuleKind;
 use crate::slice::Slice;
 use crate::slice_pattern::ExtendedMatch::{Left, Right};
 use crate::{assert_struct_sizes, const_for, pattern};
-use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
+use std::simd::cmp::SimdPartialEq;
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 #[repr(transparent)]
@@ -129,9 +129,7 @@ fn increase_closed_four(mut copied: u128, mask: u128) -> u128 {
 }
 
 pub fn five_in_a_row_idx(stones: u16) -> Option<u32> {
-    let five = calculate_five_in_a_rows(stones);
-
-    (five != 0).then_some(five.trailing_zeros())
+    calculate_five_in_a_rows(stones).lowest_one()
 }
 
 fn calculate_five_in_a_rows(stones: u16) -> u16 {

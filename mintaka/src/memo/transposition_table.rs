@@ -64,14 +64,8 @@ impl TranspositionTable {
 
         self.table = Vec::new();
 
-        unsafe {
-            self.table = Vec::from_raw_parts(
-                std::alloc::alloc_zeroed(
-                    std::alloc::Layout::array::<TTEntryBucket>(len).unwrap()
-                ).cast(),
-                len, len
-            );
-        };
+        self.table = unsafe { Box::<[TTEntryBucket]>::new_zeroed_slice(len).assume_init() }
+            .into_vec();
     }
 
     pub fn view(&self) -> TTView<'_> {

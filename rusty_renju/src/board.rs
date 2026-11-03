@@ -4,13 +4,13 @@ use crate::notation::color::{Color, ColorContainer};
 use crate::notation::direction::{Direction, DirectionContainer};
 use crate::notation::pos::{MaybePos, Pos};
 use crate::notation::rule::RuleKind;
-use crate::pattern::{Patterns, CLOSED_FOUR_SINGLE};
+use crate::pattern::{CLOSED_FOUR_SINGLE, Patterns};
 use crate::slice::{Slice, Slices};
+use crate::slice_pattern;
 use crate::utils::empty::Empty;
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "typeshare")]
 use typeshare::typeshare;
-use crate::slice_pattern;
 
 #[cfg_attr(feature = "typeshare", typeshare(serialized_as = "BoardData"))]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
@@ -579,10 +579,9 @@ impl<const R: RuleKind> Board<R> {
 
         let (stones, blocks) = self.slices.calculate_window::<11>(color, direction, pos);
 
-        let responses = slice_pattern::match_five_positions::<R>(stones | 0b100000, blocks, color);
-        (responses != 0).then(||
-            pos.directional_offset_unchecked(direction, responses.trailing_zeros() as isize - 5)
-        )
+        let five_idx = slice_pattern::match_five_positions::<R>(stones | 0b100000, blocks, color).lowest_one()?;
+
+        Some(pos.directional_offset_unchecked(direction, five_idx as isize - 5))
     }
 }
 
