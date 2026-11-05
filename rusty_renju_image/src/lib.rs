@@ -2,32 +2,36 @@ mod text;
 mod renderer;
 
 use rusty_renju::notation::pos::MaybePos;
+use std::ptr::NonNull;
 use webp::Encoder;
 
 #[repr(C)]
 pub struct ByteBuffer {
     ptr: *mut u8,
+    cap: usize,
     len: usize,
 }
 
 impl From<Vec<u8>> for ByteBuffer {
     fn from(value: Vec<u8>) -> Self {
-        let boxed = value.into_boxed_slice();
-        let len = boxed.len();
-        let ptr = Box::into_raw(boxed) as *mut u8;
+        let (ptr, len, cap) = value.into_parts();
 
-        Self { ptr, len }
+        Self { ptr: ptr.as_ptr(), cap, len }
     }
 }
 
-impl From<ByteBuffer> for Vec<u8> {
-    fn from(value: ByteBuffer) -> Self {
-        unsafe { Vec::from_raw_parts(value.ptr, value.len, value.len) }
+impl TryFrom<ByteBuffer> for Vec<u8> {
+    type Error = ();
+
+    fn try_from(value: ByteBuffer) -> Result<Self, Self::Error> {
+        let ptr = NonNull::new(value.ptr).ok_or(())?;
+
+        Ok(unsafe { Vec::from_parts(ptr, value.len, value.cap) })
     }
 }
 
 impl ByteBuffer {
-    const NULL: Self = Self { ptr: std::ptr::null_mut(), len: 0 };
+    const NULL: Self = Self { ptr: std::ptr::null_mut(), cap: 0, len: 0 };
 }
 
 
@@ -96,7 +100,7 @@ pub struct RenderPayloads {
 }
 
 #[unsafe(no_mangle)]
-pub fn rusty_renju_image_render(
+pub extern "C" fn rusty_renju_image_render(
     image_format: u8, webp_quality: f32,
     option: u8, enable_forbidden: bool,
     board: *const rusty_renju::board_io::AnyBoard,
@@ -135,10 +139,10 @@ pub fn rusty_renju_image_render(
 }
 
 #[unsafe(no_mangle)]
-pub fn rusty_renju_image_free_byte_buffer(byte_buffer: *const ByteBuffer) {
+pub extern "C" fn rusty_renju_image_free_byte_buffer(byte_buffer: *const ByteBuffer) {
     if let Some(byte_buffer) = unsafe { byte_buffer.as_ref() }
-        && !byte_buffer.ptr.is_null()
+        && let Some(ptr) = NonNull::new(byte_buffer.ptr)
     {
-        unsafe { drop(Box::from_raw(std::ptr::slice_from_raw_parts_mut(byte_buffer.ptr, byte_buffer.len))) }
+        unsafe { drop(Vec::from_parts(ptr, byte_buffer.len, byte_buffer.cap)) }
     }
 }

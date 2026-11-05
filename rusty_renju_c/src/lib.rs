@@ -293,24 +293,19 @@ pub extern "C" fn rusty_renju_board_set(
     pos: u32,
     out: *mut rusty_renju::board_io::AnyBoard,
 ) -> bool {
-    if out.is_aligned()
-        && let Some(board) = unsafe { board.as_ref() }
-        && let Ok(action) = rusty_renju::notation::pos::MaybePos::try_from(pos as u8)
-    {
-        let board = dispatch_any_board!(wrap board, board => {
-            if let Some(pos) = action.ok() {
-                board.set(pos)
-            } else {
-                board.pass()
-            }
-        });
+    let Some((board, maybe_pos)) = inspect_board_and_pos(board, pos, out) else { return false };
 
-        unsafe { out.write(board); }
+    let board = dispatch_any_board!(wrap board, board => {
+        if let Some(pos) = maybe_pos.ok() {
+            board.set(pos)
+        } else {
+            board.pass()
+        }
+    });
 
-        true
-    } else {
-        false
-    }
+    unsafe { out.write(board); }
+
+    true
 }
 
 #[unsafe(no_mangle)]
@@ -318,22 +313,17 @@ pub extern "C" fn rusty_renju_board_set_mut(
     board: *mut rusty_renju::board_io::AnyBoard,
     pos: u32,
 ) -> bool {
-    if board.is_aligned()
-        && let Some(board) = unsafe { board.as_mut() }
-        && let Ok(maybe_pos) = rusty_renju::notation::pos::MaybePos::try_from(pos)
-    {
-        dispatch_any_board!(board, board => {
-            if let Some(pos) = maybe_pos.ok() {
-                board.set_mut::<()>(pos);
-            } else {
-                board.pass_mut();
-            }
-        });
+    let Some((board, maybe_pos)) = inspect_board_and_pos_mut(board, pos) else { return false };
 
-        true
-    } else {
-        false
-    }
+    dispatch_any_board!(board, board => {
+        if let Some(pos) = maybe_pos.ok() {
+            board.set_mut::<()>(pos);
+        } else {
+            board.pass_mut();
+        }
+    });
+
+    true
 }
 
 #[unsafe(no_mangle)]
@@ -342,24 +332,19 @@ pub extern "C" fn rusty_renju_board_unset(
     pos: u32,
     out: *mut rusty_renju::board_io::AnyBoard,
 ) -> bool {
-    if out.is_aligned()
-        && let Some(board) = unsafe { board.as_ref() }
-        && let Ok(maybe_pos) = rusty_renju::notation::pos::MaybePos::try_from(pos as u8)
-    {
-        let board = dispatch_any_board!(wrap board, board => {
-            if let Some(pos) = maybe_pos.ok() {
-                board.unset(pos)
-            } else {
-                board.pass()
-            }
-        });
+    let Some((board, maybe_pos)) = inspect_board_and_pos(board, pos, out) else { return false };
 
-        unsafe { out.write(board); }
+    let board = dispatch_any_board!(wrap board, board => {
+        if let Some(pos) = maybe_pos.ok() {
+            board.unset(pos)
+        } else {
+            board.pass()
+        }
+    });
 
-        true
-    } else {
-        false
-    }
+    unsafe { out.write(board); }
+
+    true
 }
 
 #[unsafe(no_mangle)]
@@ -367,33 +352,17 @@ pub extern "C" fn rusty_renju_board_unset_mut(
     board: *mut rusty_renju::board_io::AnyBoard,
     pos: u32,
 ) -> bool {
-    if board.is_aligned()
-        && let Some(board) = unsafe { board.as_mut() }
-        && let Ok(maybe_pos) = rusty_renju::notation::pos::MaybePos::try_from(pos)
-    {
-        dispatch_any_board!(board, board => {
-            if let Some(pos) = maybe_pos.ok() {
-                board.unset_mut::<()>(pos);
-            } else {
-                board.pass_mut();
-            }
-        });
+    let Some((board, maybe_pos)) = inspect_board_and_pos_mut(board, pos) else { return false };
 
-        true
-    } else {
-        false
-    }
-}
+    dispatch_any_board!(board, board => {
+        if let Some(pos) = maybe_pos.ok() {
+            board.unset_mut::<()>(pos);
+        } else {
+            board.pass_mut();
+        }
+    });
 
-#[unsafe(no_mangle)]
-pub extern "C" fn rusty_renju_board_rule_kind(
-    board: *const rusty_renju::board_io::AnyBoard,
-) -> u8 {
-    if let Some(board) = unsafe { board.as_ref() } {
-        board.rule_kind() as u8
-    } else {
-        u8::MAX
-    }
+    true
 }
 
 #[unsafe(no_mangle)]
@@ -429,5 +398,35 @@ pub extern "C" fn rusty_renju_board_pattens(
         true
     } else {
         false
+    }
+}
+
+fn inspect_board_and_pos_mut<'a>(
+    board: *mut rusty_renju::board_io::AnyBoard,
+    pos: u32,
+) -> Option<(&'a mut rusty_renju::board_io::AnyBoard, rusty_renju::notation::pos::MaybePos)> {
+    if !board.is_null() && board.is_aligned()
+        && let Some(board) = unsafe { board.as_mut() }
+        && let Ok(maybe_pos) = rusty_renju::notation::pos::MaybePos::try_from(pos)
+    {
+        Some((board, maybe_pos))
+    } else {
+        None
+    }
+}
+
+fn inspect_board_and_pos<'a>(
+    board: *const rusty_renju::board_io::AnyBoard,
+    pos: u32,
+    out: *const rusty_renju::board_io::AnyBoard,
+) -> Option<(&'a rusty_renju::board_io::AnyBoard, rusty_renju::notation::pos::MaybePos)> {
+    if !board.is_null() && board.is_aligned()
+        && !out.is_null() && out.is_aligned()
+        && let Some(board) = unsafe { board.as_ref() }
+        && let Ok(maybe_pos) = rusty_renju::notation::pos::MaybePos::try_from(pos)
+    {
+        Some((board, maybe_pos))
+    } else {
+        None
     }
 }
