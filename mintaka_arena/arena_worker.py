@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass
@@ -27,9 +28,9 @@ class Run:
 class ArenaWorker(ThreadingHTTPServer):
     daemon_threads = False
 
-    def __init__(self, address, max_concurrency):
+    def __init__(self, address, max_workers):
         super().__init__(address, ArenaWorkerHandler)
-        self.max_concurrency = max_concurrency
+        self.max_workers = max_workers
         self.lock = threading.Condition()
         self.run = None
 
@@ -44,13 +45,13 @@ class ArenaWorker(ThreadingHTTPServer):
         with self.lock:
             if self.run is not None:
                 raise worker_manager.HTTPError(409, "worker is busy")
-            return self.max_concurrency
+            return self.max_workers
 
     def start(self, data):
         run_id, workers = data["run_id"], data["workers"]
 
-        if workers > self.max_concurrency:
-            raise worker_manager.HTTPError(400, "allocation > capacity")
+        if workers > self.max_workers:
+            raise worker_manager.HTTPError(400, f"requested workers={workers} exceeds max-workers={self.max_workers}")
 
         sources = {
             arena.Player[name.upper()]: binary_manager.Source.from_json(source) if isinstance(source, dict) else source
@@ -195,15 +196,15 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--address", type=str, default="0.0.0.0")
+    parser.add_argument("--max-workers", type=int, default=os.cpu_count() or 1)
     parser.add_argument("--port", type=int, default=8095)
-    parser.add_argument("--max-concurrency", type=int, default=6)
     parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO")
 
     args = parser.parse_args()
     arena.configure_logging(args.log_level)
 
-    with ArenaWorker((args.address, args.port), args.max_concurrency) as worker:
-        logging.info(f"Arena worker: address={args.address}, port={args.port}, max-concurrency={args.max_concurrency}")
+    with ArenaWorker((args.address, args.port), args.max_workers) as worker:
+        logging.info(f"Arena worker: address={args.address}, port={args.port}, max-workers={args.max_workers}")
         try:
             worker.serve_forever()
         except KeyboardInterrupt:

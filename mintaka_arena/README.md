@@ -12,7 +12,7 @@ docker compose -f mintaka_arena/compose.yml up --build -d
 
 ```shell
 python3 -m mintaka_arena.sprt
---concurrency 8
+--workers local
 --base-ref origin/master
 --base-params "--workers 1 --memory-in-mib 32"
 --target-params "--workers 1 --memory-in-mib 32"
@@ -44,8 +44,7 @@ python3 -m mintaka_arena.sprt
 
 ```shell
 python3 -m mintaka_arena.elo
---worker-addresses http://test-server-1:8095 http://test-server-2:8095 local
---concurrency 24
+--workers http://test-server-1:8095=16 http://test-server-2:8095=16 local=8
 --base-ref origin/master@commit_hash
 --target-ref ${mintaka_arena/checkpoint.sh}
 --base-params "--workers 1 --memory-in-mib 256"

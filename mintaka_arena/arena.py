@@ -89,7 +89,7 @@ def create_affinity_queue(config: Config, concurrency: int) -> Queue | None:
     cpus = sorted(os.sched_getaffinity(0))
     affinity_queue = Queue()
     for slot in range(concurrency):
-        affinity_queue.put(cpus[slot * count:(slot + 1) * count])
+        affinity_queue.put([cpus[(slot * count + offset) % len(cpus)] for offset in range(min(count, len(cpus)))])
     return affinity_queue
 
 
@@ -389,6 +389,23 @@ pentanomial_score = {
 }
 
 
+def parse_worker(value: str) -> tuple[str, int]:
+    from . import worker_manager
+
+    address, separator, count = value.rpartition("=")
+    if not separator:
+        address = value
+        try:
+            count = os.cpu_count() or 1 if address == "local" else worker_manager.request_json(address, "/status", timeout=3)
+        except (worker_manager.HTTPError, OSError, ValueError) as error:
+            raise argparse.ArgumentTypeError(str(error)) from error
+
+    if not address or not str(count).isdecimal():
+        raise argparse.ArgumentTypeError("expected HOST:PORT[=N] or local[=N]")
+
+    return address, int(count)
+
+
 def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
     from . import binary_manager
 
@@ -397,7 +414,8 @@ def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
 
     parser.add_argument("--seed", type=int, default=secrets.randbits(42))
 
-    parser.add_argument("--worker-addresses", type=str, nargs="+", help="http(s)://HOST:PORT .. <local>")
+    parser.add_argument("--workers", type=parse_worker, nargs="+", default=[("local", 2)],
+                        metavar="HOST:PORT[=N]", help="http(s)://HOST:PORT[=N] or local[=N]; omitted N uses /status or local CPU count (default: local=2)")
     parser.add_argument("--timeout-start", type=float, help="in seconds")
     parser.add_argument("--timeout-play", type=float, help="in seconds")
 
@@ -405,8 +423,6 @@ def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
         parser.add_argument(f"--{player}-params", type=str, default="")
 
     parser.add_argument("--max-openings", type=int, default=100)
-    parser.add_argument("--concurrency", type=int, default=2)
-    parser.add_argument("--local-concurrency", type=int, help="maximum local game slots")
     parser.add_argument("--affinity", type=int, help="affinity per each player")
 
     parser.add_argument("--time-unit", type=str, choices=[unit.value for unit in TimeUnit], default=TimeUnit.CLOCK.value)

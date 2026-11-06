@@ -13,7 +13,7 @@ variable "project" {
 }
 variable "region" { type = string }
 variable "name" { type = string }
-variable "concurrency" {
+variable "instances" {
   type = number
 }
 variable "machine_type" { type = string }
@@ -68,7 +68,7 @@ resource "google_compute_firewall" "controller" {
 }
 
 resource "google_compute_instance" "arena" {
-  count        = var.concurrency
+  count        = var.instances
   name         = "${var.name}-vm-${count.index}"
   zone         = local.zones[count.index % length(local.zones)]
   machine_type = var.machine_type
@@ -108,7 +108,7 @@ resource "google_compute_instance" "arena" {
     timeout 600 sh -c 'until test -f /tmp/arena.tar; do sleep 2; done'
     tar -xf /tmp/arena.tar -C /opt/mintaka
     cd /opt/mintaka
-    nohup python3 -m mintaka_arena.arena_worker --max-concurrency "$(nproc)" >/dev/null 2>&1 &
+    nohup python3 -m mintaka_arena.arena_worker >/dev/null 2>&1 &
   SCRIPT
 
   provisioner "local-exec" {

@@ -21,7 +21,7 @@ python3 -m mintaka_arena.cloud_worker.run \
 --cache mintaka_arena/cloud_worker/transfer/arena_cache.tar \
 --region us-central1 \
 --machine-type c4d-highcpu-8 \
---concurrency 20 \
+--instances 20 \
 --suit elo \
 -- \
 --rule Renju \

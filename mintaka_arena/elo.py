@@ -51,7 +51,7 @@ def main():
     stats = None
 
     logging.info(f"ELO Started [{config.args.min_openings}, {config.args.max_openings}]: "
-                 f"concurrency={config.args.concurrency}, "
+                 f"workers={sum(dict(config.args.workers).values())}, "
                  f"base={config.args.base_elo:g}, target={config.args.target_elo:g}")
 
     with worker_manager.WorkerManager(config) as workers:

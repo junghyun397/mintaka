@@ -28,7 +28,7 @@ def cloud_workers(args):
 
     variables = {
         "project": args.project,
-        "region": args.region, "machine_type": args.machine_type, "concurrency": args.concurrency,
+        "region": args.region, "machine_type": args.machine_type, "instances": args.instances,
         "name": "mintaka", "archive": str(archive),
         "controller_ip": controller_ip,
     }
@@ -63,7 +63,7 @@ def main():
     parser.add_argument("--cache", type=Path, required=True)
     parser.add_argument("--region", default="us-central1")
     parser.add_argument("--machine-type", default="c4d-highcpu-8")
-    parser.add_argument("--concurrency", type=int)
+    parser.add_argument("--instances", type=int, required=True)
     parser.add_argument("--suit", choices=["elo", "sprt"], required=True)
     parser.add_argument("params", nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -77,13 +77,11 @@ def main():
     signal.signal(signal.SIGTERM, signal.default_int_handler)
 
     with cloud_workers(args) as addresses:
-        concurrency = sum(worker_manager.request_json(address, "/status", timeout=5) for address in addresses)
         subprocess.run([
             sys.executable, "-u", "-m", f"mintaka_arena.{args.suit}",
-            "--concurrency", str(concurrency),
             *params,
             "--base-path", base_path, "--target-path", target_path,
-            "--worker-addresses", *addresses,
+            "--workers", *addresses,
         ], check=True)
 
 

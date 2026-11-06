@@ -113,22 +113,16 @@ class WorkerManager:
 
     def prepare(self):
         args = self.config.args
-        remaining = args.concurrency
-        addresses = list(dict.fromkeys(args.worker_addresses or ["local"]))
+        requests = dict(args.workers)
+        requested = sum(requests.values())
         sources = binary_manager.prepare_sources(args)
         settings = {name: getattr(args, name) for name in arena.GAME_SETTINGS}
 
-        with ThreadPoolExecutor(max_workers=len(addresses)) as executor:
-            capacities = list(executor.map(self.capacity, addresses))
-            starts = []
-            for address, capacity in zip(addresses, capacities):
-                if remaining == 0:
-                    break
-                count = min(remaining, capacity)
-                if count <= 0:
-                    continue
-                starts.append(executor.submit(self.start_worker, address, count, sources, settings))
-                remaining -= count
+        with ThreadPoolExecutor(max_workers=len(requests)) as executor:
+            starts = [
+                executor.submit(self.start_worker, address, count, sources, settings)
+                for address, count in requests.items()
+            ]
 
             for future in starts:
                 future.result()
@@ -136,20 +130,8 @@ class WorkerManager:
         concurrency = self.concurrency
         if concurrency == 0:
             raise RuntimeError("no arena workers remaining")
-        if concurrency < args.concurrency:
-            logging.warning(f"Arena concurrency: requested={args.concurrency}, available={concurrency}")
-
-    def capacity(self, address):
-        if address == "local":
-            limit = self.config.args.local_concurrency
-            if limit is None:
-                return self.config.args.concurrency
-            return min(self.config.args.concurrency, max(0, limit))
-        try:
-            return request_json(address, "/status", timeout=5)
-        except (HTTPError, OSError) as error:
-            logging.warning(f"Arena skipping {address}: {error}")
-            return 0
+        if concurrency < requested:
+            logging.warning(f"Arena concurrency: requested={requested}, available={concurrency}")
 
     def start_worker(self, address, count, sources, settings):
         remote = None
@@ -184,8 +166,7 @@ class WorkerManager:
                     self.disable_worker(worker, error)
                 return
 
-        if self.config.args.worker_addresses:
-            logging.info(f"Arena workers: {address}={count}")
+        logging.info(f"Arena workers: {address}={count}")
 
     def disable_worker(self, worker, error):
         with self.lock:
