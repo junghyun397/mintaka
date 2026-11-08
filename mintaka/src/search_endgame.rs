@@ -1,6 +1,6 @@
 use crate::game_state::GameState;
 use crate::memo::transposition_table;
-use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucketProbe};
+use crate::memo::tt_entry::{TTEntry, TTEntryBucketProbe};
 use crate::movegen::move_generator::{TT_MOVE_SCORE, generate_endgame_moves, generate_full_endgame_moves};
 use crate::movegen::move_list::{EndgameMoveEntry, EndgameMoveList};
 use crate::principal_variation::PrincipalVariation;
@@ -8,6 +8,7 @@ use crate::thread_data::ThreadData;
 use crate::thread_type::ThreadType;
 use crate::utils::depth;
 use crate::utils::depth::Depth;
+use crate::utils::score_kind::ScoreKind;
 use rusty_renju::notation::color::Color;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
@@ -663,12 +664,8 @@ fn try_vcf<const R: RuleKind, const C: Color, TH: ThreadType, Pf: EndgameProof>(
 
     let mut score_kind = if Pf::COMPLETE_PROOF {
         best_score.is_win().then_some(ScoreKind::LowerBound)
-    } else if best_score >= beta {
-        Some(ScoreKind::LowerBound)
-    } else if best_score > original_alpha {
-        Some(ScoreKind::Exact)
     } else {
-        Some(ScoreKind::UpperBound)
+        Some(ScoreKind::from_alpha_beta(best_score, original_alpha, beta))
     };
 
     if best_score.is_win() && matches!(score_kind, Some(ScoreKind::LowerBound | ScoreKind::Exact))

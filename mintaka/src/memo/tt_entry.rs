@@ -1,3 +1,4 @@
+use crate::utils::score_kind::ScoreKind;
 use rusty_renju::assert_struct_sizes;
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
@@ -8,26 +9,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 const KEY_SIZE: usize = 21;
 const KEY_MASK: u64 = !(u64::MAX << KEY_SIZE as u64);
 const KEY_SHIFT: u64 = 64 - KEY_SIZE as u64;
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-#[repr(u8)]
-pub enum ScoreKind {
-    UpperBound = 1,
-    LowerBound = 2,
-    Exact = 3,
-}
-
-impl From<ScoreKind> for u8 {
-    fn from(score_kind: ScoreKind) -> Self {
-        score_kind as u8
-    }
-}
-
-impl From<ScoreKind> for i32 {
-    fn from(score_kind: ScoreKind) -> Self {
-        score_kind as i32
-    }
-}
 
 // age(5), is_pv(1) , score_kind(2)
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

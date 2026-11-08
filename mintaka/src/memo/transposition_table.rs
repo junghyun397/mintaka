@@ -1,6 +1,7 @@
-use crate::memo::tt_entry::{ScoreKind, TTEntry, TTEntryBucket, TTEntryBucketProbe, TTFlag};
+use crate::memo::tt_entry::{TTEntry, TTEntryBucket, TTEntryBucketProbe, TTFlag};
 use crate::protocol::nodes::Nodes;
 use crate::utils::depth::Depth;
+use crate::utils::score_kind::ScoreKind;
 use rusty_renju::hash_key::HashKey;
 use rusty_renju::notation::pos::MaybePos;
 use rusty_renju::notation::score::{MaybeScore, Score};
