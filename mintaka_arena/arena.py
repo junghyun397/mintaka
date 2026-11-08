@@ -11,8 +11,9 @@ import shlex
 import subprocess
 import sys
 import time
+from collections import deque
 from collections.abc import Iterable
-from contextlib import ExitStack
+from contextlib import ExitStack, suppress
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
@@ -80,13 +81,13 @@ class Config:
         }
 
 
-def create_affinity_queue(config: Config, concurrency: int) -> Queue | None:
+def create_affinity_queue(config: Config, concurrency: int, affinity_pool: list[int] | None = None) -> Queue | None:
     count = config.args.affinity
 
     if sys.platform != "linux" or count is None:
         return None
 
-    cpus = sorted(os.sched_getaffinity(0))
+    cpus = sorted(os.sched_getaffinity(0)) if affinity_pool is None else affinity_pool
     affinity_queue = Queue()
     for slot in range(concurrency):
         affinity_queue.put([cpus[(slot * count + offset) % len(cpus)] for offset in range(min(count, len(cpus)))])
@@ -175,6 +176,12 @@ def color_wdl(result: GameResults) -> tuple[int, int, int]:
     return result[Color.BLACK], result[None], result[Color.WHITE]
 
 
+class EngineError(Exception):
+    def __init__(self, process, message):
+        super().__init__(message)
+        self.process = process
+
+
 @dataclass
 class Engine:
     process: subprocess.Popen
@@ -189,17 +196,19 @@ class Engine:
         response = self.command("gen")
         elapsed_ms = (time.perf_counter_ns() - started) // 1_000_000
         if response is None:
-            raise RuntimeError("engine did not report a search result")
+            raise EngineError(self.process, "engine did not report a search result")
 
         try:
             result = dict(field.strip().split("=", 1) for field in response.split(","))
+
             move = result["pos"]
+
             if self.resource.time_unit == TimeUnit.CLOCK:
                 self.resource.consume(elapsed_ms)
             elif self.resource.total_remaining is not None:
                 self.resource.consume(int(result["nodes"].removesuffix("K")))
         except (KeyError, ValueError) as error:
-            raise RuntimeError(f"invalid search result: {response}") from error
+            raise EngineError(self.process, f"invalid search result: {response}") from error
 
         return move
 
@@ -260,17 +269,29 @@ def spawn_process(path, params, resource: TimeManager, opening: Opening) -> subp
 def command_process(
         process, command: str, filter_prefix: tuple[str, ...],
 ) -> str | None:
-    process.stdin.write(f"{command}\n")
-    process.stdin.flush()
+    recent_output = deque(maxlen=8)
+
+    def engine_exited(context):
+        return EngineError(process, f"engine exited {context}: exit={process.poll()}, output={list(recent_output)!r}")
+
+    try:
+        process.stdin.write(f"{command}\n")
+        process.stdin.flush()
+    except BrokenPipeError as error:
+        raise engine_exited(f"while sending {command!r}") from error
 
     while True:
-        response = process.stdout.readline().rstrip("\r\n")
+        response = process.stdout.readline()
+        if not response:
+            raise engine_exited(f"while handling {command!r}")
+        response = response.rstrip("\r\n")
+        recent_output.append(response[-500:])
 
         if response == "=":
             return None
 
         if response.startswith("?"):
-            raise RuntimeError(f"command: {command}, error: {response[2:]}")
+            raise EngineError(process, f"command: {command}, error: {response[1:].strip()}")
 
         if response.startswith("=\x02"):
             chunks = []
@@ -297,6 +318,7 @@ def play_game(
     winner = None
 
     with ExitStack() as stack:
+        stack.enter_context(suppress(BrokenPipeError))
         engines = {}
 
         for player, (path, params, resource) in path_params_resource.items():
@@ -305,30 +327,36 @@ def play_game(
 
             engines[player] = Engine(process, copy.copy(resource), log_prefix_filter)
 
-        player = first_player
-        for _ in range(draw_in):
-            engine = engines[player]
-            move = engine.generate()
-            if move == "none":
-                winner = (player.flip(), colors[player.flip()])
-                break
+        history = opening.sequence
+        try:
+            player = first_player
+            for _ in range(draw_in):
+                engine = engines[player]
+                move = engine.generate()
+                if move == "none":
+                    winner = (player.flip(), colors[player.flip()])
+                    break
 
-            result = engine.command(f"play {move}")
-            opponent_result = engines[player.flip()].command(f"play {move}")
+                result = engine.command(f"play {move}")
+                opponent_result = engines[player.flip()].command(f"play {move}")
 
-            if result != opponent_result:
-                raise RuntimeError(f"player_winner={result}, opponent_winner={opponent_result}")
+                history += move
 
-            if result is not None:
-                if result not in ("draw", "full"):
-                    winner_color = Color(result.split()[0].capitalize())
-                    winner = next((side, color) for side, color in colors.items() if color == winner_color)
-                break
+                if result != opponent_result:
+                    raise RuntimeError(f"player_winner={result}, opponent_winner={opponent_result}")
 
-            engine.apply_increment()
-            player = player.flip()
+                if result is not None:
+                    if result not in ("draw", "full"):
+                        winner_color = Color(result.split()[0].capitalize())
+                        winner = next((side, color) for side, color in colors.items() if color == winner_color)
+                    break
 
-        history = engines[Player.BASE].command("history")
+                engine.apply_increment()
+                player = player.flip()
+        except EngineError as error:
+            loser = next(side for side, engine in engines.items() if engine.process is error.process)
+            winner = (loser.flip(), colors[loser.flip()])
+            logging.error(f"Arena engine failed: player={loser}, history={history}, error={error}")
 
         if logging.getLogger().isEnabledFor(logging.DEBUG):
             board = engines[Player.BASE].command("board")

@@ -1,6 +1,5 @@
 import json
 import logging
-import secrets
 import signal
 import sys
 import threading
@@ -39,17 +38,33 @@ def request_json(address, path, data=None, timeout=None):
 @dataclass
 class RemoteWorker:
     address: str
-    run_id: str
+    key: str
+
+    @classmethod
+    def acquire(cls, address, timeout=None):
+        allocation = request_json(address, "/acquire", {}, timeout=timeout)
+        return cls(address, allocation["key"])
+
+    def start(self, count, sources, settings, timeout=None):
+        request_json(self.address, "/start", {
+            "key": self.key,
+            "workers": count,
+            "sources": {
+                str(player): source.to_json() if isinstance(source, binary_manager.Source) else source
+                for player, source in sources.items()
+            },
+            "settings": settings,
+        }, timeout=timeout)
 
     def play(self, opening, timeout=None):
         return arena.PairResult.from_json(request_json(self.address, "/play", {
-            "run_id": self.run_id,
+            "key": self.key,
             "opening": opening.to_json(),
         }, timeout=timeout))
 
     def stop(self, timeout=None):
         try:
-            request_json(self.address, "/stop", {"run_id": self.run_id}, timeout=timeout)
+            request_json(self.address, "/stop", {"key": self.key}, timeout=timeout)
         except HTTPError as error:
             if error.status != 409:
                 raise
@@ -92,7 +107,6 @@ def finish_on_interrupt():
 class WorkerManager:
     def __init__(self, config: arena.Config):
         self.config = config
-        self.run_id = secrets.token_hex(16)
         self.workers: list[Worker] = []
         self.lock = threading.Lock()
         self.executor = None
@@ -134,37 +148,30 @@ class WorkerManager:
             logging.warning(f"Arena concurrency: requested={requested}, available={concurrency}")
 
     def start_worker(self, address, count, sources, settings):
-        remote = None
         if address == "local":
             config = binary_manager.build_config(sources, settings)
             affinity_queue = arena.create_affinity_queue(config, count)
-            play = partial(arena.play_pair, config, affinity_queue=affinity_queue)
-        else:
-            remote = RemoteWorker(address, self.run_id)
-            play = partial(remote.play, timeout=self.config.args.timeout_play)
+            worker = Worker(count, partial(arena.play_pair, config, affinity_queue=affinity_queue))
+            with self.lock:
+                self.workers.append(worker)
+            logging.info(f"Arena workers: {address}={count}")
+            return
 
-        worker = Worker(count, play, remote)
+        try:
+            remote = RemoteWorker.acquire(address, timeout=self.config.args.timeout_start)
+        except Exception as error:
+            logging.warning(f"Arena skipping {address}: {error}")
+            return
+
+        worker = Worker(count, partial(remote.play, timeout=self.config.args.timeout_play), remote)
         with self.lock:
             self.workers.append(worker)
-        if remote is not None:
-            try:
-                request_json(address, "/start", {
-                    "run_id": self.run_id,
-                    "workers": count,
-                    "sources": {
-                        str(player): source.to_json() if isinstance(source, binary_manager.Source) else source
-                        for player, source in sources.items()
-                    },
-                    "settings": settings,
-                }, timeout=self.config.args.timeout_start)
-            except Exception as error:
-                if isinstance(error, HTTPError) and error.status == 409:
-                    with self.lock:
-                        self.workers.remove(worker)
-                    logging.warning(f"Arena skipping {address}: {error}")
-                else:
-                    self.disable_worker(worker, error)
-                return
+
+        try:
+            remote.start(count, sources, settings, timeout=self.config.args.timeout_start)
+        except Exception as error:
+            self.disable_worker(worker, error)
+            return
 
         logging.info(f"Arena workers: {address}={count}")
 
@@ -178,6 +185,16 @@ class WorkerManager:
         logging.warning(f"Arena disabled {worker.remote.address}: "
                         f"removed concurrency={removed}, adjusted concurrency={self.concurrency}: {error}")
 
+    def submit_openings(self, openings, pending, next_opening):
+        with self.lock:
+            for worker in self.workers:
+                while worker.active < worker.concurrency and next_opening < self.config.args.max_openings:
+                    future = self.executor.submit(self.play, worker, openings[next_opening])
+                    pending[future] = worker, next_opening
+                    worker.active += 1
+                    next_opening += 1
+        return next_opening
+
     def results(self, openings: list[arena.Opening]) -> Iterator[arena.PairResult]:
         pending = {}
         completed = {}
@@ -186,13 +203,7 @@ class WorkerManager:
 
         try:
             while True:
-                with self.lock:
-                    for worker in self.workers:
-                        while worker.active < worker.concurrency and next_opening < self.config.args.max_openings:
-                            future = self.executor.submit(self.play, worker, openings[next_opening])
-                            pending[future] = worker, next_opening
-                            worker.active += 1
-                            next_opening += 1
+                next_opening = self.submit_openings(openings, pending, next_opening)
 
                 if not pending:
                     if self.concurrency == 0:
@@ -227,21 +238,28 @@ class WorkerManager:
                 raise
             self.disable_worker(worker, error)
 
+    def stop_worker(self, worker):
+        if worker.remote is None:
+            return None
+
+        try:
+            worker.remote.stop(timeout=5 if worker.concurrency == 0 else None)
+        except Exception as error:
+            if worker.concurrency == 0:
+                logging.warning(f"Arena stop failed for {worker.remote.address}: {error}")
+                return None
+            logging.error(f"Arena stop failed for {worker.remote.address}: {error}")
+            return error
+
+    @finish_on_interrupt()
     def __exit__(self, exc_type, exc_value, traceback):
+        if self.executor is not None:
+            self.executor.shutdown(wait=True, cancel_futures=True)
+
         cleanup_error = None
-        with finish_on_interrupt():
-            if self.executor is not None:
-                self.executor.shutdown(wait=True, cancel_futures=True)
-            for worker in self.workers:
-                if worker.remote is None:
-                    continue
-                try:
-                    worker.remote.stop(timeout=5 if worker.concurrency == 0 else None)
-                except Exception as error:
-                    if worker.concurrency == 0:
-                        logging.warning(f"Arena stop failed for {worker.remote.address}: {error}")
-                    else:
-                        logging.error(f"Arena stop failed for {worker.remote.address}: {error}")
-                        cleanup_error = cleanup_error or error
+        for worker in self.workers:
+            error = self.stop_worker(worker)
+            cleanup_error = cleanup_error or error
+
         if exc_type is None and cleanup_error is not None:
             raise cleanup_error

@@ -2,9 +2,11 @@ import argparse
 import json
 import logging
 import os
+import secrets
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import Enum, auto
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from queue import Queue
 
@@ -13,33 +15,46 @@ from . import binary_manager
 from . import worker_manager
 
 
+class RunState(Enum):
+    PREPARING = auto()
+    STOPPING = auto()
+
+
 @dataclass
 class Run:
-    run_id: str
-    workers: int
+    key: str
+    workers: int = 0
     config: arena.Config | None = None
     affinity_queue: Queue | None = None
-    preparing: bool = True
-    stopping: bool = False
+    state: RunState | None = None
     active: int = 0
-    last_pair_finished: float | None = None
+    idle_since: float | None = field(default_factory=time.monotonic)
 
 
 class ArenaWorker(ThreadingHTTPServer):
     daemon_threads = False
 
-    def __init__(self, address, max_workers):
-        super().__init__(address, ArenaWorkerHandler)
+    def __init__(self, address, max_workers, affinity_pool=None):
         self.max_workers = max_workers
+        self.affinity_pool = affinity_pool
         self.lock = threading.Condition()
         self.run = None
+        self.closing = False
+        super().__init__(address, ArenaWorkerHandler)
+
+    def server_close(self):
+        with self.lock:
+            self.closing = True
+            self.lock.notify_all()
+        super().server_close()
 
     def service_actions(self):
         with self.lock:
             run = self.run
-            if (run is not None and not run.active and run.last_pair_finished is not None
-                    and time.monotonic() - run.last_pair_finished >= 5):
-                self.stop({"run_id": run.run_id})
+            if run is None or run.active or run.idle_since is None:
+                return
+            if time.monotonic() - run.idle_since >= 5:
+                self.stop({"key": run.key})
 
     def status(self):
         with self.lock:
@@ -47,52 +62,65 @@ class ArenaWorker(ThreadingHTTPServer):
                 raise worker_manager.HTTPError(409, "worker is busy")
             return self.max_workers
 
-    def start(self, data):
-        run_id, workers = data["run_id"], data["workers"]
-
-        if workers > self.max_workers:
-            raise worker_manager.HTTPError(400, f"requested workers={workers} exceeds max-workers={self.max_workers}")
-
-        sources = {
-            arena.Player[name.upper()]: binary_manager.Source.from_json(source) if isinstance(source, dict) else source
-            for name, source in data["sources"].items()
-        }
-
+    def acquire(self, _):
         with self.lock:
             if self.run is not None:
                 raise worker_manager.HTTPError(409, "worker is busy")
-            run = Run(run_id, workers)
-            self.run = run
+            self.run = Run(secrets.token_hex(16))
+            return {"key": self.run.key}
+
+    def reserve(self, _):
+        with self.lock:
+            self.lock.wait_for(lambda: self.run is None or self.closing)
+            if self.closing:
+                raise worker_manager.HTTPError(503, "worker is shutting down")
+            return self.max_workers
+
+    def start(self, data):
+        with self.lock:
+            run = self.owned_run(data["key"])
+            if run.state is not None or run.config is not None:
+                raise worker_manager.HTTPError(409, "run cannot be started")
+
+            workers = data["workers"]
+            if not isinstance(workers, int) or not 0 < workers <= self.max_workers:
+                raise worker_manager.HTTPError(400, f"workers must be between 1 and {self.max_workers}")
+
+            run.workers = workers
+            run.state = RunState.PREPARING
+            run.active += 1
 
         try:
-            logging.info(f"Arena Worker [{run_id}]: preparing {workers} workers")
+            logging.info(f"Arena Worker [{run.key}]: preparing {workers} workers")
 
-            binary_manager.fetch(
-                source.ref for source in sources.values()
-                if isinstance(source, binary_manager.Source)
-                and not source.cache_path(arena.Rule(data["settings"]["rule"])).is_file()
-            )
+            sources = {
+                arena.Player[name.upper()]: binary_manager.Source.from_json(source) if isinstance(source, dict) else source
+                for name, source in data["sources"].items()
+            }
 
             run.config = binary_manager.build_config(sources, data["settings"])
-            run.affinity_queue = arena.create_affinity_queue(run.config, workers)
+            run.affinity_queue = arena.create_affinity_queue(run.config, workers, self.affinity_pool)
         except BaseException:
             with self.lock:
-                self.run = None
+                run.state = RunState.STOPPING
             raise
         finally:
             with self.lock:
-                run.preparing = False
+                run.active -= 1
+                if run.state is RunState.PREPARING:
+                    run.state = None
+                run.idle_since = time.monotonic() if run.state is RunState.STOPPING else None
                 self.lock.notify_all()
 
         with self.lock:
-            if run.stopping:
+            if run.state is RunState.STOPPING:
                 raise worker_manager.HTTPError(409, "run is stopping")
 
-        logging.info(f"Arena Worker [{run_id}]: started {workers} workers")
+        logging.info(f"Arena Worker [{run.key}]: started {workers} workers")
         return {"workers": workers}
 
-    def owned_run(self, run_id):
-        if self.run is None or self.run.run_id != run_id:
+    def owned_run(self, key):
+        if self.run is None or self.run.key != key:
             raise worker_manager.HTTPError(409, "run does not own this worker")
         return self.run
 
@@ -100,9 +128,9 @@ class ArenaWorker(ThreadingHTTPServer):
         opening = arena.Opening.from_json(data["opening"])
 
         with self.lock:
-            run = self.owned_run(data["run_id"])
+            run = self.owned_run(data["key"])
 
-            if run.preparing or run.stopping:
+            if run.config is None or run.state is not None:
                 raise worker_manager.HTTPError(409, "run is not accepting games")
 
             if run.active >= run.workers:
@@ -111,20 +139,20 @@ class ArenaWorker(ThreadingHTTPServer):
             run.active += 1
 
         try:
-            logging.info(f"Arena Play [{run.run_id}]: opening={opening.sequence}")
+            logging.info(f"Arena Play [{run.key}]: opening={opening.sequence}")
 
             pair = arena.play_pair(run.config, opening, run.affinity_queue)
         except BaseException:
             with self.lock:
-                run.stopping = True
+                run.state = RunState.STOPPING
             raise
         finally:
             with self.lock:
                 run.active -= 1
-                run.last_pair_finished = time.monotonic()
+                run.idle_since = time.monotonic()
                 self.lock.notify_all()
 
-        logging.info(f"Arena Plied [{run.run_id}]: opening={opening.sequence}, "
+        logging.info(f"Arena Plied [{run.key}]: opening={opening.sequence}, "
                      f"base={pair.snapshots[arena.Player.BASE].history}, "
                      f"target={pair.snapshots[arena.Player.TARGET].history}")
 
@@ -132,13 +160,14 @@ class ArenaWorker(ThreadingHTTPServer):
 
     def stop(self, data):
         with self.lock:
-            run = self.owned_run(data["run_id"])
-            run.stopping = True
-            self.lock.wait_for(lambda: not run.preparing and not run.active)
+            run = self.owned_run(data["key"])
+            run.state = RunState.STOPPING
+            self.lock.wait_for(lambda: not run.active)
             if self.run is run:
                 self.run = None
+                self.lock.notify_all()
 
-        logging.info(f"Arena Worker [{run.run_id}]: stopped")
+        logging.info(f"Arena Worker [{run.key}]: stopped")
         return {"stopped": True}
 
 
@@ -168,6 +197,8 @@ class ArenaWorkerHandler(BaseHTTPRequestHandler):
 
         self.dispatch(
             {
+                "/acquire": self.server.acquire,
+                "/reserve": self.server.reserve,
                 "/start": self.server.start,
                 "/play": self.server.play,
                 "/stop": self.server.stop,
@@ -196,15 +227,23 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--address", type=str, default="0.0.0.0")
-    parser.add_argument("--max-workers", type=int, default=os.cpu_count() or 1)
-    parser.add_argument("--port", type=int, default=8095)
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--max-workers", type=int)
+    group.add_argument("--affinity-pool", type=int, nargs="+")
+
+    parser.add_argument("--port", type=int, default=8051)
     parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO")
 
     args = parser.parse_args()
     arena.configure_logging(args.log_level)
 
-    with ArenaWorker((args.address, args.port), args.max_workers) as worker:
-        logging.info(f"Arena worker: address={args.address}, port={args.port}, max-workers={args.max_workers}")
+    max_workers = args.max_workers if args.max_workers is not None \
+        else len(args.affinity_pool) if args.affinity_pool is not None \
+        else (os.cpu_count() or 1)
+
+    with ArenaWorker((args.address, args.port), max_workers, args.affinity_pool) as worker:
+        logging.info(f"Arena worker: address={args.address}, port={args.port}, max-workers={max_workers}")
         try:
             worker.serve_forever()
         except KeyboardInterrupt:
@@ -213,7 +252,7 @@ def main():
             logging.info("Arena worker: shutting down")
             with worker.lock:
                 if worker.run is not None:
-                    worker.run.stopping = True
+                    worker.run.state = RunState.STOPPING
 
 
 if __name__ == "__main__":

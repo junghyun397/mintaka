@@ -3,9 +3,16 @@ All scripts must be run from **project root**.
 
 ## Arena Remote Worker
 
+### python
 ```shell
-export ADDRESS=0.0.0.0 PORT=8095 CONCURRENCY=8
-docker compose -f mintaka_arena/compose.yml up --build -d
+python3 -m mintaka_arena.arena_worker --address 127.0.0.1 --port 8051 --affinity-pool 0 1 2 3
+python3 -m mintaka_arena.arena_worker --address 127.0.0.1 --port 8052 --affinity-pool 4 5 6 7
+```
+
+### Docker
+```shell
+export ADDRESS=0.0.0.0 PORT="8051 8052" AFFINITY_MATRIX="0,1,2,3 4,5,6,7"
+docker compose -f mintaka_arena/compose.yml up --build
 ```
 
 ## sprt.py Sequential Probability Ratio Tester

@@ -1,14 +1,29 @@
 import argparse
 import base64
+import fcntl
 import hashlib
 import logging
 import shutil
 import subprocess
 import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
 from . import arena
+
+
+@contextmanager
+def build_lock():
+    path = Path("artifacts/arena.lock")
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    with path.open("a+b") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 def add_build_arguments(parser: argparse.ArgumentParser):
@@ -79,6 +94,7 @@ class Source:
         return cls(data["ref"], data["commit"], patch)
 
 
+@build_lock()
 def prepare_sources(args) -> dict[arena.Player, Source | str]:
     refs = {
         player: parse_ref(getattr(args, f"{player}_ref") or "origin/master")
@@ -103,6 +119,7 @@ def prepare_sources(args) -> dict[arena.Player, Source | str]:
     return sources
 
 
+@build_lock()
 def build_binary(source: Source, rule: arena.Rule = arena.Rule.RENJU) -> Path:
     key = source.key()
 
@@ -113,6 +130,7 @@ def build_binary(source: Source, rule: arena.Rule = arena.Rule.RENJU) -> Path:
         return cached
 
     logging.info(f"Arena building: {key}")
+    fetch([source.ref])
     cached.parent.mkdir(parents=True, exist_ok=True)
     target = Path("target/arena").absolute()
     with tempfile.TemporaryDirectory(dir=cached.parent) as directory:
@@ -126,7 +144,9 @@ def build_binary(source: Source, rule: arena.Rule = arena.Rule.RENJU) -> Path:
                  "--bin", binary_name, "--target-dir", str(target)],
                 cwd=worktree, check=True,
             )
-            shutil.copy2(target / "release" / binary_name, cached)
+            staged = Path(directory) / binary_name
+            shutil.copy2(target / "release" / binary_name, staged)
+            staged.replace(cached)
         finally:
             git("worktree", "remove", "--force", str(worktree))
     return cached

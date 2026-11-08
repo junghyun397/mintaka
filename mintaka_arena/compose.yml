@@ -5,11 +5,12 @@ services:
       context: ..
       dockerfile: mintaka_arena/Dockerfile
     image: mintaka-arena-worker:latest
-    command: ["--address", "0.0.0.0", "--port", "${PORT:-8095}"]
+    network_mode: host
     environment:
       CARGO_INCREMENTAL: "1"
-    ports:
-      - ${ADDRESS:-0.0.0.0}:${PORT:-8095}:${PORT:-8095}
+      AFFINITY_MATRIX: ${AFFINITY_MATRIX:-}
+      PORTS: ${PORTS}
+      ADDRESS: ${ADDRESS:-0.0.0.0}
     volumes:
       - ../compose-arena-data/artifacts:/app/mintaka/artifacts
       - ../compose-arena-data/target:/app/mintaka/target

@@ -1,6 +1,7 @@
-FROM rust:bookwarm
+FROM rust:bookworm
 
-RUN apk add --no-cache build-base git openssh-client python3
+RUN apt-get update && apt-get install -y --no-install-recommends git openssh-client python3 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/mintaka
 
@@ -10,4 +11,4 @@ COPY . .
 
 RUN rustup toolchain install --profile minimal
 
-ENTRYPOINT ["python3", "-m", "mintaka_arena.arena_worker"]
+ENTRYPOINT ["bash", "/app/mintaka/mintaka_arena/docker.sh"]

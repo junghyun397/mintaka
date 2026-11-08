@@ -63,7 +63,7 @@ resource "google_compute_firewall" "controller" {
 
   allow {
     protocol = "tcp"
-    ports    = ["22", "8095"]
+    ports    = ["22", "8051"]
   }
 }
 
@@ -117,7 +117,7 @@ resource "google_compute_instance" "arena" {
       CLOUDSDK_COMPUTE_ZONE = self.zone
       INSTANCE              = self.name
       ARCHIVE               = var.archive
-      WORKER_ADDRESS        = "http://${self.network_interface[0].access_config[0].nat_ip}:8095"
+      WORKER_ADDRESS        = "http://${self.network_interface[0].access_config[0].nat_ip}:8051"
     }
     command = <<-SCRIPT
       set -e
@@ -133,5 +133,5 @@ resource "google_compute_instance" "arena" {
 }
 
 output "worker_addresses" {
-  value = [for instance in google_compute_instance.arena : "http://${instance.network_interface[0].access_config[0].nat_ip}:8095"]
+  value = [for instance in google_compute_instance.arena : "http://${instance.network_interface[0].access_config[0].nat_ip}:8051"]
 }
