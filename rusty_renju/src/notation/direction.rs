@@ -11,6 +11,10 @@ pub enum Direction {
     Descending = 3
 }
 
+impl Direction {
+    pub const ALL: [Self; 4] = [Self::Horizontal, Self::Vertical, Self::Ascending, Self::Descending];
+}
+
 impl From<u8> for Direction {
     fn from(value: u8) -> Self {
         debug_assert!(value < 4);
@@ -39,7 +43,7 @@ impl<T> DirectionContainer<T> {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (Direction, &T)> {
-        [Direction::Horizontal, Direction::Vertical, Direction::Ascending, Direction::Descending]
+        Direction::ALL
             .map(|direction| (direction, &self[direction]))
             .into_iter()
     }

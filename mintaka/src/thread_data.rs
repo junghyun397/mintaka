@@ -5,16 +5,77 @@ use crate::game_state::RecoveryState;
 use crate::memo::history_table::HistoryTable;
 use crate::memo::transposition_table::TTView;
 use crate::params;
+use crate::principal_variation::PrincipalVariation;
+use crate::search::SearchResult;
 use crate::thread_type::ThreadType;
 use crate::utils::depth;
 use crate::utils::depth::Depth;
+use crate::utils::score_kind::ScoreKind;
 use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::{MaybeScore, Score};
+use std::cmp::Reverse;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 pub const KILLER_MOVE_SLOTS: usize = 2;
+
+#[derive(Copy, Clone)]
+pub struct RootMove {
+    pub pos: Pos,
+    pub nodes: u64,
+    pub score: Score,
+    pub score_kind: ScoreKind,
+    pub pv: PrincipalVariation,
+    pub depth: Depth,
+    pub selective_depth: Depth,
+}
+
+impl RootMove {
+    pub fn new(pos: Pos) -> Self {
+        let mut pv = PrincipalVariation::EMPTY;
+        pv.set(pos);
+
+        Self {
+            pos,
+            nodes: 0,
+            score: Score::NEG_INF,
+            score_kind: ScoreKind::UpperBound,
+            pv,
+            depth: Depth::ZERO,
+            selective_depth: Depth::ZERO,
+        }
+    }
+
+    pub fn update(
+        &mut self,
+        score: Score,
+        child_pv: &PrincipalVariation,
+        depth: Depth,
+        selective_depth: Depth,
+        alpha: Score,
+        beta: Score,
+    ) {
+        self.score = score;
+
+        self.score_kind = ScoreKind::from_alpha_beta(score, alpha, beta);
+
+        self.pv.update(self.pos, child_pv);
+        self.depth = depth;
+        self.selective_depth = selective_depth;
+    }
+}
+
+impl From<&RootMove> for SearchResult {
+    fn from(root_move: &RootMove) -> Self {
+        SearchResult {
+            score: root_move.score,
+            pv: root_move.pv,
+            depth: root_move.depth,
+            selective_depth: root_move.selective_depth,
+        }
+    }
+}
 
 #[derive(Debug, Copy, Clone)]
 pub struct SearchFrame {
@@ -70,7 +131,8 @@ pub struct ThreadData<'a, const R: RuleKind, TH: ThreadType> {
 
     pub lmr_table: Box<[[Depth; depth::MAX_PLY_SLOTS]; 64]>,
 
-    pub root_exact_nodes: [u64; pos::BOARD_SIZE],
+    pub root_moves: Vec<RootMove>,
+    pub root_indexes: [u8; pos::BOARD_SIZE],
     pub singular_root: bool,
 
     pub batch_counter: BatchCounter<'a>,
@@ -106,7 +168,8 @@ impl<'a, const R: RuleKind, TH: ThreadType> ThreadData<'a, R, TH> {
             killers: Box::new([[MaybePos::NONE; 2]; depth::MAX_PLY_SLOTS]),
             lmr_table: Box::new(build_lmr_table(config)),
             debug_statics: Box::new([DebugStatics::EMPTY; depth::MAX_PLY_SLOTS]),
-            root_exact_nodes: [0; pos::BOARD_SIZE],
+            root_moves: Vec::with_capacity(pos::BOARD_SIZE),
+            root_indexes: [u8::MAX; pos::BOARD_SIZE],
             singular_root: false,
             batch_counter: BatchCounter::new(global_counter_in_1k),
             aborted,
@@ -117,6 +180,30 @@ impl<'a, const R: RuleKind, TH: ThreadType> ThreadData<'a, R, TH> {
 
     pub fn should_check_limit(&self) -> bool {
         self.batch_counter.buffer_zero()
+    }
+
+    pub fn clear_root_moves(&mut self) {
+        self.root_moves.clear();
+        self.root_indexes.fill(u8::MAX);
+    }
+
+    pub fn ensure_root_move(&mut self, pos: Pos) {
+        if self.root_indexes[pos.idx_usize()] == u8::MAX {
+            self.root_indexes[pos.idx_usize()] = self.root_moves.len() as u8;
+            self.root_moves.push(RootMove::new(pos));
+        }
+    }
+
+    pub fn sort_root_moves(&mut self) {
+        self.root_moves.sort_by_key(|root_move| Reverse((
+            root_move.score_kind != ScoreKind::UpperBound,
+            root_move.depth,
+            root_move.score,
+        )));
+
+        for (index, root_move) in self.root_moves.iter().enumerate() {
+            self.root_indexes[root_move.pos.idx_usize()] = index as u8;
+        }
     }
 
     pub fn search_limit_exceeded(&self) -> bool {

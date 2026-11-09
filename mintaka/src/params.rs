@@ -38,6 +38,11 @@ pub const LMP_DIV_NON_IMPROVING: f64 = parse_float!("lmp_div_non_improving", f64
 pub const FP_BASE: i32 = parse_int!("fp_base", i32, 100);
 pub const FP_MUL: i32 = parse_int!("fp_mul", i32, 32);
 
+pub const RFP_MAX_DEPTH: Depth = Depth::from_i32(parse_int!("rfp_max_depth", i32, 8));
+pub const RFP_BASE: i32 = parse_int!("rfp_base", i32, 48);
+pub const RFP_MUL: i32 = parse_int!("rfp_mul", i32, 64);
+pub const RFP_IMPROVING: i32 = parse_int!("rfp_improving", i32, 32);
+
 pub const RAZORING_MAX_DEPTH_LEFT: Depth = Depth::from_i32(parse_int!("razoring_max_depth", i32, 2));
 pub const RAZORING_MARGIN: [Score; 5] =
     [

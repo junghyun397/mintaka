@@ -1,15 +1,15 @@
 use crate::bitfield::Bitfield;
 use crate::notation::color::Color;
 use crate::notation::direction::Direction;
+use crate::notation::pos;
+use crate::notation::rule::RuleKind;
 use crate::pattern::Pattern;
-use crate::{pattern, slice};
 use crate::slice_pattern::SlicePattern;
 use crate::step_idx;
 use crate::utils::empty::Empty;
-use std::simd::cmp::SimdPartialEq;
+use crate::{pattern, slice};
 use std::simd::Simd;
-use crate::notation::pos;
-use crate::notation::rule::RuleKind;
+use std::simd::cmp::SimdPartialEq;
 
 #[derive(Debug, Copy, Clone)]
 #[repr(align(32))]
@@ -161,8 +161,7 @@ impl<const R: RuleKind> PatternIndex<R> {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", inline(never))]
-#[cfg_attr(not(target_arch = "wasm32"), inline(always))]
+#[inline(always)]
 fn pattern_bitmask(patterns: Simd<u8, 16>, mask: u8) -> u16 {
     (patterns & Simd::splat(mask))
         .simd_ne(Simd::splat(0))

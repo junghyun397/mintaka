@@ -8,9 +8,9 @@ services:
     network_mode: host
     environment:
       CARGO_INCREMENTAL: "1"
-      AFFINITY_MATRIX: ${AFFINITY_MATRIX:-}
-      PORTS: ${PORTS}
-      ADDRESS: ${ADDRESS:-0.0.0.0}
+      AFFINITY_MATRIX: "${AFFINITY_MATRIX:-0,1,2,3 4,5,6,7}"
+      PORTS: "${PORTS:-8051 8052}"
+      ADDRESS: "${ADDRESS:-0.0.0.0}"
     volumes:
       - ../compose-arena-data/artifacts:/app/mintaka/artifacts
       - ../compose-arena-data/target:/app/mintaka/target

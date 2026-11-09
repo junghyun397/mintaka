@@ -7,7 +7,7 @@ use rusty_renju::notation::pos;
 use rusty_renju::notation::pos::{MaybePos, Pos};
 use rusty_renju::notation::rule::RuleKind;
 use rusty_renju::notation::score::Score;
-use rusty_renju::pattern::Pattern;
+use rusty_renju::pattern::{Pattern, Threat};
 use rusty_renju::slice::{self, Slice, Slices};
 use rusty_renju::utils::empty::Empty;
 use rusty_renju::{const_for, pattern};
@@ -27,6 +27,8 @@ pub struct HeuristicEvaluator<const R: RuleKind> {
 }
 
 impl<const R: RuleKind> HeuristicEvaluator<R> {
+    const SCORE_LUT: [[PatternScore; SCORE_LUT_SIZE]; 2] = build_score_lut::<R>();
+
     pub fn from_state(state: &GameState<R>) -> Self {
         let mut evaluator = Self {
             pattern_scores: [ColorContainer::splat(PatternScore::ZERO); pattern::PATTERN_SIZE],
@@ -46,8 +48,10 @@ impl<const R: RuleKind> HeuristicEvaluator<R> {
         self.line_scores.init::<R>(&board.slices);
 
         for idx in 0 .. pos::BOARD_SIZE {
-            for color in [Color::Black, Color::White] {
-                self.pattern_scores[idx][color] = PatternScore::from_pattern(board.patterns.field[color][idx]);
+            for color in Color::ALL {
+                self.pattern_scores[idx][color] = Self::pattern_score(
+                    board.patterns.field[color][idx], color,
+                );
             }
 
             self.pattern_score_black += self.pattern_scores[idx][Color::Black].value as i32
@@ -56,19 +60,11 @@ impl<const R: RuleKind> HeuristicEvaluator<R> {
     }
 
     pub fn play(&mut self, board: &Board<R>, artifact: MoveArtifact, plied: MaybePos) {
-        if let Some(plied) = plied.ok() {
-            self.update(board, artifact, plied);
-        }
-
-        self.hash_key = board.hash_key;
+        self.update(board, artifact, plied);
     }
 
     pub fn undo(&mut self, board: &Board<R>, artifact: MoveArtifact, removed: MaybePos) {
-        if let Some(removed) = removed.ok() {
-            self.update(board, artifact, removed);
-        }
-
-        self.hash_key = board.hash_key;
+        self.update(board, artifact, removed);
     }
 
     pub fn require_stabilize(&self) -> bool {
@@ -126,12 +122,19 @@ impl<const R: RuleKind> HeuristicEvaluator<R> {
         score
     }
 
-    fn update(&mut self, board: &Board<R>, artifact: MoveArtifact, plied: Pos) {
-        let black_delta = self.update_color::<{ Color::Black }>(board, &artifact, plied);
-        let white_delta = self.update_color::<{ Color::White }>(board, &artifact, plied);
+    fn pattern_score(pattern: Pattern, color: Color) -> PatternScore {
+        Self::SCORE_LUT[color as usize][pattern_key(pattern)]
+    }
 
-        self.pattern_score_black += black_delta - white_delta;
-        self.line_scores.update::<R>(&board.slices, plied);
+    fn update(&mut self, board: &Board<R>, artifact: MoveArtifact, changed: MaybePos) {
+        if let Some(pos) = changed.ok() {
+            self.pattern_score_black += self.update_color::<{ Color::Black }>(board, &artifact, pos)
+                - self.update_color::<{ Color::White }>(board, &artifact, pos);
+
+            self.line_scores.update::<R>(&board.slices, pos);
+        }
+
+        self.hash_key = board.hash_key;
     }
 
     #[inline(always)]
@@ -159,7 +162,7 @@ impl<const R: RuleKind> HeuristicEvaluator<R> {
             changed_bitmap &= changed_bitmap - 1;
 
             let pos = start_pos.directional_offset_unchecked(D, slice_idx as isize);
-            let score = PatternScore::from_pattern(board.patterns.field[C][pos.idx_usize()]);
+            let score = Self::pattern_score(board.patterns.field[C][pos.idx_usize()], C);
             let old_score = std::mem::replace(&mut self.pattern_scores[pos.idx_usize()][C], score);
 
             score_delta += score.value as i32 - old_score.value as i32;
@@ -213,6 +216,9 @@ fn can_counter_attack<const R: RuleKind>(board: &Board<R>) -> bool {
 const WINDOW_LENGTH: u8 = 5;
 const WINDOW_MASK: u16 = (1 << WINDOW_LENGTH) - 1;
 const WINDOW_LUT_SIZE: usize = 1 << (WINDOW_LENGTH * 2);
+const RENJU_BLACK_WINDOW_LENGTH: u8 = WINDOW_LENGTH + 2;
+const RENJU_BLACK_WINDOW_MASK: u32 = (1 << RENJU_BLACK_WINDOW_LENGTH) - 1;
+const RENJU_WINDOW_LUT_SIZE: usize = 1 << (RENJU_BLACK_WINDOW_LENGTH + WINDOW_LENGTH);
 const MAX_LINE_WINDOWS: usize = pos::U_BOARD_WIDTH - WINDOW_LENGTH as usize + 1;
 
 #[derive(Clone)]
@@ -293,46 +299,70 @@ fn direction_offset(direction: Direction) -> usize {
     }
 }
 
-static WINDOW_LUT: [i16; WINDOW_LUT_SIZE] = build_window_lut();
+static WINDOW_LUT: [i16; WINDOW_LUT_SIZE] = build_window_lut::<{ RuleKind::Freestyle }, WINDOW_LUT_SIZE>();
+static RENJU_WINDOW_LUT: [i16; RENJU_WINDOW_LUT_SIZE] = build_window_lut::<{ RuleKind::Renju }, RENJU_WINDOW_LUT_SIZE>();
 
-const fn build_window_lut() -> [i16; WINDOW_LUT_SIZE] {
-    const STONE_VALUE: [i16; WINDOW_LENGTH as usize + 1] = [0, 3, 15, 42, 160, 2400];
-    let mut lut = [0; WINDOW_LUT_SIZE];
+const fn build_window_lut<const R: RuleKind, const SIZE: usize>() -> [i16; SIZE] {
+    const STONE_VALUES: [i16; WINDOW_LENGTH as usize + 1] = [0, 3, 15, 42, 160, 2400];
+    const RENJU_VALUES: [i16; WINDOW_MASK as usize + 1] = [
+        0, 10, 0, 16, 0, 19, 8, 60,
+        0, 15, 11, 63, 8, 50, 56, 160,
+        10, 19, 15, 50, 19, 52, 50, 160,
+        16, 50, 63, 160, 60, 160, 160, 2400,
+    ];
 
-    const_for!(key in 0, WINDOW_LUT_SIZE; {
-        let black = key & WINDOW_MASK as usize;
-        let white = key >> WINDOW_LENGTH;
+    let renju = matches!(R, RuleKind::Renju);
+    let black_shift = if renju { 1 } else { 0 };
+    let white_shift = if renju { RENJU_BLACK_WINDOW_LENGTH } else { WINDOW_LENGTH };
+    let neighbor_count = if renju { 4 } else { 1 };
+    let mut lut = [0; SIZE];
 
-        lut[key] = if white == 0 {
-            STONE_VALUE[black.count_ones() as usize]
-        } else if black == 0 {
-            -STONE_VALUE[white.count_ones() as usize]
+    const_for!(mask in 0, WINDOW_MASK as usize + 1; {
+        let value = if renju {
+            RENJU_VALUES[mask]
         } else {
-            0
+            STONE_VALUES[mask.count_ones() as usize]
         };
+
+        lut[mask << black_shift] = value;
+
+        const_for!(neighbors in 0, neighbor_count; {
+            let left = neighbors & 1;
+            let right = (neighbors >> 1) << (RENJU_BLACK_WINDOW_LENGTH - 1);
+            lut[(mask << white_shift) | left | right] = -value;
+        });
     });
 
     lut
 }
 
-fn window_value<const R: RuleKind>(line: &Slice, start: u8) -> i16 {
-    let black = line.stones[Color::Black];
-    let white = line.stones[Color::White];
-    let black_window = (black >> start) & WINDOW_MASK;
-    let white_window = (white >> start) & WINDOW_MASK;
-    let key = black_window | (white_window << WINDOW_LENGTH);
-    let score = WINDOW_LUT[key as usize];
+fn window_value<const R: RuleKind>(slice: &Slice, start: u8) -> i16 {
+    let black = slice.stones[Color::Black];
+    let white = slice.stones[Color::White];
 
-    let before_window = (1u32 << start) >> 1;
-    let after_window = 1u32 << (start + WINDOW_LENGTH);
-    let neighbors = before_window | after_window;
-    let black_window_invalid = R != RuleKind::Freestyle && score > 0 && black as u32 & neighbors != 0;
-    let white_window_invalid = R == RuleKind::Gomoku && score < 0 && white as u32 & neighbors != 0;
+    match R {
+        RuleKind::Renju => {
+            let black_context = ((black as u32) << 1 >> start) & RENJU_BLACK_WINDOW_MASK;
+            let white_window = (white >> start) & WINDOW_MASK;
+            let key = black_context | ((white_window as u32) << RENJU_BLACK_WINDOW_LENGTH);
 
-    if black_window_invalid || white_window_invalid {
-        0
-    } else {
-        score
+            RENJU_WINDOW_LUT[key as usize]
+        }
+        RuleKind::Gomoku | RuleKind::Freestyle => {
+            let black_window = (black >> start) & WINDOW_MASK;
+            let white_window = (white >> start) & WINDOW_MASK;
+            let key = black_window | (white_window << WINDOW_LENGTH);
+            let score = WINDOW_LUT[key as usize];
+
+            let neighbors = ((1u32 << start) >> 1) | (1u32 << (start + WINDOW_LENGTH));
+            let scoring_stones = if score > 0 { black } else { white };
+
+            if R == RuleKind::Gomoku && scoring_stones as u32 & neighbors != 0 {
+                0
+            } else {
+                score
+            }
+        }
     }
 }
 
@@ -350,10 +380,6 @@ struct PatternScore {
 impl PatternScore {
     const ZERO: Self = Self { value: 0, key: 0 };
 
-    fn from_pattern(pattern: Pattern) -> Self {
-        SCORE_LUT[pattern_key(pattern)]
-    }
-
     fn attack_score(self) -> i16 {
         ATTACK_LUT[self.key as usize]
     }
@@ -363,51 +389,12 @@ impl PatternScore {
     }
 }
 
-#[derive(Copy, Clone)]
-enum Threat {
-    Quiet,
-    OpenThree,
-    DoubleThree,
-    ClosedFour,
-    ThreeFour,
-    ForkFour,
-    Five,
-}
-
-impl Threat {
-    const ALL: [Self; 7] = [
-        Self::Quiet, Self::OpenThree, Self::DoubleThree, Self::ClosedFour,
-        Self::ThreeFour, Self::ForkFour, Self::Five,
-    ];
-
-    fn from_pattern(pattern: Pattern) -> Self {
-        let closed_fours = pattern.count_closed_four();
-        let open_threes = pattern.count_open_three();
-
-        if pattern.has_five() {
-            Self::Five
-        } else if pattern.has_open_four() || closed_fours > 1 {
-            Self::ForkFour
-        } else if closed_fours != 0 && open_threes != 0 {
-            Self::ThreeFour
-        } else if closed_fours != 0 {
-            Self::ClosedFour
-        } else if open_threes > 1 {
-            Self::DoubleThree
-        } else if open_threes != 0 {
-            Self::OpenThree
-        } else {
-            Self::Quiet
-        }
-    }
-}
-
 fn pattern_key(pattern: Pattern) -> usize {
     if pattern.is_empty() {
         return 0;
     }
 
-    let threat = Threat::from_pattern(pattern);
+    let threat = pattern.threat();
     let close_threes = pattern.count_close_three().min(MAX_SUPPORT_COUNT) as usize;
     let potential_fours = pattern.count_potential_four().min(MAX_SUPPORT_COUNT) as usize;
     let potential_threes = pattern.count_potential_three().min(MAX_SUPPORT_COUNT) as usize;
@@ -420,24 +407,24 @@ const fn score_key(threat: Threat, close_threes: usize, potential_fours: usize, 
         * SUPPORT_COUNT_SIZE + potential_threes
 }
 
-static SCORE_LUT: [PatternScore; SCORE_LUT_SIZE] = build_score_lut();
+const fn build_score_lut<const R: RuleKind>() -> [[PatternScore; SCORE_LUT_SIZE]; 2] {
+    let mut lut = [[PatternScore::ZERO; SCORE_LUT_SIZE]; 2];
 
-const fn build_score_lut() -> [PatternScore; SCORE_LUT_SIZE] {
-    let mut lut = [PatternScore::ZERO; SCORE_LUT_SIZE];
+    const_for!(color_idx in 0, Color::ALL.len(); {
+        const_for!(threat_idx in 0, Threat::ALL.len(); {
+            let threat = Threat::ALL[threat_idx];
+            let values = point_values::<R>(threat, Color::ALL[color_idx]);
 
-    const_for!(threat_idx in 0, Threat::ALL.len(); {
-        let threat = Threat::ALL[threat_idx];
-        let values = point_values(threat);
+            const_for!(close_threes in 0, SUPPORT_COUNT_SIZE; {
+                const_for!(potential_fours in 0, SUPPORT_COUNT_SIZE; {
+                    const_for!(potential_threes in 0, SUPPORT_COUNT_SIZE; {
+                        let key = score_key(threat, close_threes, potential_fours, potential_threes);
 
-        const_for!(close_threes in 0, SUPPORT_COUNT_SIZE; {
-            const_for!(potential_fours in 0, SUPPORT_COUNT_SIZE; {
-                const_for!(potential_threes in 0, SUPPORT_COUNT_SIZE; {
-                    let key = score_key(threat, close_threes, potential_fours, potential_threes);
-
-                    lut[key] = PatternScore {
-                        value: values[close_threes][potential_fours][potential_threes],
-                        key: key as u16,
-                    };
+                        lut[color_idx][key] = PatternScore {
+                            value: values[close_threes][potential_fours][potential_threes],
+                            key: key as u16,
+                        };
+                    });
                 });
             });
         });
@@ -461,30 +448,6 @@ struct PolicyWeights {
     close_three_pairs: i16,
     potential_four_pairs: i16,
     potential_three_pairs: i16,
-}
-
-impl PolicyWeights {
-    const fn score(&self, threat: Threat, close_threes: i16, potential_fours: i16, potential_threes: i16) -> i16 {
-        let forcing = match threat {
-            Threat::Quiet => 0,
-            Threat::OpenThree => self.open_three,
-            Threat::DoubleThree => self.double_three,
-            Threat::ClosedFour => self.closed_four,
-            Threat::ThreeFour => self.three_four,
-            Threat::ForkFour => self.fork_four,
-            Threat::Five => self.five,
-        };
-
-        forcing
-            + self.close_three * close_threes
-            + self.potential_four * potential_fours
-            + self.potential_three * potential_threes
-            + self.close_three_potential_four * close_threes * potential_fours
-            + self.support_potential_three * (close_threes + potential_fours) * potential_threes
-            + self.close_three_pairs * close_threes * (close_threes - 1)
-            + self.potential_four_pairs * potential_fours * (potential_fours - 1)
-            + self.potential_three_pairs * potential_threes * (potential_threes - 1)
-    }
 }
 
 const ATTACK_WEIGHTS: PolicyWeights = PolicyWeights {
@@ -529,13 +492,34 @@ const fn build_policy_lut(weights: PolicyWeights) -> [i16; SCORE_LUT_SIZE] {
 
     const_for!(threat_idx in 0, Threat::ALL.len(); {
         let threat = Threat::ALL[threat_idx];
+        let forcing = match threat {
+            Threat::Quiet => 0,
+            Threat::OpenThree => weights.open_three,
+            Threat::DoubleThree => weights.double_three,
+            Threat::ClosedFour => weights.closed_four,
+            Threat::ThreeFour => weights.three_four,
+            Threat::ForkFour => weights.fork_four,
+            Threat::Five => weights.five,
+        };
 
         const_for!(close_threes in 0, SUPPORT_COUNT_SIZE; {
             const_for!(potential_fours in 0, SUPPORT_COUNT_SIZE; {
                 const_for!(potential_threes in 0, SUPPORT_COUNT_SIZE; {
                     let key = score_key(threat, close_threes, potential_fours, potential_threes);
 
-                    lut[key] = weights.score(threat, close_threes as i16, potential_fours as i16, potential_threes as i16);
+                    let close_threes = close_threes as i16;
+                    let potential_fours = potential_fours as i16;
+                    let potential_threes = potential_threes as i16;
+
+                    lut[key] = forcing
+                        + weights.close_three * close_threes
+                        + weights.potential_four * potential_fours
+                        + weights.potential_three * potential_threes
+                        + weights.close_three_potential_four * close_threes * potential_fours
+                        + weights.support_potential_three * (close_threes + potential_fours) * potential_threes
+                        + weights.close_three_pairs * close_threes * (close_threes - 1)
+                        + weights.potential_four_pairs * potential_fours * (potential_fours - 1)
+                        + weights.potential_three_pairs * potential_threes * (potential_threes - 1);
                 });
             });
         });
@@ -544,52 +528,142 @@ const fn build_policy_lut(weights: PolicyWeights) -> [i16; SCORE_LUT_SIZE] {
     lut
 }
 
-// [close threes, 3][potential fours, 3][potential threes, 3]
+// [close threes; 4][potential fours; 4][potential threes; 4]
 type SupportValues = [[[i16; SUPPORT_COUNT_SIZE]; SUPPORT_COUNT_SIZE]; SUPPORT_COUNT_SIZE];
 
-const fn point_values(threat: Threat) -> SupportValues {
-    match threat {
-        Threat::Quiet => [
-            [[0, 0, 1, 0], [0, 58, 76, 0], [62, 80, 0, 382], [163, 469, 528, 660]],
-            [[64, 108, 152, 196], [102, 190, 278, 366], [198, 330, 462, 594], [352, 528, 704, 880]],
-            [[128, 216, 304, 392], [174, 306, 438, 570], [278, 454, 630, 806], [440, 660, 880, 1100]],
-            [[192, 324, 456, 588], [246, 422, 598, 774], [358, 578, 798, 1018], [528, 792, 1056, 1320]],
-        ],
-        Threat::OpenThree => [
-            [[5, 30, 54, 223], [161, 126, 56, 209], [8, 272, 356, 444], [320, 473, 605, 737]],
-            [[128, 172, 216, 260], [181, 269, 357, 445], [292, 424, 556, 688], [461, 637, 813, 989]],
-            [[224, 312, 400, 488], [285, 417, 549, 681], [404, 580, 756, 932], [581, 801, 1021, 1241]],
-            [[320, 452, 584, 716], [389, 565, 741, 917], [516, 736, 956, 1176], [701, 965, 1229, 1493]],
-        ],
-        Threat::DoubleThree => [
-            [[0, 0, 284, 0], [68, 0, 133, 177], [148, 236, 324, 412], [309, 441, 573, 705]],
-            [[96, 140, 184, 228], [149, 237, 325, 413], [260, 392, 524, 656], [429, 605, 781, 957]],
-            [[192, 280, 368, 456], [253, 385, 517, 649], [372, 548, 724, 900], [549, 769, 989, 1209]],
-            [[288, 420, 552, 684], [357, 533, 709, 885], [484, 704, 924, 1144], [669, 933, 1197, 1461]],
-        ],
-        Threat::ClosedFour => [
-            [[100, 403, 539, 714], [321, 706, 860, 277], [694, 649, 424, 512], [486, 541, 673, 805]],
-            [[222, 83, 0, 328], [126, 174, 425, 513], [270, 492, 624, 756], [529, 705, 881, 1057]],
-            [[292, 380, 468, 556], [353, 485, 617, 749], [472, 648, 824, 1000], [649, 869, 1089, 1309]],
-            [[388, 520, 652, 784], [457, 633, 809, 985], [584, 804, 1024, 1244], [769, 1033, 1297, 1561]],
-        ],
-        Threat::ThreeFour => [
-            [[1457, 1600, 1658, 1493], [1667, 1608, 1626, 1670], [1641, 1729, 1817, 1905], [1802, 1934, 2066, 2198]],
-            [[0, 507, 1677, 1721], [686, 1730, 1818, 1906], [1753, 1885, 2017, 2149], [1922, 2098, 2274, 2450]],
-            [[1685, 1773, 1861, 1949], [1746, 1878, 2010, 2142], [1865, 2041, 2217, 2393], [2042, 2262, 2482, 2702]],
-            [[1781, 1913, 2045, 2177], [1850, 2026, 2202, 2378], [1977, 2197, 2417, 2637], [2162, 2426, 2690, 2954]],
-        ],
-        Threat::ForkFour => [
-            [[822, 177, 387, 387], [471, 476, 520, 564], [535, 623, 711, 799], [696, 828, 960, 1092]],
-            [[259, 215, 155, 491], [338, 123, 296, 800], [278, 779, 911, 1043], [816, 992, 1168, 1344]],
-            [[0, 667, 755, 843], [640, 772, 904, 1036], [759, 935, 1111, 1287], [936, 1156, 1376, 1596]],
-            [[675, 807, 939, 1071], [744, 920, 1096, 1272], [871, 1091, 1311, 1531], [1056, 1320, 1584, 1848]],
-        ],
-        Threat::Five => [
-            [[1600, 1600, 1600, 1600], [1645, 1689, 1733, 1777], [1748, 1836, 1924, 2012], [1909, 2041, 2173, 2305]],
-            [[1696, 1740, 1784, 1828], [1749, 1837, 1925, 2013], [1860, 1992, 2124, 2256], [2029, 2205, 2381, 2557]],
-            [[1792, 1880, 1968, 2056], [1853, 1985, 2117, 2249], [1972, 2148, 2324, 2500], [2149, 2369, 2589, 2809]],
-            [[1888, 2020, 2152, 2284], [1957, 2133, 2309, 2485], [2084, 2304, 2524, 2744], [2269, 2533, 2797, 3061]],
-        ],
+const fn point_values<const R: RuleKind>(threat: Threat, color: Color) -> SupportValues {
+    match (R, color) {
+        (RuleKind::Renju, Color::Black) => match threat {
+            Threat::Quiet => [
+                [[0, 3, 71, 62], [6, 93, 165, 22], [117, 281, 50, 382], [167, 462, 528, 660]],
+                [[64, 108, 152, 196], [102, 190, 278, 366], [198, 330, 462, 594], [352, 528, 704, 880]],
+                [[128, 216, 304, 392], [174, 306, 438, 570], [278, 454, 630, 806], [440, 660, 880, 1100]],
+                [[192, 324, 456, 588], [246, 422, 598, 774], [358, 578, 798, 1018], [528, 792, 1056, 1320]],
+            ],
+            Threat::OpenThree => [
+                [[100, 218, 322, 262], [232, 239, 71, 209], [91, 275, 356, 444], [320, 473, 605, 737]],
+                [[128, 172, 216, 260], [181, 269, 357, 445], [292, 424, 556, 688], [461, 637, 813, 989]],
+                [[224, 312, 400, 488], [285, 417, 549, 681], [404, 580, 756, 932], [581, 801, 1021, 1241]],
+                [[320, 452, 584, 716], [389, 565, 741, 917], [516, 736, 956, 1176], [701, 965, 1229, 1493]],
+            ],
+            Threat::DoubleThree => [
+                [[107, 0, 284, 0], [78, 0, 133, 177], [148, 236, 324, 412], [309, 441, 573, 705]],
+                [[96, 140, 184, 228], [149, 237, 325, 413], [260, 392, 524, 656], [429, 605, 781, 957]],
+                [[192, 280, 368, 456], [253, 385, 517, 649], [372, 548, 724, 900], [549, 769, 989, 1209]],
+                [[288, 420, 552, 684], [357, 533, 709, 885], [484, 704, 924, 1144], [669, 933, 1197, 1461]],
+            ],
+            Threat::ClosedFour => [
+                [[78, 435, 630, 715], [309, 723, 868, 277], [628, 649, 424, 512], [486, 541, 673, 805]],
+                [[234, 104, 21, 328], [217, 181, 425, 513], [270, 492, 624, 756], [529, 705, 881, 1057]],
+                [[292, 380, 468, 556], [353, 485, 617, 749], [472, 648, 824, 1000], [649, 869, 1089, 1309]],
+                [[388, 520, 652, 784], [457, 633, 809, 985], [584, 804, 1024, 1244], [769, 1033, 1297, 1561]],
+            ],
+            Threat::ThreeFour => [
+                [[1393, 1561, 1658, 1493], [1674, 1608, 1626, 1670], [1641, 1729, 1817, 1905], [1802, 1934, 2066, 2198]],
+                [[45, 507, 1677, 1721], [686, 1730, 1818, 1906], [1753, 1885, 2017, 2149], [1922, 2098, 2274, 2450]],
+                [[1685, 1773, 1861, 1949], [1746, 1878, 2010, 2142], [1865, 2041, 2217, 2393], [2042, 2262, 2482, 2702]],
+                [[1781, 1913, 2045, 2177], [1850, 2026, 2202, 2378], [1977, 2197, 2417, 2637], [2162, 2426, 2690, 2954]],
+            ],
+            Threat::ForkFour => [
+                [[874, 177, 387, 387], [471, 476, 520, 564], [535, 623, 711, 799], [696, 828, 960, 1092]],
+                [[378, 421, 234, 491], [425, 157, 296, 800], [278, 779, 911, 1043], [816, 992, 1168, 1344]],
+                [[0, 667, 755, 843], [640, 772, 904, 1036], [759, 935, 1111, 1287], [936, 1156, 1376, 1596]],
+                [[675, 807, 939, 1071], [744, 920, 1096, 1272], [871, 1091, 1311, 1531], [1056, 1320, 1584, 1848]],
+            ],
+            Threat::Five => [
+                [[1600, 1600, 1600, 1600], [1645, 1689, 1733, 1777], [1748, 1836, 1924, 2012], [1909, 2041, 2173, 2305]],
+                [[1696, 1740, 1784, 1828], [1749, 1837, 1925, 2013], [1860, 1992, 2124, 2256], [2029, 2205, 2381, 2557]],
+                [[1792, 1880, 1968, 2056], [1853, 1985, 2117, 2249], [1972, 2148, 2324, 2500], [2149, 2369, 2589, 2809]],
+                [[1888, 2020, 2152, 2284], [1957, 2133, 2309, 2485], [2084, 2304, 2524, 2744], [2269, 2533, 2797, 3061]],
+            ],
+        },
+        (RuleKind::Renju, Color::White) => match threat {
+            Threat::Quiet => [
+                [[0, 11, 39, 30], [18, 113, 155, 14], [151, 265, 46, 382], [165, 462, 528, 660]],
+                [[64, 108, 152, 196], [102, 190, 278, 366], [198, 330, 462, 594], [352, 528, 704, 880]],
+                [[128, 216, 304, 392], [174, 306, 438, 570], [278, 454, 630, 806], [440, 660, 880, 1100]],
+                [[192, 324, 456, 588], [246, 422, 598, 774], [358, 578, 798, 1018], [528, 792, 1056, 1320]],
+            ],
+            Threat::OpenThree => [
+                [[100, 170, 252, 258], [208, 211, 67, 209], [87, 275, 356, 444], [320, 473, 605, 737]],
+                [[128, 172, 216, 260], [181, 269, 357, 445], [292, 424, 556, 688], [461, 637, 813, 989]],
+                [[224, 312, 400, 488], [285, 417, 549, 681], [404, 580, 756, 932], [581, 801, 1021, 1241]],
+                [[320, 452, 584, 716], [389, 565, 741, 917], [516, 736, 956, 1176], [701, 965, 1229, 1493]],
+            ],
+            Threat::DoubleThree => [
+                [[95, 0, 284, 0], [74, 0, 133, 177], [148, 236, 324, 412], [309, 441, 573, 705]],
+                [[96, 140, 184, 228], [149, 237, 325, 413], [260, 392, 524, 656], [429, 605, 781, 957]],
+                [[192, 280, 368, 456], [253, 385, 517, 649], [372, 548, 724, 900], [549, 769, 989, 1209]],
+                [[288, 420, 552, 684], [357, 533, 709, 885], [484, 704, 924, 1144], [669, 933, 1197, 1461]],
+            ],
+            Threat::ClosedFour => [
+                [[110, 407, 610, 715], [341, 715, 868, 277], [630, 649, 424, 512], [486, 541, 673, 805]],
+                [[232, 92, 17, 328], [217, 179, 425, 513], [270, 492, 624, 756], [529, 705, 881, 1057]],
+                [[292, 380, 468, 556], [353, 485, 617, 749], [472, 648, 824, 1000], [649, 869, 1089, 1309]],
+                [[388, 520, 652, 784], [457, 633, 809, 985], [584, 804, 1024, 1244], [769, 1033, 1297, 1561]],
+            ],
+            Threat::ThreeFour => [
+                [[1385, 1557, 1658, 1493], [1674, 1608, 1626, 1670], [1641, 1729, 1817, 1905], [1802, 1934, 2066, 2198]],
+                [[45, 507, 1677, 1721], [686, 1730, 1818, 1906], [1753, 1885, 2017, 2149], [1922, 2098, 2274, 2450]],
+                [[1685, 1773, 1861, 1949], [1746, 1878, 2010, 2142], [1865, 2041, 2217, 2393], [2042, 2262, 2482, 2702]],
+                [[1781, 1913, 2045, 2177], [1850, 2026, 2202, 2378], [1977, 2197, 2417, 2637], [2162, 2426, 2690, 2954]],
+            ],
+            Threat::ForkFour => [
+                [[876, 177, 387, 387], [471, 476, 520, 564], [535, 623, 711, 799], [696, 828, 960, 1092]],
+                [[370, 413, 230, 491], [425, 157, 296, 800], [278, 779, 911, 1043], [816, 992, 1168, 1344]],
+                [[0, 667, 755, 843], [640, 772, 904, 1036], [759, 935, 1111, 1287], [936, 1156, 1376, 1596]],
+                [[675, 807, 939, 1071], [744, 920, 1096, 1272], [871, 1091, 1311, 1531], [1056, 1320, 1584, 1848]],
+            ],
+            Threat::Five => [
+                [[1600, 1600, 1600, 1600], [1645, 1689, 1733, 1777], [1748, 1836, 1924, 2012], [1909, 2041, 2173, 2305]],
+                [[1696, 1740, 1784, 1828], [1749, 1837, 1925, 2013], [1860, 1992, 2124, 2256], [2029, 2205, 2381, 2557]],
+                [[1792, 1880, 1968, 2056], [1853, 1985, 2117, 2249], [1972, 2148, 2324, 2500], [2149, 2369, 2589, 2809]],
+                [[1888, 2020, 2152, 2284], [1957, 2133, 2309, 2485], [2084, 2304, 2524, 2744], [2269, 2533, 2797, 3061]],
+            ],
+        },
+        (RuleKind::Gomoku | RuleKind::Freestyle, _) => match threat {
+            Threat::Quiet => [
+                [[0, 0, 1, 0], [0, 58, 76, 0], [62, 80, 0, 382], [163, 469, 528, 660]],
+                [[64, 108, 152, 196], [102, 190, 278, 366], [198, 330, 462, 594], [352, 528, 704, 880]],
+                [[128, 216, 304, 392], [174, 306, 438, 570], [278, 454, 630, 806], [440, 660, 880, 1100]],
+                [[192, 324, 456, 588], [246, 422, 598, 774], [358, 578, 798, 1018], [528, 792, 1056, 1320]],
+            ],
+            Threat::OpenThree => [
+                [[5, 30, 54, 223], [161, 126, 56, 209], [8, 272, 356, 444], [320, 473, 605, 737]],
+                [[128, 172, 216, 260], [181, 269, 357, 445], [292, 424, 556, 688], [461, 637, 813, 989]],
+                [[224, 312, 400, 488], [285, 417, 549, 681], [404, 580, 756, 932], [581, 801, 1021, 1241]],
+                [[320, 452, 584, 716], [389, 565, 741, 917], [516, 736, 956, 1176], [701, 965, 1229, 1493]],
+            ],
+            Threat::DoubleThree => [
+                [[0, 0, 284, 0], [68, 0, 133, 177], [148, 236, 324, 412], [309, 441, 573, 705]],
+                [[96, 140, 184, 228], [149, 237, 325, 413], [260, 392, 524, 656], [429, 605, 781, 957]],
+                [[192, 280, 368, 456], [253, 385, 517, 649], [372, 548, 724, 900], [549, 769, 989, 1209]],
+                [[288, 420, 552, 684], [357, 533, 709, 885], [484, 704, 924, 1144], [669, 933, 1197, 1461]],
+            ],
+            Threat::ClosedFour => [
+                [[100, 403, 539, 714], [321, 706, 860, 277], [694, 649, 424, 512], [486, 541, 673, 805]],
+                [[222, 83, 0, 328], [126, 174, 425, 513], [270, 492, 624, 756], [529, 705, 881, 1057]],
+                [[292, 380, 468, 556], [353, 485, 617, 749], [472, 648, 824, 1000], [649, 869, 1089, 1309]],
+                [[388, 520, 652, 784], [457, 633, 809, 985], [584, 804, 1024, 1244], [769, 1033, 1297, 1561]],
+            ],
+            Threat::ThreeFour => [
+                [[1457, 1600, 1658, 1493], [1667, 1608, 1626, 1670], [1641, 1729, 1817, 1905], [1802, 1934, 2066, 2198]],
+                [[0, 507, 1677, 1721], [686, 1730, 1818, 1906], [1753, 1885, 2017, 2149], [1922, 2098, 2274, 2450]],
+                [[1685, 1773, 1861, 1949], [1746, 1878, 2010, 2142], [1865, 2041, 2217, 2393], [2042, 2262, 2482, 2702]],
+                [[1781, 1913, 2045, 2177], [1850, 2026, 2202, 2378], [1977, 2197, 2417, 2637], [2162, 2426, 2690, 2954]],
+            ],
+            Threat::ForkFour => [
+                [[822, 177, 387, 387], [471, 476, 520, 564], [535, 623, 711, 799], [696, 828, 960, 1092]],
+                [[259, 215, 155, 491], [338, 123, 296, 800], [278, 779, 911, 1043], [816, 992, 1168, 1344]],
+                [[0, 667, 755, 843], [640, 772, 904, 1036], [759, 935, 1111, 1287], [936, 1156, 1376, 1596]],
+                [[675, 807, 939, 1071], [744, 920, 1096, 1272], [871, 1091, 1311, 1531], [1056, 1320, 1584, 1848]],
+            ],
+            Threat::Five => [
+                [[1600, 1600, 1600, 1600], [1645, 1689, 1733, 1777], [1748, 1836, 1924, 2012], [1909, 2041, 2173, 2305]],
+                [[1696, 1740, 1784, 1828], [1749, 1837, 1925, 2013], [1860, 1992, 2124, 2256], [2029, 2205, 2381, 2557]],
+                [[1792, 1880, 1968, 2056], [1853, 1985, 2117, 2249], [1972, 2148, 2324, 2500], [2149, 2369, 2589, 2809]],
+                [[1888, 2020, 2152, 2284], [1957, 2133, 2309, 2485], [2084, 2304, 2524, 2744], [2269, 2533, 2797, 3061]],
+            ],
+        },
     }
 }

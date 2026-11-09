@@ -14,6 +14,8 @@ pub enum Color {
 }
 
 impl Color {
+    pub const ALL: [Self; 2] = [Self::Black, Self::White];
+
     pub const fn reversed(&self) -> Color {
         match self {
             Color::Black => Color::White,
@@ -123,7 +125,7 @@ macro_rules! impl_color_container {
             }
 
             pub fn iter(&self) -> impl Iterator<Item = (Color, &T)> {
-                [Color::Black, Color::White]
+                Color::ALL
                     .map(|color| (color, &self[color]))
                     .into_iter()
             }

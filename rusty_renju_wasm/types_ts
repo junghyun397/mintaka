@@ -54,9 +54,10 @@ export interface BestMove {
 	position_hash: HashKey;
 	best_move: MaybePos;
 	score: Score;
+	pv: PrincipalVariation;
+	depth: Depth;
 	selective_depth: Depth;
 	total_nodes: Nodes;
-	pv: PrincipalVariation;
 	time_elapsed: Duration;
 }
 
@@ -73,6 +74,7 @@ export interface BoardWinner {
 export interface BoardDescribe {
 	hash_key: HashKey;
 	player_color: Color;
+	five_pos: ColorContainer<[MaybePos, MaybePos]>;
 	bitfield: ColorContainer<Bitfield>;
 	field: BoardExportItem[];
 	winner?: BoardWinner;
@@ -168,6 +170,7 @@ export type Response =
 	hash: HashKey;
 	best_move: MaybePos;
 	score: Score;
+	depth: Depth;
 	selective_depth: Depth;
 	total_nodes: Nodes;
 	pv: PrincipalVariation;

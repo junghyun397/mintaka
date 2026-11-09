@@ -153,6 +153,45 @@ impl Pattern {
     fn apply_mask(&self, mask: u32) -> u32 {
         u32::from(*self) & mask
     }
+
+    pub fn threat(&self) -> Threat {
+        let closed_fours = self.count_closed_four();
+        let open_threes = self.count_open_three();
+
+        if self.has_five() {
+            Threat::Five
+        } else if self.has_open_four() || closed_fours > 1 {
+            Threat::ForkFour
+        } else if closed_fours != 0 && open_threes != 0 {
+            Threat::ThreeFour
+        } else if closed_fours != 0 {
+            Threat::ClosedFour
+        } else if open_threes > 1 {
+            Threat::DoubleThree
+        } else if open_threes != 0 {
+            Threat::OpenThree
+        } else {
+            Threat::Quiet
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Threat {
+    Quiet,
+    OpenThree,
+    DoubleThree,
+    ClosedFour,
+    ThreeFour,
+    ForkFour,
+    Five,
+}
+
+impl Threat {
+    pub const ALL: [Self; 7] = [
+        Self::Quiet, Self::OpenThree, Self::DoubleThree, Self::ClosedFour,
+        Self::ThreeFour, Self::ForkFour, Self::Five,
+    ];
 }
 
 #[derive(Debug, Copy, Clone)]
