@@ -4,6 +4,8 @@ version = "0.9.0"
 edition = "2024"
 
 [features]
+neural-eval = ["mintaka/neural-eval"]
+neural-eval-policy = ["neural-eval", "mintaka/neural-eval-policy"]
 default = []
 
 [[bin]]

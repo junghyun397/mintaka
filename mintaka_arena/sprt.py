@@ -68,7 +68,7 @@ def main():
     stats = None
 
     logging.info(f"SPRT Started [0, {config.args.max_openings}]: "
-                 f"workers={sum(dict(config.args.workers).values())}, "
+                 f"workers={sum(worker.count for worker in config.args.workers)}, "
                  f"bounds=[{lower:.3f}, {upper:.3f}], "
                  f"elo=[{config.args.elo0:g}, {config.args.elo1:g}]")
 
@@ -100,9 +100,9 @@ def main():
                 decision = "accepted"
                 break
 
-    logging.info(f"SPRT Finished [{completed_openings}/{config.args.max_openings}]: {decision}, "
-                 f"elo=[{config.args.elo0:g}, {config.args.elo1:g}], bounds=[{lower:.3f}, {upper:.3f}], "
-                 f"{stats}")
+    print(f"decision={decision}, completed_openings={completed_openings}, max_openings={config.args.max_openings}, "
+          f"elo=({config.args.elo0:g}, {config.args.elo1:g}), bounds=[{lower:.3f}, {upper:.3f}], "
+          f"{stats}")
 
 
 if __name__ == "__main__":

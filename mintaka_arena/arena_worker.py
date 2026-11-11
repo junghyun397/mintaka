@@ -57,15 +57,14 @@ class ArenaWorker(ThreadingHTTPServer):
                 self.stop({"key": run.key})
 
     def status(self):
-        with self.lock:
-            if self.run is not None:
-                raise worker_manager.HTTPError(409, "worker is busy")
-            return self.max_workers
+        return self.max_workers
 
-    def acquire(self, _):
+    def acquire(self, data):
         with self.lock:
-            if self.run is not None:
-                raise worker_manager.HTTPError(409, "worker is busy")
+            while self.run is not None:
+                if not data.get("preempt", False):
+                    raise worker_manager.HTTPError(409, "worker is busy")
+                self.stop({"key": self.run.key})
             self.run = Run(secrets.token_hex(16))
             return {"key": self.run.key}
 
@@ -113,15 +112,16 @@ class ArenaWorker(ThreadingHTTPServer):
                 self.lock.notify_all()
 
         with self.lock:
+            self.owned_run(run.key)
             if run.state is RunState.STOPPING:
-                raise worker_manager.HTTPError(409, "run is stopping")
+                raise worker_manager.HTTPError(410, "run is stopping")
 
         logging.info(f"Arena Worker [{run.key}]: started {workers} workers")
         return {"workers": workers}
 
     def owned_run(self, key):
         if self.run is None or self.run.key != key:
-            raise worker_manager.HTTPError(409, "run does not own this worker")
+            raise worker_manager.HTTPError(410, "run does not own this worker")
         return self.run
 
     def play(self, data):
@@ -130,6 +130,8 @@ class ArenaWorker(ThreadingHTTPServer):
         with self.lock:
             run = self.owned_run(data["key"])
 
+            if run.state is RunState.STOPPING:
+                raise worker_manager.HTTPError(410, "run is stopping")
             if run.config is None or run.state is not None:
                 raise worker_manager.HTTPError(409, "run is not accepting games")
 

@@ -51,7 +51,7 @@ def main():
     stats = None
 
     logging.info(f"ELO Started [{config.args.min_openings}, {config.args.max_openings}]: "
-                 f"workers={sum(dict(config.args.workers).values())}, "
+                 f"workers={sum(worker.count for worker in config.args.workers)}, "
                  f"base={config.args.base_elo:g}, target={config.args.target_elo:g}")
 
     with worker_manager.WorkerManager(config) as workers:
@@ -85,7 +85,8 @@ def main():
                 decision = "precision"
                 break
 
-    logging.info(f"ELO Finished [{completed_openings}/{config.args.max_openings}]: {decision}, {stats}")
+    print(f"decision={decision}, completed_openings={completed_openings}, max_openings={config.args.max_openings}, "
+          f"{stats}")
 
 
 if __name__ == "__main__":

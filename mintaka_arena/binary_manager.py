@@ -5,6 +5,7 @@ import hashlib
 import logging
 import shutil
 import subprocess
+import sys
 import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -35,6 +36,7 @@ def add_build_arguments(parser: argparse.ArgumentParser):
         ref_group.add_argument(f"--{player}-ref", type=str, help="REMOTE/BRANCH[@COMMIT] (default: origin/master)")
 
         parser.add_argument(f"--{player}-patch", type=str, help="exact patch file path")
+        parser.add_argument(f"--{player}-features", default="", help="comma-separated Cargo features")
 
 
 def git(*args, cwd=None, input=None) -> bytes:
@@ -68,10 +70,14 @@ class Source:
     ref: str
     commit: str
     patch: bytes | None = None
+    features: tuple[str, ...] = ()
 
     def key(self) -> str:
         ref = self.ref.replace("/", "-")
         key = f"{ref}-{self.commit}"
+
+        if self.features:
+            key += "-features-" + hashlib.sha256(",".join(self.features).encode()).hexdigest()[:16]
 
         if self.patch:
             return f"{key}-{hashlib.sha256(self.patch).hexdigest()}"
@@ -86,12 +92,13 @@ class Source:
             "ref": self.ref,
             "commit": self.commit,
             "patch": base64.b64encode(self.patch).decode("ascii") if self.patch else None,
+            "features": list(self.features),
         }
 
     @classmethod
     def from_json(cls, data):
         patch = base64.b64decode(data["patch"]) if data["patch"] else None
-        return cls(data["ref"], data["commit"], patch)
+        return cls(data["ref"], data["commit"], patch, tuple(data.get("features", [])))
 
 
 @build_lock()
@@ -114,7 +121,10 @@ def prepare_sources(args) -> dict[arena.Player, Source | str]:
         git("merge-base", "--is-ancestor", commit, f"refs/remotes/{ref}")
         patch = getattr(args, f"{player}_patch")
         patch_data = Path(patch).read_bytes() if patch else None
-        sources[player] = Source(ref, commit, patch_data or None)
+        features = tuple(sorted(set(filter(None, (
+            value.strip() for value in getattr(args, f"{player}_features", "").split(",")
+        )))))
+        sources[player] = Source(ref, commit, patch_data or None, features)
 
     return sources
 
@@ -141,8 +151,9 @@ def build_binary(source: Source, rule: arena.Rule = arena.Rule.RENJU) -> Path:
                 git("apply", "--binary", "--whitespace=nowarn", "-", cwd=worktree, input=source.patch)
             subprocess.run(
                 ["cargo", "build", "--release", "-p", "mintaka_interface",
-                 "--bin", binary_name, "--target-dir", str(target)],
-                cwd=worktree, check=True,
+                 "--bin", binary_name, "--target-dir", str(target)]
+                + (["--features", ",".join(source.features)] if source.features else []),
+                cwd=worktree, check=True, stdout=sys.stderr,
             )
             staged = Path(directory) / binary_name
             shutil.copy2(target / "release" / binary_name, staged)

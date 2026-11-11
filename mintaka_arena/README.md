@@ -51,7 +51,7 @@ python3 -m mintaka_arena.sprt
 
 ```shell
 python3 -m mintaka_arena.elo
---workers http://test-server-1:8095=16 http://test-server-2:8095=16 local=8
+--workers http://test-server-1:8051?workers=8 http://test-server-2:8052?workers=8&preempt=true local=8
 --base-ref origin/master@commit_hash
 --target-ref ${mintaka_arena/checkpoint.sh}
 --base-params "--workers 1 --memory-in-mib 256"

@@ -11,13 +11,13 @@ import shlex
 import subprocess
 import sys
 import time
-from collections import deque
 from collections.abc import Iterable
 from contextlib import ExitStack, suppress
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
 from queue import Queue
+from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 
 class Rule(Enum):
@@ -57,7 +57,7 @@ class TimeUnit(Enum):
 
 
 GAME_SETTINGS = (
-    "rule", "base_params", "target_params", "time_unit", "time", "draw_in", "log_prefix_filter",
+    "rule", "base_params", "target_params", "time_unit", "time", "draw_in",
     "affinity",
 )
 
@@ -65,7 +65,6 @@ GAME_SETTINGS = (
 class Config:
     def __init__(self, args):
         self.args = args
-        self.args.log_prefix_filter = tuple(args.log_prefix_filter or ())
 
         self.path_params_resource: PathParamsResource = {
             player: (path, params, TimeManager(
@@ -186,17 +185,16 @@ class EngineError(Exception):
 class Engine:
     process: subprocess.Popen
     resource: TimeManager
-    log_prefix_filter: tuple[str, ...]
 
     def command(self, command: str) -> str | None:
-        return command_process(self.process, command, self.log_prefix_filter)
+        return command_process(self.process, command)
 
-    def generate(self) -> str:
+    def gen(self) -> str:
         started = time.perf_counter_ns()
         response = self.command("gen")
         elapsed_ms = (time.perf_counter_ns() - started) // 1_000_000
         if response is None:
-            raise EngineError(self.process, "engine did not report a search result")
+            raise EngineError(self.process, "engine gen failed")
 
         try:
             result = dict(field.strip().split("=", 1) for field in response.split(","))
@@ -225,8 +223,8 @@ class UTCFormatter(logging.Formatter):
     default_msec_format = "%s.%03dZ"
 
 
-def configure_logging(level=logging.INFO):
-    handler = logging.StreamHandler(sys.stdout)
+def configure_logging(level=logging.DEBUG):
+    handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(UTCFormatter("%(asctime)s %(levelname)s %(message)s"))
     logging.basicConfig(
         level=level,
@@ -259,20 +257,16 @@ def spawn_process(path, params, resource: TimeManager, opening: Opening) -> subp
             + ["--history", opening.sequence],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stderr=sys.stderr,
         text=True,
         bufsize=1,
         start_new_session=True,
     )
 
 
-def command_process(
-        process, command: str, filter_prefix: tuple[str, ...],
-) -> str | None:
-    recent_output = deque(maxlen=8)
-
+def command_process(process, command: str) -> str | None:
     def engine_exited(context):
-        return EngineError(process, f"engine exited {context}: exit={process.poll()}, output={list(recent_output)!r}")
+        return EngineError(process, f"engine exited {context}: exit={process.poll()}")
 
     try:
         process.stdin.write(f"{command}\n")
@@ -280,38 +274,37 @@ def command_process(
     except BrokenPipeError as error:
         raise engine_exited(f"while sending {command!r}") from error
 
-    while True:
-        response = process.stdout.readline()
-        if not response:
-            raise engine_exited(f"while handling {command!r}")
-        response = response.rstrip("\r\n")
-        recent_output.append(response[-500:])
+    response = process.stdout.readline()
+    if not response:
+        raise engine_exited(f"while handling {command!r}")
+    response = response.rstrip("\r\n")
 
-        if response == "=":
-            return None
+    if response == "=":
+        return None
 
-        if response.startswith("?"):
-            raise EngineError(process, f"command: {command}, error: {response[1:].strip()}")
+    if response.startswith("?"):
+        raise EngineError(process, f"command: {command}, error: {response[1:].strip()}")
 
-        if response.startswith("=\x02"):
-            chunks = []
-            line = response[2:]
-            while "\x03" not in line:
-                chunks.append(line)
-                line = process.stdout.readline()
-            chunks.append(line.split("\x03", 1)[0])
-            return "".join(chunks)
+    if response.startswith("=\x02"):
+        chunks = []
+        line = response[2:]
+        while "\x03" not in line:
+            chunks.append(line)
+            line = process.stdout.readline()
+            if not line:
+                raise engine_exited("while reading a response")
+        chunks.append(line.split("\x03", 1)[0])
+        return "".join(chunks)
 
-        if response.startswith("="):
-            return response[2:]
+    if response.startswith("="):
+        return response[2:]
 
-        if response.startswith("% ") and response[2:].startswith(filter_prefix):
-            logging.debug(response[2:])
+    raise EngineError(process, f"command: {command}, invalid response: {response!r}")
 
 
 def play_game(
         path_params_resource: PathParamsResource,
-        draw_in: int, opening: Opening, first_player: Player, log_prefix_filter: tuple[str, ...]
+        draw_in: int, opening: Opening, first_player: Player
 ) -> GameSnapshot:
     game_timer = time.perf_counter_ns()
     colors = {first_player: opening.initial_color, first_player.flip(): opening.initial_color.flip()}
@@ -319,20 +312,20 @@ def play_game(
 
     with ExitStack() as stack:
         stack.enter_context(suppress(BrokenPipeError))
-        engines = {}
+        engines: dict[Player, Engine] = {}
 
         for player, (path, params, resource) in path_params_resource.items():
             process = stack.enter_context(spawn_process(path, params, resource, opening))
             stack.callback(process.terminate)
 
-            engines[player] = Engine(process, copy.copy(resource), log_prefix_filter)
+            engines[player] = Engine(process, copy.copy(resource))
 
         history = opening.sequence
         try:
             player = first_player
             for _ in range(draw_in):
                 engine = engines[player]
-                move = engine.generate()
+                move = engine.gen()
                 if move == "none":
                     winner = (player.flip(), colors[player.flip()])
                     break
@@ -376,11 +369,10 @@ def play_pair(config: Config, opening: Opening, affinity_queue: Queue | None) ->
             stack.callback(os.sched_setaffinity, 0, os.sched_getaffinity(0))
             os.sched_setaffinity(0, cpus)
 
-        snapshots = {
+        snapshots: Snapshots = {
             first_player: play_game(
                 config.path_params_resource,
-                config.args.draw_in, opening, first_player,
-                config.args.log_prefix_filter
+                config.args.draw_in, opening, first_player
             )
             for first_player in Player
         }
@@ -389,7 +381,7 @@ def play_pair(config: Config, opening: Opening, affinity_queue: Queue | None) ->
 
 
 def game_results(snapshots: Iterable[GameSnapshot]) -> GameResults:
-    results = {
+    results: GameResults = {
         Player.BASE: 0,
         Player.TARGET: 0,
         Color.BLACK: 0,
@@ -417,21 +409,25 @@ pentanomial_score = {
 }
 
 
-def parse_worker(value: str) -> tuple[str, int]:
+@dataclass
+class WorkerOptions:
+    address: str
+    count: int
+    preempt: bool = False
+
+
+def parse_worker(value: str) -> WorkerOptions:
     from . import worker_manager
 
-    address, separator, count = value.rpartition("=")
-    if not separator:
-        address = value
-        try:
-            count = os.cpu_count() or 1 if address == "local" else worker_manager.request_json(address, "/status", timeout=3)
-        except (worker_manager.HTTPError, OSError, ValueError) as error:
-            raise argparse.ArgumentTypeError(str(error)) from error
+    if value == "local" or value.startswith("local="):
+        count = int(value.split("=", 1)[1]) if "=" in value else os.cpu_count() or 1
+        return WorkerOptions("local", count)
 
-    if not address or not str(count).isdecimal():
-        raise argparse.ArgumentTypeError("expected HOST:PORT[=N] or local[=N]")
-
-    return address, int(count)
+    url = urlsplit(value)
+    query = parse_qs(url.query)
+    address = urlunsplit((url.scheme, url.netloc, "", "", ""))
+    count = int(query["workers"][0]) if "workers" in query else worker_manager.request_json(address, "/status", timeout=3)
+    return WorkerOptions(address, count, query.get("preempt", ["false"])[0] == "true")
 
 
 def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
@@ -442,8 +438,9 @@ def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
 
     parser.add_argument("--seed", type=int, default=secrets.randbits(42))
 
-    parser.add_argument("--workers", type=parse_worker, nargs="+", default=[("local", 2)],
-                        metavar="HOST:PORT[=N]", help="http(s)://HOST:PORT[=N] or local[=N]; omitted N uses /status or local CPU count (default: local=2)")
+    parser.add_argument("--workers", type=parse_worker, nargs="+", default=[WorkerOptions("local", 2)],
+                        metavar="URL", help="http(s)://HOST:PORT?workers=N&preempt=false or local=N; omitted N uses /status or local CPU count (default: local=2)")
+    parser.add_argument("--wait", type=int, metavar="SECONDS", help="in seconds")
     parser.add_argument("--timeout-start", type=float, help="in seconds")
     parser.add_argument("--timeout-play", type=float, help="in seconds")
 
@@ -460,7 +457,6 @@ def new_parser(default_time: list[int]) -> argparse.ArgumentParser:
     parser.add_argument("--draw-in", type=int, default=225)
 
     parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO")
-    parser.add_argument("--log-prefix-filter", type=str, nargs="*")
 
     return parser
 

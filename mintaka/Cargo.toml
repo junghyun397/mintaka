@@ -4,11 +4,16 @@ version = "0.1.0-pre-alpha"
 edition = "2024"
 
 [features]
+neural-eval = []
+neural-eval-policy = ["neural-eval"]
+training-samples = []
+
+debug-statics = []
+compress-tt = ["dep:lz4"]
+
 serde = ["dep:serde", "dep:serde_with", "rusty_renju/serde"]
 typeshare = ["serde", "dep:typeshare", "rusty_renju/typeshare"]
-compress-tt = ["dep:lz4"]
-debug-statics = []
-neural-eval = []
+
 default = []
 
 [dependencies]

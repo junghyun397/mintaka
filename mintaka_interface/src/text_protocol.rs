@@ -48,9 +48,10 @@ enum TextProtocolResponse {
 }
 
 fn stdio_out(text_protocol_response: Result<TextProtocolResponse, String>) {
-    match text_protocol_response { 
+    match text_protocol_response {
         Ok(TextProtocolResponse::Log(message)) => {
-            println!("% {}", message);
+            eprintln!("% {}", message);
+            return;
         }
         Ok(TextProtocolResponse::Response(response)) => {
             println!("= {}", response);
